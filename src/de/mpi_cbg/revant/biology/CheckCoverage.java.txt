@@ -1,0 +1,546 @@
+package de.mpi_cbg.revant.biology;
+
+import java.util.Arrays;
+import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.FileReader;
+
+
+/**
+ * Compares the coverage of every factor in $factorization.txt$ to an estimate of its true
+ * coverage based only on $trueFactorization.txt$. The boundaries of the factor are not
+ * checked.
+ *
+ * A predicted factor is modeled as a sequence of substrings of repeats (possibly just
+ * one, or zero), induced by the true factors that the predicted factor intersects. Unique
+ * substrings inside a predicted factor are almost completely ignored, so the resulting
+ * coverage is, from this respect, an upper bound.
+ *
+ * Unfortunately it is not strictly an upper bound, since the aligner could create an
+ * alignment even in the presence of such unique substrings in one occurrence of $S$, and
+ * in their absence in another occurrence of $S$, where $S$ is the set of repeating
+ * substrings of the factor.
+ *
+ * It is also not an upper bound, since the procedure could include in the factor a prefix
+ * and/or a suffix of a true factor that makes it more specific, but that is ignored by
+ * the aligner.
+ *
+ * Finally, in case of singleton $S$, this procedure requires the substring to match a
+ * true factor by a large fraction: this might not happen, since the true factor might
+ * be a fragment of the repeat induced by unique interspersed insertions. The aligner,
+ * however, might be able to detect some alignments, and the coverage estimation procedure
+ * is capable of inferring the presence of the repeat even when it is interspersed with
+ * unique insertions.
+ *
+ * The coverage estimation procedure is also capable of detecting the presence of just a
+ * fraction of a factor, which is not computed by this procedure.
+ */
+public class CheckCoverage {
+	/**
+	 * Parameters of the pipeline
+	 */
+	private static final double intersectionThreshold = 0.2;  // Fraction of a factor length to decide a prefix/suffix intersection
+	private static final double identityThreshold = 0.8;  // Fraction of the length of a true factor to decide its inclusion in $substrings$
+	private static final double distanceThreshold = 0.25;  // Fraction of the substring of a repeat to decide the distance between the first/last substring of a factor and the substring of the corresponding true factor
+	private static final double distanceScaling = 0.25;  // Fraction of the original distance between the occurrences of two substrings in the original read
+	private static final double alignmentThreshold = 0.6;  // At least this fraction of each side of a match must be covered by an alignment in order for the match to be considered discoverable
+	private static final double mismatchThreshold = 0.2;  // At most this fraction of mismatching substrings are allowed in a match when a factor is periodic
+
+	/**
+	 * Reused variables
+	 */
+	private static int[][] repeats;
+	private static int[][] factors;
+	private static int[][] trueFactors;
+	private static final int MAX_SUBSTRINGS_PER_FACTOR = 1000;
+	private static final int MAX_FACTORS_PER_READ = 100;
+	private static final double ERROR_BIN = 0.1;
+	private static final int N_ERROR_BINS = 250;
+	private static int[][] substrings;  // 0=repeatID; 1=orientation (1=forward); 2=start (in the forward orientation of the repeat); 3=end (in the forward orientation of the repeat); 4=distance from the previous occurrence in the read.
+	private static int lastSubstring;
+	private static int[] tmp = new int[4];
+	private static int firstPositionOfMatch, lastPositionOfMatch;
+
+
+	/**
+	 * java CheckCoverage ../simulations/forPeriodicSubstrings/genome9/factorization.txt ../simulations/forPeriodicSubstrings/genome9/trueFactorization.txt ../simulations/forPeriodicSubstrings/genome9/repeats.txt 0 195154 98 ../simulations/forPeriodicSubstrings/genome9/LAshow.txt ../simulations/forPeriodicSubstrings/genome9/readLengths.txt 1> ../simulations/forPeriodicSubstrings/genome9/correctedCoverageHistogram.txt 2> ../simulations/forPeriodicSubstrings/genome9/correctedCoverageLog.txt
+	 */
+	public static void main(String[] args) throws IOException {
+		boolean includeSelfAlignments, isPeriodic;
+		int i, j, k, p;
+		int read, previousRead, length, factorLength, rawCoverage, correctedCoverage, bin;
+		int estimatedCoverage;
+		double intersection, error;
+		int[] lastFactor;
+		double[][] histogram1;
+		int[] histogram2;
+
+		loadFactors(args[0]);
+		loadTrueFactors(args[1]);
+		loadRepeats(args[2]);
+		includeSelfAlignments=Integer.parseInt(args[3])==1;
+		substrings = new int[MAX_SUBSTRINGS_PER_FACTOR][5];
+		Alignments.nAlignments=Integer.parseInt(args[4]);
+		Reads.nReads=Integer.parseInt(args[5]);
+		Alignments.loadAlignments(args[6]);
+		Reads.loadReadLengths(args[7]);
+		histogram1 = new double[Reads.maxReadLength/IO.quantum][MAX_FACTORS_PER_READ*Reads.nReads];
+		histogram2 = new int[N_ERROR_BINS<<1];
+		lastFactor = new int[Reads.maxReadLength/IO.quantum];
+		Math.set(lastFactor,lastFactor.length-1,-1);
+
+		p=0;  // First position of the block of a read in $trueFactors$
+		previousRead=-1;
+		for (i=0; i<factors.length; i++) {
+			read=factors[i][0];
+			if (read!=previousRead) {
+				while (p<trueFactors.length && trueFactors[p][0]<read) p++;
+				previousRead=read;
+			}
+			factorLength=factors[i][2]-factors[i][1]+1;
+			isPeriodic=factors[i][5]!=-1;
+
+			// Building the set of substrings that corresponds to the factor. Only true
+			// factors with a large enough intersection with the factor create a
+			// substring.
+			lastSubstring=-1;
+			for (j=p; j<trueFactors.length; j++) {
+				if (trueFactors[j][0]!=read || trueFactors[j][1]>factors[i][2]) break;
+				if (trueFactors[j][2]<factors[i][1]) continue;
+				intersection=Intervals.intersectionLength(factors[i][1],factors[i][2],trueFactors[j][1],trueFactors[j][2]);
+				length=trueFactors[j][2]-trueFactors[j][1]+1;
+				if (intersection/factorLength<intersectionThreshold && intersection/length<identityThreshold) continue;
+				addSubstring(i,j);
+			}
+			// IO.printErr("Substrings of factor "+i+":");
+			// printSubstrings();
+
+			// Computing corrected coverage, assuming that all reverse matches are
+			// reverse-complement matches. Only matches with a large enough intersection
+			// with an alignment are counted.
+			if (lastSubstring==-1) {
+				IO.printErr("Warning: factor "+i+" does not contain substrings of repeats");
+				continue;
+			}
+			rawCoverage=0; correctedCoverage=0;
+			for (j=0; j<trueFactors.length; j++) {
+				if (trueFactors[j][0]==read) {
+					if (includeSelfAlignments) {
+						reverseSubstrings();
+						if (match(j,isPeriodic)) {
+							rawCoverage++;
+							getMatchingInterval(j);
+							if (alignmentExists(read,factors[i][1],factors[i][2],read,firstPositionOfMatch,lastPositionOfMatch)) correctedCoverage++;
+						}
+						reverseSubstrings();
+					}
+				}
+				else {
+					if (match(j,isPeriodic)) {
+						rawCoverage++;
+						getMatchingInterval(j);
+						// IO.printErr("matching interval with read "+trueFactors[j][0]+": ["+firstPositionOfMatch+".."+lastPositionOfMatch+"]");
+						if (alignmentExists(read,factors[i][1],factors[i][2],trueFactors[j][0],firstPositionOfMatch,lastPositionOfMatch)) correctedCoverage++;
+					}
+					else {
+						reverseSubstrings();
+						if (match(j,isPeriodic)) {
+							rawCoverage++;
+							getMatchingInterval(j);
+							// IO.printErr("matching interval with read "+trueFactors[j][0]+": ["+firstPositionOfMatch+".."+lastPositionOfMatch+"]");
+							if (alignmentExists(read,factors[i][1],factors[i][2],trueFactors[j][0],firstPositionOfMatch,lastPositionOfMatch)) correctedCoverage++;
+						}
+						reverseSubstrings();
+					}
+				}
+			}
+			if (correctedCoverage>factors[i][7]) IO.printErr("Warning: factor "+i+", true: "+correctedCoverage+", true without checking alignments: "+rawCoverage+", predicted: "+factors[i][7]);
+			else if (correctedCoverage<factors[i][7]) IO.printErr("  ERROR: factor "+i+", true: "+correctedCoverage+", true without checking alignments: "+rawCoverage+", predicted: "+factors[i][7]);
+			lastFactor[factorLength/IO.quantum]++;
+			estimatedCoverage=factors[i][6]==0?1:factors[i][6];
+			error=((double)(correctedCoverage-estimatedCoverage))/estimatedCoverage;
+			histogram1[factorLength/IO.quantum][lastFactor[factorLength/IO.quantum]]=error;
+			bin=(int)(N_ERROR_BINS+error/ERROR_BIN);
+			if (bin>=histogram2.length) bin=histogram2.length-1;
+			histogram2[bin]++;
+			// IO.printErr("factor "+i+" processed");
+		}
+
+ 		// printHistogram(histogram1,lastFactor);
+		printHistogram(histogram2);
+	}
+
+
+	/**
+	 * Format: $min, 1st quartile, 2nd quartile, 3rd quartile, max$.
+	 */
+	private static final void printHistogram(double[][] histogram, int[] lastFactor) {
+		for (int i=0; i<histogram.length; i++) {
+			if (lastFactor[i]>0) Arrays.sort(histogram[i],0,lastFactor[i]+1);
+			System.out.println( (lastFactor[i]==-1?0:histogram[i][0])+","+
+			                    (lastFactor[i]==-1?0:histogram[i][(lastFactor[i]+1)>>2])+","+
+			                    (lastFactor[i]==-1?0:histogram[i][(lastFactor[i]+1)>>1])+","+
+			                    (lastFactor[i]==-1?0:histogram[i][(3*(lastFactor[i]+1))>>2])+","+
+			                    (lastFactor[i]==-1?0:histogram[i][lastFactor[i]]) );
+		}
+	}
+
+
+	private static final void printHistogram(int[] histogram) {
+		for (int i=0; i<histogram.length; i++) System.out.println((i>=N_ERROR_BINS?(i-N_ERROR_BINS+1)*ERROR_BIN:(i-N_ERROR_BINS)*ERROR_BIN)+","+histogram[i]);
+	}
+
+
+	/**
+	 * @return true iff there is an alignment, in any orientation, that has a large enough
+	 * intersection with $readA[startA..endA]$ and with $readB[startB..endB]$. The
+	 * procedure uses threshold $alignmentThreshold$.
+	 */
+	private static final boolean alignmentExists(int readA, int startA, int endA, int readB, int startB, int endB) {
+		int i;
+		int firstB, lastB, length;
+		double intersection;
+
+		for (i=Alignments.read2firstAlignment[readA]; i<Alignments.nAlignments; i++) {
+			if (Alignments.alignments[i][0]-1!=readA) return false;
+			if (Alignments.alignments[i][1]-1!=readB) continue;
+			length=endA-startA+1;
+			intersection=Intervals.intersectionLength(Alignments.alignments[i][3],Alignments.alignments[i][4],startA,endA);
+			if (intersection/length<alignmentThreshold) continue;
+			firstB=Alignments.alignments[i][2]==1?Alignments.alignments[i][5]:Reads.getReadLength(readB)-Alignments.alignments[i][6]-1;
+			lastB=Alignments.alignments[i][2]==1?Alignments.alignments[i][6]:Reads.getReadLength(readB)-Alignments.alignments[i][5]-1;
+			length=endB-startB+1;
+			intersection=Intervals.intersectionLength(firstB,lastB,startB,endB);
+			if (intersection/length<alignmentThreshold) continue;
+			return true;
+		}
+		return false;
+	}
+
+
+	/**
+	 * Loads in array $substrings$ a new element that corresponds to the intersection
+	 * between $factor$ and $trueFactor$. At the end of this procedure, all such elements
+	 * appear in $substrings$ in the order in which they appear in the original read.
+	 *
+	 * Remark: a factor could also contain unique substrings of a read. Such substrings
+	 * are ignored by this procedure. However, the distance between the occurrences in the
+	 * read of two consecutive non-unique substrings is saved in $substrings$, and it is
+	 * used for matching.
+	 */
+	private static final void addSubstring(int factor, int trueFactor) {
+		boolean orientation;
+		int first, last, length, offset;
+		double substringLength, scaling;
+
+		lastSubstring++;
+		substrings[lastSubstring][0]=trueFactors[trueFactor][4];
+		first=trueFactors[trueFactor][1];
+		if (factors[factor][1]>first) first=factors[factor][1];
+		last=trueFactors[trueFactor][2];
+		if (factors[factor][2]<last) last=factors[factor][2];
+		length=trueFactors[trueFactor][2]-trueFactors[trueFactor][1]+1;
+		substringLength=trueFactors[trueFactor][6]-trueFactors[trueFactor][5];
+		if (substringLength<0) {
+			substringLength=-substringLength;
+			orientation=false;
+		}
+		else orientation=true;
+		substringLength++;
+		substrings[lastSubstring][1]=orientation?1:0;
+		scaling=substringLength/length;
+		if (first>trueFactors[trueFactor][1]) {
+			offset=(int)((first-trueFactors[trueFactor][1])*scaling);
+			if (orientation) substrings[lastSubstring][2]=trueFactors[trueFactor][5]+offset;
+			else substrings[lastSubstring][3]=trueFactors[trueFactor][5]-offset;
+		}
+		else {
+			if (orientation) substrings[lastSubstring][2]=trueFactors[trueFactor][5];
+			else substrings[lastSubstring][3]=trueFactors[trueFactor][5];
+		}
+		if (last<trueFactors[trueFactor][2]) {
+			offset=(int)((trueFactors[trueFactor][2]-last)*scaling);
+			if (orientation) substrings[lastSubstring][3]=trueFactors[trueFactor][6]-offset;
+			else substrings[lastSubstring][2]=trueFactors[trueFactor][6]+offset;
+		}
+		else {
+			if (orientation) substrings[lastSubstring][3]=trueFactors[trueFactor][6];
+			else substrings[lastSubstring][2]=trueFactors[trueFactor][6];
+		}
+		if (lastSubstring>0) substrings[lastSubstring][4]=trueFactors[trueFactor][1]-trueFactors[trueFactor-1][2];
+	}
+
+
+	/**
+	 * Reverses $substrings$.
+	 *
+	 * Remark: at this level of abstraction it is not possible to complement.
+	 */
+	private static final void reverseSubstrings() {
+		int i, j;
+
+		for (i=0; i<(lastSubstring+1)>>1; i++) {
+			for (j=0; j<=3; j++) tmp[j]=substrings[i][j];
+			for (j=0; j<=3; j++) substrings[i][j]=substrings[lastSubstring-i][j];
+			for (j=0; j<=3; j++) substrings[lastSubstring-i][j]=tmp[j];
+
+		}
+		for (i=0; i<=lastSubstring; i++) substrings[i][1]=substrings[i][1]==0?1:0;
+	}
+
+
+	private static final void printSubstrings() {
+		IO.printErr("substrings:");
+		for (int i=0; i<=lastSubstring; i++) {
+			IO.printErr(substrings[i][0]+(substrings[i][1]==1?">":"<")+"["+substrings[i][2]+".."+substrings[i][3]+"]");
+		}
+	}
+
+
+	/**
+	 * Tries to match $substrings$ starting from position $pos$ of $trueFactors$.
+	 *
+	 * Remark: unique substrings that may occur at the beginning/end of the factor are
+	 * ignored. Unique substrings between non-unique substrings in the factor are not
+	 * required to be identical for a match, but just to approximately respect the
+	 * original distance. So, in this case, the output of the procedure is optimistic.
+	 */
+	private static final boolean match(int pos, boolean isPeriodic) {
+		boolean orientation;
+		int i;
+		int first, last, newFirst, newLast, substringLength, distance;
+		int nSubstrings, nMismatches;
+		double intersection;
+
+		// One substring
+		if (lastSubstring==0) {
+			if (substrings[0][0]!=trueFactors[pos][4]) return false;
+			orientation=trueFactors[pos][5]<trueFactors[pos][6];
+			first=orientation?trueFactors[pos][5]:trueFactors[pos][6];
+			last=orientation?trueFactors[pos][6]:trueFactors[pos][5];
+			if (substrings[0][1]==(orientation?1:0)) {
+				newFirst=first;
+				newLast=last;
+			}
+			else {
+				if (repeats[substrings[0][0]][1]!=1) return false;
+				newFirst=repeats[substrings[0][0]][0]-last-1;  // Trying to symmetrize the substring of the repeat that corresponds to true factor $pos$
+				newLast=repeats[substrings[0][0]][0]-first-1;
+			}
+			intersection=Intervals.intersectionLength(newFirst,newLast,substrings[0][2],substrings[0][3]);
+			substringLength=substrings[0][3]-substrings[0][2]+1;
+			return intersection/substringLength>=identityThreshold;
+		}
+
+		// Multiple substrings
+		nSubstrings=0; nMismatches=0;
+		for (i=0; i<=lastSubstring && pos+i<trueFactors.length; i++) {
+			nSubstrings++;
+			if (substrings[i][0]!=trueFactors[pos+i][4]) {
+ 				// IO.printErr("-->1 read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+				return false;  // Mismatching repeat IDs never allowed
+			}
+			if (i>0) {
+				distance=trueFactors[pos+i][1]-trueFactors[pos+i-1][2];
+				if ( distance>substrings[i][4]+substrings[i][4]*distanceScaling ||
+				     distance<substrings[i][4]-substrings[i][4]*distanceScaling ) {
+ 					// IO.printErr("-->2 read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+					nMismatches++;
+					continue;
+				}
+			}
+			orientation=trueFactors[pos+i][5]<trueFactors[pos+i][6];
+			first=orientation?trueFactors[pos+i][5]:trueFactors[pos+i][6];
+			last=orientation?trueFactors[pos+i][6]:trueFactors[pos+i][5];
+			if (substrings[i][1]==(orientation?1:0)) {
+				newFirst=first;
+				newLast=last;
+			}
+			else {
+				if (repeats[substrings[i][0]][1]!=1) {
+ 					// IO.printErr("-->3 read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+					return false;  // Mismatching orientations never allowed
+				}
+				newFirst=repeats[substrings[i][0]][0]-last-1;  // Trying to symmetrize the substring of the repeat that corresponds to true factor $pos+i$
+				newLast=repeats[substrings[i][0]][0]-first-1;
+			}
+			intersection=Intervals.intersectionLength(newFirst,newLast,substrings[i][2],substrings[i][3]);
+			substringLength=substrings[i][3]-substrings[i][2]+1;
+			if (intersection/substringLength<identityThreshold) {
+ 				// IO.printErr("-->4 read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+				nMismatches++;
+			}
+			if (i==0) {
+				if (substrings[i][1]!=(orientation?1:0)) distance=orientation?substrings[i][2]-newFirst:substrings[i][3]-newLast;
+				else distance=orientation?substrings[i][3]-newLast:substrings[i][2]-newFirst;
+				if (distance<0) distance=-distance;
+				if (distance>substringLength*distanceThreshold) {
+ 					// IO.printErr("-->5 read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+					nMismatches++;
+				}
+			}
+			else if (i==lastSubstring) {
+				if (substrings[i][1]!=(orientation?1:0)) distance=orientation?substrings[i][3]-newLast:substrings[i][2]-newFirst;
+				else distance=orientation?substrings[i][2]-newFirst:substrings[i][3]-newLast;
+				if (distance<0) distance=-distance;
+				if (distance>substringLength*distanceThreshold) {
+ 					// IO.printErr("-->6 read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+					nMismatches++;
+				}
+				// IO.printErr("MATCH! read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+				//return true;
+			}
+			else {
+				substringLength=last-first+1;
+				if (intersection/substringLength<identityThreshold) {
+ 					// IO.printErr("-->7 read="+trueFactors[pos+i][0]+" pos="+pos+" i="+i);
+					nMismatches++;
+				}
+			}
+		}
+		if (nSubstrings!=lastSubstring+1) return false;  // We are interested only in full matches
+		if ( (!isPeriodic && nMismatches==0) ||
+		     (isPeriodic && ((double)nMismatches)/nSubstrings<=mismatchThreshold) ) return true;
+		return false;
+	}
+
+
+	/**
+	 * Assume that $substrings$ matches $trueFactors[pos..pos+lastSubstring]$ in some
+	 * $readB$. The procedure estimates the first and the last position of the interval in
+	 * $readB$ that matches $substrings$, storing the estimate in $firstPositionOfMatch$,
+	 * $lastPositionOfMatch$.
+	 */
+	private static final void getMatchingInterval(int pos) {
+		boolean orientation;
+		int start, end, substringLength;
+		int substringStart, substringEnd, newSubstringStart, newSubstringEnd;
+		double length, scaling;
+
+		if (lastSubstring==0) {
+			orientation=trueFactors[pos][5]<trueFactors[pos][6];
+			substringStart=orientation?trueFactors[pos][5]:trueFactors[pos][6];
+			substringEnd=orientation?trueFactors[pos][6]:trueFactors[pos][5];
+			length=trueFactors[pos][2]-trueFactors[pos][1]+1;
+			substringLength=substringEnd-substringStart+1;
+			scaling=length/substringLength;
+			if (substrings[0][1]==(orientation?1:0)) {
+				start=substrings[0][2]<substringStart?substringStart:substrings[0][2];
+				end=substrings[0][3]>substringEnd?substringEnd:substrings[0][3];
+				firstPositionOfMatch=(int)(trueFactors[pos][1]+(orientation?start-substringStart:substringEnd-end)*scaling);
+				lastPositionOfMatch=(int)(trueFactors[pos][2]-(orientation?substringEnd-end:start-substringStart)*scaling);
+			}
+			else {
+				// Symmetrizing the substring of the factor inside the repeat
+				newSubstringStart=repeats[substrings[0][0]][0]-substringEnd-1;
+				newSubstringEnd=repeats[substrings[0][0]][0]-substringStart-1;
+				start=substrings[0][2]<newSubstringStart?newSubstringStart:substrings[0][2];
+				end=substrings[0][3]>newSubstringEnd?newSubstringEnd:substrings[0][3];
+				firstPositionOfMatch=(int)(trueFactors[pos][1]+(orientation?newSubstringEnd-end:start-newSubstringStart)*scaling);
+				lastPositionOfMatch=(int)(trueFactors[pos][2]-(orientation?start-newSubstringStart:newSubstringEnd-end)*scaling);
+			}
+		}
+		else {
+			substringLength=substrings[0][3]-substrings[0][2]+1;
+			firstPositionOfMatch=trueFactors[pos][2]-substringLength+1;
+			if (trueFactors[pos][1]>firstPositionOfMatch) firstPositionOfMatch=trueFactors[pos][1];
+			substringLength=substrings[lastSubstring][3]-substrings[lastSubstring][2]+1;
+			lastPositionOfMatch=trueFactors[pos+lastSubstring][1]+substringLength-1;
+			if (trueFactors[pos+lastSubstring][2]>lastPositionOfMatch) lastPositionOfMatch=trueFactors[pos+lastSubstring][2];
+		}
+	}
+
+
+	private static final void loadFactors(String path) throws IOException {
+		int i, j;
+		String str;
+		String[] tokens;
+		BufferedReader br;
+
+		// Determining the number of factors
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+		factors = new int[i][9];
+
+		// Loading factors
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			tokens=str.split(",");
+			for (j=0; j<tokens.length; j++) factors[i][j]=Integer.parseInt(tokens[j]);
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+	}
+
+
+	private static final void loadTrueFactors(String path) throws IOException {
+		int i, j;
+		String str;
+		String[] tokens;
+		BufferedReader br;
+
+		// Determining the number of factors
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+		trueFactors = new int[i][8];
+
+		// Loading factors
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			tokens=str.split(",");
+			for (j=0; j<tokens.length; j++) trueFactors[i][j]=Integer.parseInt(tokens[j]);
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+	}
+
+
+	private static final void loadRepeats(String path) throws IOException {
+		int i, j;
+		String str;
+		String[] tokens;
+		BufferedReader br;
+
+		// Determining the number of repeats
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+		repeats = new int[i][2];
+
+		// Loading factors
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			tokens=str.split(",");
+			for (j=0; j<tokens.length; j++) repeats[i][j]=Integer.parseInt(tokens[j]);
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+	}
+
+}

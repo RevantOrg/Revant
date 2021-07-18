@@ -1,0 +1,143 @@
+package de.mpi_cbg.revant.biology;
+
+import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.FileReader;
+
+
+/**
+ * Adds to the end of $trueFactorization.txt$ an upper bound on the true corrected
+ * coverage of each factor that can be derived from a set of alignments and from the true
+ * factorization. The procedure counts just once every occurrence of a factor that equals
+ * its reverse-complement.
+ */
+public class AddCoverageToTrueFactorization {
+
+	public static final double alignmentFraction = 0.8;
+
+	private static final double intersectionThreshold = 0.8;
+	private static int[][] factors;
+
+
+	/**
+	 * java AddCoverageToTrueFactorization ../simulations/simple/genome8/trueFactorization.txt 732 10 ../simulations/simple/genome8/LAshow.txt ../simulations/simple/genome8/readLengths.txt 0
+	 */
+	public static void main(String[] args) throws IOException {
+		boolean includesSelfAlignments, discoverable;
+		int i, j, k;
+		int repeatID, readA, readB;
+		int factorLength, otherFactorLength;
+		int substringStart, substringEnd, otherSubstringStart, otherSubstringEnd;
+		int alignmentLengthA, alignmentLengthB;
+		int correctedCoverage;
+		int alignmentStart, alignmentEnd;
+		int nUsedAlignments;
+		double intersection, intersectionA, intersectionB;
+
+		// Loading true factorization and alignments
+		loadTrueFactors(args[0]);
+		Alignments.nAlignments=Integer.parseInt(args[1]);
+		Reads.nReads=Integer.parseInt(args[2]);
+		Alignments.loadAlignments(args[3]);
+		Reads.loadReadLengths(args[4]);
+		includesSelfAlignments=Integer.parseInt(args[5])==1;
+		Alignments.minAlignmentLength=1000;
+
+		// Computing the true corrected coverage
+		k=0;  // Pointer to alignments
+		for (i=0; i<factors.length; i++) {
+			readA=factors[i][0];
+			repeatID=factors[i][4];
+			factorLength=factors[i][2]-factors[i][1]+1;
+			substringStart=factors[i][5]<factors[i][6]?factors[i][5]:factors[i][6];  // The factor is this substring of its repeat
+			substringEnd=factors[i][5]>factors[i][6]?factors[i][5]:factors[i][6];
+			// Searching for other occurrences of the same factor, possibly in the same
+			// read.
+			correctedCoverage=0; nUsedAlignments=0;
+			for (j=0; j<factors.length; j++) {
+				if (j==i) continue;
+				if (factors[j][4]!=repeatID) continue;
+				if (!includesSelfAlignments && factors[j][0]==readA) continue;
+				readB=factors[j][0];
+				otherFactorLength=factors[j][2]-factors[j][1]+1;
+				otherSubstringStart=factors[j][5]<factors[j][6]?factors[j][5]:factors[j][6];
+				otherSubstringEnd=factors[j][5]>factors[j][6]?factors[j][5]:factors[j][6];
+				intersection=Intervals.intersectionLength(substringStart,substringEnd,otherSubstringStart,otherSubstringEnd);
+				if (intersection/(substringEnd-substringStart+1)<intersectionThreshold) continue;
+				// Other occurrence of the same factor found. Checking whether it can be
+				// discovered using alignments.
+				discoverable=false;
+				k=Alignments.read2firstAlignment[readA];
+				if (k==-1) continue;  // No alignment for $readA$
+				while (k<Alignments.nAlignments) {
+					if (Alignments.alignments[k][0]-1>readA) break;
+					if (Alignments.alignments[k][1]-1<readB) {
+						k++;
+						continue;
+					}
+					else if (Alignments.alignments[k][1]-1>readB) break;
+					if (Alignments.alignments[k][4]<factors[i][1]) {
+						k++;
+						continue;
+					}
+					else if (Alignments.alignments[k][3]>factors[i][2]) break;
+					alignmentLengthA=Alignments.alignments[k][4]-Alignments.alignments[k][3]+1;
+					intersectionA=Intervals.intersectionLength(factors[i][1],factors[i][2],Alignments.alignments[k][3],Alignments.alignments[k][4]);
+					if ( intersectionA/factorLength<alignmentFraction &&
+					     intersectionA/alignmentLengthA<alignmentFraction ) {
+						k++;
+						continue;
+					}
+					alignmentStart=Alignments.alignments[k][2]==1?Alignments.alignments[k][5]:Reads.getReadLength(readB)-Alignments.alignments[k][6]-1;
+					alignmentEnd=Alignments.alignments[k][2]==1?Alignments.alignments[k][6]:Reads.getReadLength(readB)-Alignments.alignments[k][5]-1;
+					alignmentLengthB=Alignments.alignments[k][6]-Alignments.alignments[k][5]+1;
+					intersectionB=Intervals.intersectionLength(factors[j][1],factors[j][2],alignmentStart,alignmentEnd);
+					if ( intersectionB/otherFactorLength<alignmentFraction &&
+					     intersectionB/alignmentLengthB<alignmentFraction ) {
+						k++;
+						continue;
+					}
+					discoverable=true;
+ 					break;
+				}
+				if (discoverable) correctedCoverage++;
+			}
+			System.out.println(factors[i][0]+","+factors[i][1]+","+factors[i][2]+","+factors[i][3]+","+factors[i][4]+":"+correctedCoverage);
+		}
+	}
+
+
+	/**
+	 * Loads the true factorization file
+	 */
+	private static final void loadTrueFactors(String path) throws IOException {
+		int i, j;
+		String str;
+		String[] tokens;
+		BufferedReader br;
+
+		// Determining the number of factors
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+		factors = new int[i][7];
+
+		// Loading factors
+		br = new BufferedReader(new FileReader(path));
+		i=0;
+		str=br.readLine();
+		while (str!=null && str.length()>0) {
+			tokens=str.split(",");
+			for (j=0; j<tokens.length; j++) factors[i][j]=Integer.parseInt(tokens[j]);
+			i++;
+			str=br.readLine();
+		}
+		br.close();
+	}
+
+}

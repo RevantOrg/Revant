@@ -1,0 +1,192 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	pattern	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	/ee7b9c12/
+ClusterRepbaseGraph	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^public class ClusterRepbaseGraph {$/;"	class	line:10
+ClusterRepbaseStats	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^public class ClusterRepbaseStats {$/;"	class	line:13
+DNA_ALPHABET	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	public static final char[] DNA_ALPHABET = new char[] {'a','c','g','t'};$/;"	field	line:12
+ExtractRepbaseNames	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ExtractRepbaseNames.java	/^public class ExtractRepbaseNames {$/;"	class	line:8
+FilterRepbase	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/FilterRepbase.java	/^public class FilterRepbase {$/;"	class	line:7
+GenomeSimulator	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^public class GenomeSimulator {$/;"	class	line:11
+MAX_CHILDREN	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		final static int MAX_CHILDREN = 1000;$/;"	field	line:346
+MAX_COLOR	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		final static int MAX_COLOR = 255;$/;"	field	line:347
+MAX_STRINGS	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	private static final int MAX_STRINGS = 100000;$/;"	field	line:20
+N_REPEAT_TYPES	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	public static final int N_REPEAT_TYPES = Constants.INTERVAL_UNKNOWN+1;$/;"	field	line:17
+OTHER_LABEL	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	private static final String OTHER_LABEL = "other";$/;"	field	line:18
+PrintHistograms	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/PrintHistograms.java	/^public class PrintHistograms {$/;"	class	line:6
+PrintTransposonCode	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/PrintTransposonCode.java	/^public class PrintTransposonCode {$/;"	class	line:10
+REST_LABEL	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	private static final String REST_LABEL = "rest";$/;"	field	line:19
+RepBase	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^public class RepBase {$/;"	class	line:15
+Repbase2Pacbio	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/Repbase2Pacbio.java	/^public class Repbase2Pacbio {$/;"	class	line:7
+RepbaseTreeNode	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public RepbaseTreeNode(String label, int depth) {$/;"	method	line:375
+RepbaseTreeNode	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static class RepbaseTreeNode {$/;"	class	line:345
+Repeat	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static class Repeat {$/;"	class	line:211
+RepeatInstance	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public RepeatInstance() {$/;"	method	line:191
+RepeatInstance	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public RepeatInstance(String s, Repeat r, boolean o, int rs, int re) {$/;"	method	line:200
+RepeatInstance	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	public static class RepeatInstance {$/;"	class	line:182
+RepeatModel	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public RepeatModel(String configDir) throws IOException {$/;"	method	line:560
+RepeatModel	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static class RepeatModel {$/;"	class	line:511
+TRANSPOSABLE_ELEMENT_LABEL	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	private static final String TRANSPOSABLE_ELEMENT_LABEL = "transposable-element";$/;"	field	line:17
+addChild	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void addChild(RepbaseTreeNode node) {$/;"	method	line:392
+addCompressibility	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void addCompressibility(double compressibility) {$/;"	method	line:403
+addLength	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void addLength(int length) {$/;"	method	line:398
+addReplicationNoise	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static final void addReplicationNoise(StringBuilder sb, RepeatModel model, Random rando/;"	method	line:450
+byComponent	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static RepeatInstance[][] byComponent;$/;"	field	line:32
+charProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] charProb, charProbCumulative;$/;"	field	line:524
+charProbCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] charProb, charProbCumulative;$/;"	field	line:524
+charProbShortPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] charProbShortPeriod, charProbShortPeriodCumulative;$/;"	field	line:525
+charProbShortPeriodCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] charProbShortPeriod, charProbShortPeriodCumulative;$/;"	field	line:525
+charProbUnique	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] charProbUnique, charProbUniqueCumulative;$/;"	field	line:526
+charProbUniqueCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] charProbUnique, charProbUniqueCumulative;$/;"	field	line:526
+children	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public RepbaseTreeNode[] children;$/;"	field	line:349
+comp1q	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double compMin, comp1q, comp2q, comp3q, compMax;$/;"	field	line:366
+comp2q	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double compMin, comp1q, comp2q, comp3q, compMax;$/;"	field	line:366
+comp3q	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double compMin, comp1q, comp2q, comp3q, compMax;$/;"	field	line:366
+compMax	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double compMin, comp1q, comp2q, comp3q, compMax;$/;"	field	line:366
+compMin	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double compMin, comp1q, comp2q, comp3q, compMax;$/;"	field	line:366
+component	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int component;  $/;"	field	line:212
+componentsInfo	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^	private static int[] componentsInfo;$/;"	field	line:12
+compressibilities	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double[] lengths, compressibilities;$/;"	field	line:359
+computeStats	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final double[] computeStats(boolean type) {$/;"	method	line:411
+computeStats	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	private static final double[] computeStats(RepbaseTreeNode node, boolean type) {$/;"	method	line:241
+count	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public int count;$/;"	field	line:352
+countHistogram	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static int[] countHistogram;$/;"	field	line:17
+cumulativeByComponent	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static int[] cumulativeByComponent;$/;"	field	line:39
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ExtractRepbaseNames.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/FilterRepbase.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/PrintHistograms.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/PrintTransposonCode.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+de.mpi_cbg.revant.biology	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/Repbase2Pacbio.java	/^package de.mpi_cbg.revant.biology;$/;"	package	line:1
+deletionProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double mismatchProb, insertionProb, deletionProb;$/;"	field	line:549
+depth	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public int depth;$/;"	field	line:351
+divideCounts	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void divideCounts(double[] denominator) {$/;"	method	line:586
+entropies	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static double[] entropies;$/;"	field	line:19
+entropy	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static final double entropy(RepBase.RepbaseTreeNode[] neighbors, int lastNeighbor) {$/;"	method	line:108
+epoch	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static final long epoch(RepeatModel model, StringBuilder sb, Random random) {$/;"	method	line:114
+files	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static File[] files;$/;"	field	line:15
+frequency	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int frequency;$/;"	field	line:220
+frequencyProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] frequencyProb;  \/\/ Prob. of block 10^i+1..10^(i+1)$/;"	field	line:556
+frequencyProbCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] frequencyProbCumulative;$/;"	field	line:557
+fromInstanceProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double fromInstanceProb;$/;"	field	line:541
+getFrequency	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final int getFrequency(Random random) {$/;"	method	line:819
+getInstance	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final RepeatInstance getInstance(RepeatModel model, StringBuilder sb, Random random) {$/;"	method	line:314
+getLength	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final int getLength(Random random) {$/;"	method	line:728
+getLengthLongPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final int getLengthLongPeriod(Random random) {$/;"	method	line:748
+getLengthShortPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final int getLengthShortPeriod(Random random) {$/;"	method	line:738
+getMaxCounts	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void getMaxCounts(double[] out) {$/;"	method	line:569
+getShortPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final int getShortPeriod(Random random) {$/;"	method	line:754
+getShortPeriodString	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final void getShortPeriodString(int length, StringBuilder out, Random random) {$/;"	method	line:774
+getStats	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static final void getStats(String aligmentsDir, int treeDepth, double entropyMin, doubl/;"	method	line:48
+getString	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final void getString(int length, StringBuilder out, Random random) {$/;"	method	line:762
+getType	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final int getType(Random random) {$/;"	method	line:719
+getUniqueString	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final void getUniqueString(int length, StringBuilder out, Random random) {$/;"	method	line:786
+id	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int id;$/;"	field	line:213
+id	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public int id;$/;"	field	line:353
+initTypeCounts	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void initTypeCounts() {$/;"	method	line:557
+initialize	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final void initialize(RepeatInstance instance, RepeatModel model, StringBuilder sb, Ran/;"	method	line:280
+initialize	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final void initialize(RepeatModel model, StringBuilder sb, Random random) {$/;"	method	line:243
+initialize	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final void initialize(int length, RepeatModel model, StringBuilder sb, Random random) {$/;"	method	line:226
+initializeGenome	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static final void initializeGenome(int nUniqueBps, RepeatModel model, StringBuilder sb,/;"	method	line:84
+insertInComponent	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final void insertInComponent(RepeatModel model, StringBuilder sb, Random random) {$/;"	method	line:386
+insertionProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double mismatchProb, insertionProb, deletionProb;$/;"	field	line:549
+insertionProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public static double[] insertionProb;  \/\/ In every component of past repeats$/;"	field	line:218
+insertionProbCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public static double[] insertionProbCumulative;$/;"	field	line:219
+insertionProbPerturbation	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double insertionProbPerturbation;$/;"	field	line:543
+label	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public String label;$/;"	field	line:358
+lastByComponent	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static int[] lastByComponent;$/;"	field	line:33
+lastChild	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public int lastChild;$/;"	field	line:350
+lastComponent	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static int lastRepeat, lastComponent;$/;"	field	line:19
+lastCompressibility	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public int lastLength, lastCompressibility;$/;"	field	line:360
+lastCount	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static int lastCount;$/;"	field	line:18
+lastEntropy	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static int lastEntropy;$/;"	field	line:20
+lastFile	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static int lastFile;$/;"	field	line:16
+lastLength	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public int lastLength, lastCompressibility;$/;"	field	line:360
+lastRepeat	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static int lastRepeat, lastComponent;$/;"	field	line:19
+length1q	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double lengthMin, length1q, length2q, length3q, lengthMax;$/;"	field	line:365
+length2q	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double lengthMin, length1q, length2q, length3q, lengthMax;$/;"	field	line:365
+length3q	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double lengthMin, length1q, length2q, length3q, lengthMax;$/;"	field	line:365
+lengthMax	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double lengthMin, length1q, length2q, length3q, lengthMax;$/;"	field	line:365
+lengthMin	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double lengthMin, length1q, length2q, length3q, lengthMax;$/;"	field	line:365
+lengthProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] lengthProb;  \/\/ Prob. of block i*mAL+1..(i+1)*mAL$/;"	field	line:531
+lengthProbCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] lengthProbCumulative;$/;"	field	line:532
+lengthProbLongPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] lengthProbLongPeriod;  \/\/ Prob. of a tandem of 1..X instances$/;"	field	line:535
+lengthProbLongPeriodCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] lengthProbLongPeriodCumulative;$/;"	field	line:536
+lengthProbShortPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] lengthProbShortPeriod;  \/\/ Prob. of block i*mAL+1..(i+1)*mAL$/;"	field	line:533
+lengthProbShortPeriodCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] lengthProbShortPeriodCumulative;$/;"	field	line:534
+lengths	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double[] lengths, compressibilities;$/;"	field	line:359
+loadComponentsInfo	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^	private static final void loadComponentsInfo(String path) throws IOException {$/;"	method	line:59
+loadRepbase	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static final int loadRepbase(String treeFile, String fastaFile, boolean compress) throws/;"	method	line:41
+loadRepbaseFasta	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static final int loadRepbaseFasta(String path, HashMap<String,RepbaseTreeNode> map, bool/;"	method	line:116
+loadRepbaseTree	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static final RepbaseTreeNode loadRepbaseTree(String path, HashMap<String,RepbaseTreeNode/;"	method	line:72
+loadString2node	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	private static final RepbaseTreeNode[] loadString2node(int nStrings, String path, HashMap<Strin/;"	method	line:200
+mPlusI	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double mPlusI, mPlusIPlusD;$/;"	field	line:550
+mPlusIPlusD	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double mPlusI, mPlusIPlusD;$/;"	field	line:550
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:21
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:26
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ExtractRepbaseNames.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:13
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/FilterRepbase.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:13
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:50
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/PrintHistograms.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:11
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/PrintTransposonCode.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:15
+main	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/Repbase2Pacbio.java	/^	public static void main(String[] args) throws IOException {$/;"	method	line:12
+mark	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void mark(int type) {$/;"	method	line:633
+marked	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		private boolean marked;$/;"	field	line:372
+maxIndelLength	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private int maxIndelLength;$/;"	field	line:551
+maxPeriodDifference	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double maxPeriodDifference, maxPhaseDifference;$/;"	field	line:542
+maxPhaseDifference	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double maxPeriodDifference, maxPhaseDifference;$/;"	field	line:542
+maxShortPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private int minShortPeriod, maxShortPeriod, shortPeriodRange;$/;"	field	line:513
+minAlignmentLength	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int minAlignmentLength;$/;"	field	line:512
+minShortPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private int minShortPeriod, maxShortPeriod, shortPeriodRange;$/;"	field	line:513
+mismatchProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double mismatchProb, insertionProb, deletionProb;$/;"	field	line:549
+nNodes	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static int nNodes;  \/\/ Number of nodes under $root$, included.$/;"	field	line:26
+next	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public RepeatInstance previous, next;  \/\/ In genome order$/;"	field	line:188
+orientation	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public boolean orientation;$/;"	field	line:186
+parent	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public Repeat parent;$/;"	field	line:214
+parent	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public RepbaseTreeNode parent;$/;"	field	line:348
+perturbInsertionProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final double[] perturbInsertionProb(double[] insertionProb, Random random) {$/;"	method	line:810
+perturbPeriod	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public final int perturbPeriod(int oldPeriod, Random random) {$/;"	method	line:801
+previous	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public RepeatInstance previous, next;  \/\/ In genome order$/;"	field	line:188
+printClusterRepbaseGraph	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^	private static final void printClusterRepbaseGraph(String aligmentFilesPath, int firstFile, int/;"	method	line:107
+printLeaves	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static final void printLeaves(RepbaseTreeNode node, boolean printLabel, BufferedWriter b/;"	method	line:679
+printRepbaseHeatmaps	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^	private static final void printRepbaseHeatmaps(int firstFile, int lastFile, String fragmentFile/;"	method	line:226
+printStats	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseStats.java	/^	private static final void printStats(String countFile, String entropyFile) throws IOException {$/;"	method	line:124
+printTree	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static final void printTree(RepbaseTreeNode root, boolean printLabel) throws IOException/;"	method	line:648
+rcProbability	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double rcProbability;$/;"	field	line:548
+repeat	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public Repeat repeat;$/;"	field	line:185
+repeatEnd	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int repeatStart, repeatEnd;  \/\/ Not useful if the repeat type is single deletion or p/;"	field	line:187
+repeatStart	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int repeatStart, repeatEnd;  \/\/ Not useful if the repeat type is single deletion or p/;"	field	line:187
+repeats	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static Repeat[] repeats;$/;"	field	line:18
+reverseComplement	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static final void reverseComplement(StringBuilder sb) {$/;"	method	line:418
+root	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static RepeatInstance root;$/;"	field	line:26
+root	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static RepbaseTreeNode root;$/;"	field	line:25
+search	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final RepbaseTreeNode search(String str) {$/;"	method	line:543
+sequence	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public String sequence;  \/\/ Of the period if periodic$/;"	field	line:216
+sequence	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public String sequence;$/;"	field	line:183
+sequenceLength	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int sequenceLength;$/;"	field	line:184
+sequenceLength	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int sequenceLength;$/;"	field	line:217
+setDepth	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		private final int setDepth() {$/;"	method	line:511
+setID	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final int setID(int id) {$/;"	method	line:530
+shortPeriodRange	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private int minShortPeriod, maxShortPeriod, shortPeriodRange;$/;"	field	line:513
+string2node	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	public static RepbaseTreeNode[] string2node;$/;"	field	line:27
+tmp	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^	private static double[] tmp;$/;"	field	line:32
+toDot	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void toDot() {$/;"	method	line:610
+toDot	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void toDot(StringBuilder[] levels) {$/;"	method	line:601
+toDot	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public final void toDot(int type, BufferedWriter bw) throws IOException {$/;"	method	line:622
+toString	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public String toString() {$/;"	method	line:404
+type	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		public int type;  \/\/ -1 for unique sequence$/;"	field	line:215
+type2color	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/ClusterRepbaseGraph.java	/^	private static final String type2color(int type) {$/;"	method	line:87
+typeCounts	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/RepBase.java	/^		public double[] typeCounts;$/;"	field	line:371
+typeProb	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] typeProb, typeProbCumulative;$/;"	field	line:519
+typeProbCumulative	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^		private double[] typeProb, typeProbCumulative;$/;"	field	line:519
+unique	/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw/src/biology/GenomeSimulator.java	/^	private static Repeat unique;$/;"	field	line:20
