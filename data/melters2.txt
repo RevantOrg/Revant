@@ -1,0 +1,48 @@
+# Supplementary material of "Comparative analysis of tandem repeats from hundreds of species reveals unique insights into centromere evolution"
+# Table S2. Known centromere DNA sequences identified by TRF or nugtohs pipelines								
+# Species	Common name	Sequencing platform	Most common tandem repeat (nt)	Reported centromeric tandem repeat (nt)	Validation method	Reference	Notes and explanation of discordance between literature and our findings.
+1	Equus caballus	Horse	Sanger	221	221	RD, Seq, FISH, ChIP	Wade et al 2009; Piras et al 2010; Alkan et al 2011	
+2	Gallus gallus	Chicken	Sanger, Illumina	93, 42	42	RD, Seq, FISH, ChIP	Matzke et al 1990; Shang et al 2010	Most chromosomes lack centromeric tandem repeat arrays
+3	Glycine max	Soybean	Sanger, Illumina	92	92, 411	RD, Seq, FISH, ChIP	Tek et al 2010	
+4	Homo sapiens	Human	Sanger, Illumina	171	171	RD, Seq, FISH, ChIP	Lee et al 1997; Alkan et al 2007; Alonso et al 2010	
+5	Loxodonta africana	African bush elephant	Sanger	37	842, 936	RD, Seq, FISH, ChIP	Alkan et al 2011	Sanger reads are too short to detect long tandem repeat, Illumina reads not available for assembly approach
+6	Monodelphis domestica	Gray short-tailed opossum	Sanger	84	528	RD, Seq, FISH, ChIP	Alkan et al 2011	Sanger reads are too short to detect long tandem repeat, Illumina reads not available for assembly approach
+7	Pongo pygmaeus	Bornean orangutan	Sanger, Illumina	171	171	RD, Seq, FISH, ChIP	Haaf et al 1995, Alkan et al 2007, Locke et al 2011	
+8	Zea mays	Maize	Sanger, Illumina	180, 156	180, 156	RD, Seq, FISH, ChIP	Zhong et al 2002; Nagaki et al 2003	The 180-bp repeat is a knob tandem repeat. The centromere tandem repeat CentC is the 4th most common repeat and the first non-knob repeat
+9	Oryza sativa	Rice	Illumina	158, 165	158, 165	RD, Seq, FISH, ChIP	Cheng et al 2002, Lee et al 2005	
+10	Arabidopsis thaliana	Mouse-ear cress	Illumina	178	178	RD, Seq, FISH, ChIP	Heslop-Harrison et al 1999; Hall et al 2003; Zhang et al 2008	
+11	Apis mellifera	Honeybee	Sanger	176	176, 550	RD, Seq, FISH	Tarès et al 1993; Beye & Moritz 1995	
+12	Callithrix jacchus	Common marmoset	Sanger	342	342	RD, Seq, FISH	Cellamare et al 2009	
+13	Dasypus novemcinctus	Nine-banded armadillo	Sanger	173	173	RD, Seq, FISH	Alkan et al 2011	
+14	Drosophila melanogaster	Fruitfly	Sanger, Illumina	358, 5	359, 12, 5	RD, Seq, FISH	Abad et al, 1992; Abad et al 2000; Sun et al 2003	
+15	Gorilla gorilla	Gorilla	Sanger, Illumina	171	171	RD, Seq, FISH	Haaf  et al 1995; Samonte et al 1997, Alkan et al 2007	
+16	Macaca mulatta	Rhesus macaque	Sanger, Illumina	171	171	RD, Seq, FISH	Musich et al 1980; Alkan et al 2007	
+17	Mimulus guttatus	Common monkey-flower	Sanger, Illumina	728, 198	728, 198	RD, Seq, FISH	Fishman & Saunders 2008	
+18	Mus musculus domesticus	House mouse	Sanger, Illumina	58	120, 225	RD, Seq, FISH	Guenatri et al 2004; Kuznetsova et al 2006	Our 58-bp repeat is similar to the reported 120 bp centromere satellite, and is half as long (suggesting higher-order structure in the published sequence). Our 2nd and 3rd tandem repeat clusters are similar to the 224 nt centromere satellite.
+19	Nomascus leucogenys	Northern white-cheeked gibbon	Sanger	171	171	RD, Seq, FISH	Cellamare et al 2009	
+20	Ornithorhynchus anatinus	Platypus	Sanger	72	144	RD, Seq, FISH	Alkan et al 2011	Our 72 bp repeat is similar to the reported centromere sequence, and is half as long (suggesting higher-order structure in the published sequence)
+21	Pan troglodytes	Chimpanzee	Sanger, Illumina	171	171	RD, Seq, FISH	Haaf et al 1995; Samonte et al 1997; Alkan et al 2007	
+22	Papio hamadryas	Hamadryas baboon	Sanger	170	171	RD, Seq, FISH	Musich et al 1980; Alkan et al 2007	
+23	Salmo salar	Atlantic salmon	Sanger	241	237	RD, Seq, FISH	Viñas et al 2004	
+24	Solanum tuberosum	Potato	Sanger	181	7, 2754, 1924, 979, 2957, 3814, 1180	RD, Seq, FISH, ChIP	Tek et al 2004, Gong et al 2012	Centromere DNA contains degenerate copies of the 7 bp telomere repeat, which is shorter than the minimum repeat size found by our bioinformatic pipeline
+25	Sorghum bicolor 	Sorghum	Sanger, Illumina	137	140, 745	RD, Seq, FISH	Jiang et al 1996; Zwick et al 2000	
+26	Tetraodon nigroviridis	Green spotted pufferfish	Sanger	118	118	RD, Seq, FISH	Fischer et al 2000; Roest Crollius et al 2000	
+27	Tribolium castaneum	Red flour beetle	Sanger	166	360	RD, Seq, FISH	Ugarković et al 1996	Centromere DNA in the published work was identified by restriction digest, and has not been subsequently compared to all tandem repeats in the Tribolium genome.
+28	Brassica oleracea	Wild cabbage	Sanger, Illumina	176	176, 342, 350	RD, Seq, FISH	Harrison & Heslop-Harrison 1995; Lim et al 2007; Koo et al 2011	
+29	Canis familiaris	Domestic dog	Sanger, Illumina	249, 246	244, 246	RD, Seq, FISH	Alkan et al 2011	
+30	Ixodes scapularis	Lyme disease tick	Sanger	95	90, 95,96,97,98,99, 385	RD, Seq, FISH	Meyer et al 2010	
+31	Oryctolagus cuniculus	European rabbit	Sanger	370	375, 585	RD, Seq, FISH	Ékes et al 2004	
+32	Jatropha curcas	Jatropha	Illumina	358	358	RD, Seq, FISH	Kikuchi et al 2010	
+33	Bubalus bubalis	Water buffalo	Illumina	680, 1400	673, 1378	RD, Seq, FISH	Tanaka et al 1999; Pathak et al 2006	Water buffalo tandem repeats are the same as those found in other members of the family Bovidae, although their relative abundance varies.
+34	Mus calori	Ryukyu mouse	Illumina	60	60, 79	RD, Seq, PRINS	Kipling et al 1995	Correct centromere repeat identified from PacBio reads
+35	Myzus persicae	Peach aphid	Sanger, Illumina	169	169	RD, Seq, ISH	Spence et al 1998	
+36	Sus scrofa	Pig	Sanger, Illumina	73	14, 200, 290, 410, 450, 800	RD, Seq, ISH	Jantsch et al 1990, Bratanich et al 2000	Published descriptions of pig centromere repeats quantified tandem repeats by dot blotting, and do not rigorously compare the relative abundance of all tandem repeats in the genome
+37	Bos taurus	Cattle	Sanger, Illumina	686, 1418	377, 686, 710, 989, 1402	RD, Seq, ISH	Gaillard et al 1981; Plucienniczak et al 1982; Taparowsky and Gerbi 1982	
+38	Rattus norvegicus	Norwegian rat	Sanger	93	93	RD, Seq, ISH	Sternes & Vig 1995	Correct centromere repeat identified from PacBio reads
+39	Ovis aries	Sheep	Illumina	816	820	RD, Seq, ISH	Buckland 1983; Novuk 1984	
+40	Theobroma cacao	Cacao	Illumina	170	212	Seq, FISH	Argout et al 2010	Primers used for FISH experiments in literature align well to our repeat. The literature repeat may be similar to the one from our study, although the reported length is different (no repeat sequence was provided for comparison).
+41	Daubentonia madagascariensis	Aye-aye	Illumina	146, 270	146, 286	Seq, FISH	Lee et al 2011	Our centromere repeats are similar to published sequences, but have a slightly different length.
+42	Macropus eugenii	Tammar wallaby	Sanger	175	178	Seq, FISH	Carone et al 2008	
+43	Pan paniscus	Bonobo	Sanger, Illumina	170	171	Seq, FISH	Samonte et al 1997, Alkan et al 2007	 
+#								
+#	Validation methods: RD = restriction digestion; seq = sequencing; ISH = in situ hybdrization; FISH = fluorescent in situ hybridization; PRINS = primed in situ labelling ; ChIP = chromatin immunoprecipitation					
