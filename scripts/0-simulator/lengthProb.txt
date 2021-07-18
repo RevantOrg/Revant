@@ -1,0 +1,2 @@
+// Length probability of a non-periodic repeat (in multiples of minAlignmentLength).
+1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01
