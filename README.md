@@ -45,11 +45,11 @@ The `scripts` directory contains shell scripts that automate most steps of the p
 * The scripts require several input variables from the user, and such variables are currently set inside the scripts themselves. So, when running the pipeline on a new dataset, you currently have to duplicate the `scripts` directory and to customize its scripts as needed. A better solution will follow.
 * Scripts are numbered according to the order in which they should be executed. There is currently no scheduling system for running all scripts automatically.
 
-The pipeline is organized in the following steps, that are reflect both by the `scripts` directory and by the source code. 
+The pipeline is organized in the following steps, that are reflected both by the `scripts` directory and by the source code. For more details about each step, please refer to the comments inside each script.
 
 ### Read factorization
 
-This is the process that 
+Given the alignments between a read and all other reads in the 1X subset, this step marks some intervals of the read as belonging to a specific repeat type. This is embarrassingly parallel and should be performed on several chunks of the alignments file at the same time.
 
 
 
