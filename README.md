@@ -1,6 +1,5 @@
 <img align="center" src="./logo.png" width="297" height="35"/>
-
-A pipeline for de novo repeat inference from long reads.
+De novo repeat inference from long reads.
 
 **Remark: This is just a first draft of the readme file. More detailed instructions will follow.**
 
