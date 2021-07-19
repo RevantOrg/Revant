@@ -2,7 +2,7 @@
 De novo repeat inference from long reads.
 
 
-**Remark: This is just a first draft of the readme file. More detailed instructions will follow.**
+**Remark: This is just a first draft. More detailed instructions will follow.**
 
 
 ## Compiling the project
