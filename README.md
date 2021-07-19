@@ -7,7 +7,7 @@ A pipeline for de novo repeat inference from long reads.
 
 ## Compiling the project
 
-This project is written in Java, so you need a Java development kit (any version) for compiling it. Java was chosen because it takes segfaults and memory leaks out of the way, which was very useful for developing the first prototype of a complex project. The code is designed to be converted into C with very little effort.
+This project is written in Java, so you need a Java development kit (any version) for compiling it. Java was chosen because it takes segfaults and memory leaks out of the way, which was very useful for developing the first prototype of a complex project. The code uses very few Java-specific features and can be converted to C with little effort.
 
 After cloning this repo, you can compile it by running the `build.sh` script in the main directory.
 
