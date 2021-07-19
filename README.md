@@ -45,7 +45,7 @@ The `scripts` directory contains shell scripts that automate most steps of the p
 * The scripts require several input variables from the user, and such variables are currently set inside the scripts themselves. So, when running the pipeline on a new dataset, you currently have to duplicate the `scripts` directory and to customize its scripts as needed. A better solution will follow.
 * Scripts are numbered according to the order in which they should be executed. There is currently no scheduling system for running all scripts automatically.
 
-The pipeline is organized in the following steps. Both the `scripts` directory and the source code are organized around these steps. 
+The pipeline is organized in the following steps, that are reflect both by the `scripts` directory and by the source code. 
 
 ### Read factorization
 
