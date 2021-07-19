@@ -59,4 +59,4 @@ The pipeline is organized in the following steps, that are reflected both by the
 
 # Acknowledgements
 
-The core parts of this project were developed by Fabio Cunial while he was affiliated with [MPI-CBG](https://www.mpi-cbg.de/home/) and [CSBD](http://www.csbdresden.de). We thank MPI-CBG and Gene Myers for funding. We thank Gene Myers and the Myers lab at MPI-CBG for fruitful discussions.
+The core parts of this project were developed by Fabio Cunial while he was affiliated with [MPI-CBG](https://www.mpi-cbg.de/home/) and [CSBD](http://www.csbdresden.de). We thank MPI-CBG and Gene Myers for funding. We thank Gene Myers and the Myers lab at MPI-CBG for useful discussions.
