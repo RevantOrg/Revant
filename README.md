@@ -35,7 +35,7 @@ To set up a new project, create a new emtpy directory and put the following text
 * `DBdump-lengths.txt`: length of each read. This is the output of the `DBdump -rh` tool from DAZZ_DB.
 * `qualityThresholds.txt`: text file containing quality thresholds for deciding low-quality regions. Example in `/scripts/1-factorize/qualityThresholds.txt`.
 * `qtrack.txt`: an estimate of intrinsic quality value for each read. This can be computed by aligning the 1X subset against, say, a distinct 10X random subset, and by running the `DASqv` tool from DALIGNER.
-* Optionally, one or several text files that encode a repeat track each: the union of all such files will be discarded by the pipeline. This is the output of the `DBdump -r -mTrackName` tool from DAZZ_DB.
+* Optionally, one or several text files that each encode a repeat track: the union of all such files will be discarded by the pipeline. This is the output of the `DBdump -r -mTrackName` tool from DAZZ_DB.
 
 ## Running the scripts
 
