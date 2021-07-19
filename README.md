@@ -25,6 +25,8 @@ Please refer to each external dependency for instructions on compiling it.
 
 **Remark: A detailed, step-by-step example with a toy dataset will follow.**
 
+## Input data
+
 To set up a new project, create a new emtpy directory and put the following input files in a subdirectory called `input`. All input and intermediate files used by REVANT are currently human-readable text files: this is for debugging and might be dropped in the future.
 
 * `LAshow.txt`: all pairwise alignments between the reads in a random subset that covers 1X of the genome. This is the output of the `LAshow` tool from DALIGNER.
@@ -33,6 +35,7 @@ To set up a new project, create a new emtpy directory and put the following inpu
 * `qtrack.txt`: an estimate of intrinsic quality value for each read. This can be computed by aligning the 1X subset against, say, a distinct 10X random sample, and running the `DASqv` tool from DALIGNER.
 * 
 
+## Running the scripts
 
 The `scripts` directory contains shell scripts that automate most steps of the pipeline. This is just a first draft of a scripting system and must be improved. Current issues:
 
@@ -42,7 +45,7 @@ The `scripts` directory contains shell scripts that automate most steps of the p
 
 The pipeline is organized in the following steps. Both the `scripts` directory and the source code are organized around these steps. 
 
-## Read factorization
+### Read factorization
 
 This is the process that 
 
