@@ -7,6 +7,7 @@ A pipeline for de novo repeat inference from long reads.
 
 # Requirements and compilation
 
+Requirements:
 * Any recent Java development kit
 * [DAZZ_DB](https://github.com/thegenemyers/DAZZ_DB) 
 * [DALIGNER](https://github.com/thegenemyers/DALIGNER)
