@@ -17,3 +17,5 @@ This project is written in Java, so you need a Java development kit (any version
 
 Please refer to each external dependency for instructions on compiling it.
 
+# The REVANT pipeline
+
