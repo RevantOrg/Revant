@@ -25,7 +25,7 @@ Please refer to each external dependency for instructions on compiling it.
 
 **Remark: A detailed, step-by-step example with a toy dataset will follow.**
 
-## Input data
+## Setting up a new project
 
 All input and intermediate files used by REVANT are currently human-readable text files: this helps with debugging, and is easy to drop in the future in the unlikely case IO becomes a bottleneck. 
 
