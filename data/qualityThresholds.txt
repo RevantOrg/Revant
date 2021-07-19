@@ -1,3 +1,0 @@
-25  // (from DASqv) Intrinsic qualities >= this are considered random insertions
-21  // (from DASqv) Intrinsic qualities <= this are considered high
-100  // Quality spacing
