@@ -12,5 +12,5 @@ A pipeline for de novo repeat inference from long reads.
 * [DALIGNER](https://github.com/thegenemyers/DALIGNER)
 * [d'accord](https://gitlab.com/german.tischler/daccord)
 
-After cloning this repo, building the pipeline requires just running the `build.sh` script in the main directory. Please refer to the instructions of the external dependencies for compiling them.
+After cloning this repo and setting up all dependencies, building the pipeline requires just running the `build.sh` script in the main directory. Please refer to the instructions of each external dependency for compiling it.
 
