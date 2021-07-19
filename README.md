@@ -42,3 +42,9 @@ The pipeline is organized in the following steps. Both the `scripts` directory a
 ## Read factorization
 
 This is the process that 
+
+
+
+# Acknowledgements
+
+This project was developed while the author was affiliated with [MPI-CBG](https://www.mpi-cbg.de/home/) and [CSBD](http://www.csbdresden.de).
