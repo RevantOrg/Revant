@@ -1,6 +1,6 @@
 <img align="right" src="./logo.png" width="297" height="35"/>
 
-**This is just a first draft of the readme file: better instructions will come in the next few weeks.**
+**Remark: This is just a first draft of the readme file. More detailed instructions will be added in the next few weeks.**
 
 # Revant
 
