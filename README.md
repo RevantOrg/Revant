@@ -8,5 +8,6 @@ A pipeline for de novo repeat inference from long reads.
 # Requirements and installation
 
 * A Java Development Kit for compiling, a Java Runtime Environment for executing (any recent version).
-* DAZZLER   DALIGNER version 
+* [DAZZ_DB](https://github.com/thegenemyers/DAZZ_DB) and [DALIGNER](https://github.com/thegenemyers/DALIGNER) (any recent version).
+* 
 
