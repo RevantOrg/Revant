@@ -47,7 +47,7 @@ The `scripts` directory contains shell scripts that automate most steps of the p
 
 The pipeline is organized in the following steps, that are reflected both by the `scripts` directory and by the source code. For more details about each step, please refer to the comments inside each script.
 
-### Read factorization
+### 1 - Read factorization
 
 Given the alignments between a read and all other reads in the 1X subset, this step marks some intervals of the read as belonging to a specific repeat type. This is embarrassingly parallel and should be performed on several chunks of the alignments file at the same time.
 
