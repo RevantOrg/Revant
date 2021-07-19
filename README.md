@@ -21,6 +21,12 @@ Please refer to each external dependency for instructions on compiling it.
 
 # Running the pipeline
 
+To set up a new project, create a new emtpy directory and put the following input files in a subdirectory called `input`. All input and intermediate files used by REVANT are currently human-readable text files: this is for debugging and might be dropped in the future.
+
+* `LAshow.txt`: all pairwise alignments between the reads in a random subset that covers 1X of the genome. This is the output of the `LAshow` tool of DALIGNER.
+* 
+
+
 The `scripts` directory contains shell scripts that automate most steps of the pipeline. This is just a first draft of a scripting system and must be improved. Current issues:
 
 * For simplicity, the current scripts are designed for a single machine rather than for a cluster. A cluster version of the whole pipeline will follow.
@@ -29,4 +35,6 @@ The `scripts` directory contains shell scripts that automate most steps of the p
 
 The pipeline is organized in the following steps. Both the `scripts` directory and the source code are organized around these steps. 
 
-## 
+## Read factorization
+
+This is the process that 
