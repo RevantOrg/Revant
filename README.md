@@ -32,7 +32,7 @@ To set up a new project, create a new emtpy directory and put the following inpu
 * `LAshow.txt`: all pairwise alignments between the reads in a random subset that covers 1X of the genome. This is the output of the `LAshow` tool from DALIGNER.
 * `DBdump-lengths.txt`: length of each read. This is the output of the `DBdump -rh` tool from DAZZ_DB.
 * `qualityThresholds.txt`: text file containing quality thresholds for deciding low-quality regions. Example in `/scripts/1-factorize/qualityThresholds.txt`.
-* `qtrack.txt`: an estimate of intrinsic quality value for each read. This can be computed by aligning the 1X subset against, say, a distinct 10X random subset, and running the `DASqv` tool from DALIGNER.
+* `qtrack.txt`: an estimate of intrinsic quality value for each read. This can be computed by aligning the 1X subset against, say, a distinct 10X random subset, and by running the `DASqv` tool from DALIGNER.
 * 
 
 ## Running the scripts
