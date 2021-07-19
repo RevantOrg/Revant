@@ -21,4 +21,6 @@ Please refer to each external dependency for instructions on compiling it.
 
 # Running the pipeline
 
-The `scripts` directory contains Bash scripts that automate most steps of the pipeline. For simplicity, the current scripts are designed for a single machine rather than for a cluster: a cluster version of the whole pipeline will follow. The scripts require several input variables from the user, and such variables are currently set inside the scripts themselves. So, when running the pipeline on a new dataset, you currently have to duplicate the `scripts` directory and to customize its scripts as needed. 
+The `scripts` directory contains Bash scripts that automate most steps of the pipeline. For simplicity, the current scripts are designed for a single machine rather than for a cluster: a cluster version of the whole pipeline will follow. The scripts require several input variables from the user, and such variables are currently set inside the scripts themselves. So, when running the pipeline on a new dataset, you currently have to duplicate the `scripts` directory and to customize its scripts as needed. A better solution will follow.
+
+
