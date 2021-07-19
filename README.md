@@ -28,7 +28,7 @@ Please refer to each external dependency for instructions on compiling it.
 To set up a new project, create a new emtpy directory and put the following input files in a subdirectory called `input`. All input and intermediate files used by REVANT are currently human-readable text files: this is for debugging and might be dropped in the future.
 
 * `LAshow.txt`: all pairwise alignments between the reads in a random subset that covers 1X of the genome. This is the output of the `LAshow` tool from DALIGNER.
-* `DBdump-lengths.txt`: 
+* `DBdump-lengths.txt`: length of each read. This is the output of the `DBdump -rh` tool from DAZZ_DB.
 
 
 The `scripts` directory contains shell scripts that automate most steps of the pipeline. This is just a first draft of a scripting system and must be improved. Current issues:
