@@ -47,4 +47,4 @@ This is the process that
 
 # Acknowledgements
 
-This project was developed while the author was affiliated with [MPI-CBG](https://www.mpi-cbg.de/home/) and [CSBD](http://www.csbdresden.de).
+The main parts of this project were developed while the author was affiliated with [MPI-CBG](https://www.mpi-cbg.de/home/) and [CSBD](http://www.csbdresden.de).
