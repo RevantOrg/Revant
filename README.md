@@ -1,4 +1,4 @@
-<img align="right" src="./logo.png" width="297" height="35"/>
+<img align="center" src="./logo.png" width="297" height="35"/>
 
 **Remark: This is just a first draft of the readme file. More detailed instructions will be added in the next few weeks.**
 
