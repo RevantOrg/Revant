@@ -27,7 +27,7 @@ Please refer to each external dependency for instructions on compiling it.
 
 ## Input data
 
-All input and intermediate files used by REVANT are currently human-readable text files: this helps with debugging, and is easy to drop in the future in the unlikely case IO is a bottleneck. 
+All input and intermediate files used by REVANT are currently human-readable text files: this helps with debugging, and is easy to drop in the future in the unlikely case IO becomes a bottleneck. 
 
 To set up a new project, create a new emtpy directory and put the following text files in a subdirectory called `input`.
 
