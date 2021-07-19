@@ -48,7 +48,7 @@ The `scripts` directory contains shell scripts that automate most steps of the p
 The pipeline is organized in the following steps, that are reflected both by the `scripts` directory and by the source code. For more details about each step, please refer to the comments inside each script.
 
 1. **Read factorization** - Given the alignments between a read and all other reads in the 1X subset, this step marks some intervals of the read as belonging to a specific repeat type. This is embarrassingly parallel and should be performed on several chunks of the alignments file at the same time. This step works on a *filtered* set of alignments, from which inconsistencies from the aligner have been internally removed.
-2. **Interval graph construction** - Given the repeat intervals of each read in the 1X subset, and the set of filtered alignments, this step builds a graph whose nodes are intervals, and whose edges are containment and overlap relations induced by the alignments. 
+2. **Interval graph construction** - Given the repeat intervals of each read in the 1X subset, and the set of filtered alignments, this step builds a graph whose nodes are intervals, and whose edges are containment and overlap relations induced by the alignments. The maximal elements by containment are used to build bidirected graphs, every path in such a bidirected graph becomes the "reference sequence" of a repeat, and all nodes of the interval graph that are reachable from a path of the bidirected graph are assigned to the corresponding repeat.
 3. 
 4. 
 5. The graph is built sequentially, but after construction each connected component, and each cluster in a component, can be processed independently and in parallel.
