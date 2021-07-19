@@ -2,7 +2,7 @@
 
 # Revant
 
-Program for de novo inference of repeats from long reads.
+A pipeline for de novo repeat inference from long reads.
 
 ## Requirements
 
