@@ -27,13 +27,15 @@ Please refer to each external dependency for instructions on compiling it.
 
 ## Input data
 
-To set up a new project, create a new emtpy directory and put the following input files in a subdirectory called `input`. All input and intermediate files used by REVANT are currently human-readable text files: this helps debugging, but might be dropped in the future in the unlikely case IO is a bottleneck.
+All input and intermediate files used by REVANT are currently human-readable text files: this helps with debugging, and is easy to drop in the future in the unlikely case IO is a bottleneck. 
+
+To set up a new project, create a new emtpy directory and put the following text files in a subdirectory called `input`.
 
 * `LAshow.txt`: all pairwise alignments between the reads in a random subset that covers 1X of the genome. This is the output of the `LAshow` tool from DALIGNER.
 * `DBdump-lengths.txt`: length of each read. This is the output of the `DBdump -rh` tool from DAZZ_DB.
 * `qualityThresholds.txt`: text file containing quality thresholds for deciding low-quality regions. Example in `/scripts/1-factorize/qualityThresholds.txt`.
 * `qtrack.txt`: an estimate of intrinsic quality value for each read. This can be computed by aligning the 1X subset against, say, a distinct 10X random subset, and by running the `DASqv` tool from DALIGNER.
-* 
+* Optionally, one or several text files that encode a repeat track each: the union of all such files will be discarded by the pipeline. This is the output of the `DBdump -r -mTrackName` tool from DAZZ_DB.
 
 ## Running the scripts
 
