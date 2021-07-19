@@ -1,5 +1,5 @@
 <img align="center" src="./logo.png" width="297" height="35"/>
-De novo repeat inference from long reads.
+De novo repeat inference from long reads
 
 
 **Remark: This is just a first draft. More detailed instructions will follow.**
