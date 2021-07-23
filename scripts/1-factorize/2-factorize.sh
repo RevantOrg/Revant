@@ -15,7 +15,7 @@
 # This is the only section of the script that needs to be customized.
 #
 PROJECT_DIR=$1
-CHUNK=$1
+CHUNK=$2
 MIN_ALIGNMENT_LENGTH="1500"
 MAX_READ_LENGTH="261338"   # Median=28005
 GENOME_COVERAGE="1"  # Use 1 even when smaller than one.
