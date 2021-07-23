@@ -24,6 +24,7 @@ MIN_ALIGNMENT_LENGTH="1500"  # Alignments shorter than this are discarded
 MAX_READ_LENGTH="200000"  # Coarse upper bound
 SPLIT_IN_PARTS="4"  # For factorizing in parallel
 # Track files
+INPUT_DIR="${PROJECT_DIR}/input"
 DAMAR_QUALITY_TRACK="${INPUT_DIR}/DAMAR_Qtrack.txt"  # Use "null" to discard it.
 DAZZLER_QUALITY_TRACK="null"  # Use "null" to discard it.
 DAZZLER_DUST_TRACK="null"  # Use "null" to discard it.
@@ -38,7 +39,6 @@ JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 
 
 
-INPUT_DIR="${PROJECT_DIR}/input"
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow.txt"
 QUALITY_THRESHOLDS_FILE="${INPUT_DIR}/qualityThresholds.txt"
 DBDUMP_READ_LENGTHS="${INPUT_DIR}/DBdump-lengths.txt"
