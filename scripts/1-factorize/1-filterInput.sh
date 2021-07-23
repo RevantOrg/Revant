@@ -32,6 +32,7 @@ DAZZLER_TANDEM_TRACK="null"  # Use "null" to discard it.
 REPEAT_TRACK_DIR="${INPUT_DIR}"  # Use "null" to discard it.
 REPEAT_TRACK_PREFIX="repmod"  # Use "null" to discard it.
 REPEAT_TRACK_FORMAT="0"  # 0=DAZZLER, 1=DAMAR format
+VERBOSE="0"  # 0/1
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -92,7 +93,7 @@ echo "Quality track file built: ${PHRED_FILE}"
 
 echo "Filtering and splitting alignments..."
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.FilterAlignments ${MAX_ALIGNMENT_ERROR} ${MIN_ALIGNMENT_LENGTH} ${ALIGNMENTS_FILE} ${FILTERED_ALIGNMENTS_FILE} ${N_READS} ${MAX_READ_LENGTH} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${REPEAT_TRACK_DIR} ${REPEAT_TRACK_PREFIX} ${REPEAT_TRACK_FORMAT} ${FIRST_READ_IN_RANGE} ${LAST_READ_IN_RANGE} ${N_ALIGNMENTS} ${QUALITY_THRESHOLDS_FILE} ${PHRED_FILE}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.FilterAlignments ${MAX_ALIGNMENT_ERROR} ${MIN_ALIGNMENT_LENGTH} ${ALIGNMENTS_FILE} ${FILTERED_ALIGNMENTS_FILE} ${N_READS} ${MAX_READ_LENGTH} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${REPEAT_TRACK_DIR} ${REPEAT_TRACK_PREFIX} ${REPEAT_TRACK_FORMAT} ${FIRST_READ_IN_RANGE} ${LAST_READ_IN_RANGE} ${N_ALIGNMENTS} ${QUALITY_THRESHOLDS_FILE} ${PHRED_FILE} ${VERBOSE}
 EXIT_STATUS=$?
 if [ ${EXIT_STATUS} -ne 0 ]; then
     echo "The following command returned error ${EXIT_STATUS}:"

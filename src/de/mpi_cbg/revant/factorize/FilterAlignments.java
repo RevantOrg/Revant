@@ -40,6 +40,7 @@ public class FilterAlignments  {
 	private static int[] tmpArray1, tmpArray2, tmpArray3, tmpArray4, tmpArray5;
 	private static long tmpSurface;
 	private static String tmpString;
+	private static boolean VERBOSE;
 
 	
 	/**
@@ -76,6 +77,7 @@ public class FilterAlignments  {
 		final int N_ALIGNMENTS = Integer.parseInt(args[13]);
 		final String QUALITY_THRESHOLDS_FILE = args[14];
 		final String QUALITIES_FILE = args[15].equalsIgnoreCase("null")?null:args[15];
+		VERBOSE=Integer.parseInt(args[16])==1;
 		
 		final boolean REPEAT_TRACK_EXISTS = !REPEAT_TRACK_DIR.equalsIgnoreCase("null") && !REPEAT_TRACK_PREFIX.equalsIgnoreCase("null");
 		final int BUFFER_SIZE = 1000000;
@@ -379,7 +381,7 @@ public class FilterAlignments  {
 					totalIntersection[track1][track2-track1-1]=0;
 					for (i=0; i<N_READS; i++) {
 						intersectionLength=Intervals.intersectionLength(repeatTracks[track1][i],lastRepeatTracks[track1][i],repeatTracks[track2][i],lastRepeatTracks[track2][i],minIntersection,true);
-						if (intersectionLength>0) {
+						if (intersectionLength>0 && VERBOSE) {
 							System.err.println("WARNING> Repeat tracks "+repeatTrackNames[track1]+" and "+repeatTrackNames[track2]+" intersect in read "+(firstRead+i)+" (zero-based) by >="+minIntersection+" bps:");
 							System.err.print(repeatTrackNames[track1]+": ");
 							for (j=0; j<lastRepeatTracks[track1][i]; j+=2) System.err.print("["+repeatTracks[track1][i][j]+".."+repeatTracks[track1][i][j+1]+"], ");
