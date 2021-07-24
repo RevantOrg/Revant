@@ -24,7 +24,6 @@ STEP1_DIR="${PROJECT_DIR}/step1"
 STEP5_DIR="${STEP1_DIR}/finalOutput/step4/step5"
 ALIGNMENTS_DIR="${STEP5_DIR}/fragments-strings-alignments"
 FRAGMENTS_LIST="${ALIGNMENTS_DIR}/list-fragments.txt"
-CODE_DIR="/Users/ramseysnow/Dropbox/dropbox private/collaborators/myers/NEW/sw"
 
 while IFS= read -r INPUT_FILE; do
 	BASE_NAME=$(basename ${INPUT_FILE} .txt)
