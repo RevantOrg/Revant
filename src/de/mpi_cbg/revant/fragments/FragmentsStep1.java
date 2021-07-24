@@ -242,7 +242,7 @@ public class FragmentsStep1 {
 					if (currentRead!=-1) {
 						fragmentFound[currentRead]=true;
 						if (newFragmentCoordinates[currentRead][0]!=-1) {
-							checkSurfaces(currentRead,currentReference,isCyclicAndNonperiodic,BASIN_TYPE,PERIOD,REFERENCE_LENGTH,MIN_INTERSECTION_LENGTH,tmpWindows,lastTmpWindow,newFragmentCoordinates,stats,frUncoveredHistogram,ffUncoveredHistogram,rrUncoveredHistogram);
+							checkSurfaces(currentRead,currentReference,isCyclicAndNonperiodic,BASIN_TYPE,PERIOD,REFERENCE_LENGTH,MIN_INTERSECTION_LENGTH,tmpWindows,lastTmpWindow,newFragmentCoordinates,stats,frUncoveredHistogram,ffUncoveredHistogram,rrUncoveredHistogram,list[i]);
 							if ((BASIN_TYPE!=Constants.INTERVAL_PERIODIC || PERIOD>=PeriodicSubstrings.MIN_PERIOD_LONG) && newFragmentCoordinates[currentRead][0]!=-1 && lastTmpWindow>0) {
 								if (isPermutation(tmpWindows,lastTmpWindow,PERIOD,tmpIO)) {
 									newFragmentCoordinates[currentRead][0]=-1;
@@ -303,7 +303,7 @@ public class FragmentsStep1 {
 			if (currentRead!=-1) {
 				fragmentFound[currentRead]=true;
 				if (newFragmentCoordinates[currentRead][0]!=-1) {
-					checkSurfaces(currentRead,currentReference,isCyclicAndNonperiodic,BASIN_TYPE,PERIOD,REFERENCE_LENGTH,MIN_INTERSECTION_LENGTH,tmpWindows,lastTmpWindow,newFragmentCoordinates,stats,frUncoveredHistogram,ffUncoveredHistogram,rrUncoveredHistogram);
+					checkSurfaces(currentRead,currentReference,isCyclicAndNonperiodic,BASIN_TYPE,PERIOD,REFERENCE_LENGTH,MIN_INTERSECTION_LENGTH,tmpWindows,lastTmpWindow,newFragmentCoordinates,stats,frUncoveredHistogram,ffUncoveredHistogram,rrUncoveredHistogram,list[i]);
 					if ((BASIN_TYPE!=Constants.INTERVAL_PERIODIC || PERIOD>=PeriodicSubstrings.MIN_PERIOD_LONG) && newFragmentCoordinates[currentRead][0]!=-1 && lastTmpWindow>0) {
 						if (isPermutation(tmpWindows,lastTmpWindow,PERIOD,tmpIO)) {
 							newFragmentCoordinates[currentRead][0]=-1;
@@ -343,7 +343,7 @@ public class FragmentsStep1 {
 					rrUncoveredSurface=uncoveredSurface_read2read(currentRead,MIN_INTERSECTION_LENGTH);
 					if (rrUncoveredSurface>=SURFACE_THRESHOLD && !(BASIN_TYPE==Constants.INTERVAL_PERIODIC && PERIOD==-1 && Reads.getReadLength(currentRead)>REFERENCE_LENGTH)) {
 						stats[2]++;
-						System.err.println("      Fragment "+currentRead+" does not fully align to the reference, nor to other fragments, nor to basin intervals using read-read alignments, for "+rrUncoveredSurface+" bp.");
+						System.err.println("      Fragment "+currentRead+" does not fully align to the reference, nor to other fragments, nor to basin intervals using read-read alignments, for "+rrUncoveredSurface+" bp ("+list[i]+").");
 						rrUncoveredSurface/=IO.quantum;
 						rrUncoveredSurface=Math.min(rrUncoveredSurface,rrUncoveredHistogram.length-1);
 						rrUncoveredHistogram[rrUncoveredSurface]++;
@@ -411,7 +411,7 @@ public class FragmentsStep1 {
 	 * @param windows not assumed to be sorted in any way; the procedure might change the
 	 * order.
 	 */
-	private static final void checkSurfaces(int currentRead, boolean currentReference, boolean isCyclicAndNonperiodic, int basinType, int period, int referenceLength, int minIntersectionLength, PermutationWindow[] windows, int lastWindow, int[][] newFragmentCoordinates, int[] stats, int[] frUncoveredHistogram, int[] ffUncoveredHistogram, int[] rrUncoveredHistogram) {
+	private static final void checkSurfaces(int currentRead, boolean currentReference, boolean isCyclicAndNonperiodic, int basinType, int period, int referenceLength, int minIntersectionLength, PermutationWindow[] windows, int lastWindow, int[][] newFragmentCoordinates, int[] stats, int[] frUncoveredHistogram, int[] ffUncoveredHistogram, int[] rrUncoveredHistogram, String fileName) {
 		int i;
 		int last, currentSurface, currentStart, currentEnd;
 		int ffUncoveredSurface, rrUncoveredSurface;
@@ -468,7 +468,7 @@ public class FragmentsStep1 {
 				rrUncoveredSurface=uncoveredSurface_read2read(currentRead,minIntersectionLength);
 				if (rrUncoveredSurface>=SURFACE_THRESHOLD && !(basinType==Constants.INTERVAL_PERIODIC && period<PeriodicSubstrings.MIN_PERIOD_LONG && Reads.getReadLength(currentRead)>referenceLength)) {
 					stats[2]++;
-					System.err.println("      Fragment "+currentRead+" does not fully align to the reference, nor to other fragments, nor to basin intervals using read-read alignments, for "+rrUncoveredSurface+" bp.");
+					System.err.println("      Fragment "+currentRead+" does not fully align to the reference, nor to other fragments, nor to basin intervals using read-read alignments, for "+rrUncoveredSurface+" bp ("+fileName+").");
 					rrUncoveredSurface/=IO.quantum;
 					rrUncoveredSurface=Math.min(rrUncoveredSurface,rrUncoveredHistogram.length-1);
 					rrUncoveredHistogram[rrUncoveredSurface]++;
