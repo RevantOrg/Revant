@@ -388,15 +388,6 @@ public class IntervalGraph {
 		
 		// ---------------------- FIXES RELATED TO PERIODIC INTERVALS --------------------
 		sortNodesArray();
-		
-		
-System.err.println("FUCK 1> ");		
-System.err.println("Consistency checks");
-checkConsistency(0,nNodes-1,new int[maxAlignmentsPerRead<<1]);
-System.err.println("Consistency checks passed");
-
-		
-		
 		makeAlignmentIntervalsPeriodic();  // Propagating periodic tag
 		fixPeriodicLoops();  // Transforming short loops into periodic
 		fixMultiEdges();  // Transforming overlap multi-edges into periodic
@@ -405,13 +396,6 @@ System.err.println("Consistency checks passed");
 		mergePeriodicSubstringsOfNodes();
 		fixPeriodicUndersplits(true,tmpArray);  // Fixing periodic undersplits
 		removePeriodicNonperiodicEdges();
-
-
-System.err.println("FUCK 2> ");		
-System.err.println("Consistency checks");
-checkConsistency(0,nNodes-1,new int[maxAlignmentsPerRead<<1]);
-System.err.println("Consistency checks passed");
-		
 		
 		// -------------------- FIXES RELATED TO WEAK DENSE SUBSTRINGS -------------------
 		setDenseSubstringsOfNodes_sameRead(false);		
@@ -419,14 +403,6 @@ System.err.println("Consistency checks passed");
 		fixPeriodicUndersplits(false,tmpArray);		
 		redirectWeakSubstrings(true);
 		redirectWeakSubstrings(false);
-
-
-
-System.err.println("FUCK 3> ");		
-System.err.println("Consistency checks");
-checkConsistency(0,nNodes-1,new int[maxAlignmentsPerRead<<1]);
-System.err.println("Consistency checks passed");
-
 		
 		// Fixing undersplits
 /*		setPeriodicSubstringsOfNodes_neighbors(false,tmpArray);
@@ -455,24 +431,10 @@ System.err.println("Consistency checks passed");
 		disconnectLowCoverageNodes();		
 		i=nNodes;
 		disconnected=removeDisconnectedNodes(tagsDir,tagsPrefix);
-		System.err.println(disconnected+" disconnected nodes removed ("+IO.getPercent(disconnected,i)+"%)");		
-		
-		
-System.err.println("FUCK 4> ");		
-System.err.println("Consistency checks");
-checkConsistency(0,nNodes-1,new int[maxAlignmentsPerRead<<1]);
-System.err.println("Consistency checks passed");		
-		
+		System.err.println(disconnected+" disconnected nodes removed ("+IO.getPercent(disconnected,i)+"%)");
 		
 		// Finalizing properties
 		finalizeEdgeAndNodeProperties();
-		
-		
-System.err.println("FUCK 5> ");		
-System.err.println("Consistency checks");
-checkConsistency(0,nNodes-1,new int[maxAlignmentsPerRead<<1]);
-System.err.println("Consistency checks passed");
-		
 		
 		// Adding supplement edges
 /*		sortNodesArray();
@@ -3932,7 +3894,6 @@ System.err.println("Consistency checks passed");
 			if (tmpEdge==null) {
 				tmpEdge = new Edge(alignmentPair);
 				edges.put(tmpEdge,tmpEdge);
-if ((alignmentPair.node1.read==971459 || alignmentPair.node1.read==1280933) && (alignmentPair.node2.read==1280933 || alignmentPair.node2.read==971459)) System.err.println("FUCK>fixUnassignedAlignments_impl>   created edge "+tmpEdge);
 			}
 			else {
 				tmpEdge.addTypes(queryEdge);
