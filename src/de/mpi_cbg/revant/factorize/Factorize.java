@@ -270,7 +270,7 @@ public class Factorize {
 		System.err.print(" 5 ");
 		Events.allocateMemory(10/*Arbitrary, reallocated later.*/,Factors.maxFactorsPerRead<<1);
 		System.err.print(" 6 ");
-		PeriodicSubstrings.allocateMemory(Alignments.maxAlignmentsPerRead,Alignments.maxOccurrences>>1/* Division by two arbitrary */,Factors.maxFactorsPerRead<<1,10/*Arbitrary, reallocated later.*/);
+		PeriodicSubstrings.allocateMemory(Alignments.maxAlignmentsPerRead,Alignments.maxOccurrences,Factors.maxFactorsPerRead<<1,10/*Arbitrary, reallocated later.*/);
 		System.err.print(" 7 ");
 		DenseSubstrings.allocateMemory(Alignments.maxAlignmentsPerRead,Math.ceil(Alignments.maxAlignmentsPerRead,DenseSubstrings.DEFAULT_MIN_PATH_LENGTH>>1),Factors.maxFactorsPerRead<<1,10/*Arbitrary, reallocated later.*/,Reads.maxReadLength);
 		System.err.print(" 8 ");
