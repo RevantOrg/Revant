@@ -30,9 +30,9 @@ JAVA_RUNTIME_FLAGS="-Xms10G -Xmx16G"
 
 
 N_READS=$(wc -l < ${PROJECT_DIR}/reads-lengths.txt)
+OUTPUT_DIR="${PROJECT_DIR}/step1"
 TAGS_DIR="${OUTPUT_DIR}/finalOutput"
 TAGS_FILE="${TAGS_DIR}/tags-root.txt"
-OUTPUT_DIR="${PROJECT_DIR}/step1"
 
 rm -rf ${OUTPUT_DIR}
 mkdir ${OUTPUT_DIR}
