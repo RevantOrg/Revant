@@ -32,9 +32,8 @@ for INPUT_FILE in $(cat ${FRAGMENTS_LIST}); do
     BASE_NAME=$(basename ${INPUT_FILE} .txt)
     OUTPUT_DIR="${ROOT_DIR}/${OUTPUT_PREFIX}-${BASE_NAME}"
     mkdir ${OUTPUT_DIR}
-    cp ${FRAGMENTS_DIR}/${INPUT_FILE} ${OUTPUT_DIR}
+    cp ${FRAGMENTS_DIR}/${BASE_NAME}.txt ${OUTPUT_DIR}/${BASE_NAME}.fasta
     cd ${OUTPUT_DIR}
-    mv ${INPUT_FILE} ${BASE_NAME}.fasta
     fasta2DB ${BASE_NAME}.db ${BASE_NAME}.fasta
     DBsplit ${BASE_NAME}.db
     DBdump -rh ${BASE_NAME}.db > output-DBdump.txt
@@ -50,9 +49,8 @@ for INPUT_FILE in $(cat ${REFERENCES_LIST}); do
     ID=${BASE_NAME#"reference-"}
     OUTPUT_DIR="${ROOT_DIR}/${OUTPUT_PREFIX}-fragments-${ID}"
     if [ -d ${OUTPUT_DIR} ]; then
-        cp ${REFERENCES_DIR}/${INPUT_FILE} ${OUTPUT_DIR}
+        cp ${REFERENCES_DIR}/${BASE_NAME}.txt ${OUTPUT_DIR}/${BASE_NAME}.fasta
         cd ${OUTPUT_DIR}
-        mv ${INPUT_FILE} ${BASE_NAME}.fasta
         fasta2DB ${BASE_NAME}.db ${BASE_NAME}.fasta
         daligner -T${N_THREADS} -M${MEMORY} -e${IDENTITY} -l${MIN_ALIGNMENT_LENGTH} fragments-${ID}.db ${BASE_NAME}.db
         LAshow fragments-${ID}.db ${BASE_NAME}.db fragments-${ID}.${BASE_NAME}.las > LAshow-fragments-reference.txt
