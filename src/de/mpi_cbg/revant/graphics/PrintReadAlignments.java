@@ -42,7 +42,7 @@ public class PrintReadAlignments {
 	public static final int HISTOGRAM_ROWS = 100;  // in pixels
 	public static final int HISTOGRAM_THICKNESS = 4;  // in pixels
 	private static final int MAX_INTERVALS_PER_READ = 30000;
-	private static final int READ_AHEAD_LIMIT = MAX_INTERVALS_PER_READ*100;  // Characters
+	private static final int READ_AHEAD_LIMIT = MAX_INTERVALS_PER_READ*1000;  // Characters
 	private static final int TRACK_HEIGHT = QUANTUM;  // In pixels
 	private static final int TRACK_SPACE = 2;  // In pixels
 	public static final String DEFAULT_FONT = "Barlow";
