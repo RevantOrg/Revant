@@ -897,7 +897,7 @@ public class Math {
 		double[] out;
 		
 		out = new double[dimension];
-		if (dimension==1) out[0]=random.nextDouble();
+		if (dimension==1) out[0]=1.0;
 		else if (dimension==2) {
 			out[0]=random.nextDouble();
 			out[1]=1.0-out[0];

@@ -987,6 +987,10 @@ public class FragmentsStep1 {
 	
 	
 	/**
+	 * Remark: it can happen that a fragment has a long substring that is not covered by
+	 * alignments between intervals. This might be caused by e.g. $IntervalGraphStep3.
+	 * checkKernelsWithReads()$ and $IntervalGraphStep3.getBasins_ensureKernelLengths()$.
+	 *
 	 * Remark: the procedure uses global variables $tmpAlignment,tmpArray,tmpPairs$, which
 	 * are assumed to be already initialized and large enough.
 	 * 

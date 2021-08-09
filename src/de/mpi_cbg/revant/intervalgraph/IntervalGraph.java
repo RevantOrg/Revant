@@ -14258,6 +14258,68 @@ if (IO.SHOW_INTERACTIVE) System.err.println("addEdgesToOverlapNeighbors_sameRead
 			return 0;
 		}
 		
+		
+		/**
+		 * Removes from $kernels,kernelOrientations,pathsWithStart,pathsWithEnd$ every 
+		 * element of $kernels$ that does not occur in $otherNode$.
+		 *
+		 * Remark: the procedure assumes all kernel arrays of both nodes to be sorted.
+		 *
+		 * @param tmp1,tmp2 of size at least twice the number of kernels in this node.
+		 */
+		public final void removeKernels(Node otherNode, int[] tmp1, int[] tmp2) {
+			int i, j;
+			int tmpValue, lastAbsent, lastAbsentPrime;
+			
+			if (lastKernel==-1) return;
+			lastAbsent=Math.setMinus(kernels,lastKernel,otherNode.kernels,otherNode.lastKernel,tmp1);
+			if (lastAbsent==-1) return;
+			
+			// Cleaning $kernels,kernelOrientations$.
+			i=0; j=0;
+			while (i<=lastKernel && j<=lastAbsent) {
+				if (kernels[i]<tmp1[j]) {
+					i++;
+					continue;
+				}
+				else if (kernels[i]>tmp1[j]) {
+					j++;
+					continue;
+				}
+				else {
+					kernels[i]=-1;
+					i++; j++;
+				}
+			}
+			j=-1;
+			for (i=0; i<=lastKernel; i++) {
+				if (kernels[i]==-1) continue;
+				j++;
+				kernels[j]=kernels[i];
+				kernelOrientations[j]=kernelOrientations[i];
+			}
+			lastKernel=j;
+			
+			// Cleaning $pathsWithStart,pathsWithEnd$.
+			if (lastPathWithStart>=0 || lastPathWithEnd>=0) {
+				System.arraycopy(tmp1,0,tmp1,lastAbsent+1,lastAbsent+1);
+				for (i=0; i<=lastAbsent; i++) {
+					tmpValue=-tmp1[lastAbsent-i];
+					tmp1[lastAbsent-i]=-tmp1[i];
+					tmp1[i]=tmpValue;
+				}
+				lastAbsentPrime=(lastAbsent+1)<<1;
+				if (lastPathWithStart>=0) {
+					lastPathWithStart=Math.setMinus(pathsWithStart,lastPathWithStart,tmp1,lastAbsentPrime,tmp2);
+					if (lastPathWithStart>=0) System.arraycopy(tmp2,0,pathsWithStart,0,lastPathWithStart+1);
+				}
+				if (lastPathWithEnd>=0) {
+					lastPathWithEnd=Math.setMinus(pathsWithEnd,lastPathWithEnd,tmp1,lastAbsentPrime,tmp2);
+					if (lastPathWithEnd>=0) System.arraycopy(tmp2,0,pathsWithEnd,0,lastPathWithEnd+1);
+				}
+			}
+		}
+		
 	}
 	
 	

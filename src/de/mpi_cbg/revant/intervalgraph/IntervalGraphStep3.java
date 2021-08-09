@@ -264,9 +264,9 @@ for (int x=0; x<nNodesInKernel; x++) System.err.println(IntervalGraph.nodesArray
 
 		
 		// -------------------------------- BASINS ---------------------------------------
-		System.err.println("STEP3> Computing basins of "+nPathKernels+" path kernels...  ("+IntervalGraph.nNodes+" nodes)");		
+		System.err.println("STEP3> Computing basins of "+nPathKernels+" path kernels...  ("+IntervalGraph.nNodes+" nodes)");
 		getBasins(nPathKernels,true);  // Some nodes might get no kernel tag
-		if (IO.CONSISTENCY_CHECKS) checkKernelLengths(0,GRAPH_FILE,CHECK_LENGTHS_FILE);		
+		if (IO.CONSISTENCY_CHECKS) checkKernelLengths(0,GRAPH_FILE,CHECK_LENGTHS_FILE);
 		kernelSize = new int[nPathKernels];
 		kernelFrequency = new int[nPathKernels][4];
 		frequencyPairs = new FrequencyPair[100];  // Arbitrary, needed by $getFrequency$.
@@ -292,13 +292,12 @@ for (int x=0; x<nNodesInKernel; x++) System.err.println(IntervalGraph.nodesArray
 			Points.deallocateMemory();
 			return;
 		}		
-		System.err.println("STEP3> Refining basins with sequential information...");
+		System.err.println("STEP3> Refining basins with sequential information...");		
 		refined=checkKernelsWithReads(MAX_ALIGNMENTS_PER_READ,nPathKernels,true);
 		basinStats(tmpIO,true);
 		maxKernelsPerInterval=tmpIO[0];
 		System.err.println("STEP3> Path kernels refined in "+refined+" nodes ("+(100*((double)refined)/IntervalGraph.nNodes)+"% of all nodes)");
-		printBasinHistograms(tmpIO);
-		
+		printBasinHistograms(tmpIO);		
 		
 		// ----------------------------- KERNEL GRAPH ------------------------------------
 		System.out.println("STEP3> Building the kernel graph");
@@ -2944,6 +2943,11 @@ if (IO.SHOW_INTERACTIVE) {
 	 * consistent length might not get the kernel tag (since length is not monotonic along
 	 * identity edges).
 	 *
+	 * Remark: the procedure might make a node have a kernel tag that none of its 
+	 * ancestors by containment has. Fixing this inconsistency takes too much effort:* we 
+	 * don't do it for simplicity. However, it might be the reason why a node is reported 
+	 * by $FragmentsStep1$.
+	 *
 	 * Remark: there might be a repeat that replicates \emph{by expansion}, i.e. every 
 	 * copy is a slightly longer version of a previous copy. This might create long
 	 * paths of identity edges in a basin, and the procedure would remove the tag after
@@ -4009,6 +4013,11 @@ if (IO.SHOW_INTERACTIVE) {
 	 * Remark: the procedure does not change the kernel tags of a node if no tag occurs 
 	 * within suitable distance.
 	 *
+	 * Remark: the procedure might make a node have a kernel tag that none of its 
+	 * ancestors by containment has. Fixing this inconsistency takes too much effort:* we 
+	 * don't do it for simplicity. However, it might be the reason why a node is reported 
+	 * by $FragmentsStep1$.
+	 *
 	 * Remark: the procedure assumes that $IntervalGraph.nodesArray$ is sorted by read, 
 	 * and the $kernels$ array of every node to be sorted in ascending order.
 	 *
@@ -4018,13 +4027,13 @@ if (IO.SHOW_INTERACTIVE) {
 	 */
 	private static final int checkKernelsWithReads(int maxAlignmentsPerRead, int maxKernelsPerInterval, boolean kernelsSorted) {
 		int i, j;
-		int id, readA, previousReadA, lastNodeInBatch, tmpOrder, out;
+		int id, readA, previousReadA, lastNodeInBatch, tmpOrder, lastCorrectedNode;
 		IntervalGraph.Node node;
 		int[] notFoundLeft = new int[maxKernelsPerInterval];
 		int[] notFoundRight = new int[maxKernelsPerInterval];
-		if (tmpArray1==null || tmpArray1.length<maxKernelsPerInterval) tmpArray1 = new int[maxKernelsPerInterval];
-		if (tmpArray2==null || tmpArray2.length<maxKernelsPerInterval) tmpArray2 = new int[maxKernelsPerInterval];
-		if (tmpArray3==null || tmpArray3.length<maxKernelsPerInterval) tmpArray3 = new int[maxKernelsPerInterval];
+		if (tmpArray1==null || tmpArray1.length<maxKernelsPerInterval<<1) tmpArray1 = new int[maxKernelsPerInterval<<1];
+		if (tmpArray2==null || tmpArray2.length<maxKernelsPerInterval<<1) tmpArray2 = new int[maxKernelsPerInterval<<1];
+		if (tmpArray3==null || tmpArray3.length<maxKernelsPerInterval<<1) tmpArray3 = new int[maxKernelsPerInterval<<1];
 		if (tmpArray4==null || tmpArray4.length<nNodesInKernel) tmpArray4 = new int[nNodesInKernel];
 		System.arraycopy(nodesInKernel,0,tmpArray4,0,nNodesInKernel);
 		if (nNodesInKernel>1) Arrays.sort(tmpArray4,0,nNodesInKernel);
@@ -4038,7 +4047,7 @@ if (IO.SHOW_INTERACTIVE) {
 		
 		// Loading in $batch$ the set of all distinct intervals (excluding periodic
 		// intervals) in the same read.
-		previousReadA=-1; lastNodeInBatch=-1; out=0; j=0;
+		previousReadA=-1; lastNodeInBatch=-1; lastCorrectedNode=-1; j=0;
 		for (i=0; i<IntervalGraph.nNodes; i++) {
 			readA=IntervalGraph.nodesArray[i].read;
 			if (readA!=previousReadA) {
@@ -4047,7 +4056,7 @@ if (IO.SHOW_INTERACTIVE) {
 					IntervalGraph.Node.order=IntervalGraph.Node.START;
 					if (lastNodeInBatch>0) Arrays.sort(batch,0,lastNodeInBatch+1);
 					IntervalGraph.Node.order=tmpOrder;
-					out+=checkKernelsWithReads_impl(batch,lastNodeInBatch,notFoundLeft,notFoundRight,tmpArray1,tmpArray2,tmpArray3);
+					lastCorrectedNode=checkKernelsWithReads_impl(batch,lastNodeInBatch,notFoundLeft,notFoundRight,lastCorrectedNode+1,tmpArray1,tmpArray2,tmpArray3);					
 				}
 				previousReadA=readA;
 				lastNodeInBatch=-1;
@@ -4060,11 +4069,12 @@ if (IO.SHOW_INTERACTIVE) {
 			IntervalGraph.Node.order=IntervalGraph.Node.START;
 			if (lastNodeInBatch>0) Arrays.sort(batch,0,lastNodeInBatch+1);
 			IntervalGraph.Node.order=tmpOrder;
-			out+=checkKernelsWithReads_impl(batch,lastNodeInBatch,notFoundLeft,notFoundRight,tmpArray1,tmpArray2,tmpArray3);
+			lastCorrectedNode=checkKernelsWithReads_impl(batch,lastNodeInBatch,notFoundLeft,notFoundRight,lastCorrectedNode+1,tmpArray1,tmpArray2,tmpArray3);
 		}
 		for (i=0; i<batch.length; i++) batch[i]=null;
 		batch=null;
-		return out;
+		
+		return lastCorrectedNode+1;
 	}
 	
 	
@@ -4075,22 +4085,26 @@ if (IO.SHOW_INTERACTIVE) {
 	 * @param batch set of distinct node pointers that do not point to periodic substring
 	 * intervals, sorted by node start position;
 	 * @param notFoundLeft,notFoundRight,tmp1,tmp2,tmp3 temporary space;
-	 * @return the number of nodes that have been corrected by the procedure.
+	 * @param correctedNodes nodes that have been corrected by the procedure;
+	 * @return the procedure stores in global variable $tmpArray4[from...]$ the nodes it 
+	 * corrected, and it returns the index of the last such node.
 	 */
-	private static final int checkKernelsWithReads_impl(IntervalGraph.Node[] batch, int lastNodeInBatch, int[] notFoundLeft, int[] notFoundRight, int[] tmp1, int[] tmp2, int[] tmp3) {
-		final int THRESHOLD = IO.quantum;
+	private static final int checkKernelsWithReads_impl(IntervalGraph.Node[] batch, int lastNodeInBatch, int[] notFoundLeft, int[] notFoundRight, int from, int[] tmp1, int[] tmp2, int[] tmp3) {
+		final int READ = batch[0].read;
+		final int READ_LENGTH = Reads.getReadLength(READ);
+		final int THRESHOLD = IO.quantum;  // Arbitrary
 		int i, j, k, i1, i2;
-		int length, nUnreachable, lastNotFoundLeft, lastNotFoundRight, lastNotFound, out;
+		int length, nUnreachable, lastNotFoundLeft, lastNotFoundRight, lastNotFound, lastCorrectedNode;
 		IntervalGraph.Node node;
 		int[] swap, notFound;
 		
-		out=0;
+		lastCorrectedNode=from-1;
 		for (i=0; i<=lastNodeInBatch; i++) {
 			node=batch[i];
 			if (node.lastKernel==0 || (node.isLeftMaximal && node.isRightMaximal)) continue;
 			
 			// Checking on the left side
-			if (!node.isLeftMaximal) {
+			if (!node.isLeftMaximal && node.start>=Alignments.minAlignmentLength) {
 				lastNotFoundLeft=notStart(node,notFoundLeft,tmp3);
 				for (j=i-1; j>=0; j--) {
 					if (batch[j].isRightMaximal || batch[j].end>=node.start) continue;
@@ -4119,7 +4133,7 @@ if (IO.SHOW_INTERACTIVE) {
 			else lastNotFoundLeft=-1;
 			
 			// Checking on the right side
-			if (!node.isRightMaximal) {
+			if (!node.isRightMaximal && node.end<READ_LENGTH-Alignments.minAlignmentLength) {
 				lastNotFoundRight=notEnd(node,notFoundRight,tmp3);
 				for (j=i+1; j<=lastNodeInBatch; j++) {
 					if (batch[j].isLeftMaximal || batch[j].start<=node.end) continue;
@@ -4214,17 +4228,17 @@ if (IO.SHOW_INTERACTIVE) {
 				if (Arrays.binarySearch(node.kernels,0,node.lastKernel+1,i2)>=0) node.pathsWithEnd[++k]=node.pathsWithEnd[i1];
 			}
 			node.lastPathWithEnd=k;
-			out++;
+			lastCorrectedNode++;
+			if (lastCorrectedNode==tmpArray4.length) {
+				int[] newArray = new int[tmpArray4.length<<1];
+				System.arraycopy(tmpArray4,0,newArray,0,tmpArray4.length);
+				tmpArray4=newArray;
+			}
+			tmpArray4[lastCorrectedNode]=node.nodeID;
 		}
-		return out;
+		return lastCorrectedNode;
 	}
 
-	
-	
-	
-	
-	
-	
 	
 	
 	
