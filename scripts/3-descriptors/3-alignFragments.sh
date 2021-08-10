@@ -8,7 +8,7 @@
 # --------------------------------- CONFIGURATION ----------------------------------------
 # This is the only section of the script that needs to be customized.
 #
-ROOT_DIR=$1
+PROJECT_DIR=$1
 # DALIGNER
 IDENTITY="0.7"  # Must be >=0.7
 MIN_ALIGNMENT_LENGTH="500"
@@ -19,6 +19,7 @@ MEMORY="16"  # GB
 
 
 
+ROOT_DIR="${PROJECT_DIR}/step1/finalOutput/step4/step5"
 FRAGMENTS_DIR="${ROOT_DIR}/fragments-strings"
 REFERENCES_DIR="${ROOT_DIR}/references-strings"
 FRAGMENTS_LIST="${ROOT_DIR}/list-fragments.txt"

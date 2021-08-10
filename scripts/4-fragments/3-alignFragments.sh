@@ -9,7 +9,7 @@
 # --------------------------------- CONFIGURATION ----------------------------------------
 # This is the only section of the script that needs to be customized.
 #
-ROOT_DIR=$1
+PROJECT_DIR=$1
 # DALIGNER
 IDENTITY="0.7"  # Must be >=0.7
 MIN_ALIGNMENT_LENGTH="500"
@@ -20,6 +20,7 @@ MEMORY="16"  # GB
 
 
 
+ROOT_DIR="${PROJECT_DIR}/step1/finalOutput/step4/step5/fragments-strings-alignments"
 FRAGMENTS_DIR="${ROOT_DIR}/fragments-strings-new"
 REFERENCES_DIR="${ROOT_DIR}/references-strings-new"
 FRAGMENTS_LIST="${ROOT_DIR}/list-fragments.txt"
@@ -42,9 +43,8 @@ for INPUT_FILE in $(cat ${FRAGMENTS_LIST}); do
     BASE_NAME=$(basename ${INPUT_FILE} .txt)
     OUTPUT_DIR="${ROOT_DIR}/${OUTPUT_PREFIX}-${BASE_NAME}"
     mkdir ${OUTPUT_DIR}
-    cp ${FRAGMENTS_DIR}/${INPUT_FILE} ${OUTPUT_DIR}/
+    cp ${FRAGMENTS_DIR}/${BASE_NAME}.txt ${OUTPUT_DIR}/${BASE_NAME}.fasta
     cd ${OUTPUT_DIR}
-    mv ${INPUT_FILE} ${BASE_NAME}.fasta
     fasta2DB ${BASE_NAME}.db ${BASE_NAME}.fasta
     DBsplit ${BASE_NAME}.db
     cd ..
@@ -57,9 +57,8 @@ for INPUT_FILE in $(cat ${REFERENCES_LIST}); do
     ID=${BASE_NAME#"reference-"}
     OUTPUT_DIR="${ROOT_DIR}/${OUTPUT_PREFIX}-fragments-${ID}"
     if [ -d ${OUTPUT_DIR} ]; then
-        cp ${REFERENCES_DIR}/${INPUT_FILE} ${OUTPUT_DIR}
+        cp ${REFERENCES_DIR}/${BASE_NAME}.txt ${OUTPUT_DIR}/${BASE_NAME}.fasta
         cd ${OUTPUT_DIR}
-        mv ${INPUT_FILE} ${BASE_NAME}.fasta
         fasta2DB ${BASE_NAME}.db ${BASE_NAME}.fasta
         daligner -T${N_THREADS} -M${MEMORY} -e${IDENTITY} -l${MIN_ALIGNMENT_LENGTH} fragments-${ID}.db ${BASE_NAME}.db
         LAshow fragments-${ID}.db ${BASE_NAME}.db fragments-${ID}.${BASE_NAME}.las > LAshow-fragments-reference.txt
