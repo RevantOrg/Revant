@@ -24,14 +24,17 @@ FRAGMENTS_DIR="${ROOT_DIR}/fragments-strings"
 REFERENCES_DIR="${ROOT_DIR}/references-strings"
 FRAGMENTS_LIST="${ROOT_DIR}/list-fragments.txt"
 REFERENCES_LIST="${ROOT_DIR}/list-references.txt"
+ALIGNMENTS_DIR="${ROOT_DIR}/fragments-strings-alignments"
 OUTPUT_PREFIX="test-basin"
+
+rm -rf ${ALIGNMENTS_DIR}
+mkdir ${ALIGNMENTS_DIR}
 
 # Computing all fragment-fragment alignments
 ls ${FRAGMENTS_DIR}/fragments-*.txt > ${FRAGMENTS_LIST}
-rm -rf ${ROOT_DIR}/${OUTPUT_PREFIX}*
 for INPUT_FILE in $(cat ${FRAGMENTS_LIST}); do
     BASE_NAME=$(basename ${INPUT_FILE} .txt)
-    OUTPUT_DIR="${ROOT_DIR}/${OUTPUT_PREFIX}-${BASE_NAME}"
+    OUTPUT_DIR="${ALIGNMENTS_DIR}/${OUTPUT_PREFIX}-${BASE_NAME}"
     mkdir ${OUTPUT_DIR}
     cp ${FRAGMENTS_DIR}/${BASE_NAME}.txt ${OUTPUT_DIR}/${BASE_NAME}.fasta
     cd ${OUTPUT_DIR}
@@ -48,7 +51,7 @@ ls ${REFERENCES_DIR}/reference-*.txt > ${REFERENCES_LIST}
 for INPUT_FILE in $(cat ${REFERENCES_LIST}); do
     BASE_NAME=$(basename ${INPUT_FILE} .txt)
     ID=${BASE_NAME#"reference-"}
-    OUTPUT_DIR="${ROOT_DIR}/${OUTPUT_PREFIX}-fragments-${ID}"
+    OUTPUT_DIR="${ALIGNMENTS_DIR}/${OUTPUT_PREFIX}-fragments-${ID}"
     if [ -d ${OUTPUT_DIR} ]; then
         cp ${REFERENCES_DIR}/${BASE_NAME}.txt ${OUTPUT_DIR}/${BASE_NAME}.fasta
         cd ${OUTPUT_DIR}
