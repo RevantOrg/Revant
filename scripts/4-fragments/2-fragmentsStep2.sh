@@ -40,7 +40,7 @@ while IFS= read -r INPUT_FILE; do
 	CURRENT_DIR="${ALIGNMENTS_DIR}/test-basin-${BASE_NAME}"
 	NREADS=$(wc -l < ${CURRENT_DIR}/reads-lengths.txt)
 	NREADS=${NREADS##*( )}
-	FRAGMENT_STRINGS="${FRAGMENT_STRINGS_DIR}/${INPUT_FILE}"
+	FRAGMENT_STRINGS="${FRAGMENT_STRINGS_DIR}/${BASE_NAME}.txt"
 	REFERENCE_IS_GOOD=$(grep ^${ID}, ${STATS_FILE} | cut -d "," -f 2)
 	if [ ${REFERENCE_IS_GOOD} -eq 0 ]; then
 		echo "Running FragmentsStep2 on ${BASE_NAME}..."
