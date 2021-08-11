@@ -38,6 +38,8 @@ mkdir ${REFERENCES_DIR}/${LENGTHS_SUBDIR}
 mv ${REFERENCES_DIR}/*-lengths.txt ${REFERENCES_DIR}/${LENGTHS_SUBDIR}/
 
 # Building fragment DBs
+rm -rf ${NEW_ALIGNMENTS_DIR}
+mkdir ${NEW_ALIGNMENTS_DIR}
 ls ${FRAGMENTS_DIR}/fragments-*.txt > ${FRAGMENTS_LIST}
 rm -rf ${ROOT_DIR}/${OUTPUT_PREFIX}*
 for INPUT_FILE in $(cat ${FRAGMENTS_LIST}); do
