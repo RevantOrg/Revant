@@ -71,3 +71,9 @@ for INPUT_FILE in $(cat ${REFERENCES_LIST}); do
 		:
     fi
 done
+
+# Moving back length files
+mv ${FRAGMENTS_DIR}/${LENGTHS_SUBDIR}/*-lengths.txt ${FRAGMENTS_DIR}
+rm -rf ${FRAGMENTS_DIR}/${LENGTHS_SUBDIR}/
+mv ${REFERENCES_DIR}/${LENGTHS_SUBDIR}/*-lengths.txt ${REFERENCES_DIR}
+rm -rf ${REFERENCES_DIR}/${LENGTHS_SUBDIR}/
