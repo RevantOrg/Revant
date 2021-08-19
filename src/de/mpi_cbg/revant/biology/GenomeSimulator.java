@@ -12,11 +12,12 @@ public class GenomeSimulator {
 	public static final char[] DNA_ALPHABET = new char[] {'a','c','g','t'};
 	
 	/**
-	 * Repeats
+	 * Repeats. All unique substrings of the genome are assumed to belong to the same 
+	 * artificial repeat, which forms its own evolutionary tree with just one node.
 	 */
 	public static final int N_REPEAT_TYPES = Constants.INTERVAL_UNKNOWN+1;
 	private static Repeat[] repeats;
-	private static int lastRepeat, lastComponent;
+	private static int lastRepeat, lastTree;
 	private static Repeat unique;
 	
 	/**
@@ -26,17 +27,17 @@ public class GenomeSimulator {
 	private static RepeatInstance root;
 	
 	/**
-	 * Row $i$ stores all the repeat instances that belong to the $i$-th component, in no
-	 * particular order.
+	 * Row $i$ stores all the repeat instances that belong to the $i$-th tree and that 
+	 * have length $>=2*minAlignmentLength$, in no particular order.
 	 */
-	private static RepeatInstance[][] byComponent;
-	private static int[] lastByComponent;
+	private static RepeatInstance[][] byTree;
+	private static int[] lastByTree;
 	
 	/**
-	 * Temporary array: cell $i$ contains the numer of instances in all components $<=i$
-	 * (excluding component zero).
+	 * Temporary array: cell $i$ contains the number of columns in all rows of $byTree$ 
+	 * that are $<=i$ (including row zero).
 	 */
-	private static int[] cumulativeByComponent;
+	private static int[] cumulativeByTree;
 	
 	
 	
@@ -45,7 +46,7 @@ public class GenomeSimulator {
 	/**
 	 *
 	 * @param args
-	 * 0=number of unique basepairs (an integer, so at most 2 billion);
+	 * 0=number of unique basepairs (an int, so at most 2 billion);
 	 */
 	public static void main(String[] args) throws IOException {
 		final int N_UNIQUE_BPS = Integer.parseInt(args[0]);
@@ -63,13 +64,7 @@ public class GenomeSimulator {
 		
 		initializeGenome(N_UNIQUE_BPS,model,sb,random);
 		nRepeatBps=0;
-		while (nRepeatBps<N_REPEAT_BPS) {
-			
-			
-			
-		}
-	
-	
+		while (nRepeatBps<N_REPEAT_BPS) nRepeatBps+=epoch(model,sb,random);
 	}
 	
 	
@@ -79,7 +74,8 @@ public class GenomeSimulator {
 	// ------------------------------------ GENOME ---------------------------------------
 	
 	/**
-	 * Sets the genome to a non-repetitive random sequence of length $nUniqueBps$.
+	 * Sets the genome to a non-repetitive random sequence of length $nUniqueBps >=
+	 * 2*minAlignmentLength$.
 	 */
 	private static final void initializeGenome(int nUniqueBps, RepeatModel model, StringBuilder sb, Random random) {
 		final int CAPACITY_ROWS = 100;  // Arbitrary
@@ -87,54 +83,53 @@ public class GenomeSimulator {
 		RepeatInstance instance;
 		
 		// Repeats
-		lastRepeat=-1; lastComponent=-1;
 		unique = new Repeat();
 		unique.initialize(nUniqueBps,model,sb,random);
 		repeats = new Repeat[CAPACITY_ROWS];
 		repeats[0]=unique;
+		lastRepeat=0; lastTree=0;
 		
 		// Instances
 		root = new RepeatInstance();
 		instance = new RepeatInstance(unique.sequence,unique,true,0,unique.sequenceLength-1);
 		root.previous=null; root.next=instance; 
 		instance.previous=root; instance.next=null;
-		byComponent = new RepeatInstance[CAPACITY_ROWS][0];
-		byComponent[0] = new RepeatInstance[CAPACITY_COLUMNS];
-		byComponent[0][1]=instance;
-		lastByComponent = new int[CAPACITY_ROWS];
-		lastByComponent[0]=0;
-		cumulativeByComponent = new int[CAPACITY_ROWS];
+		byTree = new RepeatInstance[CAPACITY_ROWS][0];
+		byTree[0] = new RepeatInstance[CAPACITY_COLUMNS];
+		byTree[0][1]=instance;
+		lastByTree = new int[CAPACITY_ROWS];
+		lastByTree[0]=0;
+		cumulativeByTree = new int[CAPACITY_ROWS];
 	}
 	
 	
 	/**
 	 *
-	 * @return the number of new repetitive basepairs created.
+	 * @return the number of new repetitive basepairs created by the procedure.
 	 */
 	private static final long epoch(RepeatModel model, StringBuilder sb, Random random) {
 		final int CAPACITY = 1000;  // Arbitrary
-		boolean newComponent;
 		int i, j;
-		int insertionComponent;
+		int repeatTree, insertionTree;
 		long newBps;
 		Repeat repeat;
 		
+		// Creating a new repeat
 		repeat = new Repeat();
 		if (lastRepeat==0 || random.nextDouble()>model.fromInstanceProb) {
 			// New repeat from scratch
 			repeat.initialize(model,sb,random);
-			newComponent=true;
+			repeatTree=-1;
 		}
 		else {
-			// New repeat from instance chosen uniformly at random
-			cumulativeByComponent[0]=0;
-			cumulativeByComponent[1]=lastByComponent[1]+1;
-			for (i=2; i<=lastComponent; i++) cumulativeByComponent[i]=cumulativeByComponent[i-1]+lastByComponent[i]+1;
-			i=1+random.nextInt(cumulativeByComponent[lastComponent]);
-			j=Arrays.binarySearch(cumulativeByComponent,1,lastComponent+1,i);
-			if (j<0) j=-j-1;
-			repeat.initialize(byComponent[j][i-cumulativeByComponent[j-1]-1],model,sb,random);
-			newComponent=false;
+			// New repeat from an instance chosen uniformly at random
+			cumulativeByTree[0]=0;
+			cumulativeByTree[1]=lastByTree[1]+1;
+			for (i=2; i<=lastTree; i++) cumulativeByTree[i]=cumulativeByTree[i-1]+lastByTree[i]+1;
+			i=1+random.nextInt(cumulativeByTree[lastTree]);
+			repeatTree=Arrays.binarySearch(cumulativeByTree,1,lastTree+1,i);
+			if (repeatTree<0) repeatTree=-1-repeatTree;
+			repeat.initialize(byTree[repeatTree][i-cumulativeByTree[repeatTree-1]-1],model,sb,random);
 		}
 		lastRepeat++;
 		if (lastRepeat==repeats.length) {
@@ -143,30 +138,82 @@ public class GenomeSimulator {
 			repeats=newRepeats;
 		}
 		repeats[lastRepeat]=repeat;
+		if (repeatTree==-1) {
+			lastTree++;
+			if (lastTree==byTree.length) {
+				RepeatInstance[][] newByTree = new RepeatInstance[byTree.length<<1][0];
+				for (i=0; i<byTree.length; i++) newByTree[i]=byTree[i];
+				byTree=newByTree;
+				int[] newLastByTree = new int[byTree.length];
+				System.arraycopy(lastByTree,0,newLastByTree,0,byTree.length);
+				lastByTree=newLastByTree;
+			}	
+			byTree[lastTree] = new RepeatInstance[CAPACITY];
+			lastByTree[lastTree]=-1;
+			repeatTree=lastTree;
+		}
 		
 		// Replication wave
-		if (newComponent && lastComponent==byComponent.length) {
-			RepeatInstance[][] newByComponent = new RepeatInstance[byComponent.length<<1][0];
-			for (i=0; i<byComponent.length; i++) newByComponent[i] = byComponent[i];
-			byComponent=newByComponent;
-			byComponent[lastComponent] = new RepeatInstance[CAPACITY];
-			int[] newLastByComponent = new int[byComponent.length];
-			System.arraycopy(lastByComponent,0,newLastByComponent,0,byComponent.length);
-			lastByComponent=newLastByComponent;
-			lastByComponent[lastComponent]=-1;
-		}
 		newBps=0;
-		for (i=0; i<repeat.frequency; i++) {
-//			----------------->
-			
-			
-			
-			
-		}
-		
-		
-		return 0;
+		for (i=0; i<repeat.frequency; i++) newBps+=epoch_impl(repeat,model,sb,random);
+		return newBps;
 	}
+	
+	
+	/**
+	 * Creates a new instance of $repeat$ and inserts it into an existing instance of a
+	 * repeat (possibly of the same repeat, or of the artificial repeat that represents 
+	 * unique sequence).
+	 *
+	 * @return the number of new basepairs created.
+	 */
+	private static final int epoch_impl(Repeat repeat, RepeatModel model, StringBuilder sb, Random random) {
+		int i, j, p;
+		int toTree;
+		RepeatInstance fromInstance, toInstance, prefix, suffix;
+		
+		fromInstance=repeat.getInstance(model,sb,random);
+		if (lastTree==0) {
+			toTree=0;
+			i=lastByTree[0]==0?0:random.nextInt(lastByTree[0]+1);
+		}
+		else {
+			toTree=Arrays.binarySearch(repeat.insertionProbCumulative,random.nextDouble());
+			if (toTree<0) toTree=-1-toTree;
+			i=lastByTree[toTree]==0?0:random.nextInt(lastByTree[toTree]+1);
+		}
+		toInstance=byTree[toTree][i];
+		p=model.minAlignmentLength+random.nextInt(toInstance.sequenceLength-(model.minAlignmentLength<<1));
+		prefix=toInstance.getPrefix(p);
+		suffix=toInstance.getSuffix(toInstance.sequenceLength-p);
+		prefix.previous=toInstance.previous;
+		toInstance.previous.next=prefix;
+		prefix.next=fromInstance;
+		fromInstance.previous=prefix;
+		fromInstance.next=suffix;
+		suffix.previous=fromInstance;
+		suffix.next=toInstance.next;
+		toInstance.next.previous=suffix;
+		if (prefix.sequenceLength>=model.minAlignmentLength<<1) {
+			byTree[toTree][i]=prefix;
+			if (suffix.sequenceLength>=model.minAlignmentLength<<1) {
+				lastByTree[toTree]++;
+				if (lastByTree[toTree]==byTree[toTree].length) {
+					RepeatInstance[] newByTree = new RepeatInstance[byTree[toTree].length<<1];
+					System.arraycopy(byTree[toTree],0,newByTree,0,byTree[toTree].length);
+					byTree[toTree]=newByTree;
+				}
+				byTree[toTree][lastByTree[toTree]]=suffix;
+			}
+		}
+		else if (suffix.sequenceLength>=model.minAlignmentLength<<1) byTree[toTree][i]=suffix;
+		else {
+			for (j=i; j<lastByTree[toTree]; j++) byTree[toTree][j]=byTree[toTree][j+1];
+			lastByTree[toTree]--;
+		}
+		return fromInstance.sequenceLength;
+	}
+	
 	
 	
 	
@@ -179,13 +226,52 @@ public class GenomeSimulator {
 	
 	// --------------------------- REPEATS AND REPEAT INSTANCES --------------------------
 	
+	private static final void reverseComplement(StringBuilder sb) {
+		char c, d;
+		int i;
+		final int length = sb.length();
+		final int halfLength = length/2;
+		
+		for (i=0; i<halfLength; i++) {
+			c=sb.charAt(i); d=sb.charAt(length-i);
+			switch (d) {
+				case 'a': sb.setCharAt(i,'t'); break;
+				case 'c': sb.setCharAt(i,'g'); break;
+				case 'g': sb.setCharAt(i,'c'); break;
+				case 't': sb.setCharAt(i,'a'); break;
+			}
+			switch (c) {
+				case 'a': sb.setCharAt(length-i,'t'); break;
+				case 'c': sb.setCharAt(length-i,'g'); break;
+				case 'g': sb.setCharAt(length-i,'c'); break;
+				case 't': sb.setCharAt(length-i,'a'); break;
+			}
+		}
+		if (length%2!=0) {
+			i=halfLength;
+			switch (sb.charAt(i)) {
+				case 'a': sb.setCharAt(i,'t'); break;
+				case 'c': sb.setCharAt(i,'g'); break;
+				case 'g': sb.setCharAt(i,'c'); break;
+				case 't': sb.setCharAt(i,'a'); break;
+			}
+		}
+	}
+	
+	
 	public static class RepeatInstance {
 		public String sequence;
 		public int sequenceLength;
 		public Repeat repeat;
 		public boolean orientation;
-		public int repeatStart, repeatEnd;  // Not useful if the repeat type is single deletion or periodic.
 		public RepeatInstance previous, next;  // In genome order
+		
+		/**
+		 * The substring of the repeat of which this instance is a copy. 
+		 * $repeatStart <= repeatEnd$ regardless of $orientation$.
+		 * Not used if the repeat type is single deletion or periodic.
+		 */
+		public int repeatStart, repeatEnd;
 		
 		
 		public RepeatInstance() {
@@ -205,17 +291,57 @@ public class GenomeSimulator {
 			repeatStart=rs;
 			repeatEnd=re;
 		}
+		
+		
+		public RepeatInstance getPrefix(int prefixLength) {
+			RepeatInstance out = new RepeatInstance();
+			out.sequence=sequence.substring(0,prefixLength);
+			out.sequenceLength=prefixLength;
+			out.repeat=repeat;
+			out.orientation=orientation;
+			if (orientation) {
+				out.repeatStart=repeatStart;
+				out.repeatEnd=repeatStart+prefixLength-1;
+			}
+			else {
+				out.repeatEnd=repeatEnd;
+				out.repeatStart=repeatStart+sequenceLength-prefixLength-1;
+			}
+			out.previous=previous;
+			out.next=null;
+			return out;
+		}
+		
+		
+		public RepeatInstance getSuffix(int suffixLength) {
+			RepeatInstance out = new RepeatInstance();
+			out.sequence=sequence.substring(sequenceLength-suffixLength);
+			out.sequenceLength=suffixLength;
+			out.repeat=repeat;
+			out.orientation=orientation;
+			if (orientation) {
+				out.repeatStart=repeatEnd-suffixLength+1;
+				out.repeatEnd=repeatEnd;
+			}
+			else {
+				out.repeatEnd=repeatEnd-(sequenceLength-suffixLength);
+				out.repeatStart=repeatStart;
+			}
+			out.previous=null;
+			out.next=next;
+			return out;
+		}
 	}
 	
 	
 	private static class Repeat {
-		public int component;  
+		public int tree;  
 		public int id;
 		public Repeat parent;
 		public int type;  // -1 for unique sequence
 		public String sequence;  // Of the period if periodic
 		public int sequenceLength;
-		public double[] insertionProb;  // In every component of past repeats
+		public double[] insertionProb;  // In every tree of past repeats
 		public double[] insertionProbCumulative;
 		public int frequency;
 		
@@ -226,7 +352,7 @@ public class GenomeSimulator {
 		public final void initialize(int length, RepeatModel model, StringBuilder sb, Random random) {
 			id=++lastRepeat;
 			parent=null;
-			component=++lastComponent;
+			tree=++lastTree;
 			type=-1;
 			sequenceLength=length;
 			model.getUniqueString(sequenceLength,sb,random);
@@ -245,7 +371,7 @@ public class GenomeSimulator {
 			
 			id=++lastRepeat;
 			parent=null;
-			component=++lastComponent;
+			tree=++lastTree;
 			type=model.getType(random);
 			if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
 				do { sequenceLength=model.getLength(random); }
@@ -263,9 +389,9 @@ public class GenomeSimulator {
 				model.getString(sequenceLength,sb,random);
 				sequence=sb.toString();
 			}
-			insertionProb=Math.sampleFromSimplex(lastComponent,random);
+			insertionProb=Math.sampleFromSimplex(lastTree,random);
 			insertionProbCumulative[0]=insertionProb[0];
-			for (i=1; i<=lastComponent; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
+			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
 		}
 		
@@ -282,9 +408,9 @@ public class GenomeSimulator {
 			
 			id=++lastRepeat;
 			parent=instance.repeat;
-			component=parent.component;
+			tree=parent.tree;
 			type=parent.type;
-			if (type<6) {
+			if (type<Constants.INTERVAL_PERIODIC) {
 				sequence=""+instance.sequence;
 				sequenceLength=instance.sequenceLength;
 			}
@@ -297,19 +423,19 @@ public class GenomeSimulator {
 			}
 			insertionProb=model.perturbInsertionProb(parent.insertionProb,random);
 			insertionProbCumulative[0]=insertionProb[0];
-			for (i=1; i<=lastComponent; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
+			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
 		}
 		
 		
 		/**
-		 * Remark: (1) prefix-suffix type has equal prob. of generating a prefix or a 
+		 * Remark: (1) the prefix-suffix type has equal prob. of generating a prefix or a 
 		 * suffix, and uniform prob. of generating every length >=minAlignmentLength;
 		 * (2) substring type has uniform prob. of generating every substring length >=
 		 * minAlignmentLength, and uniform prob. of first position; (3) single-deletion
-		 * ensures that a prefix and a suffix of >=minAlignmentLength are always present;
-		 * (4) short-period can have a perturbed phase; (5) long-period can have an 
-		 * integer multiple of the period, always in phase.
+		 * ensures that a prefix and a suffix of length >=minAlignmentLength are always 
+		 * present; (4) short-period can have a perturbed phase; (5) long-period can have 
+		 * an integer multiple of the period, always in phase.
 		 */
 		public final RepeatInstance getInstance(RepeatModel model, StringBuilder sb, Random random) {
 			boolean orientation;
@@ -320,7 +446,7 @@ public class GenomeSimulator {
 			repeatStart=-1; repeatEnd=-1;
 			sb.delete(0,sb.length());
 			if (type==Constants.INTERVAL_ALIGNMENT) {
-				repeatStart=0; repeatEnd=sequenceLength;
+				repeatStart=0; repeatEnd=sequenceLength-1;
 				sb.append(sequence);
 			}
 			else if (type==Constants.INTERVAL_DENSE_PREFIX) {
@@ -378,29 +504,14 @@ public class GenomeSimulator {
 				reverseComplement(sb);
 			}
 			else orientation=true;
-			addReplicationNoise(sb,model,random);
+			model.addReplicationNoise(sb,random);
 			return new RepeatInstance(sb.toString(),this,orientation,repeatStart,repeatEnd);
 		}
 		
 		
-		public final void insertInComponent(RepeatModel model, StringBuilder sb, Random random) {
-			int i;
-			int insertionComponent;
-			RepeatInstance instance;
-			
-			instance=getInstance(model,sb,random);
-			insertionComponent=Arrays.binarySearch(insertionProbCumulative,random.nextDouble());
-			if (insertionComponent<0) insertionComponent=-insertionComponent-1;
-			i=random.nextInt(lastByComponent[insertionComponent]+1);
-			
-			
-			
-			
-			
-			
-		}
-		
-		
+		/**
+		 * FASTA format
+		 */
 		public String toString() {
 			final int length = insertionProb.length;
 			int i;
@@ -412,95 +523,6 @@ public class GenomeSimulator {
 			out+=sequence+"\n";
 			return out;
 		}
-	}
-	
-	
-	private static final void reverseComplement(StringBuilder sb) {
-		char c, d;
-		int i;
-		final int length = sb.length();
-		
-		for (i=0; i<length/2; i++) {
-			c=sb.charAt(i); d=sb.charAt(length-i);
-			switch (d) {
-				case 'a': sb.setCharAt(i,'t'); break;
-				case 'c': sb.setCharAt(i,'g'); break;
-				case 'g': sb.setCharAt(i,'c'); break;
-				case 't': sb.setCharAt(i,'a'); break;
-			}
-			switch (c) {
-				case 'a': sb.setCharAt(length-i,'t'); break;
-				case 'c': sb.setCharAt(length-i,'g'); break;
-				case 'g': sb.setCharAt(length-i,'c'); break;
-				case 't': sb.setCharAt(length-i,'a'); break;
-			}
-		}
-		if (length%2!=0) {
-			i=length/2;
-			switch (sb.charAt(i)) {
-				case 'a': sb.setCharAt(i,'t'); break;
-				case 'c': sb.setCharAt(i,'g'); break;
-				case 'g': sb.setCharAt(i,'c'); break;
-				case 't': sb.setCharAt(i,'a'); break;
-			}
-		}
-	}
-	
-	
-	private static final void addReplicationNoise(StringBuilder sb, RepeatModel model, Random random) {
-		int i, p;
-		int c, cPrime, nBases;
-		final int length = sb.length();
-		double prob;
-		
-		p=-1;
-		while (p<length) {
-			prob=random.nextDouble();
-			if (p==-1) {
-				if (prob>model.mismatchProb && prob<=model.mPlusI) {
-					nBases=1+random.nextInt(model.maxIndelLength);
-					for (i=0; i<nBases; i++) {
-						cPrime=random.nextInt(4);
-						sb.append(DNA_ALPHABET[cPrime]);
-					}
-				}
-				else p++;
-			}
-			else {
-				c=sb.charAt(p);
-				if (prob<=model.mismatchProb) {
-					do { cPrime=random.nextInt(4); }
-					while (cPrime==c);
-					sb.append(DNA_ALPHABET[cPrime]);
-					p++;
-				}
-				else if (prob<=model.mPlusI) {
-					nBases=1+random.nextInt(model.maxIndelLength);
-					for (i=0; i<nBases; i++) {
-						cPrime=random.nextInt(4);
-						sb.append(DNA_ALPHABET[cPrime]);
-					}
-				}
-				else if (prob<=model.mPlusIPlusD) {
-					nBases=1+random.nextInt(model.maxIndelLength);
-					p+=nBases;
-				}
-				else {
-					sb.append(c);
-					p++;
-				}
-			}
-		}
-		// Insertion after the last character
-		prob=random.nextDouble();
-		if (prob>model.mismatchProb && prob<=model.mPlusI) {
-			nBases=1+random.nextInt(model.maxIndelLength);
-			for (i=0; i<nBases; i++) {
-				cPrime=random.nextInt(4);
-				sb.append(DNA_ALPHABET[cPrime]);
-			}
-		}
-		sb.delete(0,length);
 	}
 	
 	
@@ -519,31 +541,31 @@ public class GenomeSimulator {
 		private double[] typeProb, typeProbCumulative;
 		
 		/**
-		 * Character generation probabilities
+		 * Probability of creating a character
 		 */
 		private double[] charProb, charProbCumulative;
 		private double[] charProbShortPeriod, charProbShortPeriodCumulative;
 		private double[] charProbUnique, charProbUniqueCumulative;
 		
 		/**
-		 * Length generation probabilities
+		 * Probability of creating a repeat length
 		 */
 		private double[] lengthProb;  // Prob. of block i*mAL+1..(i+1)*mAL
 		private double[] lengthProbCumulative;
 		private double[] lengthProbShortPeriod;  // Prob. of block i*mAL+1..(i+1)*mAL
 		private double[] lengthProbShortPeriodCumulative;
-		private double[] lengthProbLongPeriod;  // Prob. of a tandem of 1..X instances
+		private double[] lengthProbLongPeriod;  // Prob. of a tandem of i instances
 		private double[] lengthProbLongPeriodCumulative;
 		
 		/**
-		 * From-instance probabilities
+		 * Probability of creating a new repeat from an existing instance
 		 */
 		private double fromInstanceProb;
 		private double maxPeriodDifference, maxPhaseDifference;
 		private double insertionProbPerturbation;
 		
 		/**
-		 * Sequence probabilities
+		 * Probability of editing a sequence
 		 */
 		private double rcProbability;
 		private double mismatchProb, insertionProb, deletionProb;
@@ -551,7 +573,7 @@ public class GenomeSimulator {
 		private int maxIndelLength;
 		
 		/**
-		 * Frequency probabilities
+		 * Probability of a repeat having a given frequency in the genome.
 		 */
 		private double[] frequencyProb;  // Prob. of block 10^i+1..10^(i+1)
 		private double[] frequencyProbCumulative;
@@ -667,7 +689,7 @@ public class GenomeSimulator {
 			length=tokens.length;
 			lengthProb = new double[length];
 			for (i=0; i<length; i++) lengthProb[i]=Double.parseDouble(tokens[i]);
-			tokens[i]=null;
+			tokens=null;
 			lengthProbCumulative = new double[length];
 			lengthProbCumulative[0]=lengthProb[0];
 			for (i=0; i<length; i++) lengthProbCumulative[i]=lengthProb[i]+lengthProbCumulative[i-1];
@@ -681,7 +703,7 @@ public class GenomeSimulator {
 			length=tokens.length;
 			lengthProbShortPeriod = new double[length];
 			for (i=0; i<length; i++) lengthProbShortPeriod[i]=Double.parseDouble(tokens[i]);
-			tokens[i]=null;
+			tokens=null;
 			lengthProbShortPeriodCumulative = new double[length];
 			lengthProbShortPeriodCumulative[0]=lengthProbShortPeriod[0];
 			for (i=0; i<length; i++) lengthProbShortPeriodCumulative[i]=lengthProbShortPeriod[i]+lengthProbShortPeriodCumulative[i-1];
@@ -695,7 +717,7 @@ public class GenomeSimulator {
 			length=tokens.length;
 			lengthProbLongPeriod = new double[length];
 			for (i=0; i<length; i++) lengthProbLongPeriod[i]=Double.parseDouble(tokens[i]);
-			tokens[i]=null;
+			tokens=null;
 			lengthProbLongPeriodCumulative = new double[length];
 			lengthProbLongPeriodCumulative[0]=lengthProbLongPeriod[0];
 			for (i=0; i<length; i++) lengthProbLongPeriodCumulative[i]=lengthProbLongPeriod[i]+lengthProbLongPeriodCumulative[i-1];
@@ -709,7 +731,7 @@ public class GenomeSimulator {
 			length=tokens.length;
 			frequencyProb = new double[length];
 			for (i=0; i<length; i++) frequencyProb[i]=Double.parseDouble(tokens[i]);
-			tokens[i]=null;
+			tokens=null;
 			frequencyProbCumulative = new double[length];
 			frequencyProbCumulative[0]=frequencyProb[0];
 			for (i=0; i<length; i++) frequencyProbCumulative[i]=frequencyProb[i]+frequencyProbCumulative[i-1];
@@ -796,11 +818,12 @@ public class GenomeSimulator {
 		
 		
 		/**
-		 * @return a value which is at most $maxPeriodDifference*period$ from $period$.
+		 * @return a value which is at most $maxPeriodDifference*oldPeriod$ from 
+		 * $oldPeriod$.
 		 */
 		public final int perturbPeriod(int oldPeriod, Random random) {
 			final int delta = (int)Math.ceil(oldPeriod*maxPeriodDifference);
-			return oldPeriod-delta+random.nextInt(delta<<1);
+			return delta==0?oldPeriod:oldPeriod-delta+random.nextInt(delta<<1);
 		}
 		
 		
@@ -813,7 +836,7 @@ public class GenomeSimulator {
 		
 		
 		/**
-		 * @return the frequency of a repeat (>=2); every element inside the same bin of 
+		 * @return the frequency of a repeat (>=2); every frequency inside the same bin of 
 		 * $frequencyProb$ is considered equally likely.
 		 */
 		public final int getFrequency(Random random) {
@@ -822,6 +845,51 @@ public class GenomeSimulator {
 			final int from = 10^(i)+1;
 			final int to = 10^(i+1);
 			return from+random.nextInt(to-from+1);
+		}
+		
+		
+		public final void addReplicationNoise(StringBuilder sb, Random random) {
+			int i, p;
+			int c, cPrime, nBases;
+			final int length = sb.length();
+			double prob;
+		
+			p=0;
+			while (p<length) {
+				c=Arrays.binarySearch(DNA_ALPHABET,0,DNA_ALPHABET.length,sb.charAt(p));
+				prob=random.nextDouble();
+				if (prob<=mismatchProb) {
+					do { cPrime=random.nextInt(4); }
+					while (cPrime==c);
+					sb.append(DNA_ALPHABET[cPrime]);
+					p++;
+				}
+				else if (prob<=mPlusI) {
+					nBases=1+random.nextInt(maxIndelLength);
+					for (i=0; i<nBases; i++) {
+						cPrime=random.nextInt(4);
+						sb.append(DNA_ALPHABET[cPrime]);
+					}
+				}
+				else if (prob<=mPlusIPlusD) {
+					nBases=1+random.nextInt(maxIndelLength);
+					p+=nBases;
+				}
+				else {
+					sb.append(DNA_ALPHABET[c]);
+					p++;
+				}
+			}
+			// Insertion after the last character
+			prob=random.nextDouble();
+			if (prob>mismatchProb && prob<=mPlusI) {
+				nBases=1+random.nextInt(maxIndelLength);
+				for (i=0; i<nBases; i++) {
+					cPrime=random.nextInt(4);
+					sb.append(DNA_ALPHABET[cPrime]);
+				}
+			}
+			sb.delete(0,length);
 		}
 	}
 
