@@ -5,7 +5,7 @@ import java.io.*;
 import de.mpi_cbg.revant.util.Math;
 
 /**
- * Converts a PAF file produced by miniasm, into the output of LAshow.
+ * Converts a PAF file produced by minimap2, into the output of LAshow.
  *
  * Remark: this is just a simple first attempt and it has not been optimized. 
  *

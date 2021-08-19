@@ -4,7 +4,7 @@ import java.util.*;
 import java.io.*;
 
 /**
- * Given a multi-FASTA file, and a mapping from miniasm read IDs to integers, the program 
+ * Given a multi-FASTA file, and a mapping from minimap2 read IDs to integers, the program 
  * creates one file per read in the mapping, with all the sequence on a single line.
  */
 public class PAF2Reads {
