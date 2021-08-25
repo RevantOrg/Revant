@@ -1101,7 +1101,7 @@ if (ReadA.id<SELECTED_READ) {
 		final int HALF_MAX_HEIGHT = nRows>>1;
 		final int TRUNCATION_THRESHOLD = 100;
 		final int TRUNCATION_TAG_WIDTH_PIXELS = 3;
-		final int TRUNCATION_MULTIPLE= 1000;
+		final int TRUNCATION_MULTIPLE = 1000;
 		final int TRANSPARENT_BORDER_PIXELS = 2;
 		int x, y, firstX, lastX, height, color;
 		int leftTruncation, rightTruncation, referenceLength;

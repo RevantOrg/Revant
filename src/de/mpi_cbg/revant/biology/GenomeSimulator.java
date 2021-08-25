@@ -4,11 +4,18 @@ import java.util.Arrays;
 import java.util.Vector;
 import java.util.Random;
 import java.io.*;
+import java.awt.*;
+import java.awt.image.*;
+import java.awt.geom.*;
+import javax.imageio.*;
+import java.text.*;
 import de.mpi_cbg.revant.util.Math;
 import de.mpi_cbg.revant.util.Constants;
+import de.mpi_cbg.revant.util.Colors;
 
 
 public class GenomeSimulator {
+	
 	public static final char[] DNA_ALPHABET = new char[] {'a','c','g','t'};
 	
 	/**
@@ -40,6 +47,15 @@ public class GenomeSimulator {
 	private static int[] cumulativeByTree;
 	
 	
+	/**
+	 * Drawing constants
+	 */
+	private static final int ROWS_PER_LINE = 100;
+	private static final int ROWS_PER_LINE_OVER_TWO = ROWS_PER_LINE>>1;
+	private static final int TRUNCATION_THRESHOLD = 100;
+	private static final int TRUNCATION_TAG_WIDTH_PIXELS = 3;
+	private static final int TRUNCATION_MULTIPLE = 1000;
+	public static final String DEFAULT_FONT = "Barlow";
 	
 	
 	
@@ -215,7 +231,44 @@ public class GenomeSimulator {
 	}
 	
 	
+	/**
+	 * In basepairs
+	 */
+	private static final long getGenomeLength() {
+		long out;
+		RepeatInstance currentInstance;
+		
+		out=0;
+		currentInstance=root.next;
+		do {
+			out+=currentInstance.sequenceLength;
+			currentInstance=currentInstance.next;
+		} while (currentInstance!=null);
+		return out;
+	}
 	
+	
+	
+	private static final void drawGenome(int nColumns) throws IOException {
+		/*int x, y;
+		final long genomeLength = getGenomeLength();
+		final int nRows = 1+genomeLength/width;
+		RepeatInstance currentInstance;
+		BufferedImage image;
+		
+		image = new BufferedImage(nColumns,nRows,BufferedImage.TYPE_INT_RGB);
+		for (x=0; x<nColumns; x++) {
+			for (y=0; y<nRows; y++) Colors.setRGB(image,x,y,Colors.COLOR_BACKGROUND);
+		}
+		currentInstance=root;
+		row=0;
+		
+		
+		
+		
+		
+		*/
+	}
 	
 	
 	
@@ -330,6 +383,96 @@ public class GenomeSimulator {
 			out.previous=null;
 			out.next=next;
 			return out;
+		}
+		
+		
+		/**
+		 * Draws the repeat instance starting from point $(fromX,toX)$ of $image$, and 
+		 * handling overflows by keep drawing on the following rows.
+		 *
+		 * @param nColumns total number of columns in $image$;
+		 * @return out output array: 0=the new value of fromX; 1=the new value of fromY
+		 * after the procedure completes.
+		 */
+		public final void draw(int fromX, int fromY, BufferedImage image, int nColumns, int[] out) throws IOException {
+			boolean isOverflow;
+			int overflow, missingLength, windowStart, windowEnd;
+			
+			missingLength=sequenceLength; windowStart=repeatStart; isOverflow=false;
+			while (true) {
+				overflow=Math.max(fromX+missingLength-nColumns,0);
+				windowEnd=repeatEnd-overflow;
+				drawSubstring(repeat.sequenceLength,repeat.id+"",windowStart,windowEnd,orientation,image,fromX,fromY,isOverflow);
+				if (overflow>0) {
+					fromX=0; fromY+=ROWS_PER_LINE; isOverflow=true;
+					missingLength-=windowEnd-windowStart+1;
+					windowStart=windowEnd+1;
+				}
+				else {
+					fromX+=windowEnd-windowStart+1; isOverflow=false;
+					missingLength=0;
+					break;
+				}
+			}
+			out[0]=fromX; out[1]=fromY;
+		}
+		
+		
+		/**
+		 * Draws the substring $[repeatStart..repeatEnd]$ of a repeat, starting from point
+		 * $(fromX,toX)$ of $image$, assuming that the drawing does not overflow the 
+		 * image.
+		 *
+		 * @param repeatLength length of the full repeat;
+		 * @param isOverflow TRUE iff the substring is the result of splitting a repeat
+		 * instance because it overflowed; in this case, left-truncation information is 
+		 * not printed. 
+		 */
+		private static final void drawSubstring(int repeatLength, String repeatName, int repeatStart, int repeatEnd, boolean orientation, BufferedImage image, int fromX, int fromY, boolean isOverflow) throws IOException {
+			int x, y;
+			int height, firstX, lastX, color;
+			final int sequenceLength = repeatEnd-repeatStart+1;
+			final int toX = fromX+sequenceLength-1;
+			final int leftTruncation = orientation?repeatStart:repeatLength-repeatEnd;
+			final int rightTruncation = orientation?repeatLength-repeatEnd:repeatStart;
+			String label;
+			final Graphics2D g2d = image.createGraphics();
+			g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+			g2d.setFont(new Font(DEFAULT_FONT,Font.PLAIN,15));
+			g2d.setColor(new Color(Colors.COLOR_REFERENCE_HIGHLIGHT));
+			final FontMetrics fontMetrics = g2d.getFontMetrics();
+			final NumberFormat formatter = NumberFormat.getInstance();
+			formatter.setMaximumFractionDigits(2);
+			
+			// Drawing truncated triangle
+			firstX=fromX-(orientation?repeatStart:repeatLength-repeatEnd);
+			lastX=fromX+sequenceLength+(orientation?repeatLength-repeatEnd:repeatStart);
+			for (x=fromX; x<=toX; x++) {
+				height=Math.round(ROWS_PER_LINE_OVER_TWO*(orientation?lastX-x:x-firstX)/repeatLength);
+				if ( (!isOverflow && leftTruncation>TRUNCATION_THRESHOLD && (x-fromX)<=TRUNCATION_TAG_WIDTH_PIXELS) || 
+					 (rightTruncation>TRUNCATION_THRESHOLD && (fromX+sequenceLength-x)<=TRUNCATION_TAG_WIDTH_PIXELS)
+				   ) color=Colors.COLOR_REFERENCE_HIGHLIGHT;
+				else color=Colors.COLOR_REFERENCE;
+				for (y=fromY+ROWS_PER_LINE_OVER_TWO-height; y<=fromY+ROWS_PER_LINE_OVER_TWO+height; y++) Colors.setRGB(image,x,y,color);
+			}
+			
+			// Drawing text
+			label=""+repeatName.toUpperCase();
+			x=(fromX+toX)/2-Math.round(fontMetrics.stringWidth(label),2);
+			y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
+			g2d.drawString(label,x,y);
+			if (!isOverflow && leftTruncation>TRUNCATION_THRESHOLD) {
+				label=""+formatter.format(((double)leftTruncation)/TRUNCATION_MULTIPLE);
+				x=fromX+TRUNCATION_TAG_WIDTH_PIXELS+TRUNCATION_TAG_WIDTH_PIXELS;
+				y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
+				g2d.drawString(label,x,y);
+			}
+			if (rightTruncation>TRUNCATION_THRESHOLD) {
+				label=""+formatter.format(((double)rightTruncation)/TRUNCATION_MULTIPLE);
+				x=toX-TRUNCATION_TAG_WIDTH_PIXELS-TRUNCATION_TAG_WIDTH_PIXELS-fontMetrics.stringWidth(label);
+				y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
+				g2d.drawString(label,x,y);
+			}
 		}
 	}
 	
