@@ -69,6 +69,8 @@ public class GenomeSimulator {
 		final double REPEAT_BPS_OVER_UNIQUE_BPS = Double.parseDouble(args[1]);
 		final long RANDOM_SEED = Long.parseLong(args[2]);  // -1 to discard it
 		final String REPEAT_MODEL_DIR = args[3];
+		final int N_OUTPUT_COLUMNS = Integer.parseInt(args[4]);
+		final String OUTPUT_IMAGE = args[5];
 		
 		final int STRING_CAPACITY = 100000;  // Arbitrary
 		final long N_REPEAT_BPS = (long)(REPEAT_BPS_OVER_UNIQUE_BPS*N_UNIQUE_BPS);
@@ -80,7 +82,11 @@ public class GenomeSimulator {
 		
 		initializeGenome(N_UNIQUE_BPS,model,sb,random);
 		nRepeatBps=0;
-		while (nRepeatBps<N_REPEAT_BPS) nRepeatBps+=epoch(model,sb,random);
+		while (nRepeatBps<N_REPEAT_BPS) {
+			nRepeatBps+=epoch(model,sb,random);
+			System.err.println("Epoch completed, "+nRepeatBps+" repeat bps, "+N_UNIQUE_BPS+" unique bps.");
+		}
+		drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
 	}
 	
 	
@@ -112,7 +118,7 @@ public class GenomeSimulator {
 		instance.previous=root; instance.next=null;
 		byTree = new RepeatInstance[CAPACITY_ROWS][0];
 		byTree[0] = new RepeatInstance[CAPACITY_COLUMNS];
-		byTree[0][1]=instance;
+		byTree[0][0]=instance;
 		lastByTree = new int[CAPACITY_ROWS];
 		lastByTree[0]=0;
 		cumulativeByTree = new int[CAPACITY_ROWS];
@@ -209,7 +215,7 @@ public class GenomeSimulator {
 		fromInstance.next=suffix;
 		suffix.previous=fromInstance;
 		suffix.next=toInstance.next;
-		toInstance.next.previous=suffix;
+		if (toInstance.next!=null) toInstance.next.previous=suffix;
 		if (prefix.sequenceLength>=model.minAlignmentLength<<1) {
 			byTree[toTree][i]=prefix;
 			if (suffix.sequenceLength>=model.minAlignmentLength<<1) {
@@ -248,27 +254,36 @@ public class GenomeSimulator {
 	}
 	
 	
-	
-	private static final void drawGenome(int nColumns) throws IOException {
-		/*int x, y;
+	/**
+	 * @param nColumns pixel width of the image (one pixel corresponds to one basepair).
+	 */
+	private static final void drawGenome(int nColumns, String outputFile) throws IOException {
+		int x, y;
+		int fromX, fromY;
 		final long genomeLength = getGenomeLength();
-		final int nRows = 1+genomeLength/width;
+		final int nLines = 1+(int)(genomeLength/nColumns);
+		final int nRows = nLines*ROWS_PER_LINE;
 		RepeatInstance currentInstance;
 		BufferedImage image;
+		int[] tmpArray = new int[2];
 		
 		image = new BufferedImage(nColumns,nRows,BufferedImage.TYPE_INT_RGB);
 		for (x=0; x<nColumns; x++) {
 			for (y=0; y<nRows; y++) Colors.setRGB(image,x,y,Colors.COLOR_BACKGROUND);
 		}
 		currentInstance=root;
-		row=0;
-		
-		
-		
-		
-		
-		*/
+		fromX=0; fromY=0;
+		while (currentInstance.next!=null) {
+			currentInstance=currentInstance.next;
+			currentInstance.draw(fromX,fromY,image,nColumns,tmpArray);
+			fromX=tmpArray[0]; fromY=tmpArray[1];
+		}
+		ImageIO.write(image,"png",new File(outputFile));
 	}
+	
+	
+	
+	
 	
 	
 	
@@ -284,9 +299,9 @@ public class GenomeSimulator {
 		int i;
 		final int length = sb.length();
 		final int halfLength = length/2;
-		
+
 		for (i=0; i<halfLength; i++) {
-			c=sb.charAt(i); d=sb.charAt(length-i);
+			c=sb.charAt(i); d=sb.charAt(length-1-i);
 			switch (d) {
 				case 'a': sb.setCharAt(i,'t'); break;
 				case 'c': sb.setCharAt(i,'g'); break;
@@ -294,10 +309,10 @@ public class GenomeSimulator {
 				case 't': sb.setCharAt(i,'a'); break;
 			}
 			switch (c) {
-				case 'a': sb.setCharAt(length-i,'t'); break;
-				case 'c': sb.setCharAt(length-i,'g'); break;
-				case 'g': sb.setCharAt(length-i,'c'); break;
-				case 't': sb.setCharAt(length-i,'a'); break;
+				case 'a': sb.setCharAt(length-1-i,'t'); break;
+				case 'c': sb.setCharAt(length-1-i,'g'); break;
+				case 'g': sb.setCharAt(length-1-i,'c'); break;
+				case 't': sb.setCharAt(length-1-i,'a'); break;
 			}
 		}
 		if (length%2!=0) {
@@ -398,82 +413,142 @@ public class GenomeSimulator {
 			boolean isOverflow;
 			int overflow, missingLength, windowStart, windowEnd;
 			
-			missingLength=sequenceLength; windowStart=repeatStart; isOverflow=false;
-			while (true) {
-				overflow=Math.max(fromX+missingLength-nColumns,0);
-				windowEnd=repeatEnd-overflow;
-				drawSubstring(repeat.sequenceLength,repeat.id+"",windowStart,windowEnd,orientation,image,fromX,fromY,isOverflow);
-				if (overflow>0) {
-					fromX=0; fromY+=ROWS_PER_LINE; isOverflow=true;
-					missingLength-=windowEnd-windowStart+1;
-					windowStart=windowEnd+1;
+			if (repeat.type==-1) {
+				missingLength=sequenceLength;
+				while (true) {
+					overflow=Math.max(fromX+missingLength-nColumns,0);
+					if (overflow>0) {
+						fromX=0; fromY+=ROWS_PER_LINE;
+						missingLength=overflow;
+					}
+					else {
+						fromX+=missingLength;
+						break;
+					}
 				}
-				else {
-					fromX+=windowEnd-windowStart+1; isOverflow=false;
-					missingLength=0;
-					break;
-				}
+				out[0]=fromX; out[1]=fromY;
 			}
-			out[0]=fromX; out[1]=fromY;
+			else if (repeat.type<Constants.INTERVAL_PERIODIC) {
+				missingLength=sequenceLength; windowStart=repeatStart; isOverflow=false;
+				while (true) {
+					overflow=Math.max(fromX+missingLength-nColumns,0);
+					windowEnd=repeatEnd-overflow;
+					drawSubstring(repeat,windowStart,windowEnd,orientation,image,fromX,fromY,isOverflow);
+					if (overflow>0) {
+						fromX=0; fromY+=ROWS_PER_LINE; isOverflow=true;
+						missingLength-=windowEnd-windowStart+1;
+						windowStart=windowEnd+1;
+					}
+					else {
+						fromX+=windowEnd-windowStart+1; isOverflow=false;
+						missingLength=0;
+						break;
+					}
+				}
+				out[0]=fromX; out[1]=fromY;
+			}
+			else {
+				missingLength=sequenceLength;
+				while (true) {
+					overflow=Math.max(fromX+missingLength-nColumns,0);
+					if (overflow>0) {
+						drawPeriodicSubstring(repeat,orientation,image,fromX,nColumns-1,fromY);
+						fromX=0; fromY+=ROWS_PER_LINE;
+						missingLength=overflow;
+					}
+					else {
+						drawPeriodicSubstring(repeat,orientation,image,fromX,fromX+missingLength-1,fromY);
+						fromX+=missingLength;
+						break;
+					}
+				}
+				out[0]=fromX; out[1]=fromY;
+			}
+		}
+	}
+	
+	
+	/**
+	 * Draws the substring $[repeatStart..repeatEnd]$ of a non-periodic repeat, 
+	 * starting from point $(fromX,toX)$ of $image$, assuming that the drawing does 
+	 * not overflow the image.
+	 *
+	 * @param repeatLength length of the full repeat;
+	 * @param isOverflow TRUE iff the substring is the result of splitting a repeat
+	 * instance because it overflowed; in this case, left-truncation information is 
+	 * not printed. 
+	 */
+	private static final void drawSubstring(Repeat repeat, int repeatStart, int repeatEnd, boolean orientation, BufferedImage image, int fromX, int fromY, boolean isOverflow) throws IOException {
+		int x, y;
+		int height, firstX, lastX, color;
+		final int sequenceLength = repeatEnd-repeatStart+1;
+		final int toX = fromX+sequenceLength-1;
+		final int leftTruncation = orientation?repeatStart:repeat.sequenceLength-repeatEnd;
+		final int rightTruncation = orientation?repeat.sequenceLength-repeatEnd:repeatStart;
+		String label;
+		final Graphics2D g2d = image.createGraphics();
+		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+		g2d.setFont(new Font(DEFAULT_FONT,Font.PLAIN,15));
+		g2d.setColor(new Color(Colors.COLOR_REFERENCE_HIGHLIGHT));
+		final FontMetrics fontMetrics = g2d.getFontMetrics();
+		final NumberFormat formatter = NumberFormat.getInstance();
+		formatter.setMaximumFractionDigits(2);
+		
+		// Drawing truncated triangle
+		firstX=fromX-(orientation?repeatStart:repeat.sequenceLength-repeatEnd);
+		lastX=fromX+sequenceLength+(orientation?repeat.sequenceLength-repeatEnd:repeatStart);
+		for (x=fromX; x<=toX; x++) {
+			height=Math.round(ROWS_PER_LINE_OVER_TWO*(orientation?lastX-x:x-firstX)/repeat.sequenceLength);
+			if ( (!isOverflow && leftTruncation>TRUNCATION_THRESHOLD && (x-fromX)<=TRUNCATION_TAG_WIDTH_PIXELS) || 
+				 (rightTruncation>TRUNCATION_THRESHOLD && (fromX+sequenceLength-x)<=TRUNCATION_TAG_WIDTH_PIXELS)
+			   ) color=Colors.COLOR_REFERENCE_HIGHLIGHT;
+			else color=Colors.COLOR_REFERENCE;
+			for (y=fromY+ROWS_PER_LINE_OVER_TWO-height; y<=fromY+ROWS_PER_LINE_OVER_TWO+height; y++) Colors.setRGB(image,x,y,color);
 		}
 		
-		
-		/**
-		 * Draws the substring $[repeatStart..repeatEnd]$ of a repeat, starting from point
-		 * $(fromX,toX)$ of $image$, assuming that the drawing does not overflow the 
-		 * image.
-		 *
-		 * @param repeatLength length of the full repeat;
-		 * @param isOverflow TRUE iff the substring is the result of splitting a repeat
-		 * instance because it overflowed; in this case, left-truncation information is 
-		 * not printed. 
-		 */
-		private static final void drawSubstring(int repeatLength, String repeatName, int repeatStart, int repeatEnd, boolean orientation, BufferedImage image, int fromX, int fromY, boolean isOverflow) throws IOException {
-			int x, y;
-			int height, firstX, lastX, color;
-			final int sequenceLength = repeatEnd-repeatStart+1;
-			final int toX = fromX+sequenceLength-1;
-			final int leftTruncation = orientation?repeatStart:repeatLength-repeatEnd;
-			final int rightTruncation = orientation?repeatLength-repeatEnd:repeatStart;
-			String label;
-			final Graphics2D g2d = image.createGraphics();
-			g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-			g2d.setFont(new Font(DEFAULT_FONT,Font.PLAIN,15));
-			g2d.setColor(new Color(Colors.COLOR_REFERENCE_HIGHLIGHT));
-			final FontMetrics fontMetrics = g2d.getFontMetrics();
-			final NumberFormat formatter = NumberFormat.getInstance();
-			formatter.setMaximumFractionDigits(2);
-			
-			// Drawing truncated triangle
-			firstX=fromX-(orientation?repeatStart:repeatLength-repeatEnd);
-			lastX=fromX+sequenceLength+(orientation?repeatLength-repeatEnd:repeatStart);
-			for (x=fromX; x<=toX; x++) {
-				height=Math.round(ROWS_PER_LINE_OVER_TWO*(orientation?lastX-x:x-firstX)/repeatLength);
-				if ( (!isOverflow && leftTruncation>TRUNCATION_THRESHOLD && (x-fromX)<=TRUNCATION_TAG_WIDTH_PIXELS) || 
-					 (rightTruncation>TRUNCATION_THRESHOLD && (fromX+sequenceLength-x)<=TRUNCATION_TAG_WIDTH_PIXELS)
-				   ) color=Colors.COLOR_REFERENCE_HIGHLIGHT;
-				else color=Colors.COLOR_REFERENCE;
-				for (y=fromY+ROWS_PER_LINE_OVER_TWO-height; y<=fromY+ROWS_PER_LINE_OVER_TWO+height; y++) Colors.setRGB(image,x,y,color);
-			}
-			
-			// Drawing text
-			label=""+repeatName.toUpperCase();
-			x=(fromX+toX)/2-Math.round(fontMetrics.stringWidth(label),2);
+		// Drawing text
+		label=""+repeat.id;
+		x=(fromX+toX)/2-Math.round(fontMetrics.stringWidth(label),2);
+		y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
+		g2d.drawString(label,x,y);
+		if (!isOverflow && leftTruncation>TRUNCATION_THRESHOLD) {
+			label=""+formatter.format(((double)leftTruncation)/TRUNCATION_MULTIPLE);
+			x=fromX+TRUNCATION_TAG_WIDTH_PIXELS+TRUNCATION_TAG_WIDTH_PIXELS;
 			y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
 			g2d.drawString(label,x,y);
-			if (!isOverflow && leftTruncation>TRUNCATION_THRESHOLD) {
-				label=""+formatter.format(((double)leftTruncation)/TRUNCATION_MULTIPLE);
-				x=fromX+TRUNCATION_TAG_WIDTH_PIXELS+TRUNCATION_TAG_WIDTH_PIXELS;
-				y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
-				g2d.drawString(label,x,y);
-			}
-			if (rightTruncation>TRUNCATION_THRESHOLD) {
-				label=""+formatter.format(((double)rightTruncation)/TRUNCATION_MULTIPLE);
-				x=toX-TRUNCATION_TAG_WIDTH_PIXELS-TRUNCATION_TAG_WIDTH_PIXELS-fontMetrics.stringWidth(label);
-				y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
-				g2d.drawString(label,x,y);
-			}
 		}
+		if (rightTruncation>TRUNCATION_THRESHOLD) {
+			label=""+formatter.format(((double)rightTruncation)/TRUNCATION_MULTIPLE);
+			x=toX-TRUNCATION_TAG_WIDTH_PIXELS-TRUNCATION_TAG_WIDTH_PIXELS-fontMetrics.stringWidth(label);
+			y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
+			g2d.drawString(label,x,y);
+		}
+	}
+	
+	
+	/**
+	 * Draws a periodic repeat over points $(fromX..toX,fromY..)$ of $image$, assuming 
+	 * that the drawing does not overflow the image.
+	 */
+	private static final void drawPeriodicSubstring(Repeat repeat, boolean orientation, BufferedImage image, int fromX, int toX, int fromY) {
+		int x, y;
+		String label;
+		final Graphics2D g2d = image.createGraphics();
+		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+		g2d.setFont(new Font(DEFAULT_FONT,Font.PLAIN,15));
+		g2d.setColor(new Color(Colors.COLOR_REFERENCE_HIGHLIGHT));
+		final FontMetrics fontMetrics = g2d.getFontMetrics();
+	
+		// Drawing rectangle
+		for (x=fromX; x<=toX; x++) {
+			for (y=fromY; y<=fromY+ROWS_PER_LINE; y++) Colors.setRGB(image,x,y,Colors.COLOR_REFERENCE);
+		}
+	
+		// Drawing text
+		label=""+repeat.id+", O="+(orientation?"FWD":"RC")+", P="+repeat.sequenceLength;
+		x=(fromX+toX)/2-Math.round(fontMetrics.stringWidth(label),2);
+		y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
+		g2d.drawString(label,x,y);
 	}
 	
 	
@@ -533,8 +608,9 @@ public class GenomeSimulator {
 				sequence=sb.toString();
 			}
 			insertionProb=Math.sampleFromSimplex(lastTree,random);
+			insertionProbCumulative = new double[lastTree];
 			insertionProbCumulative[0]=insertionProb[0];
-			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
+			for (i=1; i<lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
 		}
 		
@@ -621,8 +697,8 @@ public class GenomeSimulator {
 				sb.append(sequence.substring(repeatStart,repeatEnd+1));
 			}
 			else if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
-				length=random.nextInt(sequence.length()-(model.minAlignmentLength)<<1);
-				p=model.minAlignmentLength+random.nextInt(sequence.length()-((model.minAlignmentLength)<<1)-length);
+				length=random.nextInt(sequence.length()-(model.minAlignmentLength)<<1);			
+				p=model.minAlignmentLength+random.nextInt((int)Math.max(sequence.length()-((model.minAlignmentLength)<<1)-length,0));
 				sb.append(sequence.substring(0,p));
 				sb.append(sequence.substring(p+length));
 				repeatStart=0; repeatEnd=sequenceLength-1;
@@ -753,6 +829,7 @@ public class GenomeSimulator {
 			for (i=1; i<N_REPEAT_TYPES; i++) typeProbCumulative[i]=typeProb[i]+typeProbCumulative[i-1];
 			
 			// Loading $charProb*$.
+			charProb = new double[DNA_ALPHABET.length];
 			for (i=0; i<DNA_ALPHABET.length; i++) {
 				str=br.readLine();
 				p=str.indexOf("/");
@@ -763,6 +840,7 @@ public class GenomeSimulator {
 			for (i=1; i<DNA_ALPHABET.length; i++) charProbCumulative[i]=charProb[i]+charProbCumulative[i-1];
 			
 			// Loading $charProbShortPeriod*$.
+			charProbShortPeriod = new double[DNA_ALPHABET.length];
 			for (i=0; i<DNA_ALPHABET.length; i++) {
 				str=br.readLine();
 				p=str.indexOf("/");
@@ -773,6 +851,7 @@ public class GenomeSimulator {
 			for (i=1; i<DNA_ALPHABET.length; i++) charProbShortPeriodCumulative[i]=charProbShortPeriod[i]+charProbShortPeriodCumulative[i-1];
 			
 			// Loading $charProbUnique*$.
+			charProbUnique = new double[DNA_ALPHABET.length];
 			for (i=0; i<DNA_ALPHABET.length; i++) {
 				str=br.readLine();
 				p=str.indexOf("/");
@@ -835,7 +914,7 @@ public class GenomeSimulator {
 			tokens=null;
 			lengthProbCumulative = new double[length];
 			lengthProbCumulative[0]=lengthProb[0];
-			for (i=0; i<length; i++) lengthProbCumulative[i]=lengthProb[i]+lengthProbCumulative[i-1];
+			for (i=1; i<length; i++) lengthProbCumulative[i]=lengthProb[i]+lengthProbCumulative[i-1];
 			
 			// Loading $lengthProbShortPeriod*$.
 			br = new BufferedReader(new FileReader(configDir+"/lengthProbShortPeriod.txt"));
@@ -849,7 +928,7 @@ public class GenomeSimulator {
 			tokens=null;
 			lengthProbShortPeriodCumulative = new double[length];
 			lengthProbShortPeriodCumulative[0]=lengthProbShortPeriod[0];
-			for (i=0; i<length; i++) lengthProbShortPeriodCumulative[i]=lengthProbShortPeriod[i]+lengthProbShortPeriodCumulative[i-1];
+			for (i=1; i<length; i++) lengthProbShortPeriodCumulative[i]=lengthProbShortPeriod[i]+lengthProbShortPeriodCumulative[i-1];
 			
 			// Loading $lengthProbLongPeriod*$.
 			br = new BufferedReader(new FileReader(configDir+"/lengthProbLongPeriod.txt"));
@@ -863,7 +942,7 @@ public class GenomeSimulator {
 			tokens=null;
 			lengthProbLongPeriodCumulative = new double[length];
 			lengthProbLongPeriodCumulative[0]=lengthProbLongPeriod[0];
-			for (i=0; i<length; i++) lengthProbLongPeriodCumulative[i]=lengthProbLongPeriod[i]+lengthProbLongPeriodCumulative[i-1];
+			for (i=1; i<length; i++) lengthProbLongPeriodCumulative[i]=lengthProbLongPeriod[i]+lengthProbLongPeriodCumulative[i-1];
 			
 			// Loading $frequencyProb*$.
 			br = new BufferedReader(new FileReader(configDir+"/frequencyProb.txt"));
@@ -877,7 +956,7 @@ public class GenomeSimulator {
 			tokens=null;
 			frequencyProbCumulative = new double[length];
 			frequencyProbCumulative[0]=frequencyProb[0];
-			for (i=0; i<length; i++) frequencyProbCumulative[i]=frequencyProb[i]+frequencyProbCumulative[i-1];
+			for (i=1; i<length; i++) frequencyProbCumulative[i]=frequencyProb[i]+frequencyProbCumulative[i-1];
 		}
 		
 		
