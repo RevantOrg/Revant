@@ -109,7 +109,7 @@ public class GenomeSimulator {
 		unique.initialize(nUniqueBps,model,sb,random);
 		repeats = new Repeat[CAPACITY_ROWS];
 		repeats[0]=unique;
-		lastRepeat=0; lastTree=0;
+		lastRepeat=0; lastTree=0; unique.tree=0;
 		
 		// Instances
 		root = new RepeatInstance();
@@ -135,6 +135,11 @@ public class GenomeSimulator {
 		int repeatTree, insertionTree;
 		long newBps;
 		Repeat repeat;
+		
+
+System.err.println("VITTU> byTree lengths at the beginning of the epoch:");
+for (int x=0; x<=lastTree; x++) System.err.println(x+", "+byTree[x].length+", "+lastByTree[x]);		
+		
 		
 		// Creating a new repeat
 		repeat = new Repeat();
@@ -171,13 +176,25 @@ public class GenomeSimulator {
 				lastByTree=newLastByTree;
 			}	
 			byTree[lastTree] = new RepeatInstance[CAPACITY];
+System.err.println("VITTU> lastTree="+lastTree+" space available in byTree: "+byTree[lastTree].length);
 			lastByTree[lastTree]=-1;
 			repeatTree=lastTree;
+System.err.println("VITTU> REPEATTREE="+repeatTree);			
 		}
+		repeat.tree=repeatTree;
 		
 		// Replication wave
 		newBps=0;
 		for (i=0; i<repeat.frequency; i++) newBps+=epoch_impl(repeat,model,sb,random);
+		
+		
+		
+		
+System.err.println("VITTU> byTree lengths at the end of the epoch:");
+for (int x=0; x<=lastTree; x++) System.err.println(x+", "+byTree[x].length+", "+lastByTree[x]);	
+		
+		
+		
 		return newBps;
 	}
 	
@@ -192,20 +209,34 @@ public class GenomeSimulator {
 	private static final int epoch_impl(Repeat repeat, RepeatModel model, StringBuilder sb, Random random) {
 		int i, j, p;
 		int toTree;
+		final int fromTree = repeat.tree;
 		RepeatInstance fromInstance, toInstance, prefix, suffix;
 		
-		fromInstance=repeat.getInstance(model,sb,random);
-		if (lastTree==0) {
+		do { fromInstance=repeat.getInstance(model,sb,random); }
+		while (fromInstance.sequenceLength<model.minAlignmentLength);
+		lastByTree[fromTree]++;
+		if (lastByTree[fromTree]==byTree[fromTree].length) {
+			RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
+			System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
+			byTree[fromTree]=newByTree;
+		}
+		byTree[fromTree][lastByTree[fromTree]]=fromInstance;
+		if (lastTree<=1) {
 			toTree=0;
+System.err.println("PERKELE> lastByTree[0]="+lastByTree[0]);
+//--------> EXPLICITLY HANDLE CASE IN WHICH ROW ZERO HAS ZERO COLUMNS DUE TO FRAGMENTATION
 			i=lastByTree[0]==0?0:random.nextInt(lastByTree[0]+1);
 		}
 		else {
 			toTree=Arrays.binarySearch(repeat.insertionProbCumulative,random.nextDouble());
+//--------> EXPLICITLY HANDLE CASE IN WHICH SOME ROWS HAVE ZERO COLUMNS DUE TO FRAGMENTATION			
 			if (toTree<0) toTree=-1-toTree;
+System.err.println("lastByTree["+toTree+"]="+lastByTree[toTree]);			
 			i=lastByTree[toTree]==0?0:random.nextInt(lastByTree[toTree]+1);
 		}
+System.err.println("toTree="+toTree+" i="+i+" lastByTree[toTree]="+lastByTree[toTree]);		
 		toInstance=byTree[toTree][i];
-		p=model.minAlignmentLength+random.nextInt(toInstance.sequenceLength-(model.minAlignmentLength<<1));
+		p=model.minAlignmentLength+random.nextInt(Math.max(toInstance.sequenceLength-(model.minAlignmentLength<<1),1));
 		prefix=toInstance.getPrefix(p);
 		suffix=toInstance.getSuffix(toInstance.sequenceLength-p);
 		prefix.previous=toInstance.previous;
@@ -224,6 +255,7 @@ public class GenomeSimulator {
 					RepeatInstance[] newByTree = new RepeatInstance[byTree[toTree].length<<1];
 					System.arraycopy(byTree[toTree],0,newByTree,0,byTree[toTree].length);
 					byTree[toTree]=newByTree;
+if (newByTree==null || newByTree.length==0) System.err.println("VITTU> created zero-length byTree row "+toTree);
 				}
 				byTree[toTree][lastByTree[toTree]]=suffix;
 			}
@@ -266,7 +298,8 @@ public class GenomeSimulator {
 		RepeatInstance currentInstance;
 		BufferedImage image;
 		int[] tmpArray = new int[2];
-		
+
+System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);		
 		image = new BufferedImage(nColumns,nRows,BufferedImage.TYPE_INT_RGB);
 		for (x=0; x<nColumns; x++) {
 			for (y=0; y<nRows; y++) Colors.setRGB(image,x,y,Colors.COLOR_BACKGROUND);
@@ -452,12 +485,12 @@ public class GenomeSimulator {
 				while (true) {
 					overflow=Math.max(fromX+missingLength-nColumns,0);
 					if (overflow>0) {
-						drawPeriodicSubstring(repeat,orientation,image,fromX,nColumns-1,fromY);
+						drawPeriodicSubstring(repeat,sequenceLength,orientation,image,fromX,nColumns-1,fromY);
 						fromX=0; fromY+=ROWS_PER_LINE;
 						missingLength=overflow;
 					}
 					else {
-						drawPeriodicSubstring(repeat,orientation,image,fromX,fromX+missingLength-1,fromY);
+						drawPeriodicSubstring(repeat,sequenceLength,orientation,image,fromX,fromX+missingLength-1,fromY);
 						fromX+=missingLength;
 						break;
 					}
@@ -507,7 +540,7 @@ public class GenomeSimulator {
 		}
 		
 		// Drawing text
-		label=""+repeat.id;
+		label="ID="+","+repeat.id+", T="+repeat.type+", L="+sequenceLength;
 		x=(fromX+toX)/2-Math.round(fontMetrics.stringWidth(label),2);
 		y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
 		g2d.drawString(label,x,y);
@@ -530,7 +563,7 @@ public class GenomeSimulator {
 	 * Draws a periodic repeat over points $(fromX..toX,fromY..)$ of $image$, assuming 
 	 * that the drawing does not overflow the image.
 	 */
-	private static final void drawPeriodicSubstring(Repeat repeat, boolean orientation, BufferedImage image, int fromX, int toX, int fromY) {
+	private static final void drawPeriodicSubstring(Repeat repeat, int sequenceLength, boolean orientation, BufferedImage image, int fromX, int toX, int fromY) {
 		int x, y;
 		String label;
 		final Graphics2D g2d = image.createGraphics();
@@ -545,7 +578,7 @@ public class GenomeSimulator {
 		}
 	
 		// Drawing text
-		label=""+repeat.id+", O="+(orientation?"FWD":"RC")+", P="+repeat.sequenceLength;
+		label="ID="+repeat.id+", O="+(orientation?"FWD":"RC")+", P="+repeat.sequenceLength+", L="+sequenceLength;
 		x=(fromX+toX)/2-Math.round(fontMetrics.stringWidth(label),2);
 		y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
 		g2d.drawString(label,x,y);
@@ -553,7 +586,7 @@ public class GenomeSimulator {
 	
 	
 	private static class Repeat {
-		public int tree;  
+		public int tree;
 		public int id;
 		public Repeat parent;
 		public int type;  // -1 for unique sequence
@@ -566,11 +599,12 @@ public class GenomeSimulator {
 		
 		/**
 		 * Creates a new unique region of given $length$ according to $model$.
+		 *
+		 * Remark: the procedure does not set field $tree$.
 		 */
 		public final void initialize(int length, RepeatModel model, StringBuilder sb, Random random) {
 			id=++lastRepeat;
 			parent=null;
-			tree=++lastTree;
 			type=-1;
 			sequenceLength=length;
 			model.getUniqueString(sequenceLength,sb,random);
@@ -583,17 +617,25 @@ public class GenomeSimulator {
 		
 		/**
 		 * Creates a new random repeat from scratch, according to $model$.
+		 *
+		 * Remark: the procedure does not set field $tree$.
 		 */											  
 		public final void initialize(RepeatModel model, StringBuilder sb, Random random) {
+			final int DELTA = model.minAlignmentLength>>2;
 			int i;
 			
 			id=++lastRepeat;
 			parent=null;
-			tree=++lastTree;
 			type=model.getType(random);
-			if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
+			if (type>=Constants.INTERVAL_DENSE_PREFIX && type<=Constants.INTERVAL_DENSE_SUBSTRING) {
 				do { sequenceLength=model.getLength(random); }
-				while (sequenceLength<(model.minAlignmentLength)<<1);
+				while (sequenceLength<model.minAlignmentLength<<1);
+				model.getString(sequenceLength,sb,random);
+				sequence=sb.toString();
+			}
+			else if (type<=Constants.INTERVAL_DENSE_SINGLEDELETION) {
+				do { sequenceLength=model.getLength(random); }
+				while (sequenceLength<DELTA+(model.minAlignmentLength<<1));
 				model.getString(sequenceLength,sb,random);
 				sequence=sb.toString();
 			}
@@ -607,10 +649,10 @@ public class GenomeSimulator {
 				model.getString(sequenceLength,sb,random);
 				sequence=sb.toString();
 			}
-			insertionProb=Math.sampleFromSimplex(lastTree,random);
-			insertionProbCumulative = new double[lastTree];
+			insertionProb=Math.sampleFromSimplex(lastTree+1,random);
+			insertionProbCumulative = new double[lastTree+1];
 			insertionProbCumulative[0]=insertionProb[0];
-			for (i=1; i<lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
+			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
 		}
 		
@@ -620,6 +662,8 @@ public class GenomeSimulator {
 		 * the type of the past repeat, a perturbed version of its insertion preferences,
 		 * and the exact sequence of the instance, but it gets a new frequency.
 		 *
+		 * Remark: the procedure does not set field $tree$.
+		 *
 		 * @param instance assumed to be of length at least $minAlignmentLength$.
 		 */
 		public final void initialize(RepeatInstance instance, RepeatModel model, StringBuilder sb, Random random) {
@@ -627,7 +671,6 @@ public class GenomeSimulator {
 			
 			id=++lastRepeat;
 			parent=instance.repeat;
-			tree=parent.tree;
 			type=parent.type;
 			if (type<Constants.INTERVAL_PERIODIC) {
 				sequence=""+instance.sequence;
@@ -641,8 +684,9 @@ public class GenomeSimulator {
 				sequenceLength=period;
 			}
 			insertionProb=model.perturbInsertionProb(parent.insertionProb,random);
+			insertionProbCumulative = new double[insertionProb.length];
 			insertionProbCumulative[0]=insertionProb[0];
-			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
+			for (i=1; i<insertionProb.length; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
 		}
 		
@@ -697,8 +741,9 @@ public class GenomeSimulator {
 				sb.append(sequence.substring(repeatStart,repeatEnd+1));
 			}
 			else if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
-				length=random.nextInt(sequence.length()-(model.minAlignmentLength)<<1);			
-				p=model.minAlignmentLength+random.nextInt((int)Math.max(sequence.length()-((model.minAlignmentLength)<<1)-length,0));
+				length=random.nextInt(sequence.length()-(model.minAlignmentLength<<1));							
+				p=model.minAlignmentLength+random.nextInt((int)Math.max(sequence.length()-(model.minAlignmentLength<<1)-length,1));
+System.err.println("PERKELE> length="+length+"  sequence.length()="+sequence.length()+"  p="+p);
 				sb.append(sequence.substring(0,p));
 				sb.append(sequence.substring(p+length));
 				repeatStart=0; repeatEnd=sequenceLength-1;
