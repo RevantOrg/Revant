@@ -60,6 +60,7 @@ public class Colors {
 			case Constants.INTERVAL_DENSE_SUBSTRING: return 0x00B66B15;
 			case Constants.INTERVAL_DENSE_SINGLEDELETION: return 0x00A6231A;
 			case Constants.INTERVAL_PERIODIC: return 0x00319FC7;
+			case Constants.INTERVAL_PERIODIC+1: return 0x00319FC7;
 			default: return 0x00FFFFFF;
 		}
 	}
@@ -75,7 +76,23 @@ public class Colors {
 			case Constants.INTERVAL_DENSE_SUBSTRING: return "blue";
 			case Constants.INTERVAL_DENSE_SINGLEDELETION: return "green";
 			case Constants.INTERVAL_PERIODIC: return "pink";
+			case Constants.INTERVAL_PERIODIC+1: return "pink";
 			default: return "white";
+		}
+	}
+	
+	
+	public static final String type2string(int type) {
+		switch (type) {
+			case Constants.INTERVAL_ALIGNMENT: return "alignment";
+			case Constants.INTERVAL_DENSE_PREFIX: return "prefix";
+			case Constants.INTERVAL_DENSE_SUFFIX: return "suffix";
+			case Constants.INTERVAL_DENSE_PREFIXSUFFIX: return "prefix+suffix";
+			case Constants.INTERVAL_DENSE_SUBSTRING: return "substring";
+			case Constants.INTERVAL_DENSE_SINGLEDELETION: return "deletion";
+			case Constants.INTERVAL_PERIODIC: return "periodic";
+			case Constants.INTERVAL_PERIODIC+1: return "periodic";
+			default: return "unknown";
 		}
 	}
 	
@@ -104,6 +121,7 @@ public class Colors {
 			case Constants.INTERVAL_DENSE_SUBSTRING: return 0x0047D1FF;
 			case Constants.INTERVAL_DENSE_SINGLEDELETION: return 0x00D24BFF;
 			case Constants.INTERVAL_PERIODIC: return 0x001FFF3D;
+			case Constants.INTERVAL_PERIODIC+1: return 0x001FFF3D;
 			default: return 0x00FFFFFF;
 		}
 	}
@@ -121,6 +139,7 @@ public class Colors {
 			case Constants.INTERVAL_DENSE_SUBSTRING: return 0x0000104A;
 			case Constants.INTERVAL_DENSE_SINGLEDELETION: return 0x00003700;
 			case Constants.INTERVAL_PERIODIC: return 0x003E003F;
+			case Constants.INTERVAL_PERIODIC+1: return 0x003E003F;
 			default: return 0x00000000;
 		}
 	}
@@ -135,6 +154,7 @@ public class Colors {
 			case Constants.INTERVAL_DENSE_SUBSTRING: return "#B66B15";
 			case Constants.INTERVAL_DENSE_SINGLEDELETION: return "#A6231A";
 			case Constants.INTERVAL_PERIODIC: return "#319FC7";
+			case Constants.INTERVAL_PERIODIC+1: return "#319FC7";
 			default: return "#FFFFFF";
 		}
 	}

@@ -512,7 +512,7 @@ public class FragmentsStep3 {
 	 *
 	 * @param alignmentsFile readA=fragment ID; readB=reference ID;
 	 * @param mode TRUE=filters alignments; FALSE=does not filter alignments, and instead
-	 * instead statistics on max claw size (see $getMaxClawSize()$ for definitions);
+	 * collects statistics on max claw size (see $getMaxClawSize()$ for definitions);
 	 * @param histogram if $mode=FALSE$, the procedure adds to $histogram$ the number of 
 	 * talons of each size (this array is just incremented, never reset to zero);
 	 * @param printGraphs TRUE: draws a figure for every conflict graph, representing it

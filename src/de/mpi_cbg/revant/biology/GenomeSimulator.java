@@ -133,13 +133,8 @@ public class GenomeSimulator {
 		final int CAPACITY = 1000;  // Arbitrary
 		int i, j;
 		int repeatTree, insertionTree;
-		long newBps;
-		Repeat repeat;
-		
-
-System.err.println("VITTU> byTree lengths at the beginning of the epoch:");
-for (int x=0; x<=lastTree; x++) System.err.println(x+", "+byTree[x].length+", "+lastByTree[x]);		
-		
+		long newBps, totalNewBps;
+		Repeat repeat;		
 		
 		// Creating a new repeat
 		repeat = new Repeat();
@@ -176,26 +171,19 @@ for (int x=0; x<=lastTree; x++) System.err.println(x+", "+byTree[x].length+", "+
 				lastByTree=newLastByTree;
 			}	
 			byTree[lastTree] = new RepeatInstance[CAPACITY];
-System.err.println("VITTU> lastTree="+lastTree+" space available in byTree: "+byTree[lastTree].length);
 			lastByTree[lastTree]=-1;
 			repeatTree=lastTree;
-System.err.println("VITTU> REPEATTREE="+repeatTree);			
 		}
 		repeat.tree=repeatTree;
 		
-		// Replication wave
-		newBps=0;
-		for (i=0; i<repeat.frequency; i++) newBps+=epoch_impl(repeat,model,sb,random);
-		
-		
-		
-		
-System.err.println("VITTU> byTree lengths at the end of the epoch:");
-for (int x=0; x<=lastTree; x++) System.err.println(x+", "+byTree[x].length+", "+lastByTree[x]);	
-		
-		
-		
-		return newBps;
+		// Replication wave	
+		totalNewBps=0;
+		for (i=0; i<repeat.frequency; i++) {
+			newBps=epoch_impl(repeat,model,sb,random);
+			if (newBps==0 && treesWithLongInstances()==0) break;
+			totalNewBps+=newBps;
+		}
+		return totalNewBps;
 	}
 	
 	
@@ -204,7 +192,9 @@ for (int x=0; x<=lastTree; x++) System.err.println(x+", "+byTree[x].length+", "+
 	 * repeat (possibly of the same repeat, or of the artificial repeat that represents 
 	 * unique sequence).
 	 *
-	 * @return the number of new basepairs created.
+	 * @return the number of new basepairs created, or zero if insertion did not succeed:
+	 * this happens iff no instance of the destination repeat is long enough. In this case
+	 * the procedure fails instead of trying with another destination repeat.
 	 */
 	private static final int epoch_impl(Repeat repeat, RepeatModel model, StringBuilder sb, Random random) {
 		int i, j, p;
@@ -214,27 +204,31 @@ for (int x=0; x<=lastTree; x++) System.err.println(x+", "+byTree[x].length+", "+
 		
 		do { fromInstance=repeat.getInstance(model,sb,random); }
 		while (fromInstance.sequenceLength<model.minAlignmentLength);
-		lastByTree[fromTree]++;
-		if (lastByTree[fromTree]==byTree[fromTree].length) {
-			RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
-			System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
-			byTree[fromTree]=newByTree;
-		}
-		byTree[fromTree][lastByTree[fromTree]]=fromInstance;
 		if (lastTree<=1) {
 			toTree=0;
-System.err.println("PERKELE> lastByTree[0]="+lastByTree[0]);
-//--------> EXPLICITLY HANDLE CASE IN WHICH ROW ZERO HAS ZERO COLUMNS DUE TO FRAGMENTATION
+			if (lastByTree[0]==-1) return 0;
 			i=lastByTree[0]==0?0:random.nextInt(lastByTree[0]+1);
+			lastByTree[fromTree]++;
+			if (lastByTree[fromTree]==byTree[fromTree].length) {
+				RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
+				System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
+				byTree[fromTree]=newByTree;
+			}
+			byTree[fromTree][lastByTree[fromTree]]=fromInstance;
 		}
 		else {
 			toTree=Arrays.binarySearch(repeat.insertionProbCumulative,random.nextDouble());
-//--------> EXPLICITLY HANDLE CASE IN WHICH SOME ROWS HAVE ZERO COLUMNS DUE TO FRAGMENTATION			
 			if (toTree<0) toTree=-1-toTree;
-System.err.println("lastByTree["+toTree+"]="+lastByTree[toTree]);			
+			if (lastByTree[toTree]==-1) return 0;
 			i=lastByTree[toTree]==0?0:random.nextInt(lastByTree[toTree]+1);
+			lastByTree[fromTree]++;
+			if (lastByTree[fromTree]==byTree[fromTree].length) {
+				RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
+				System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
+				byTree[fromTree]=newByTree;
+			}
+			byTree[fromTree][lastByTree[fromTree]]=fromInstance;
 		}
-System.err.println("toTree="+toTree+" i="+i+" lastByTree[toTree]="+lastByTree[toTree]);		
 		toInstance=byTree[toTree][i];
 		p=model.minAlignmentLength+random.nextInt(Math.max(toInstance.sequenceLength-(model.minAlignmentLength<<1),1));
 		prefix=toInstance.getPrefix(p);
@@ -255,7 +249,6 @@ System.err.println("toTree="+toTree+" i="+i+" lastByTree[toTree]="+lastByTree[to
 					RepeatInstance[] newByTree = new RepeatInstance[byTree[toTree].length<<1];
 					System.arraycopy(byTree[toTree],0,newByTree,0,byTree[toTree].length);
 					byTree[toTree]=newByTree;
-if (newByTree==null || newByTree.length==0) System.err.println("VITTU> created zero-length byTree row "+toTree);
 				}
 				byTree[toTree][lastByTree[toTree]]=suffix;
 			}
@@ -266,6 +259,20 @@ if (newByTree==null || newByTree.length==0) System.err.println("VITTU> created z
 			lastByTree[toTree]--;
 		}
 		return fromInstance.sequenceLength;
+	}
+	
+	
+	/**
+	 * @return the number of nonempty rows in $lastByTree$.
+	 */
+	private static final int treesWithLongInstances() {
+		int i, out;
+		
+		out=0;
+		for (i=0; i<=lastTree; i++) {
+			if (lastByTree[i]>=0) out++;
+		}
+		return out;
 	}
 	
 	
@@ -299,7 +306,6 @@ if (newByTree==null || newByTree.length==0) System.err.println("VITTU> created z
 		BufferedImage image;
 		int[] tmpArray = new int[2];
 
-System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);		
 		image = new BufferedImage(nColumns,nRows,BufferedImage.TYPE_INT_RGB);
 		for (x=0; x<nColumns; x++) {
 			for (y=0; y<nRows; y++) Colors.setRGB(image,x,y,Colors.COLOR_BACKGROUND);
@@ -436,7 +442,7 @@ System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);
 		
 		/**
 		 * Draws the repeat instance starting from point $(fromX,toX)$ of $image$, and 
-		 * handling overflows by keep drawing on the following rows.
+		 * handling overflows by continuing to draw on the following rows.
 		 *
 		 * @param nColumns total number of columns in $image$;
 		 * @return out output array: 0=the new value of fromX; 1=the new value of fromY
@@ -481,16 +487,16 @@ System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);
 				out[0]=fromX; out[1]=fromY;
 			}
 			else {
-				missingLength=sequenceLength;
+				missingLength=sequenceLength; isOverflow=false;
 				while (true) {
 					overflow=Math.max(fromX+missingLength-nColumns,0);
 					if (overflow>0) {
-						drawPeriodicSubstring(repeat,sequenceLength,orientation,image,fromX,nColumns-1,fromY);
-						fromX=0; fromY+=ROWS_PER_LINE;
+						drawPeriodicSubstring(repeat,sequenceLength,orientation,image,fromX,nColumns-1,fromY,isOverflow,true);
+						fromX=0; fromY+=ROWS_PER_LINE; isOverflow=true;
 						missingLength=overflow;
 					}
 					else {
-						drawPeriodicSubstring(repeat,sequenceLength,orientation,image,fromX,fromX+missingLength-1,fromY);
+						drawPeriodicSubstring(repeat,sequenceLength,orientation,image,fromX,fromX+missingLength-1,fromY,isOverflow,false);
 						fromX+=missingLength;
 						break;
 					}
@@ -518,11 +524,13 @@ System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);
 		final int toX = fromX+sequenceLength-1;
 		final int leftTruncation = orientation?repeatStart:repeat.sequenceLength-repeatEnd;
 		final int rightTruncation = orientation?repeat.sequenceLength-repeatEnd:repeatStart;
+		final int colorPlain = Colors.type2color(repeat.type);
+		final int colorHighlight = Colors.COLOR_TEXT;
 		String label;
 		final Graphics2D g2d = image.createGraphics();
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
 		g2d.setFont(new Font(DEFAULT_FONT,Font.PLAIN,15));
-		g2d.setColor(new Color(Colors.COLOR_REFERENCE_HIGHLIGHT));
+		g2d.setColor(new Color(colorHighlight));
 		final FontMetrics fontMetrics = g2d.getFontMetrics();
 		final NumberFormat formatter = NumberFormat.getInstance();
 		formatter.setMaximumFractionDigits(2);
@@ -534,13 +542,13 @@ System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);
 			height=Math.round(ROWS_PER_LINE_OVER_TWO*(orientation?lastX-x:x-firstX)/repeat.sequenceLength);
 			if ( (!isOverflow && leftTruncation>TRUNCATION_THRESHOLD && (x-fromX)<=TRUNCATION_TAG_WIDTH_PIXELS) || 
 				 (rightTruncation>TRUNCATION_THRESHOLD && (fromX+sequenceLength-x)<=TRUNCATION_TAG_WIDTH_PIXELS)
-			   ) color=Colors.COLOR_REFERENCE_HIGHLIGHT;
-			else color=Colors.COLOR_REFERENCE;
+			   ) color=colorHighlight;
+			else color=colorPlain;
 			for (y=fromY+ROWS_PER_LINE_OVER_TWO-height; y<=fromY+ROWS_PER_LINE_OVER_TWO+height; y++) Colors.setRGB(image,x,y,color);
 		}
 		
 		// Drawing text
-		label="ID="+","+repeat.id+", T="+repeat.type+", L="+sequenceLength;
+		label="ID="+repeat.id+", T="+Colors.type2string(repeat.type)+", L="+sequenceLength;
 		x=(fromX+toX)/2-Math.round(fontMetrics.stringWidth(label),2);
 		y=fromY+ROWS_PER_LINE_OVER_TWO+fontMetrics.getAscent()/2;
 		g2d.drawString(label,x,y);
@@ -563,18 +571,25 @@ System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);
 	 * Draws a periodic repeat over points $(fromX..toX,fromY..)$ of $image$, assuming 
 	 * that the drawing does not overflow the image.
 	 */
-	private static final void drawPeriodicSubstring(Repeat repeat, int sequenceLength, boolean orientation, BufferedImage image, int fromX, int toX, int fromY) {
+	private static final void drawPeriodicSubstring(Repeat repeat, int sequenceLength, boolean orientation, BufferedImage image, int fromX, int toX, int fromY, boolean isOverflow, boolean willOverflow) {
 		int x, y;
+		final int colorPlain = Colors.type2color(repeat.type);
+		final int colorHighlight = Colors.COLOR_TEXT;
+		int color;
 		String label;
 		final Graphics2D g2d = image.createGraphics();
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
 		g2d.setFont(new Font(DEFAULT_FONT,Font.PLAIN,15));
-		g2d.setColor(new Color(Colors.COLOR_REFERENCE_HIGHLIGHT));
+		g2d.setColor(new Color(colorHighlight));
 		final FontMetrics fontMetrics = g2d.getFontMetrics();
 	
 		// Drawing rectangle
 		for (x=fromX; x<=toX; x++) {
-			for (y=fromY; y<=fromY+ROWS_PER_LINE; y++) Colors.setRGB(image,x,y,Colors.COLOR_REFERENCE);
+			if ( (!isOverflow && (x-fromX)<=TRUNCATION_TAG_WIDTH_PIXELS) || 
+				 (!willOverflow && toX-x<=TRUNCATION_TAG_WIDTH_PIXELS)
+			   ) color=colorHighlight;
+			else color=colorPlain;
+			for (y=fromY; y<=fromY+ROWS_PER_LINE; y++) Colors.setRGB(image,x,y,color);
 		}
 	
 		// Drawing text
@@ -742,8 +757,9 @@ System.err.println("VITTU> nColumns="+nColumns+" nRows="+nRows);
 			}
 			else if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
 				length=random.nextInt(sequence.length()-(model.minAlignmentLength<<1));							
+System.err.println("PERKELE> 1  length="+length+"  sequence.length()="+sequence.length());
 				p=model.minAlignmentLength+random.nextInt((int)Math.max(sequence.length()-(model.minAlignmentLength<<1)-length,1));
-System.err.println("PERKELE> length="+length+"  sequence.length()="+sequence.length()+"  p="+p);
+System.err.println("PERKELE> 2  p="+p);
 				sb.append(sequence.substring(0,p));
 				sb.append(sequence.substring(p+length));
 				repeatStart=0; repeatEnd=sequenceLength-1;
