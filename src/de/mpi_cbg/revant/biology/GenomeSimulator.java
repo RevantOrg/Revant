@@ -127,15 +127,17 @@ public class GenomeSimulator {
 	
 	
 	/**
+	 * If Repbase strings were provided but they have all been used up by the simulation,
+	 * the program reverts to the no-Repbase case.
 	 *
 	 * @return the number of new repetitive basepairs created by the procedure.
 	 */
 	private static final long epoch(RepeatModel model, StringBuilder sb, Random random) {
 		final int MAX_NO_CONTRIBUTION_ITERATIONS = 10;  // Arbitrary
 		final int CAPACITY = 1000;  // Arbitrary
-		boolean isSatellite;
+		boolean isSatellite, isUsed;
 		int i, j;
-		int repeatTree, insertionTree, noContribution;
+		int repeatTree, insertionTree, noContribution, id;
 		long newBps, totalNewBps;
 		Repeat repeat;		
 		
@@ -143,9 +145,21 @@ public class GenomeSimulator {
 		repeat = new Repeat();
 		if (lastRepeat==0 || random.nextDouble()>model.fromInstanceProb) {
 			// New repeat from scratch
-			if (model.hasRepbaseStrings()) {
-				isSatellite=random.nextBoolean();
-				repeat.initialize(model,isSatellite,random.nextInt(isSatellite?model.lastRepbaseSat+1:model.lastRepbase+1),random);
+			if (model.hasUnusedRepbaseStrings()) {
+				do {
+					isSatellite=random.nextBoolean();
+					if (isSatellite) {
+						id=random.nextInt(model.lastRepbaseSat+1);
+						isUsed=model.repbaseSatIsUsed[id];
+						model.repbaseSatIsUsed[id]=true;
+					}
+					else {
+						id=random.nextInt(model.lastRepbase+1);
+						isUsed=model.repbaseIsUsed[id];
+						model.repbaseIsUsed[id]=true;
+					}
+				} while (isUsed);
+				repeat.initialize(model,isSatellite,id,random);
 			}
 			else repeat.initialize(model,sb,random);
 			repeatTree=-1;
@@ -630,7 +644,7 @@ public class GenomeSimulator {
 	
 	private static class Repeat {
 		public int tree;
-		public int id;
+		public String id;
 		public Repeat parent;
 		public int type;  // -1 for unique sequence
 		public String sequence;  // Of the period if periodic
@@ -646,7 +660,7 @@ public class GenomeSimulator {
 		 * Remark: the procedure does not set field $tree$.
 		 */
 		public final void initialize(int length, RepeatModel model, StringBuilder sb, Random random) {
-			id=++lastRepeat;
+			id=(++lastRepeat)+"";
 			parent=null;
 			type=-1;
 			sequenceLength=length;
@@ -666,7 +680,7 @@ public class GenomeSimulator {
 		public final void initialize(RepeatModel model, StringBuilder sb, Random random) {
 			int i;
 			
-			id=++lastRepeat;
+			id=(++lastRepeat)+"";
 			parent=null;
 			type=model.getType(random);
 			if (type>=Constants.INTERVAL_DENSE_PREFIX && type<=Constants.INTERVAL_DENSE_SUBSTRING) {
@@ -712,7 +726,7 @@ public class GenomeSimulator {
 		public final void initialize(RepeatInstance instance, RepeatModel model, StringBuilder sb, Random random) {
 			int i, period;
 			
-			id=++lastRepeat;
+			id=(++lastRepeat)+"";
 			parent=instance.repeat;
 			if (type<Constants.INTERVAL_PERIODIC) {
 				sequence=""+instance.sequence;
@@ -741,6 +755,7 @@ public class GenomeSimulator {
 			insertionProbCumulative[0]=insertionProb[0];
 			for (i=1; i<insertionProb.length; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
+			if (model.hasRepbaseStrings()) System.err.println("Created a new repeat from an instance of Repbase element "+parent.id);
 		}
 		
 		
@@ -752,7 +767,7 @@ public class GenomeSimulator {
 		public final void initialize(RepeatModel model, boolean isSatellite, int repbaseID, Random random) {
 			int i;
 			
-			id=++lastRepeat;
+			id=isSatellite?model.repbaseSatIDs[repbaseID]:model.repbaseIDs[repbaseID];
 			parent=null;
 			if (isSatellite) {
 				sequence=model.repbaseSat[repbaseID];
@@ -774,6 +789,7 @@ public class GenomeSimulator {
 			insertionProbCumulative[0]=insertionProb[0];
 			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=type==Constants.INTERVAL_PERIODIC?model.getFrequencyPeriodic(random):model.getFrequency(random);
+			System.err.println("Created Repbase repeat "+id);
 		}
 		
 		
@@ -1381,12 +1397,27 @@ public class GenomeSimulator {
 		}
 		
 		
-		public final boolean hasRepbaseStrings() { return lastRepbase+lastRepbaseSat>0; }
+		/**
+		 * @return TRUE iff the model contains some Repbase strings.
+		 */
+		public final boolean hasRepbaseStrings() { return lastRepbase+lastRepbaseSat>0; }		
 		
 		
-		
-		
-		
+		/**
+		 * @return TRUE iff some Repbase strings have not been used in the simulation yet.
+		 */
+		public final boolean hasUnusedRepbaseStrings() { 
+			int i, count;
+			
+			count=0;
+			for (i=0; i<=lastRepbase; i++) {
+				if (!repbaseIsUsed[i]) count++;
+			}
+			for (i=0; i<=lastRepbaseSat; i++) {
+				if (!repbaseSatIsUsed[i]) count++;
+			}
+			return count>0;
+		}
 		
 	}
 
