@@ -23,6 +23,7 @@ public class GenomeSimulator {
 	 * artificial repeat, which forms its own evolutionary tree with just one node.
 	 */
 	public static final int N_REPEAT_TYPES = Constants.INTERVAL_UNKNOWN+1;
+	private static int DELTA;  // For single-deletion repeat type
 	private static Repeat[] repeats;
 	private static int lastRepeat, lastTree;
 	private static Repeat unique;
@@ -169,8 +170,11 @@ public class GenomeSimulator {
 				for (i=0; i<byTree.length; i++) newByTree[i]=byTree[i];
 				byTree=newByTree;
 				int[] newLastByTree = new int[byTree.length];
-				System.arraycopy(lastByTree,0,newLastByTree,0,byTree.length);
+				System.arraycopy(lastByTree,0,newLastByTree,0,lastByTree.length);
 				lastByTree=newLastByTree;
+				int[] newCumulativeByTree = new int[byTree.length];
+				System.arraycopy(cumulativeByTree,0,newCumulativeByTree,0,cumulativeByTree.length);
+				cumulativeByTree=newCumulativeByTree;
 			}	
 			byTree[lastTree] = new RepeatInstance[CAPACITY];
 			lastByTree[lastTree]=-1;
@@ -190,6 +194,7 @@ public class GenomeSimulator {
 				noContribution=0;
 				totalNewBps+=newBps;
 			}
+			System.err.println("Replication wave "+i+" out of "+repeat.frequency);
 		}
 		return totalNewBps;
 	}
@@ -285,18 +290,25 @@ public class GenomeSimulator {
 	
 	
 	/**
-	 * In basepairs
+	 * @param mode TRUE: length in basepairs; FALSE: length in number of intances.
 	 */
-	private static final long getGenomeLength() {
+	private static final long getGenomeLength(boolean mode) {
 		long out;
 		RepeatInstance currentInstance;
 		
-		out=0;
-		currentInstance=root.next;
-		do {
-			out+=currentInstance.sequenceLength;
-			currentInstance=currentInstance.next;
-		} while (currentInstance!=null);
+		out=0; currentInstance=root.next;
+		if (mode) {
+			do {
+				out+=currentInstance.sequenceLength;
+				currentInstance=currentInstance.next;
+			} while (currentInstance!=null);
+		}
+		else {
+			do {
+				out++;
+				currentInstance=currentInstance.next;
+			} while (currentInstance!=null);
+		}
 		return out;
 	}
 	
@@ -307,17 +319,20 @@ public class GenomeSimulator {
 	private static final void drawGenome(int nColumns, String outputFile) throws IOException {
 		int x, y;
 		int fromX, fromY;
-		final long genomeLength = getGenomeLength();
+		final long genomeLength = getGenomeLength(true);
+		final long nInstances = getGenomeLength(false);
 		final int nLines = 1+(int)(genomeLength/nColumns);
 		final int nRows = nLines*ROWS_PER_LINE;
 		RepeatInstance currentInstance;
 		BufferedImage image;
+		Graphics2D g2d;
 		int[] tmpArray = new int[2];
-
+		int[] pixels;
+		
 		image = new BufferedImage(nColumns,nRows,BufferedImage.TYPE_INT_RGB);
-		for (x=0; x<nColumns; x++) {
-			for (y=0; y<nRows; y++) Colors.setRGB(image,x,y,Colors.COLOR_BACKGROUND);
-		}
+		pixels=((DataBufferInt)image.getRaster().getDataBuffer()).getData();
+		Arrays.fill(pixels,Colors.COLOR_BACKGROUND);
+		System.err.println("Drawing genome...  ("+nInstances+" blocks, "+genomeLength+" bps)");
 		currentInstance=root;
 		fromX=0; fromY=0;
 		while (currentInstance.next!=null) {
@@ -644,7 +659,6 @@ public class GenomeSimulator {
 		 * Remark: the procedure does not set field $tree$.
 		 */											  
 		public final void initialize(RepeatModel model, StringBuilder sb, Random random) {
-			final int DELTA = model.minAlignmentLength>>2;
 			int i;
 			
 			id=++lastRepeat;
@@ -656,7 +670,7 @@ public class GenomeSimulator {
 				model.getString(sequenceLength,sb,random);
 				sequence=sb.toString();
 			}
-			else if (type<=Constants.INTERVAL_DENSE_SINGLEDELETION) {
+			else if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
 				do { sequenceLength=model.getLength(random); }
 				while (sequenceLength<DELTA+(model.minAlignmentLength<<1));
 				model.getString(sequenceLength,sb,random);
@@ -682,8 +696,9 @@ public class GenomeSimulator {
 		
 		/**
 		 * Creates a new repeat from an instance of a past one. The new repeat inherits 
-		 * the type of the past repeat, a perturbed version of its insertion preferences,
-		 * and the exact sequence of the instance, but it gets a new frequency.
+		 * the type of the past repeat (if length allows), a perturbed version of its 
+		 * insertion preferences, and the exact sequence of the instance, but it gets a 
+		 * new frequency.
 		 *
 		 * Remark: the procedure does not set field $tree$.
 		 *
@@ -694,12 +709,22 @@ public class GenomeSimulator {
 			
 			id=++lastRepeat;
 			parent=instance.repeat;
-			type=parent.type;
 			if (type<Constants.INTERVAL_PERIODIC) {
 				sequence=""+instance.sequence;
 				sequenceLength=instance.sequenceLength;
+				if (parent.type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
+					if (sequenceLength>=DELTA+(model.minAlignmentLength<<1)) type=parent.type;
+					else if (sequenceLength>=model.minAlignmentLength<<1) type=Constants.INTERVAL_DENSE_SUBSTRING;
+					else type=Constants.INTERVAL_ALIGNMENT;
+				}
+				else if (parent.type>=Constants.INTERVAL_DENSE_PREFIX && parent.type<=Constants.INTERVAL_DENSE_SUBSTRING) {
+					if (sequenceLength>=model.minAlignmentLength<<1) type=parent.type;
+					else type=Constants.INTERVAL_ALIGNMENT;
+				}
+				else type=parent.type;
 			}
 			else {
+				type=parent.type;
 				do { period=model.perturbPeriod(parent.sequenceLength,random); }
 				while (period>instance.sequenceLength);
 				i=random.nextInt(instance.sequenceLength-period);
@@ -765,9 +790,7 @@ public class GenomeSimulator {
 			}
 			else if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
 				length=random.nextInt(sequence.length()-(model.minAlignmentLength<<1));							
-System.err.println("PERKELE> 1  length="+length+"  sequence.length()="+sequence.length());
 				p=model.minAlignmentLength+random.nextInt((int)Math.max(sequence.length()-(model.minAlignmentLength<<1)-length,1));
-System.err.println("PERKELE> 2  p="+p);
 				sb.append(sequence.substring(0,p));
 				sb.append(sequence.substring(p+length));
 				repeatStart=0; repeatEnd=sequenceLength-1;
@@ -880,6 +903,7 @@ System.err.println("PERKELE> 2  p="+p);
 			str=br.readLine();
 			p=str.indexOf("/");
 			minAlignmentLength=Integer.parseInt(p>=0?str.substring(0,p).trim():str.trim());
+			DELTA=minAlignmentLength>>2;  // Arbitrary
 			str=br.readLine();
 			p=str.indexOf("/");
 			minShortPeriod=Integer.parseInt(p>=0?str.substring(0,p).trim():str.trim());
