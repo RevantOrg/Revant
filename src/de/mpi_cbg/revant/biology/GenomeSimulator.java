@@ -133,6 +133,7 @@ public class GenomeSimulator {
 	private static final long epoch(RepeatModel model, StringBuilder sb, Random random) {
 		final int MAX_NO_CONTRIBUTION_ITERATIONS = 10;  // Arbitrary
 		final int CAPACITY = 1000;  // Arbitrary
+		boolean isSatellite;
 		int i, j;
 		int repeatTree, insertionTree, noContribution;
 		long newBps, totalNewBps;
@@ -142,7 +143,11 @@ public class GenomeSimulator {
 		repeat = new Repeat();
 		if (lastRepeat==0 || random.nextDouble()>model.fromInstanceProb) {
 			// New repeat from scratch
-			repeat.initialize(model,sb,random);
+			if (model.hasRepbaseStrings()) {
+				isSatellite=random.nextBoolean();
+				repeat.initialize(model,isSatellite,random.nextInt(isSatellite?model.lastRepbaseSat+1:model.lastRepbase+1),random);
+			}
+			else repeat.initialize(model,sb,random);
 			repeatTree=-1;
 		}
 		else {
@@ -740,6 +745,39 @@ public class GenomeSimulator {
 		
 		
 		/**
+		 * Creates a new random repeat from a Repbase entry.
+		 *
+		 * Remark: the procedure does not set field $tree$.
+		 */											  
+		public final void initialize(RepeatModel model, boolean isSatellite, int repbaseID, Random random) {
+			int i;
+			
+			id=++lastRepeat;
+			parent=null;
+			if (isSatellite) {
+				sequence=model.repbaseSat[repbaseID];
+				sequenceLength=sequence.length();
+				type=Constants.INTERVAL_PERIODIC;
+			}
+			else {
+				sequence=model.repbase[repbaseID];
+				sequenceLength=sequence.length();
+				do { type=model.getType(random); }
+				while ( type==Constants.INTERVAL_PERIODIC || 
+					    (type==Constants.INTERVAL_DENSE_SINGLEDELETION && sequenceLength<DELTA+(model.minAlignmentLength<<1)) ||
+						(type>=Constants.INTERVAL_DENSE_PREFIX && type<=Constants.INTERVAL_DENSE_SUBSTRING && sequenceLength<model.minAlignmentLength<<1)
+					  );
+				
+			}
+			insertionProb=Math.sampleFromSimplex(lastTree+1,random);
+			insertionProbCumulative = new double[lastTree+1];
+			insertionProbCumulative[0]=insertionProb[0];
+			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
+			frequency=type==Constants.INTERVAL_PERIODIC?model.getFrequencyPeriodic(random):model.getFrequency(random);
+		}
+		
+		
+		/**
 		 * Remark: (1) the prefix-suffix type has equal prob. of generating a prefix or a 
 		 * suffix, and uniform prob. of generating every length >=minAlignmentLength;
 		 * (2) substring type has uniform prob. of generating every substring length >=
@@ -891,11 +929,23 @@ public class GenomeSimulator {
 		private double[] frequencyProbPeriodic;  // Prob. of frequency $i$.
 		private double[] frequencyProbPeriodicCumulative;
 		
+		/**
+		 * Repbase file
+	     */
+		private String[] repbase, repbaseSat;
+		private int lastRepbase, lastRepbaseSat;
+		private String[] repbaseIDs, repbaseSatIDs;  // IDs in the file
+		
+		/**
+		 * TRUE iff a string has been already used to create a repeat.
+		 */
+		private boolean[] repbaseIsUsed, repbaseSatIsUsed;
+		
 		
 		public RepeatModel(String configDir) throws IOException {
 			int i, p;
 			int length;
-			String str;
+			String str, repbaseFile;
 			BufferedReader br;
 			String[] tokens;
 			
@@ -1066,6 +1116,11 @@ public class GenomeSimulator {
 			frequencyProbPeriodicCumulative = new double[length];
 			frequencyProbPeriodicCumulative[0]=frequencyProbPeriodic[0];
 			for (i=1; i<length; i++) frequencyProbPeriodicCumulative[i]=frequencyProbPeriodic[i]+frequencyProbPeriodicCumulative[i-1];
+			
+			// Loading Repbase strings, if any.
+			repbaseFile=configDir+"/repbase.fa";
+			if (new File(repbaseFile).exists()) loadRepbase(repbaseFile,minAlignmentLength);
+			else { lastRepbase=-1; lastRepbaseSat=-1; }
 		}
 		
 		
@@ -1232,6 +1287,107 @@ public class GenomeSimulator {
 			}
 			sb.delete(0,length);
 		}
+		
+		
+		/**
+		 * Initializes all global Repbase variables using $file$. A string is considered
+		 * satellite or non-satellite based on its Repbase label. Non-satellite strings 
+		 * shorter than $minAlignmentLength$ are not loaded. Satellite strings of any 
+		 * length are assumed to be periods (possibly long).
+		 *
+		 * @param file characters not in {A,C,G,T} are discarded.
+		 */
+		private final void loadRepbase(String file, int minAlignmentLength) throws IOException {
+			final int CAPACITY = 100;  // Arbitrary
+			final String SAT_LABEL_1 = "satellite";
+			final String SAT_LABEL_2 = "sat";
+			boolean currentIsSat;
+			String str;
+			StringBuilder buffer;
+			BufferedReader br;
+			
+			buffer = new StringBuilder();
+			repbase = new String[CAPACITY]; 
+			repbaseSat = new String[CAPACITY];
+			repbaseIDs = new String[CAPACITY];
+			repbaseSatIDs = new String[CAPACITY];
+			lastRepbase=-1; lastRepbaseSat=-1;
+			br = new BufferedReader(new FileReader(file));
+			str=br.readLine(); currentIsSat=false;
+			while (str!=null) {
+				if (str.length()!=0 && str.charAt(0)=='>') {
+					cleanBuffer(buffer);
+					if (buffer.length()!=0) {
+						if (currentIsSat) repbaseSat[lastRepbaseSat]=buffer.toString();
+						else {
+							if (buffer.length()>=minAlignmentLength) repbase[lastRepbase]=buffer.toString();
+							else lastRepbase--;
+						}
+						buffer.delete(0,buffer.length());
+					}
+					str=str.toLowerCase();
+					if (str.indexOf(SAT_LABEL_1)>=0 || str.indexOf(SAT_LABEL_2)>=0) {
+						lastRepbaseSat++;
+						if (lastRepbaseSat==repbaseSat.length) {
+							String[] newArray = new String[repbaseSat.length<<1];
+							System.arraycopy(repbaseSat,0,newArray,0,repbaseSat.length);
+							repbaseSat=newArray;
+						}
+						if (lastRepbaseSat==repbaseSatIDs.length) {
+							String[] newArray = new String[repbaseSatIDs.length<<1];
+							System.arraycopy(repbaseSatIDs,0,newArray,0,repbaseSatIDs.length);
+							repbaseSatIDs=newArray;
+						}
+						repbaseSatIDs[lastRepbaseSat]=str.substring(1).replaceAll("\t",",");
+						currentIsSat=true;
+					}
+					else {
+						lastRepbase++;
+						if (lastRepbase==repbase.length) {
+							String[] newArray = new String[repbase.length<<1];
+							System.arraycopy(repbase,0,newArray,0,repbase.length);
+							repbase=newArray;
+						}
+						if (lastRepbase==repbaseIDs.length) {
+							String[] newArray = new String[repbaseIDs.length<<1];
+							System.arraycopy(repbaseIDs,0,newArray,0,repbaseIDs.length);
+							repbaseIDs=newArray;
+						}
+						repbaseIDs[lastRepbase]=str.substring(1).replaceAll("\t",",");
+						currentIsSat=false;
+					}
+				}	
+				else buffer.append(str.trim().toLowerCase());
+				str=br.readLine();
+			}
+			br.close();
+			repbaseIsUsed = new boolean[lastRepbase+1];
+			Math.set(repbaseIsUsed,lastRepbase,false);
+			repbaseSatIsUsed = new boolean[lastRepbaseSat+1];
+			Math.set(repbaseSatIsUsed,lastRepbaseSat,false);
+			System.err.println("Repbase file loaded: "+(lastRepbase+1)+" non-satellites, "+(lastRepbaseSat+1)+" satellites.");
+		}
+		
+		
+		/**
+		 * Removes non-DNA characters from $sb$.
+		 */
+		private static final void cleanBuffer(StringBuilder sb) {
+			int i = 0;
+			while (i<sb.length()) {
+				if (Arrays.binarySearch(DNA_ALPHABET,0,DNA_ALPHABET.length,sb.charAt(i))<0) sb.deleteCharAt(i);
+				else i++;  
+			}
+		}
+		
+		
+		public final boolean hasRepbaseStrings() { return lastRepbase+lastRepbaseSat>0; }
+		
+		
+		
+		
+		
+		
 	}
 
 }
