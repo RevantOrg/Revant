@@ -71,23 +71,66 @@ public class GenomeSimulator {
 		final long RANDOM_SEED = Long.parseLong(args[2]);  // -1 to discard it
 		final String REPEAT_MODEL_DIR = args[3];
 		final int N_OUTPUT_COLUMNS = Integer.parseInt(args[4]);
-		final String OUTPUT_IMAGE = args[5];
+		final String OUTPUT_IMAGE = args[5];  // "null" to discard it
+		final String OUTPUT_FASTA = args[6];  // "null" to discard it
+		final String OUTPUT_DOT = args[7];  // "null" to discard it
 		
-		final int STRING_CAPACITY = 100000;  // Arbitrary
+		final int STRING_CAPACITY = 1000000;  // Arbitrary
 		final long N_REPEAT_BPS = (long)(REPEAT_BPS_OVER_UNIQUE_BPS*N_UNIQUE_BPS);
 		RepeatModel model = new RepeatModel(REPEAT_MODEL_DIR);
 		StringBuilder sb = new StringBuilder(STRING_CAPACITY);
 		Random random = RANDOM_SEED==-1?new Random():new Random(RANDOM_SEED);
+		BufferedWriter bw;
 		
+		int i;
 		long nRepeatBps;
+		String parentString, repeatString;
 		
+		// Building the genome
 		initializeGenome(N_UNIQUE_BPS,model,sb,random);
 		nRepeatBps=0;
 		while (nRepeatBps<N_REPEAT_BPS) {
 			nRepeatBps+=epoch(model,sb,random);
-			System.err.println("Epoch completed, "+nRepeatBps+" repeat bps, "+N_UNIQUE_BPS+" unique bps.");
+			System.err.println("Epoch completed, "+nRepeatBps+" repeat bps, "+N_UNIQUE_BPS+" unique bps, "+lastRepeat+" distinct repeats.");
 		}
-		drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
+		
+		// Printing output
+		if (!OUTPUT_FASTA.equalsIgnoreCase("null")) {
+			bw = new BufferedWriter(new FileWriter(OUTPUT_FASTA));
+			for (i=0; i<=lastRepeat; i++) bw.write(repeats[i].toString(i,model.minAlignmentLength));
+			bw.close();
+		}
+		if (!OUTPUT_DOT.equalsIgnoreCase("null")) {
+			bw = new BufferedWriter(new FileWriter(OUTPUT_DOT));
+			bw.write("digraph G { \n");
+			for (i=0; i<=lastRepeat; i++) {
+				if (repeats[i].parent!=null) {
+					parentString=repeats[i].parent.id;
+					parentString=parentString.replace(' ','_');
+					parentString=parentString.replace('/','_');
+					parentString=parentString.replace(',','_');
+					parentString=parentString.replace('-','_');
+					repeatString=repeats[i].id;
+					repeatString=repeatString.replace(' ','_');
+					repeatString=repeatString.replace('/','_');
+					repeatString=repeatString.replace(',','_');
+					repeatString=repeatString.replace('-','_');
+					bw.write(parentString+" -> "+repeatString+";  \n");
+				}
+				else {
+					repeatString=repeats[i].id;
+					repeatString=repeatString.replace(' ','_');
+					repeatString=repeatString.replace('/','_');
+					repeatString=repeatString.replace(',','_');
+					repeatString=repeatString.replace('-','_');
+					bw.write(repeatString+";  \n");
+				}
+			}
+			bw.write("}");
+			bw.close();
+		}
+		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
+		
 	}
 	
 	
@@ -107,10 +150,11 @@ public class GenomeSimulator {
 		
 		// Repeats
 		unique = new Repeat();
+		lastRepeat=-1;
 		unique.initialize(nUniqueBps,model,sb,random);
 		repeats = new Repeat[CAPACITY_ROWS];
 		repeats[0]=unique;
-		lastRepeat=0; lastTree=0; unique.tree=0;
+		lastTree=0; unique.tree=0;
 		
 		// Instances
 		root = new RepeatInstance();
@@ -175,7 +219,7 @@ public class GenomeSimulator {
 			while (repeatTree>0 && lastByTree[repeatTree]==-1) repeatTree--;
 			repeat.initialize(byTree[repeatTree][i-cumulativeByTree[repeatTree-1]-1],model,sb,random);
 		}
-		lastRepeat++;
+		// $lastRepeat$ is incremented by $Repeat.initialize$.
 		if (lastRepeat==repeats.length) {
 			Repeat[] newRepeats = new Repeat[repeats.length<<1];
 			System.arraycopy(repeats,0,newRepeats,0,repeats.length);
@@ -361,11 +405,7 @@ public class GenomeSimulator {
 		}
 		ImageIO.write(image,"png",new File(outputFile));
 	}
-	
-	
-	
-	
-	
+
 	
 	
 	
@@ -767,6 +807,7 @@ public class GenomeSimulator {
 		public final void initialize(RepeatModel model, boolean isSatellite, int repbaseID, Random random) {
 			int i;
 			
+			lastRepeat++;
 			id=isSatellite?model.repbaseSatIDs[repbaseID]:model.repbaseIDs[repbaseID];
 			parent=null;
 			if (isSatellite) {
@@ -875,17 +916,20 @@ public class GenomeSimulator {
 		
 		
 		/**
-		 * FASTA format
+		 * FASTA format. Replicates the sequence if it is shorter than 
+		 * $minAlignmentLength$.
 		 */
-		public String toString() {
-			final int length = insertionProb.length;
+		public String toString(int newID, int minAlignmentLength) {
+			final int length = insertionProb==null?0:insertionProb.length;
 			int i;
 			
-			String out = ">"+id+"/"+type+"/";
+			String out = ">U0/"+newID+"/0_"+(sequenceLength-1)+"/"+id+"/"+type+"/"+frequency+"/";
 			if (length>0) out+="P(0)="+insertionProb[0];
 			for (i=1; i<length; i++) out+=",P("+i+")="+insertionProb[i];
-			out+="/0_"+(sequenceLength-1)+"\n";
-			out+=sequence+"\n";
+			out+="\n";
+			i=0;
+			do { out+=sequence; i+=sequenceLength; } while (i<minAlignmentLength);
+			out+="\n";
 			return out;
 		}
 	}
