@@ -1,14 +1,14 @@
 1000   // Min alignment length
 10     // Min short period
 100    // Max short period
-0.125  // Prob. of repeat type: Alignment
-0.125  // Prob. of repeat type: Prefix
-0.125  // Prob. of repeat type: Suffix
-0.125  // Prob. of repeat type: Prefix+suffix
-0.125  // Prob. of repeat type: Substring
-0.125  // Prob. of repeat type: Single deletion
-0.125  // Prob. of repeat type: Short-period
-0.125  // Prob. of repeat type: Long-period
+0.1589  // Prob. of repeat type: Alignment
+0.1589  // Prob. of repeat type: Prefix
+0.1589  // Prob. of repeat type: Suffix
+0.1589  // Prob. of repeat type: Prefix+suffix
+0.1589  // Prob. of repeat type: Substring
+0.1589  // Prob. of repeat type: Single deletion
+0.015625  // Prob. of repeat type: Short-period
+0.031250  // Prob. of repeat type: Long-period
 0.25   // Prob. of character A
 0.25   // Prob. of character C
 0.25   // Prob. of character G

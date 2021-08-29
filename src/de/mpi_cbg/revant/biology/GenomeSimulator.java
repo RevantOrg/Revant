@@ -130,9 +130,10 @@ public class GenomeSimulator {
 	 * @return the number of new repetitive basepairs created by the procedure.
 	 */
 	private static final long epoch(RepeatModel model, StringBuilder sb, Random random) {
+		final int MAX_NO_CONTRIBUTION_ITERATIONS = 10;  // Arbitrary
 		final int CAPACITY = 1000;  // Arbitrary
 		int i, j;
-		int repeatTree, insertionTree;
+		int repeatTree, insertionTree, noContribution;
 		long newBps, totalNewBps;
 		Repeat repeat;		
 		
@@ -151,6 +152,7 @@ public class GenomeSimulator {
 			i=1+random.nextInt(cumulativeByTree[lastTree]);
 			repeatTree=Arrays.binarySearch(cumulativeByTree,1,lastTree+1,i);
 			if (repeatTree<0) repeatTree=-1-repeatTree;
+			while (repeatTree>0 && lastByTree[repeatTree]==-1) repeatTree--;
 			repeat.initialize(byTree[repeatTree][i-cumulativeByTree[repeatTree-1]-1],model,sb,random);
 		}
 		lastRepeat++;
@@ -177,11 +179,17 @@ public class GenomeSimulator {
 		repeat.tree=repeatTree;
 		
 		// Replication wave	
-		totalNewBps=0;
+		totalNewBps=0; noContribution=0;
 		for (i=0; i<repeat.frequency; i++) {
 			newBps=epoch_impl(repeat,model,sb,random);
-			if (newBps==0 && treesWithLongInstances()==0) break;
-			totalNewBps+=newBps;
+			if (newBps==0) {
+				noContribution++;
+				if (noContribution==MAX_NO_CONTRIBUTION_ITERATIONS || treesWithLongInstances()==0) break;
+			}
+			else {
+				noContribution=0;
+				totalNewBps+=newBps;
+			}
 		}
 		return totalNewBps;
 	}
@@ -668,7 +676,7 @@ public class GenomeSimulator {
 			insertionProbCumulative = new double[lastTree+1];
 			insertionProbCumulative[0]=insertionProb[0];
 			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
-			frequency=model.getFrequency(random);
+			frequency=type==Constants.INTERVAL_PERIODIC?model.getFrequencyPeriodic(random):model.getFrequency(random);
 		}
 		
 		
@@ -857,7 +865,9 @@ System.err.println("PERKELE> 2  p="+p);
 		 */
 		private double[] frequencyProb;  // Prob. of block 10^i+1..10^(i+1)
 		private double[] frequencyProbCumulative;
-
+		private double[] frequencyProbPeriodic;  // Prob. of frequency $i$.
+		private double[] frequencyProbPeriodicCumulative;
+		
 		
 		public RepeatModel(String configDir) throws IOException {
 			int i, p;
@@ -1018,6 +1028,20 @@ System.err.println("PERKELE> 2  p="+p);
 			frequencyProbCumulative = new double[length];
 			frequencyProbCumulative[0]=frequencyProb[0];
 			for (i=1; i<length; i++) frequencyProbCumulative[i]=frequencyProb[i]+frequencyProbCumulative[i-1];
+			
+			// Loading $frequencyProbPeriodic*$.
+			br = new BufferedReader(new FileReader(configDir+"/frequencyProbPeriodic.txt"));
+			str=br.readLine();  // Skipping header
+			str=br.readLine();
+			br.close();
+			tokens=str.split(" ");
+			length=tokens.length;
+			frequencyProbPeriodic = new double[length];
+			for (i=0; i<length; i++) frequencyProbPeriodic[i]=Double.parseDouble(tokens[i]);
+			tokens=null;
+			frequencyProbPeriodicCumulative = new double[length];
+			frequencyProbPeriodicCumulative[0]=frequencyProbPeriodic[0];
+			for (i=1; i<length; i++) frequencyProbPeriodicCumulative[i]=frequencyProbPeriodic[i]+frequencyProbPeriodicCumulative[i-1];
 		}
 		
 		
@@ -1128,6 +1152,16 @@ System.err.println("PERKELE> 2  p="+p);
 			final int from = 10^(i)+1;
 			final int to = 10^(i+1);
 			return from+random.nextInt(to-from+1);
+		}
+		
+		
+		/**
+		 * @return the frequency of a periodic repeat (>=1).
+		 */
+		public final int getFrequencyPeriodic(Random random) {
+			int i = Arrays.binarySearch(frequencyProbPeriodicCumulative,random.nextDouble());
+			if (i<0) i=-i-1;
+			return 1+i;
 		}
 		
 		
