@@ -130,7 +130,6 @@ public class GenomeSimulator {
 			bw.close();
 		}
 		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
-		
 	}
 	
 	
@@ -407,12 +406,12 @@ public class GenomeSimulator {
 	}
 
 	
+
 	
 	
 	
 	
-	
-	
+		
 	// --------------------------- REPEATS AND REPEAT INSTANCES --------------------------
 	
 	private static final void reverseComplement(StringBuilder sb) {
@@ -448,7 +447,12 @@ public class GenomeSimulator {
 	}
 	
 	
-	public static class RepeatInstance {
+	public static class RepeatInstance implements Comparable {
+		public static final byte ORDER_ID = 0;
+		public static final byte ORDER_FEATURES = 1;
+		public static byte order;
+		
+		public int id, characterID;
 		public String sequence;
 		public int sequenceLength;
 		public Repeat repeat;
@@ -479,6 +483,35 @@ public class GenomeSimulator {
 			orientation=o;
 			repeatStart=rs;
 			repeatEnd=re;
+		}
+		
+		
+		/**
+		 * Makes this instance a clone of $otherInstance$, excluding fields $previous,
+		 * next$.
+		 *
+		 * @param mode TRUE: simple clone; FALSE: this instance becomes an instance of
+		 * the same length of the artificial unique-sequence repeat.
+		 */
+		public RepeatInstance(RepeatInstance otherInstance, boolean mode) {
+			if (mode) {
+				this.sequence=otherInstance.sequence;
+				this.sequenceLength=otherInstance.sequenceLength;
+				this.repeat=otherInstance.repeat;
+				this.orientation=otherInstance.orientation;
+				this.previous=null; this.next=null;
+				this.repeatStart=otherInstance.repeatStart;
+				this.repeatEnd=otherInstance.repeatEnd;
+			}
+			else {
+				this.sequence=otherInstance.sequence;
+				this.sequenceLength=otherInstance.sequenceLength;
+				this.repeat=unique;
+				this.orientation=true;
+				this.previous=null; this.next=null;
+				this.repeatStart=-1;
+				this.repeatEnd=-1;
+			}
 		}
 		
 		
@@ -585,6 +618,64 @@ public class GenomeSimulator {
 				}
 				out[0]=fromX; out[1]=fromY;
 			}
+		}
+		
+		
+		/**
+		 * $ORDER_FEATURES$ has the following meaning:
+		 *
+		 * For non-periodic, non-single-del., non-unique: 
+		 * repeat.id, repeatStart, repeatEnd.
+		 *
+		 * For all other types: 
+		 * repeat.id, sequenceLength.
+		 *
+		 * Remark: orientation is not used on purpose.
+		 */
+		public int compareTo(Object other) {
+			RepeatInstance otherInstance = (RepeatInstance)other;
+			
+			if (order==ORDER_ID) {
+				if (id<otherInstance.id) return -1;
+				else if (id>otherInstance.id) return 1;
+			}
+			else if (order==ORDER_FEATURES) {
+				int i = repeat.id.compareTo(otherInstance.repeat.id);
+				if (i<0) return -1;
+				else if (i>0) return 1;
+				if (repeat.type>=0 && repeat.type<Constants.INTERVAL_DENSE_SINGLEDELETION) {
+					if (repeatStart<otherInstance.repeatStart) return -1;
+					else if (repeatStart>otherInstance.repeatStart) return 1;
+					if (repeatEnd<otherInstance.repeatEnd) return -1;
+					else if (repeatEnd>otherInstance.repeatEnd) return 1;
+				}
+				else {
+					if (sequenceLength<otherInstance.sequenceLength) return -1;
+					else if (sequenceLength>otherInstance.sequenceLength) return 1;
+				}
+			}
+			return 0;
+		}
+		
+		
+		/**
+		 * Similar to $compareTo()$.
+		 * 
+		 * @param uniqueMode TRUE: a unique sequence does not match any other unique
+		 * sequence, not even one of the same length; FALSE: unique sequences of the same
+		 * length are assumed to match.
+		 */
+		public boolean isApproximatelyIdentical(RepeatInstance otherInstance, int distanceThreshold, boolean uniqueMode) {
+			if (!repeat.id.equalsIgnoreCase(otherInstance.repeat.id)) return false;
+			if (repeat.type==-1) {
+				if (uniqueMode) return false;
+				else return Math.abs(sequenceLength,otherInstance.sequenceLength)<=distanceThreshold<<1;
+			}
+			else if (repeat.type<Constants.INTERVAL_DENSE_SINGLEDELETION) {
+				return Math.abs(repeatStart,otherInstance.repeatStart)<=distanceThreshold && 
+					   Math.abs(repeatEnd,otherInstance.repeatEnd)<=distanceThreshold;
+			}
+			else return Math.abs(sequenceLength,otherInstance.sequenceLength)<=distanceThreshold<<1;
 		}
 	}
 	
@@ -1464,5 +1555,314 @@ public class GenomeSimulator {
 		}
 		
 	}
-
+	
+	
+	
+	
+	
+	
+	
+	
+	// ------------------------------- DBG PROCEDURES ------------------------------------
+	
+	/**
+	 * --->
+	 *
+	 * A k-mer is a sequence of $order$ adjacent annotations that we can fully observe 
+	 * inside a read of length $readLength$. One could also include the last and the first
+	 * cropped annotation in a read, if we observe at least $minAlignmentLength$ bps of 
+	 * them: we don't do this in order to be more conservative in the result.
+	 * A (k+1)-mer is defined in a similar way, i.e. it must be observed inside a read 
+	 * without using cropped annotations.
+	 *
+	 * @param minAlignmentLength ------>
+	 * @param uniqueMode TRUE: a unique sequence does not match any other unique sequence, 
+	 * not even one of the same length; FALSE: unique sequences of the same length are 
+	 * assumed to match;
+	 * @param outputFile prints to this file a DOT representation of the graph (discarded
+	 * if NULL)
+	 */
+	private static final void buildDBG(int order, int readLength, int minAlignmentLength, boolean uniqueMode, int distanceThreshold, String outputFile) throws IOException {
+		final int CAPACITY = 1000;  // Arbitrary
+		final int EDGE_CAPACITY = 2;
+		boolean orientation;
+		int i, j, k, c;
+		int last, length, from, to, idGenerator, nCharacters, nKmers, nEnds, nEdges;
+		int currentKmerEnd, previousKmerEnd;
+		RepeatInstance currentInstance;
+		KmerNode kmerSet, currentNode;
+		BufferedWriter bw;
+		int[] stack, lastNeighbor;
+		RepeatInstance[] instances;
+		int[][] neighbors;
+		
+		// Building alphabet and recoded sequence
+		System.err.print("Building alphabet... ");
+		instances = new RepeatInstance[CAPACITY];
+		i=-1; currentInstance=root.next;
+		while (currentInstance!=null) {
+			i++;
+			if (i==instances.length) {
+				RepeatInstance[] newArray = new RepeatInstance[instances.length<<1];
+				System.arraycopy(instances,0,newArray,0,instances.length);
+				instances=newArray;
+			}
+			instances[i] = new RepeatInstance(currentInstance,currentInstance.sequenceLength>=minAlignmentLength);
+			instances[i].id=i;
+			currentInstance=currentInstance.next;
+		}
+		last=i;
+		RepeatInstance.order=RepeatInstance.ORDER_FEATURES;
+		Arrays.sort(instances,0,last+1);
+		neighbors = new int[last+1][EDGE_CAPACITY];
+		lastNeighbor = new int[last+1];
+		Math.set(lastNeighbor,last,-1);
+		for (i=0; i<last; i++) {
+			for (j=i+1; j<=last; j++) {
+				if (!instances[j].repeat.id.equalsIgnoreCase(instances[i].repeat.id)) break;
+				if (!instances[j].isApproximatelyIdentical(instances[i],distanceThreshold,uniqueMode)) continue;
+				lastNeighbor[i]++;
+				if (lastNeighbor[i]==neighbors[i].length) {
+					int[] newArray = new int[neighbors[i].length<<1];
+					System.arraycopy(neighbors[i],0,newArray,0,lastNeighbor[i]+1);
+					neighbors[i]=newArray;
+				}
+				neighbors[i][lastNeighbor[i]]=j;
+				lastNeighbor[j]++;
+				if (lastNeighbor[j]==neighbors[j].length) {
+					int[] newArray = new int[neighbors[j].length<<1];
+					System.arraycopy(neighbors[j],0,newArray,0,lastNeighbor[j]+1);
+					neighbors[j]=newArray;
+				}
+				neighbors[j][lastNeighbor[j]]=i;
+			}
+		}
+		stack = new int[last+1];
+		nCharacters=getCharacters(instances,last+1,neighbors,lastNeighbor,stack);
+		System.err.println("DONE, "+(nCharacters<<1)+" characters.");
+		
+		// Building all k-mers
+		System.err.print("Building "+order+"-mers... ");
+		RepeatInstance.order=RepeatInstance.ORDER_ID;
+		Arrays.sort(instances,0,last+1);
+		idGenerator=-1;
+		kmerSet = new KmerNode(-1);
+		for (i=0; i<=last; i++) {
+			to=i-1; length=0;
+			do { length+=instances[++to].sequenceLength; } 
+			while (to<=last && length<=readLength);
+			if (length>readLength) to--;
+			for (j=i; j<=to-order+1; j++) {
+				// Forward orientation
+				currentNode=kmerSet;
+				for (k=0; k<order; k++) {
+					currentNode=currentNode.getChild(instances[j+k].characterID);
+					if (currentNode==null) break;
+				}
+				if (currentNode==null) {
+					// RC orientation
+					currentNode=kmerSet;
+					for (k=0; k<order; k++) {
+						c=instances[j+order-1-k].characterID;
+						if (c%2==0) c++;
+						else c--;
+						currentNode=currentNode.getChild(c);
+						if (currentNode==null) break;
+					}
+				}
+				if (currentNode==null) {
+					currentNode=kmerSet;
+					for (k=0; k<order; k++) currentNode=currentNode.addChild(instances[j+k].characterID);
+					currentNode.kmer=++idGenerator;
+				}
+			}
+		}
+		nKmers=idGenerator+1;
+		System.err.println("DONE: "+nKmers+" distinct "+order+"-mers (merged with their RC).");
+		
+		// Building the DBG
+		System.err.print("Building DBG... ");
+		nEnds=nKmers<<1;
+		if (neighbors.length<nEnds) {
+			int[][] newArray = new int[nEnds][0];
+			for (i=0; i<neighbors.length; i++) newArray[i]=neighbors[i];
+			for (i=neighbors.length; i<nEnds; i++) newArray[i] = new int[EDGE_CAPACITY];
+			neighbors=newArray;
+		}
+		if (lastNeighbor.length<nEnds) lastNeighbor = new int[nEnds];
+		for (i=0; i<nEnds; i++) lastNeighbor[i]=-1;
+		// Edges that correspond to k-mers
+		for (i=0; i<nKmers; i++) {
+			from=i<<1; to=(i<<1)+1;
+			lastNeighbor[from]++;
+			if (lastNeighbor[from]==neighbors[from].length) {
+				int[] newArray = new int[neighbors[from].length<<1];
+				System.arraycopy(neighbors[from],0,newArray,0,lastNeighbor[from]+1);
+				neighbors[from]=newArray;
+			}
+			neighbors[from][lastNeighbor[from]]=to;
+			lastNeighbor[to]++;
+			if (lastNeighbor[to]==neighbors[to].length) {
+				int[] newArray = new int[neighbors[to].length<<1];
+				System.arraycopy(neighbors[to],0,newArray,0,lastNeighbor[to]+1);
+				neighbors[to]=newArray;
+			}
+			neighbors[to][lastNeighbor[to]]=from;
+		}
+		// Edges that correspond to (k+1)-mers
+		previousKmerEnd=Math.POSITIVE_INFINITY;
+		for (i=0; i<=last; i++) {
+			to=i-1; length=0;
+			do { length+=instances[++to].sequenceLength; } 
+			while (to<=last && length<=readLength);
+			if (length>readLength) to--;
+			for (j=i; j<=to-order+1; j++) {
+				// Forward orientation
+				orientation=true;
+				currentNode=kmerSet;
+				for (k=0; k<order; k++) {
+					currentNode=currentNode.getChild(instances[j+k].characterID);
+					if (currentNode==null) break;
+				}
+				if (currentNode==null) {
+					// RC orientation
+					orientation=false;
+					currentNode=kmerSet;
+					for (k=0; k<order; k++) {
+						c=instances[j+order-1-k].characterID;
+						if (c%2==0) c++;
+						else c--;
+						currentNode=currentNode.getChild(c);
+					}
+				}
+				currentKmerEnd=orientation?(currentNode.kmer<<1):(currentNode.kmer<<1)+1;
+				if (previousKmerEnd!=Math.POSITIVE_INFINITY) {
+					lastNeighbor[previousKmerEnd]++;
+					if (lastNeighbor[previousKmerEnd]==neighbors[previousKmerEnd].length) {
+						int[] newArray = new int[neighbors[previousKmerEnd].length<<1];
+						System.arraycopy(neighbors[previousKmerEnd],0,newArray,0,lastNeighbor[previousKmerEnd]+1);
+						neighbors[previousKmerEnd]=newArray;
+					}
+					neighbors[previousKmerEnd][lastNeighbor[previousKmerEnd]]=currentKmerEnd;
+					lastNeighbor[currentKmerEnd]++;
+					if (lastNeighbor[currentKmerEnd]==neighbors[currentKmerEnd].length) {
+						int[] newArray = new int[neighbors[currentKmerEnd].length<<1];
+						System.arraycopy(neighbors[currentKmerEnd],0,newArray,0,lastNeighbor[currentKmerEnd]+1);
+						neighbors[currentKmerEnd]=newArray;
+					}
+					neighbors[currentKmerEnd][lastNeighbor[currentKmerEnd]]=previousKmerEnd;
+				}
+				previousKmerEnd=currentKmerEnd;
+			}
+		}
+		nEdges=0;
+		for (i=0; i<nEnds; i++) nEdges+=lastNeighbor[i];
+		nEdges>>=1;
+		System.err.println("DONE: "+nEnds+" "+order+"-mer endpoints, "+nEdges+" edges.");
+		
+		// Printing the DBG
+		if (outputFile!=null) {
+			bw = new BufferedWriter(new FileWriter(outputFile));
+			bw.write("graph G {\n");
+			for (i=0; i<nEnds; i++) {
+				for (j=0; j<=lastNeighbor[i]; j++) {
+					if (neighbors[i][j]>i) bw.write(i+" -- "+j+";\n");
+				}
+			}
+			bw.write("}\n");
+			bw.close();
+		}
+	}
+	
+	
+	/**
+	 * Sets to $2x$ (respectively, $2x+1$) field $characterID$ of every instance in 
+	 * $instances$, if its node in the pairwise similarity graph belongs to connected 
+	 * component $x$ and is in forward (respectively, RC) orientation.
+	 *
+	 * @param stack temporary space, of size at least equal to $nNodes$;
+	 * @return number of connected components, i.e. half the number of characters in the
+	 * alphabet.
+	 */
+	private static final int getCharacters(RepeatInstance[] instances, int lastInstance, int[][] neighbors, int[] lastNeighbor, int[] stack) {
+		int i, j;
+		int from, to, top, lastComponent;
+		
+		// Computing connected components
+		for (i=0; i<=lastInstance; i++) instances[i].characterID=-1;
+		lastComponent=-1;
+		for (i=0; i<=lastInstance; i++) {
+			if (instances[i].characterID!=-1) continue;
+			lastComponent++; 
+			instances[i].characterID=lastComponent; top=0; stack[0]=i;
+			while (top>=0) {
+				from=stack[top--];
+				for (j=0; j<=lastNeighbor[from]; j++) {
+					to=neighbors[from][j];
+					if (instances[to].characterID!=-1) continue;
+					instances[to].characterID=lastComponent;
+					stack[++top]=to;
+				}
+			}
+		}
+		
+		// Mapping different orientations to different characters
+		for (i=0; i<=lastInstance; i++) {
+			if (instances[i].orientation) instances[i].characterID<<=1;
+			else instances[i].characterID=(instances[i].characterID<<1)+1;
+		}
+		
+		return lastComponent+1;
+	}
+	
+	
+	/**
+	 * A simple trie for collecting k-mers.
+	 */
+	private static class KmerNode {
+		public static final int CAPACITY = 2;  // Arbitrary
+		public int character;  // Label of the edge from the parent
+		public KmerNode parent;
+		public KmerNode[] children;
+		public int lastChild;
+		public int kmer;  // ID of the k-mer
+	
+		public KmerNode(int c) {
+			this.character=c;
+			parent=null;
+			children = new KmerNode[CAPACITY];
+			lastChild=-1;
+			kmer=-1;
+		}
+	
+		/**
+		 * @return the new child created, or the existing child of the node with
+		 * label $c$.
+		 */
+		public KmerNode addChild(int c) {
+			for (int i=0; i<=lastChild; i++) {
+				if (children[i].character==c) return children[i];
+			}
+			lastChild++;
+			if (lastChild==children.length) {
+				KmerNode[] newChildren = new KmerNode[children.length<<1];
+				System.arraycopy(children,0,newChildren,0,children.length);
+				children=newChildren;
+			}
+			children[lastChild] = new KmerNode(c);
+			children[lastChild].parent=this;
+			return children[lastChild];
+		}
+	
+		/**
+		 * @return the child of the node with label $c$, or NULL if it does not exist.
+		 */
+		public KmerNode getChild(int c) {
+			for (int i=0; i<=lastChild; i++) {
+				if (children[i].character==c) return children[i];
+			}
+			return null;
+		}
+	}
+	
 }
