@@ -74,6 +74,11 @@ public class GenomeSimulator {
 		final String OUTPUT_IMAGE = args[5];  // "null" to discard it
 		final String OUTPUT_FASTA = args[6];  // "null" to discard it
 		final String OUTPUT_DOT = args[7];  // "null" to discard it
+		final String OUTPUT_DBG = args[8];  // "null" to discard it
+		final int DBG_K = Integer.parseInt(args[9]);
+		final int DBG_READ_LENGTH = Integer.parseInt(args[10]);
+		final boolean DBG_UNIQUE_MODE = Integer.parseInt(args[11])==1;
+		final int DBG_DISTANCE_THRESHOLD = Integer.parseInt(args[12]);
 		
 		final int STRING_CAPACITY = 1000000;  // Arbitrary
 		final long N_REPEAT_BPS = (long)(REPEAT_BPS_OVER_UNIQUE_BPS*N_UNIQUE_BPS);
@@ -130,6 +135,7 @@ public class GenomeSimulator {
 			bw.close();
 		}
 		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
+		if (!OUTPUT_DBG.equalsIgnoreCase("null")) buildDBG(DBG_K,DBG_READ_LENGTH,model.minAlignmentLength,DBG_UNIQUE_MODE,DBG_DISTANCE_THRESHOLD,OUTPUT_DBG);
 	}
 	
 	
@@ -859,7 +865,7 @@ public class GenomeSimulator {
 			
 			id=(++lastRepeat)+"";
 			parent=instance.repeat;
-			if (type<Constants.INTERVAL_PERIODIC) {
+			if (parent.type<Constants.INTERVAL_PERIODIC) {
 				sequence=""+instance.sequence;
 				sequenceLength=instance.sequenceLength;
 				if (parent.type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
@@ -875,18 +881,25 @@ public class GenomeSimulator {
 			}
 			else {
 				type=parent.type;
-				do { period=model.perturbPeriod(parent.sequenceLength,random); }
-				while (period>instance.sequenceLength);
-				i=random.nextInt(instance.sequenceLength-period);
-				sequence=instance.sequence.substring(i,i+period);
-				sequenceLength=period;
+				if (instance.sequenceLength<=parent.sequenceLength) {
+					period=instance.sequenceLength;
+					sequence=instance.sequence;
+					sequenceLength=period;
+				}
+				else {
+					do { period=model.perturbPeriod(parent.sequenceLength,random); }
+					while (period>instance.sequenceLength);
+					i=random.nextInt(instance.sequenceLength-period);
+					sequence=instance.sequence.substring(i,i+period);
+					sequenceLength=period;
+				}
 			}
 			insertionProb=model.perturbInsertionProb(parent.insertionProb,random);
 			insertionProbCumulative = new double[insertionProb.length];
 			insertionProbCumulative[0]=insertionProb[0];
 			for (i=1; i<insertionProb.length; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
-			if (model.hasRepbaseStrings()) System.err.println("Created a new repeat from an instance of Repbase element "+parent.id);
+			System.err.println("Created a new repeat from an instance of element "+parent.id);
 		}
 		
 		
@@ -1360,6 +1373,7 @@ public class GenomeSimulator {
 		 */
 		public final int perturbPeriod(int oldPeriod, Random random) {
 			final int delta = (int)Math.ceil(oldPeriod*maxPeriodDifference);
+System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDifference+" delta="+delta);			
 			return delta==0?oldPeriod:oldPeriod-delta+random.nextInt(delta<<1);
 		}
 		
@@ -1512,6 +1526,14 @@ public class GenomeSimulator {
 				str=br.readLine();
 			}
 			br.close();
+			cleanBuffer(buffer);
+			if (buffer.length()!=0) {
+				if (currentIsSat) repbaseSat[lastRepbaseSat]=buffer.toString();
+				else {
+					if (buffer.length()>=minAlignmentLength) repbase[lastRepbase]=buffer.toString();
+					else lastRepbase--;
+				}
+			}
 			repbaseIsUsed = new boolean[lastRepbase+1];
 			Math.set(repbaseIsUsed,lastRepbase,false);
 			repbaseSatIsUsed = new boolean[lastRepbaseSat+1];
@@ -1566,16 +1588,18 @@ public class GenomeSimulator {
 	// ------------------------------- DBG PROCEDURES ------------------------------------
 	
 	/**
-	 * --->
+	 * Builds a de Bruijn graph of repeat instances, i.e. a bidirected graph whose nodes
+	 * are k-mer endpoints. A character is a distinct substring of a distinct repeat in a 
+	 * distinct orientation. A k-mer is a sequence of $order$ adjacent characters that 
+	 * fully occur inside a read of length $readLength$. A (k+1)-mer is defined in a 
+	 * similar way, i.e. it must fully occur inside a read.
+	 *	
+	 * Remark: one could also include the last and the first cropped annotation in a read,
+	 * if we observe at least $minAlignmentLength$ bps of them: we don't do this in order 
+	 * to be more conservative in the result. 
 	 *
-	 * A k-mer is a sequence of $order$ adjacent annotations that we can fully observe 
-	 * inside a read of length $readLength$. One could also include the last and the first
-	 * cropped annotation in a read, if we observe at least $minAlignmentLength$ bps of 
-	 * them: we don't do this in order to be more conservative in the result.
-	 * A (k+1)-mer is defined in a similar way, i.e. it must be observed inside a read 
-	 * without using cropped annotations.
-	 *
-	 * @param minAlignmentLength ------>
+	 * @param minAlignmentLength repeat instances shorter than this are transformed into 
+	 * unique sequence;
 	 * @param uniqueMode TRUE: a unique sequence does not match any other unique sequence, 
 	 * not even one of the same length; FALSE: unique sequences of the same length are 
 	 * assumed to match;
@@ -1624,21 +1648,21 @@ public class GenomeSimulator {
 				lastNeighbor[i]++;
 				if (lastNeighbor[i]==neighbors[i].length) {
 					int[] newArray = new int[neighbors[i].length<<1];
-					System.arraycopy(neighbors[i],0,newArray,0,lastNeighbor[i]+1);
+					System.arraycopy(neighbors[i],0,newArray,0,neighbors[i].length);
 					neighbors[i]=newArray;
 				}
 				neighbors[i][lastNeighbor[i]]=j;
 				lastNeighbor[j]++;
 				if (lastNeighbor[j]==neighbors[j].length) {
 					int[] newArray = new int[neighbors[j].length<<1];
-					System.arraycopy(neighbors[j],0,newArray,0,lastNeighbor[j]+1);
+					System.arraycopy(neighbors[j],0,newArray,0,neighbors[j].length);
 					neighbors[j]=newArray;
 				}
 				neighbors[j][lastNeighbor[j]]=i;
 			}
 		}
 		stack = new int[last+1];
-		nCharacters=getCharacters(instances,last+1,neighbors,lastNeighbor,stack);
+		nCharacters=getCharacters(instances,last,neighbors,lastNeighbor,stack);
 		System.err.println("DONE, "+(nCharacters<<1)+" characters.");
 		
 		// Building all k-mers
@@ -1650,7 +1674,7 @@ public class GenomeSimulator {
 		for (i=0; i<=last; i++) {
 			to=i-1; length=0;
 			do { length+=instances[++to].sequenceLength; } 
-			while (to<=last && length<=readLength);
+			while (to<last && length<readLength);
 			if (length>readLength) to--;
 			for (j=i; j<=to-order+1; j++) {
 				// Forward orientation
@@ -1697,14 +1721,14 @@ public class GenomeSimulator {
 			lastNeighbor[from]++;
 			if (lastNeighbor[from]==neighbors[from].length) {
 				int[] newArray = new int[neighbors[from].length<<1];
-				System.arraycopy(neighbors[from],0,newArray,0,lastNeighbor[from]+1);
+				System.arraycopy(neighbors[from],0,newArray,0,neighbors[from].length);
 				neighbors[from]=newArray;
 			}
 			neighbors[from][lastNeighbor[from]]=to;
 			lastNeighbor[to]++;
 			if (lastNeighbor[to]==neighbors[to].length) {
 				int[] newArray = new int[neighbors[to].length<<1];
-				System.arraycopy(neighbors[to],0,newArray,0,lastNeighbor[to]+1);
+				System.arraycopy(neighbors[to],0,newArray,0,neighbors[to].length);
 				neighbors[to]=newArray;
 			}
 			neighbors[to][lastNeighbor[to]]=from;
@@ -1714,7 +1738,7 @@ public class GenomeSimulator {
 		for (i=0; i<=last; i++) {
 			to=i-1; length=0;
 			do { length+=instances[++to].sequenceLength; } 
-			while (to<=last && length<=readLength);
+			while (to<last && length<readLength);
 			if (length>readLength) to--;
 			for (j=i; j<=to-order+1; j++) {
 				// Forward orientation
@@ -1740,14 +1764,14 @@ public class GenomeSimulator {
 					lastNeighbor[previousKmerEnd]++;
 					if (lastNeighbor[previousKmerEnd]==neighbors[previousKmerEnd].length) {
 						int[] newArray = new int[neighbors[previousKmerEnd].length<<1];
-						System.arraycopy(neighbors[previousKmerEnd],0,newArray,0,lastNeighbor[previousKmerEnd]+1);
+						System.arraycopy(neighbors[previousKmerEnd],0,newArray,0,neighbors[previousKmerEnd].length);
 						neighbors[previousKmerEnd]=newArray;
 					}
 					neighbors[previousKmerEnd][lastNeighbor[previousKmerEnd]]=currentKmerEnd;
 					lastNeighbor[currentKmerEnd]++;
 					if (lastNeighbor[currentKmerEnd]==neighbors[currentKmerEnd].length) {
 						int[] newArray = new int[neighbors[currentKmerEnd].length<<1];
-						System.arraycopy(neighbors[currentKmerEnd],0,newArray,0,lastNeighbor[currentKmerEnd]+1);
+						System.arraycopy(neighbors[currentKmerEnd],0,newArray,0,neighbors[currentKmerEnd].length);
 						neighbors[currentKmerEnd]=newArray;
 					}
 					neighbors[currentKmerEnd][lastNeighbor[currentKmerEnd]]=previousKmerEnd;
