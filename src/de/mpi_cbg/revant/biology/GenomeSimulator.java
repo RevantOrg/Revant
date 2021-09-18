@@ -79,6 +79,9 @@ public class GenomeSimulator {
 		final int DBG_READ_LENGTH = Integer.parseInt(args[10]);
 		final boolean DBG_UNIQUE_MODE = Integer.parseInt(args[11])==1;
 		final int DBG_DISTANCE_THRESHOLD = Integer.parseInt(args[12]);
+		final String GENOME_SEQUENCE_FILE = args[13];  // "null" to discard it
+		final String READS_FILE = args[14];  // "null" to discard it
+		final int READS_COVERAGE = Integer.parseInt(args[15]);
 		
 		final int STRING_CAPACITY = 1000000;  // Arbitrary
 		final long N_REPEAT_BPS = (long)(REPEAT_BPS_OVER_UNIQUE_BPS*N_UNIQUE_BPS);
@@ -136,6 +139,8 @@ public class GenomeSimulator {
 		}
 		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
 		if (!OUTPUT_DBG.equalsIgnoreCase("null")) buildDBG(DBG_K,DBG_READ_LENGTH,model.minAlignmentLength,DBG_UNIQUE_MODE,DBG_DISTANCE_THRESHOLD,OUTPUT_DBG,true);
+		if (!GENOME_SEQUENCE_FILE.equalsIgnoreCase("null")) printGenome(GENOME_SEQUENCE_FILE);
+		if (!READS_FILE.equalsIgnoreCase("null")) printReads(DBG_READ_LENGTH,READS_COVERAGE,READS_FILE,random);
 	}
 	
 	
@@ -410,13 +415,63 @@ public class GenomeSimulator {
 		}
 		ImageIO.write(image,"png",new File(outputFile));
 	}
+	
+	
+	/**
+	 * As a single string.
+	 */
+	private static final void printGenome(String outputFile) throws IOException {
+		final long genomeLength = getGenomeLength(true);
+		RepeatInstance currentInstance;
+		BufferedWriter bw;
+		
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		bw.write(">U0/1/0_"+(genomeLength-1)+"/ \n");
+		currentInstance=root;
+		while (currentInstance.next!=null) {
+			currentInstance=currentInstance.next;
+			bw.write(currentInstance.sequence);
+		}
+		bw.write("\n"); bw.close();
+	}
+	
+	
+	/**
+	 * Randomly sampled, no error.
+	 */
+	private static final void printReads(int readLength, int coverage, String outputFile, Random random) throws IOException {
+		int i, j;
+		final int genomeLength = (int)getGenomeLength(true);
+		final int nReads = (int)((coverage*genomeLength)/readLength);
+		RepeatInstance currentInstance;
+		StringBuilder sb;
+		BufferedWriter bw;
+		
+		// Building the genome sequence
+		sb = new StringBuilder(genomeLength);
+		currentInstance=root;
+		while (currentInstance.next!=null) {
+			currentInstance=currentInstance.next;
+			sb.append(currentInstance.sequence);
+		}
+		
+		// Sampling reads
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		for (i=0; i<nReads; i++) {
+			j=random.nextInt(genomeLength-readLength+1);
+			bw.write(">U0/"+i+"/0_"+readLength+"/ \n");
+			bw.write(sb.substring(j,j+readLength));
+			bw.write("\n");
+		}
+		bw.close();
+	}
+
 
 	
+	
+	
+	
 
-	
-	
-	
-	
 		
 	// --------------------------- REPEATS AND REPEAT INSTANCES --------------------------
 	
