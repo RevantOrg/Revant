@@ -1790,7 +1790,7 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 			bw.write("graph G {\n");
 			for (i=0; i<nEnds; i++) {
 				for (j=0; j<=lastNeighbor[i]; j++) {
-					if (neighbors[i][j]>i) bw.write(i+" -- "+j+";\n");
+					if (neighbors[i][j]>i) bw.write(i+" -- "+neighbors[i][j]+";\n");
 				}
 			}
 			bw.write("}\n");
