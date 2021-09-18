@@ -135,7 +135,7 @@ public class GenomeSimulator {
 			bw.close();
 		}
 		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
-		if (!OUTPUT_DBG.equalsIgnoreCase("null")) buildDBG(DBG_K,DBG_READ_LENGTH,model.minAlignmentLength,DBG_UNIQUE_MODE,DBG_DISTANCE_THRESHOLD,OUTPUT_DBG);
+		if (!OUTPUT_DBG.equalsIgnoreCase("null")) buildDBG(DBG_K,DBG_READ_LENGTH,model.minAlignmentLength,DBG_UNIQUE_MODE,DBG_DISTANCE_THRESHOLD,OUTPUT_DBG,true);
 	}
 	
 	
@@ -627,10 +627,15 @@ public class GenomeSimulator {
 		}
 		
 		
+		public String toString() {
+			return repeat.type+">"+repeat.id+"["+repeatStart+".."+repeatEnd+"](length="+sequenceLength+"), orient="+orientation;
+		}
+		
+		
 		/**
 		 * $ORDER_FEATURES$ has the following meaning:
 		 *
-		 * For non-periodic, non-single-del., non-unique: 
+		 * For non-periodic and non-unique: 
 		 * repeat.id, repeatStart, repeatEnd.
 		 *
 		 * For all other types: 
@@ -649,7 +654,7 @@ public class GenomeSimulator {
 				int i = repeat.id.compareTo(otherInstance.repeat.id);
 				if (i<0) return -1;
 				else if (i>0) return 1;
-				if (repeat.type>=0 && repeat.type<Constants.INTERVAL_DENSE_SINGLEDELETION) {
+				if (repeat.type>=0 && repeat.type<=Constants.INTERVAL_DENSE_SINGLEDELETION) {
 					if (repeatStart<otherInstance.repeatStart) return -1;
 					else if (repeatStart>otherInstance.repeatStart) return 1;
 					if (repeatEnd<otherInstance.repeatEnd) return -1;
@@ -677,7 +682,7 @@ public class GenomeSimulator {
 				if (uniqueMode) return false;
 				else return Math.abs(sequenceLength,otherInstance.sequenceLength)<=distanceThreshold<<1;
 			}
-			else if (repeat.type<Constants.INTERVAL_DENSE_SINGLEDELETION) {
+			else if (repeat.type<=Constants.INTERVAL_DENSE_SINGLEDELETION) {
 				return Math.abs(repeatStart,otherInstance.repeatStart)<=distanceThreshold && 
 					   Math.abs(repeatEnd,otherInstance.repeatEnd)<=distanceThreshold;
 			}
@@ -992,7 +997,7 @@ public class GenomeSimulator {
 				p=model.minAlignmentLength+random.nextInt((int)Math.max(sequence.length()-(model.minAlignmentLength<<1)-length,1));
 				sb.append(sequence.substring(0,p));
 				sb.append(sequence.substring(p+length));
-				repeatStart=0; repeatEnd=sequenceLength-1;
+				repeatStart=p; repeatEnd=p+length;
 			}
 			else if (type==Constants.INTERVAL_PERIODIC) {
 				length=model.getLengthShortPeriod(random);
@@ -1596,7 +1601,9 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 	 *	
 	 * Remark: one could also include the last and the first cropped annotation in a read,
 	 * if we observe at least $minAlignmentLength$ bps of them: we don't do this in order 
-	 * to be more conservative in the result. 
+	 * to be more conservative in the result.
+	 *
+	 * Remark: frequencies of k-mers and (k+1)-mers are not recorded.
 	 *
 	 * @param minAlignmentLength repeat instances shorter than this are transformed into 
 	 * unique sequence;
@@ -1604,9 +1611,9 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 	 * not even one of the same length; FALSE: unique sequences of the same length are 
 	 * assumed to match;
 	 * @param outputFile prints to this file a DOT representation of the graph (discarded
-	 * if NULL)
+	 * if NULL).
 	 */
-	private static final void buildDBG(int order, int readLength, int minAlignmentLength, boolean uniqueMode, int distanceThreshold, String outputFile) throws IOException {
+	private static final void buildDBG(int order, int readLength, int minAlignmentLength, boolean uniqueMode, int distanceThreshold, String outputFile, boolean verbose) throws IOException {
 		final int CAPACITY = 1000;  // Arbitrary
 		final int EDGE_CAPACITY = 2;
 		boolean orientation;
@@ -1664,6 +1671,9 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 		stack = new int[last+1];
 		nCharacters=getCharacters(instances,last,neighbors,lastNeighbor,stack);
 		System.err.println("DONE, "+(nCharacters<<1)+" characters.");
+		if (verbose) {
+			for (int x=0; x<=last; x++) System.err.println("Character "+instances[x].characterID+" => repeat instance "+instances[x]);
+		}
 		
 		// Building all k-mers
 		System.err.print("Building "+order+"-mers... ");
@@ -1671,7 +1681,7 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 		Arrays.sort(instances,0,last+1);
 		idGenerator=-1;
 		kmerSet = new KmerNode(-1);
-		for (i=0; i<=last; i++) {
+		for (i=0; i<=last-order+1; i++) {
 			to=i-1; length=0;
 			do { length+=instances[++to].sequenceLength; } 
 			while (to<last && length<readLength);
@@ -1698,6 +1708,12 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 					currentNode=kmerSet;
 					for (k=0; k<order; k++) currentNode=currentNode.addChild(instances[j+k].characterID);
 					currentNode.kmer=++idGenerator;
+					if (verbose) {
+						System.err.print("KMER "+currentNode.kmer+" = ");
+						System.err.print(instances[j].characterID+"");
+						for (k=1; k<order; k++) System.err.print("-"+instances[j+k].characterID);
+						System.err.println();
+					}
 				}
 			}
 		}
@@ -1734,12 +1750,12 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 			neighbors[to][lastNeighbor[to]]=from;
 		}
 		// Edges that correspond to (k+1)-mers
-		previousKmerEnd=Math.POSITIVE_INFINITY;
-		for (i=0; i<=last; i++) {
+		for (i=0; i<=last-order; i++) {
 			to=i-1; length=0;
 			do { length+=instances[++to].sequenceLength; } 
 			while (to<last && length<readLength);
 			if (length>readLength) to--;
+			previousKmerEnd=Math.POSITIVE_INFINITY;
 			for (j=i; j<=to-order+1; j++) {
 				// Forward orientation
 				orientation=true;
@@ -1776,11 +1792,24 @@ System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDiffe
 					}
 					neighbors[currentKmerEnd][lastNeighbor[currentKmerEnd]]=previousKmerEnd;
 				}
-				previousKmerEnd=currentKmerEnd;
+				previousKmerEnd=orientation?(currentNode.kmer<<1)+1:(currentNode.kmer<<1);
 			}
 		}
+		// Removing duplicated edges
 		nEdges=0;
-		for (i=0; i<nEnds; i++) nEdges+=lastNeighbor[i];
+		for (i=0; i<nEnds; i++) {
+			if (lastNeighbor[i]<=0) {
+				nEdges+=lastNeighbor[i]+1;
+				continue;
+			}
+			Arrays.sort(neighbors[i],0,lastNeighbor[i]+1);
+			k=0;
+			for (j=1; j<=lastNeighbor[i]; j++) {
+				if (neighbors[i][j]!=neighbors[i][k]) neighbors[i][++k]=neighbors[i][j];
+			}
+			lastNeighbor[i]=k;
+			nEdges+=k+1;
+		}
 		nEdges>>=1;
 		System.err.println("DONE: "+nEnds+" "+order+"-mer endpoints, "+nEdges+" edges.");
 		
