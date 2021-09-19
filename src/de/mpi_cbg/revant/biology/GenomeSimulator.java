@@ -14,6 +14,21 @@ import de.mpi_cbg.revant.util.Constants;
 import de.mpi_cbg.revant.util.Colors;
 
 
+/**
+ * Simulates a repetitive genome through several epochs. In every epoch a new repeat is 
+ * generated, either by creating a random repeat from scratch, or by perturbing an 
+ * instance of an existing repeat. In the latter case, the two repeats are connected by an
+ * edge in an evolutionary tree. Every repeat is born with a type (identical to the types 
+ * used in factorization, e.g. prefix, substring, short-period, long-period), that decides
+ *  how to create its instances when it replicates; with an insertion preference, that 
+ * tells how likely the repeat is to insert into every one of the existing evolutionary 
+ * trees; and with a desired frequency in the genome. The new repeat is replicated at 
+ * random in the current genome, until its desired frequency or the total repeat bps of 
+ * the genome are reached. The length of repeats and instances are decided according to 
+ * the min. alignment length specified by the user, so that repeat instances can be 
+ * detected using this setting of the aligner. The simulator can use a Repbase file given
+ * in input, and it classifies Repbase repeats into satellites and non-satellites.
+ */
 public class GenomeSimulator {
 	
 	public static final char[] DNA_ALPHABET = new char[] {'a','c','g','t'};
@@ -47,7 +62,6 @@ public class GenomeSimulator {
 	 */
 	private static int[] cumulativeByTree;
 	
-	
 	/**
 	 * Drawing constants
 	 */
@@ -56,32 +70,54 @@ public class GenomeSimulator {
 	private static final int TRUNCATION_THRESHOLD = 100;
 	private static final int TRUNCATION_TAG_WIDTH_PIXELS = 3;
 	private static final int TRUNCATION_MULTIPLE = 1000;
-	public static final String DEFAULT_FONT = "Barlow";
-	
+	public static final String DEFAULT_FONT = "Barlow";	
 	
 	
 	/**
+	 *  0: random seed, for reproducing a specific simulation (-1 to discard it);
+	 *  1: number of bps in non-repetitive sequence (an int, so at most 2 billion);
+	 *  2: ratio between total repetitive bps and total unique bps in the genome;  
+	 *  3: directory containing the files that describe the repeat model;
+   	 *  4: (output file) the simulated genome in FASTA format ("null" to discard it);
+   	 *  5: (output file) random reads from the genome, sampled uniformly and with no error
+   	 *     ("null" to discard it);
+   	 *  6: desired coverage of the simulated genome, for producing the reads above.
 	 *
-	 * @param args
-	 * 0=number of unique basepairs (an int, so at most 2 billion);
+	 *  7: (output file) the set of repeats created by the simulation, in FASTA format 
+	 *     ("null" to discard it);
+	 *  8: (output file) the evolutionary tree of simulated repeats, in DOT format ("null" 
+	 *     to discard it);
+	 *
+	 *  9: (output file) an image of the genome (use "null" to discard it);
+	 * 10: pixel width of the output image;
+	 * 
+	 * 11: (output file) the de Bruijn graph of the repeat annotation, in DOT format 
+	 *     ("null" to discard it);
+	 * 12: order k of the de Bruijn graph;
+	 * 13: read length to be used by the de Bruijn graph; we assume to observe every 
+	 *     substring of k and k+1 consecutive repeat annotations of total length <= this;
+	 * 14: how to handle unique sequence in the alphabet of the DBG: 1=a unique sequence 
+	 *     does not match any other unique sequence, not even one of the same length; 
+	 *     0=unique sequences of the same length are assumed to match;
+	 * 15: distance threshold for building the alphabet of the DBG.
 	 */
 	public static void main(String[] args) throws IOException {
-		final int N_UNIQUE_BPS = Integer.parseInt(args[0]);
-		final double REPEAT_BPS_OVER_UNIQUE_BPS = Double.parseDouble(args[1]);
-		final long RANDOM_SEED = Long.parseLong(args[2]);  // -1 to discard it
+		final long RANDOM_SEED = Long.parseLong(args[0]);
+		final int N_UNIQUE_BPS = Integer.parseInt(args[1]);
+		final double REPEAT_BPS_OVER_UNIQUE_BPS = Double.parseDouble(args[2]);
 		final String REPEAT_MODEL_DIR = args[3];
-		final int N_OUTPUT_COLUMNS = Integer.parseInt(args[4]);
-		final String OUTPUT_IMAGE = args[5];  // "null" to discard it
-		final String OUTPUT_FASTA = args[6];  // "null" to discard it
-		final String OUTPUT_DOT = args[7];  // "null" to discard it
-		final String OUTPUT_DBG = args[8];  // "null" to discard it
-		final int DBG_K = Integer.parseInt(args[9]);
-		final int DBG_READ_LENGTH = Integer.parseInt(args[10]);
-		final boolean DBG_UNIQUE_MODE = Integer.parseInt(args[11])==1;
-		final int DBG_DISTANCE_THRESHOLD = Integer.parseInt(args[12]);
-		final String GENOME_SEQUENCE_FILE = args[13];  // "null" to discard it
-		final String READS_FILE = args[14];  // "null" to discard it
-		final int READS_COVERAGE = Integer.parseInt(args[15]);
+		final String GENOME_SEQUENCE_FILE = args[4];
+		final String READS_FILE = args[5];
+		final int READS_COVERAGE = Integer.parseInt(args[6]);
+		final String OUTPUT_FASTA = args[7];
+		final String OUTPUT_DOT = args[8];
+		final String OUTPUT_IMAGE = args[9];
+		final int N_OUTPUT_COLUMNS = Integer.parseInt(args[10]);
+		final String OUTPUT_DBG = args[11];
+		final int DBG_K = Integer.parseInt(args[12]);
+		final int DBG_READ_LENGTH = Integer.parseInt(args[13]);
+		final boolean DBG_UNIQUE_MODE = Integer.parseInt(args[14])==1;
+		final int DBG_DISTANCE_THRESHOLD = Integer.parseInt(args[15]);
 		
 		final int STRING_CAPACITY = 1000000;  // Arbitrary
 		final long N_REPEAT_BPS = (long)(REPEAT_BPS_OVER_UNIQUE_BPS*N_UNIQUE_BPS);
@@ -147,6 +183,9 @@ public class GenomeSimulator {
 	
 	
 	
+	
+	
+	
 	// ------------------------------------ GENOME ---------------------------------------
 	
 	/**
@@ -182,7 +221,7 @@ public class GenomeSimulator {
 	
 	/**
 	 * If Repbase strings were provided but they have all been used up by the simulation,
-	 * the program reverts to the no-Repbase case.
+	 * the program reverts to the non-Repbase case.
 	 *
 	 * @return the number of new repetitive basepairs created by the procedure.
 	 */
@@ -627,6 +666,7 @@ public class GenomeSimulator {
 		public final void draw(int fromX, int fromY, BufferedImage image, int nColumns, int[] out) throws IOException {
 			boolean isOverflow;
 			int overflow, missingLength, windowStart, windowEnd;
+			int repeatStartPrime, repeatEndPrime;
 			
 			if (repeat.type==-1) {
 				missingLength=sequenceLength;
@@ -644,10 +684,16 @@ public class GenomeSimulator {
 				out[0]=fromX; out[1]=fromY;
 			}
 			else if (repeat.type<Constants.INTERVAL_PERIODIC) {
-				missingLength=sequenceLength; windowStart=repeatStart; isOverflow=false;
+				if (repeat.type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
+					// Arbitrary choice, just for display purposes.
+					repeatStartPrime=(repeat.sequenceLength-sequenceLength)>>1; 
+					repeatEndPrime=repeat.sequenceLength-repeatStartPrime;
+				}
+				else { repeatStartPrime=repeatStart; repeatEndPrime=repeatEnd; }
+				missingLength=sequenceLength; windowStart=repeatStartPrime; isOverflow=false;
 				while (true) {
 					overflow=Math.max(fromX+missingLength-nColumns,0);
-					windowEnd=repeatEnd-overflow;
+					windowEnd=repeatEndPrime-overflow;
 					drawSubstring(repeat,windowStart,windowEnd,orientation,image,fromX,fromY,isOverflow);
 					if (overflow>0) {
 						fromX=0; fromY+=ROWS_PER_LINE; isOverflow=true;
@@ -1433,7 +1479,6 @@ public class GenomeSimulator {
 		 */
 		public final int perturbPeriod(int oldPeriod, Random random) {
 			final int delta = (int)Math.ceil(oldPeriod*maxPeriodDifference);
-System.err.println("oldPeriod="+oldPeriod+" maxPeriodDifference="+maxPeriodDifference+" delta="+delta);			
 			return delta==0?oldPeriod:oldPeriod-delta+random.nextInt(delta<<1);
 		}
 		
