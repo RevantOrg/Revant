@@ -63,6 +63,11 @@ public class GenomeSimulator {
 	private static int[] cumulativeByTree;
 	
 	/**
+	 * Temporary space used by $getMultiInstanceString()$.
+	 */
+	private static StringBuilder sbLeft, sbRight, forReverse;
+	
+	/**
 	 * Drawing constants
 	 */
 	private static final int ROWS_PER_LINE = 100;
@@ -230,9 +235,10 @@ public class GenomeSimulator {
 		final int CAPACITY = 1000;  // Arbitrary
 		boolean isSatellite, isUsed;
 		int i, j;
-		int repeatTree, insertionTree, noContribution, id;
+		int repeatTree, insertionTree, noContribution, id, length;
 		long newBps, totalNewBps;
-		Repeat repeat;		
+		Repeat repeat;
+		RepeatInstance instance;
 		
 		// Creating a new repeat
 		repeat = new Repeat();
@@ -258,15 +264,15 @@ public class GenomeSimulator {
 			repeatTree=-1;
 		}
 		else {
-			// New repeat from an instance chosen uniformly at random
-			cumulativeByTree[0]=0;
-			cumulativeByTree[1]=lastByTree[1]+1;
-			for (i=2; i<=lastTree; i++) cumulativeByTree[i]=cumulativeByTree[i-1]+lastByTree[i]+1;
-			i=1+random.nextInt(cumulativeByTree[lastTree]);
-			repeatTree=Arrays.binarySearch(cumulativeByTree,1,lastTree+1,i);
-			if (repeatTree<0) repeatTree=-1-repeatTree;
-			while (repeatTree>0 && lastByTree[repeatTree]==-1) repeatTree--;
-			repeat.initialize(byTree[repeatTree][i-cumulativeByTree[repeatTree-1]-1],model,sb,random);
+			// New repeat from one or more instances
+			if (random.nextDouble()<=model.fromInstanceProb_multiInstance) {
+				instance=getRandomInstance(model.minAlignmentLength<<1/*Arbitrary*/,random);
+				repeat.initialize(instance,model,random);
+			}
+			else {
+				instance=getRandomInstance(Math.POSITIVE_INFINITY,random);
+				repeat.initialize(instance,model,sb,random);
+			}
 		}
 		// $lastRepeat$ is incremented by $Repeat.initialize$.
 		if (lastRepeat==repeats.length) {
@@ -384,6 +390,88 @@ public class GenomeSimulator {
 			lastByTree[toTree]--;
 		}
 		return fromInstance.sequenceLength;
+	}
+	
+	
+	/**
+	 * @return an instance of length at most $maxLength$, chosen at random among those in 
+	 * $byTree$.
+	 */
+	private static final RepeatInstance getRandomInstance(int maxLength, Random random) {
+		int i;
+		int repeatTree;
+		RepeatInstance instance;
+		
+		do {
+			cumulativeByTree[0]=0;
+			cumulativeByTree[1]=lastByTree[1]+1;
+			for (i=2; i<=lastTree; i++) cumulativeByTree[i]=cumulativeByTree[i-1]+lastByTree[i]+1;
+			i=1+random.nextInt(cumulativeByTree[lastTree]);
+			repeatTree=Arrays.binarySearch(cumulativeByTree,1,lastTree+1,i);
+			if (repeatTree<0) repeatTree=-1-repeatTree;
+			while (repeatTree>0 && lastByTree[repeatTree]==-1) repeatTree--;
+			instance=byTree[repeatTree][i-cumulativeByTree[repeatTree-1]-1];
+		}
+		while (instance.sequenceLength>maxLength);
+		return instance;
+	}
+	
+	
+	/**
+	 * Returns a substring of length $length$ of the genome, grown alternatively from the 
+	 * left and from the right side of $seed$. Any instance can be incorporated in the 
+	 * process, including short and periodic.
+	 *
+	 * Remark: the procedure uses global arrays $sbLeft,sbRight,forReverse$.
+	 *
+	 * @param length assumed to be bigger than $seed$.
+	 */
+	private static final String getMultiInstanceString(RepeatInstance seed, int length) {
+		boolean direction;
+		int currentLength, delta;
+		RepeatInstance instanceLeft, instanceRight;
+		
+		if (sbLeft==null) sbLeft = new StringBuilder();
+		if (sbRight==null) sbRight = new StringBuilder();
+		if (forReverse==null) forReverse = new StringBuilder();
+		sbLeft.delete(0,sbLeft.length());
+		sbRight.delete(0,sbRight.length());
+		instanceLeft=seed; instanceRight=seed;
+		currentLength=seed.sequenceLength;
+		direction=false;
+		while (currentLength<length && (instanceLeft!=null || instanceRight!=null)) {
+			if (direction) {
+				instanceRight=instanceRight.next;
+				if (instanceRight!=null) {
+					if (currentLength+instanceRight.sequenceLength<=length) {
+						sbRight.append(instanceRight.sequence);
+						currentLength+=instanceRight.sequenceLength;
+					}
+					else {
+						sbRight.append(instanceRight.sequence.substring(0,length-currentLength));
+						currentLength=length;
+					}
+				}
+			}
+			else {
+				instanceLeft=instanceLeft.previous;
+				if (instanceLeft!=null) {
+					forReverse.delete(0,forReverse.length());
+					if (currentLength+instanceLeft.sequenceLength<=length) {
+						forReverse.append(instanceLeft.sequence);
+						currentLength+=instanceLeft.sequenceLength;
+					}
+					else {
+						forReverse.append(instanceLeft.sequence.substring(instanceLeft.sequenceLength-(length-currentLength)));
+						currentLength=length;
+					}
+					forReverse.reverse();
+					sbLeft.append(forReverse);
+				}
+			}
+			direction=!direction;
+		}
+		return (sbLeft.length()>0?sbLeft.reverse().toString():"")+seed.sequence+(sbRight.length()>0?sbRight.toString():"");		
 	}
 	
 	
@@ -1006,6 +1094,50 @@ public class GenomeSimulator {
 			for (i=1; i<insertionProb.length; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
 			System.err.println("Created a new repeat from an instance of element "+parent.id);
+		}
+		
+		
+		/**
+		 * Creates a new non-periodic repeat, by taking the concatenation of several 
+		 * existing instances, starting from $instance$ and growing it. The new repeat has
+		 * a random non-periodic type and new insertion preferences and frequency.
+		 *
+		 * Remark: the procedure does not set field $tree$.
+		 *
+		 * @param instance assumed to be of length $>=minAlignmentLength$.
+		 */
+		public final void initialize(RepeatInstance instance, RepeatModel model, Random random) {
+			final int minLength = instance.sequenceLength+model.minAlignmentLength;
+			int i;
+			
+			id=(++lastRepeat)+"";
+			parent=null;
+			while (true) {
+				type=model.getType(random);
+				if (type==Constants.INTERVAL_ALIGNMENT) {
+					do { sequenceLength=model.getLength(random); }
+					while (sequenceLength<minLength);
+					sequence=getMultiInstanceString(instance,sequenceLength);
+					break;
+				}
+				else if (type>=Constants.INTERVAL_DENSE_PREFIX && type<=Constants.INTERVAL_DENSE_SUBSTRING) {
+					do { sequenceLength=model.getLength(random); }
+					while (sequenceLength<Math.max(model.minAlignmentLength<<1,minLength));
+					sequence=getMultiInstanceString(instance,sequenceLength);
+					break;
+				}
+				else if (type==Constants.INTERVAL_DENSE_SINGLEDELETION) {
+					do { sequenceLength=model.getLength(random); }
+					while (sequenceLength<Math.max(DELTA+(model.minAlignmentLength<<1),minLength));
+					sequence=getMultiInstanceString(instance,sequenceLength);
+					break;
+				}
+			}
+			insertionProb=Math.sampleFromSimplex(lastTree+1,random);
+			insertionProbCumulative = new double[lastTree+1];
+			insertionProbCumulative[0]=insertionProb[0];
+			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
+			frequency=model.getFrequency(random);
 		}
 		
 		
