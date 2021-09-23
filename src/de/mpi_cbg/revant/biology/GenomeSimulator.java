@@ -268,10 +268,12 @@ public class GenomeSimulator {
 			if (random.nextDouble()<=model.fromInstanceProb_multiInstance) {
 				instance=getRandomInstance(model.minAlignmentLength<<1/*Arbitrary*/,random);
 				repeat.initialize(instance,model,random);
+				repeatTree=-1;
 			}
 			else {
 				instance=getRandomInstance(Math.POSITIVE_INFINITY,random);
 				repeat.initialize(instance,model,sb,random);
+				repeatTree=instance.repeat.tree;
 			}
 		}
 		// $lastRepeat$ is incremented by $Repeat.initialize$.
@@ -1138,6 +1140,7 @@ public class GenomeSimulator {
 			insertionProbCumulative[0]=insertionProb[0];
 			for (i=1; i<=lastTree; i++) insertionProbCumulative[i]=insertionProb[i]+insertionProbCumulative[i-1];
 			frequency=model.getFrequency(random);
+			System.err.println("Created a new multi-instance repeat of length "+sequenceLength+" from seed instance "+instance);
 		}
 		
 		
@@ -1311,7 +1314,7 @@ public class GenomeSimulator {
 		/**
 		 * Probability of creating a new repeat from an existing instance
 		 */
-		private double fromInstanceProb;
+		private double fromInstanceProb, fromInstanceProb_multiInstance;
 		private double maxPeriodDifference, maxPhaseDifference;
 		private double insertionProbPerturbation;
 		
@@ -1412,6 +1415,9 @@ public class GenomeSimulator {
 			str=br.readLine();
 			p=str.indexOf("/");
 			fromInstanceProb=Double.parseDouble(p>=0?str.substring(0,p).trim():str.trim());
+			str=br.readLine();
+			p=str.indexOf("/");
+			fromInstanceProb_multiInstance=Double.parseDouble(p>=0?str.substring(0,p).trim():str.trim());
 			str=br.readLine();
 			p=str.indexOf("/");
 			maxPeriodDifference=Double.parseDouble(p>=0?str.substring(0,p).trim():str.trim());

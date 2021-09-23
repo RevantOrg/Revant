@@ -22,11 +22,12 @@
 0.25   // Prob. of character G in unique regions
 0.25   // Prob. of character T in unique regions
 0.3    // Prob. of building a repeat from an instance of a past one
+0.3    // Given the above: prob. of using multiple instances instead of just one.
 0.10   // Max period difference when creating a repeat from an instance of a past one
 0.10   // Max phase difference when creating an instance of a short period
 0.01   // Max perturbation of insertion probabilities
 0.25   // Probability that an instance gets reverse-complemented
-0.10   // Error in repeat replication: mismatch prob.
-0.10   // Error in repeat replication: insertion prob.
-0.10   // Error in repeat replication: deletion prob.
-5      // Error in repeat replication: max length of an indel.
+0.0   // Error in repeat replication: mismatch prob.
+0.0   // Error in repeat replication: insertion prob.
+0.0   // Error in repeat replication: deletion prob.
+0      // Error in repeat replication: max length of an indel.
