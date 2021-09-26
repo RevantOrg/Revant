@@ -306,7 +306,7 @@ System.err.println("}");
 	 * The recoded sequence of a given readA
 	 */
 	private static Character[] sequence;
-	private static int lastInSequence
+	private static int lastInSequence;
 	
 	/**
 	 * Length of the recoded sequence of every read
@@ -526,35 +526,31 @@ System.err.println("}");
 		
 		// Creating the sequence
 		lastInSequence=-1;
-		// First non-repetitive character (if any)
+		// First non-repetitive character (if any).
 		i=points[0];
 		if (i>distanceThreshold) {
 			lastInSequence=0;
-			sequence[0].setNonrepetitive(i);
-			sequence[0].openStart=true;
-			sequence[0].openEnd=i>=lengthA-distanceThreshold;
+			sequence[0].setNonrepetitive(i,true,i>=lengthA-distanceThreshold);
 		}
 		// Middle characters
 		i=1; j=0; firstJForNextI=-1; out=-1;
 		while (i<=lastPoint) {
 			startA=points[i-1]; endA=points[i];
 			if (j>lastAlignment || alignments[j].startA>=endA) {
-				if (newCharacter.lastTuple==-1) newCharacter.setNonrepetitive(endA-startA+1);
-				else newCharacter.clean(endA-startA+1);
+				if (newCharacter.lastTuple==-1) newCharacter.setNonrepetitive(endA-startA+1,startA<=distanceThreshold,endA>=lengthA-distanceThreshold);
+				else newCharacter.cleanTuples(endA-startA+1);
 				lastInSequence++;
 				if (lastInSequence==sequence.length) {
 					Character[] newSequence = new Character[sequence.length<<1];
 					System.arraycopy(sequence,0,newSequence,0,sequence.length);
-					for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Chaarcter();
+					for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Character();
 					sequence=newSequence;
 				}
 				sequence[lastInSequence].copyFrom(newCharacter);
-				sequence[lastInSequence].openStart=startA<=distanceThreshold;
-				sequence[lastInSequence].openEnd=endA>=lengthA-distanceThreshold;
 				i++;
 				if (firstJForNextI!=-1) j=firstJForNextI;
 				firstJForNextI=-1;
-				newCharacter.clear();
+				newCharacter.reset();
 				continue;
 			}
 			else if (alignments[j].endA<=startA) {
@@ -564,10 +560,10 @@ System.err.println("}");
 			if (firstJForNextI==-1 && i<lastPoint && alignments[j].endA>endA) firstJForNextI=j;
 			if ( Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) || 
 				 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
-			   ) newCharacter.add(alignments[j],tmpTuple);
+			   ) newCharacter.addTuple(alignments[j],distanceThreshold,tmpTuple);
 			j++;
 		}
-		// Last non-repetitive character
+		// Last non-repetitive character (if any).
 		i=points[lastPoint];
 		if (lengthA-i>distanceThreshold) {
 			lastInSequence++;
@@ -577,9 +573,7 @@ System.err.println("}");
 				for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Character();
 				sequence=newSequence;
 			}
-			sequence[lastInSequence].setNonrepetitive(lengthA-i);
-			sequence[lastInSequence].openStart=i<=distanceThreshold;
-			sequence[lastInSequence].openEnd=true;
+			sequence[lastInSequence].setNonrepetitive(lengthA-i,i<=distanceThreshold,true);
 		}
 	}
 	
@@ -604,38 +598,199 @@ System.err.println("}");
 	}
 	
 	
+	
+	
+	
+	
+	
+	/**
+	 * Temporary space encoding an undirected graph and its connected 
+	 * components.
+	 */
+	private static int[][] neighbors;
+	private static int[] lastNeighbor;
+	private static int[] stack, connectedComponent, connectedComponentSize;
+	private static int nComponents;
+	private static Char[] mergedChars;
+	
+	
+	
 	/**
 	 *
 	 *
 	 */
 	private static final void compactAlphabet(int distanceThreshold, int lengthThreshold) {
 		int i, j, k;
+		int isClosedI, isClosedJ;
+		Character tmpChar;
 		
+		// Discarding characters implied by other characters
 		Arrays.sort(alphabet,0,lastAlphabet+1);
-		
-		// Compacting similar characters
-		k=0;
-		for (i=1; i<=lastAlphabet; i++) {
-			found=false;
-			for (j=k; j>=0; j--) {
-				if (!alphabet[i].sameReadB(alphabet[j])) break;
-				if (alphabet[i].isSimilar(alphabet[j],distanceThreshold,lengthThreshold)) {
-					found=true;
-					break;
-				}
+		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=1;
+		for (i=0; i<=lastAlphabet; i++) {
+			if (alphabet[i].isNonrepetitive()) continue;
+			isClosedI=alphabet[i].isClosed();b
+			for (j=i+1; j<=lastAlphabet; j++) {
+				if (!alphabet[j].sameRepeat(alphabet[i])) break;
+				if (alphabet[j].isNonrepetitive()) continue;
+				isClosedJ=alphabet[j].isClosed();
+				if (isClosedJ==2 || (isClosedJ==1 && isClosedI==0)) continue;
+				if (alphabet[i].implies(alphabet[j])) alphabet[j].id=0;
 			}
-			if (!found) {
-				k++;
-				tmpCharacter=alphabet[k];
-				alphabet[k]=alphabet[i];
-				alphabet[i]=tmpCharacter;
+			for (j=i-1; j>=0; j--) {
+				if (!alphabet[j].sameRepeat(alphabet[i])) break;
+				if (alphabet[j].isNonrepetitive()) continue;
+				isClosedJ=alphabet[j].isClosed();
+				if (isClosedJ==2 || (isClosedJ==1 && isClosedI==0)) continue;
+				if (alphabet[i].implies(alphabet[j])) alphabet[j].id=0;
 			}
 		}
-		lastAlphabet=k;
+		j=-1;
+		for (i=0; i<=lastAlphabet; i++) {
+			if (alphabet[i].id==0) continue;
+			j++;
+			tmpChar=alphabet[j];
+			alphabet[j]=alphabet[i];
+			alphabet[i]=tmpChar;
+		}
+		lastAlphabet=j;
 		
-		// Compacting
 		
 		
+		
+		
+		// Paritioning closed and open characters
+		j=-1;
+		for (i=0; i<=lastAlphabet; i++) {
+			if (alphabet[i].isClosed()==2) {
+				j++;
+				tmpChar=alphabet[j];
+				alphabet[j]=alphabet[i];
+				alphabet[i]=tmpChar;
+			}
+		}
+		lastClosed=j;
+		
+		// Merging characters with closed ends
+		ensureGraph(lastClosed+1);
+		Arrays.sort(alphabet,0,lastClosed+1);
+		k=0;
+		for (i=1; i<lastClosed; i++) {
+			for (j=i+1; j<=lastClosed; j++) {
+				if (!alphabet[j].sameRepeat(alphabet[i])) break;
+				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold)) {
+					addEdge(i,j); addEdge(j,i);
+				}
+			}
+		}
+		nComponents=getConnectedComponent(lastClosed+1);
+		if (mergedChars==null) {
+			mergedChars = new Character[nComponents];
+			for (i=0; i<mergedChars.length; i++) mergedChars[i] = new Character();
+		}
+		else if (mergedChars.length<nComponents) {
+			Character[] newArray = new Character[nComponents];
+			System.arraycopy(mergedChars,0,newArray,0,mergedChars.length);
+			for (i=0; i<mergedChars.length; i++) newArray[i].reset();
+			for (i=mergedChars.length; i<newArray.length; i++) newArray[i] = new Character();
+			mergedChars=newArray;
+		}
+		for (i=0; i<=lastClosed; i++) {
+			tmpChar=mergedChars[connectedComponent[i]];
+			if (tmpChar.lastTuple==-1) tmpChar.copyFrom(alphabet[i]);
+			else tmpChar.addTupleEnds(alphabet[i]);
+		}
+		for (i=0; i<nComponents; i++) mergedChars[i].normalizeTupleEnds(connectedComponentSize[i]);
+		for (i=0; i<nComponents; i++) alphabet[i].copyFrom(mergedChars[i]);
+		lastClosedPrime=nComponents-1;
+		
+		// 
+		Arrays.sort(alphabet,lastClosed+1,lastAlphabet+1);
+		
+		
+		
+		
+		// Merging remaining open characters
+		
+		
+		
+		
+	}
+	
+	
+	
+	private static final void ensureGraph(int nNodes) {
+		final int NEIGHBORS_CAPACITY = 10;  // Arbitrary
+		
+		if (neighbors==null) neighbors = new int[nNodes][NEIGHBORS_CAPACITY];
+		else if (neighbors.length<nNodes) {
+			int[][] newNeighbors = new int[nNodes][0];
+			for (i=0; i<neighbors.length; i++) newNeighbors[i]=neighbors[i];
+			for (i=neighbors.length; i<newNeighbors.length; i++) newNeighbors[i] = new int[NEIGHBORS_CAPACITY];
+			neighbors=newNeighbors;
+		}
+		if (lastNeighbor==null || lastNeighbor.length<nNodes) lastNeighbor = new int[nNodes];
+		Math.set(lastNeighbor,nNodes-1,-1);
+		if (connectedComponent==null || connectedComponent.length<nNodes) connectedComponent = new int[nNodes];
+		if (stack==null || stack.length<nNodes) stack = new int[nNodes];
+	}
+	
+	
+	/**
+	 * To the global data structures that describe a temporary graph.
+	 */
+	private static final void addEdge(int i, int j) {
+		lastNeighbor[i]++;
+		if (lastNeighbor[i]==neighbors[i].length) {
+			int[] newArray = new int[neighbors[i].length<<1];
+			System.arraycopy(neighbors[i],0,newArray,0,neighbors[i].length);
+			neighbors[i]=newArray;
+		}
+		neighbors[i][lastNeighbor[i]]=j;
+	}
+	
+	
+	/**
+	 * @return the number of connected components of the temporary graph. 
+	 * Component IDs are marked in global array $connectedComponents$.
+	 */
+	private static final int getConnectedComponent(int nNodes) {
+		int i, j;
+		int last, idGenerator, top, currentNode, currentComponent, neighbor;
+		int nComponents;
+	
+		// Computing components
+		idGenerator=-1;
+		for (i=0; i<nNodes; i++) connectedComponent[i]=-1;
+		for (i=0; i<nNodes; i++) {
+			if (connectedComponent[i]!=-1) continue;
+			currentComponent=++idGenerator;
+			connectedComponent[i]=currentComponent;
+			stack[0]=i; top=0;
+			while (top>=0) {
+				currentNode=stack[top--];
+				last=lastNeighbor[currentNode];
+				for (j=0; j<=last; j++) {
+					neighbor=neighbors[currentNode][j];
+					if (connectedComponent[neighbor]==-1) {
+						connectedComponent[neighbor]=currentComponent;
+						stack[++top]=neighbor;
+					}
+					else if (connectedComponent[neighbor]!=currentComponent) {
+						System.err.println("getConnectedComponent> ERROR: different connected components "+currentComponent+" :: "+connectedComponent[neighbor]);
+						System.exit(1);
+					}
+				}
+			}
+		}
+		nComponents=idGenerator+1;
+	
+		// Computing component size
+		connectedComponentSize = new int[nComponents];
+		for (i=0; i<nComponents; i++) connectedComponentSize[i]=0;
+		for (i=0; i<nNodes; i++) connectedComponentSize[connectedComponent[i]]++;
+	
+		return nComponents;
 	}
 	
 	
@@ -658,10 +813,10 @@ System.err.println("}");
 		 */
 		public Character() {
 			tuples = new Tuple[CAPACITY];
-			clear();
+			reset();
 		}
 		
-		public void clear() {
+		public void reset() {
 			id=-1; lastTuple=-1;
 		}
 		
@@ -711,7 +866,7 @@ System.err.println("}");
 		}
 		
 		/**
-		 * Sorting just by $readB,orientation$ of the tuples.
+		 * Sorting just by $repeat,orientation$ of the tuples.
 		 */
 		public int compareTo(Object other) {
 			int i;
@@ -740,7 +895,7 @@ System.err.println("}");
 		
 		/**
 		 * @return TRUE iff $otherCharacter$ is identical to this character,
-		 * when considering only the $repeat$ and $orientation$ fields of all tuples.
+		 * when considering just the $repeat$ and $orientation$ fields of all tuples.
 		 */
 		public final boolean sameRepeat(Character otherCharacter) {
 			if (lastTuple!=otherCharacter.lastTuple) return false;
@@ -756,8 +911,8 @@ System.err.println("}");
 		 */
 		public final boolean isSimilar(Character otherCharacter, int distanceThrehsold, int lengthThreshold) {
 			for (int i=0; i<=lastTuple; i++) {
-				if ( Math.abs(tuples[i].start-otherCharacter.tuples[i].start)>distanceThrehsold || 
-					 Math.abs(tuples[i].end-otherCharacter.tuples[i].end)>distanceThrehsold || 
+				if ( Math.abs(tuples[i].start-otherCharacter.tuples[i].start)>distanceThreshold || 
+					 Math.abs(tuples[i].end-otherCharacter.tuples[i].end)>distanceThreshold || 
 					 Math.abs(tuples[i].length-otherCharacter.tuples[i].length)>lengthThreshold
 				   ) return false;
 			}
@@ -817,10 +972,18 @@ System.err.println("}");
 		 *
 		 * @param tmpTuple temporary space.
 		 */
-		public final void add(AlignmentRow alignment, Tuple tmpTuple) {
+		public final void addTuple(AlignmentRow alignment, int distanceThreshold, Tuple tmpTuple) {
 			int i;
 			int found;
 			
+			if (alignment.orientation) {
+				tmpTuple.openStart=alignment.startA<=distanceThreshold;
+				tmpTuple.openEnd=alignment.endA>=Reads.getReadLength(alignment.readB)-distanceThreshold;
+			}
+			else {
+				tmpTuple.openEnd=alignment.startA<=distanceThreshold;
+				tmpTuple.openStart=alignment.endA>=Reads.getReadLength(alignment.readB)-distanceThreshold;
+			}
 			tmpTuple.repeat=alignment.readB; tmpTuple.orientation=alignment.orientation;
 			if (isPeriodic[alignment.readB]==0) {
 				tmpTuple.start=alignment.startB;
@@ -843,25 +1006,30 @@ System.err.println("}");
 				if (lastTuple==tuples.length) enlarge();	
 				tuples[lastTuple].copyFrom(tmpTuple);
 			}
-			else if (isPeriodic[alignment.readB]!=0) tuples[found].length=Math.max(tuples[found].length,tmpTuple.length);
-			else if ( alignment.startB<tuples[found].start || 
-				      (alignment.startB==tuples[found].start && alignment.endB<tuples[found].end)
-			        ) {
-				tuples[found].start=alignment.startB;
-				tuples[found].end=alignment.endB;
+			else {
+				if (isPeriodic[alignment.readB]!=0) tuples[found].length=Math.max(tuples[found].length,tmpTuple.length);
+				else if ( alignment.startB<tuples[found].start || 
+						  (alignment.startB==tuples[found].start && alignment.endB<tuples[found].end)
+			        	) {
+					tuples[found].start=alignment.startB;
+					tuples[found].end=alignment.endB;
+				}
+				if (tmpTuple.openStart) tuples[found].openStart=true;
+				if (tmpTuple.openEnd) tuples[found].openEnd=true;
 			}
 		}
 		
 		/**
-		 * Sorts $tuples$ and, if the character contains a periodic repeat, removes all 
-		 * non-periodic repeats from the character and sets the length of every periodic
-		 * repeat to $periodicLength$.
+		 * (1) Sorts $tuples$. (2) Makes open marks homogeneous across all tuples. (3) If 
+		 * the character contains a periodic repeat, removes all non-periodic repeats from
+		 * the character and sets the length of every periodic repeat to $periodicLength$.
 		 */
-		public static final void clean(int periodicLength) {
-			boolean foundPeriodic, foundNonperiodic;
+		public static final void cleanTuples(int periodicLength) {
+			boolean foundPeriodic, foundNonperiodic, openLeft, openRight;
 			int i, j;
 			Tuple tmpTuple;
 			
+			// Enforcing periodic/nonperiodic criteria
 			foundPeriodic=false; foundNonperiodic=false;
 			for (i=0; i<=lastTuple; i++) {
 				if (isPeriodic[tuples[i].repeat]!=0) {
@@ -885,7 +1053,94 @@ System.err.println("}");
 				}
 				lastTuple=j;
 			}
+			
+			// Enforcing open criteria
+			openLeft=false; openRight=false;
+			for (i=0; i<=lastTuple; i++) {
+				if ((tuples[i].orientation && tuples[i].openStart) ||  (!tuples[i].orientation && tuples[i].openEnd)) openLeft=true;
+				if ((tuples[i].orientation && tuples[i].openEnd) ||  (!tuples[i].orientation && tuples[i].openStart)) openRight=true;				
+			}
+			for (i=0; i<=lastTuple; i++) {
+				if (tuples[i].orientation) { openStart=openLeft; openEnd=openRight; }
+				else { openStart=openRight; openEnd=openLeft; }
+			}			
+			
 			Arrays.sort(tuples,0,lastTuple+1);
+		}
+		
+		
+		/**
+		 * @return 0=fully open; 1=half-open; 2=fully closed.
+		 */
+		public final int isClosed() {
+			if (tuples[0].openStart && tuples[0].openEnd) return 0;
+			else if (tuples[0].openStart || tuples[0].openEnd) return 1;
+			else return 2;
+		}
+		
+		
+		/**
+		 * Adds the tuple ends of $otherCharacter$ to those of the current character,
+		 * assuming that $otherCharacter$ satisfies $sameRepeat()$ and $isSimilar()$.
+		 */
+		public final void addTupleEnds(Character otherCharacter) {
+			for (int i=0; i<=lastTuple; i++) {
+				tuples[i].start+=otherCharacter.tuples[i].start;
+				tuples[i].end+=otherCharacter.tuples[i].end;
+				tuples[i].length+=otherCharacter.tuples[i].length;
+			}
+		}
+		
+		
+		/**
+		 * Divides every tuple end by $denominator$.
+		 */
+		public final void normalizeTupleEnds(int denominator) {
+			for (int i=0; i<=lastTuple; i++) {
+				tuples[i].start/=denominator; tuples[i].end/=denominator;
+				tuples[i].length/=denominator;
+			}
+		}
+		
+		
+		/**
+		 * Remark: the characters are assumed both to be repetitive and to satisfy
+		 * $sameRepeat()$.
+		 *
+		 * @return TRUE iff no tuple of $otherCharacter$ adds information WRT the 
+		 * corresponding tuple of this character.
+		 */
+		public static final boolean implies(Character otherCharacter, int distanceThreshold) {
+			int i;
+
+			for (i=0; i<=lastTuple; i++) {
+				if (tuples[i].start==-1) {  // Periodic
+					if (Math.abs(tuples[i].length,otherCharacter.tuples[i].length)<distanceThreshold) {
+						if ( (tuples[i].openStart && !otherCharacter.tuples[i].openStart) ||
+						     (tuples[i].openEnd && !otherCharacter.tuples[i].openEnd)
+						   ) return false;
+					}
+					else if (tuples[i].length<otherCharacter.tuples[i].length) return false;
+					else if (!otherCharacter.tuples[i].openStart && !otherCharacter.tuples[i].openEnd) return false;
+				}
+				else {  // Nonperiodic
+					if (Intervals.areApproximatelyIdentical(otherCharacter.tuples[i].start,otherCharacter.tuples[i].end,tuples[i].start,tuples[i].end)) {
+						if ( (tuples[i].openStart && !otherCharacter.tuples[i].openStart) ||
+						     (tuples[i].openEnd && !otherCharacter.tuples[i].openEnd) ||
+							 (tuples[i].openStart && otherCharacter.tuples[i].openStart && tuples[i].openEnd && otherCharacter.tuples[i].openEnd)
+						   ) return false;
+					}
+					else if (Intervals.isApproximatelyContained(otherCharacter.tuples[i].start,otherCharacter.tuples[i].end,tuples[i].start,tuples[i].end)) {
+						if ( (Math.abs(tuples[i].start,otherCharacter.tuples[i].start)<=distanceThreshold && tuples[i].openStart && !otherCharacter.tuples[i].openStart) ||
+							 (otherCharacter.tuples[i].start>tuples[i].start+distanceThreshold && !otherCharacter.tuples[i].openStart) ||
+							 (Math.abs(tuples[i].end,otherCharacter.tuples[i].end)<=distanceThreshold && tuples[i].openEnd && !otherCharacter.tuples[i].openEnd) ||
+							 (otherCharacter.tuples[i].end<tuples[i].end-distanceThreshold && !otherCharacter.tuples[i].openEnd)
+						   ) return false;
+					}
+					else return false;
+				}
+			}
+			return true;
 		}
 		
 	}
@@ -947,6 +1202,57 @@ System.err.println("}");
 			return (start==-1||end==-1)?length:end-start+1;
 		}
 	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	
 	
