@@ -22,9 +22,9 @@ import de.mpi_cbg.revant.factorize.Intervals;
 public class FilterAlignments {
 	
 	/**
-	 * Marks periodic repeats
+	 * Marks periodic repeats: 0=noperiodic; 1=short-period; 2=long-period.
 	 */
-	private static final boolean[] isPeriodic;
+	private static final byte[] isPeriodic;
 	
 	
 	
@@ -34,15 +34,10 @@ public class FilterAlignments {
 	private static final String PAF_SEPARATOR = "\t";
 	private static final int HEADER_ROWS = 100;  // in pixels
 	private static int rFrom, gFrom, bFrom, rTo, gTo, bTo;
-	private static Character[] alphabet;
-	private static int lastAlphabet;
-	private static int[] tmpArray;
-	private static Character[] sequence;
-	private static AlignmentRow[] alignments;
 	
 	
-	private static int[] sequenceLengths;
-	private static int lastSequenceLength;
+	
+	
 	
 	private static int K_VALUE;
 	private static long idGenerator;
@@ -56,9 +51,7 @@ public class FilterAlignments {
 	private static Kmer[] stack;
 	
 	
-	private static final int ALPHABET_CAPACITY = 100000;  // Arbitrary
-	private static final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
-	private static final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
+	
 	private static final int STACK_CAPACITY = 10000;
 	
 	
@@ -134,13 +127,13 @@ System.err.println("}");
 	// ----------------------------- ALIGNMENT PROCEDURES --------------------------------
 	
 	/**
-	 * [UP TO DATE] Simple filters on repeat mappings.
+	 * [UP TO DATE] Basic filters on repeat alignments.
+	 *
+	 * @param alignments all alignments of a given readA.
 	 */
-	private static final int clean(AlignmentRow[] alignments, int lastAlignment) {
+	private static final void cleanAlignments(int distanceThreshold) {
 		int i, j;
-		int length, maxLength, maxAlignment, intervalStart, intervalEnd;
 		int startA, endA;
-		String intervalReadB;
 		AlignmentRow tmpAlignment;
 		
 		// Removing exact duplicates
@@ -174,7 +167,7 @@ System.err.println("}");
 				   ) alignments[j].flag=false;
 			}
 			for (j=i-1; j>=0; j--) {
-				if (alignments[j].startA<startA-DISTANCE_THRESHOLD) break;
+				if (alignments[j].startA<startA-distanceThreshold) break;
 				if ( !Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) &&
 					 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
 				   ) alignments[j].flag=false;
@@ -190,44 +183,28 @@ System.err.println("}");
 		}
 		lastAlignment=j;
 		
-		// If multiple substrings of the same repeat overlap in the read, and if the
-		// repeat is not periodic, we keep only a longest alignment. We keep all
-		// alignments if the repeat is periodic, so that they can be merged downstream.
-		AlignmentRow.order=AlignmentRow.ORDER_READB_ORIENTATION_STARTA_ENDA_STARTB_ENDB;
-		Arrays.sort(alignments,0,lastAlignment+1);
-		for (i=0; i<=lastAlignment; i++) alignments[i].flag=false;
-		intervalReadB=alignments[0].readB;
-		intervalStart=alignments[0].startA;
-		intervalEnd=alignments[0].endA;
-		maxAlignment=0; maxLength=intervalEnd-intervalStart+1;
-		for (i=1; i<=lastAlignment; i++) {
-			if (alignments[i].readB!=intervalReadB || alignments[i].startA>intervalEnd-DISTANCE_THRESHOLD) {
-				alignments[maxAlignment].flag=true;
-				intervalReadB=alignments[i].readB;
-				intervalStart=alignments[i].startA;
-				intervalEnd=alignments[i].endA;
-				maxAlignment=i; maxLength=intervalEnd-intervalStart+1;
-				continue;
-			}
-			if (alignments[i].endA>intervalEnd) intervalEnd=alignments[i].endA;
-			length=alignments[i].endA-alignments[i].startA+1;
-			if (length>maxLength) {
-				maxLength=length;
-				maxAlignment=i;
+		// Removing non-periodic alignments that straddle other non-periodic alignments
+		// (possibly with the same readB): these do not provide a clear signal.
+		for (i=0; i<=lastAlignment; i++) alignments[i].flag=true;
+		for (i=0; i<=lastAlignment; i++) {
+			if (isPeriodic[alignments[i].readB]!=0) continue;
+			startA=alignments[i].startA; endA=alignments[i].endA;
+			for (j=i+1; j<=lastAlignment; j++) {
+				if (alignments[j].startA>=endA-distanceThreshold) break;
+				if (isPeriodic[alignments[j].readB]!=0) continue;
+				if (Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) continue;
+				alignments[i].flag=false; alignments[j].flag=false;
 			}
 		}
-		alignments[maxAlignment].flag=true;
 		j=-1;
 		for (i=0; i<=lastAlignment; i++) {
-			if (!isPeriodic[alignments[i].readB] && !alignments[i].flag) continue;
+			if (!alignments[i].flag) continue;
 			j++;
 			tmpAlignment=alignments[j];
 			alignments[j]=alignments[i];
 			alignments[i]=tmpAlignment;
 		}
 		lastAlignment=j;
-		
-		return lastAlignment;
 	}
 	
 	
@@ -314,17 +291,54 @@ System.err.println("}");
 	// ----------------------------- ALPHABET PROCEDURES ---------------------------------
 	
 	/**
-	 * [UP TO DATE] Recodes every read and collects in $alphabet$ all distinct repeat 
-	 * intervals.
+	 * The recoded alphabet
+	 */
+	private static Character[] alphabet;
+	private static int lastAlphabet;
+	
+	/**
+	 * All alignments of a given readA
+	 */
+	private static AlignmentRow[] alignments;
+	private static int lastAlignment;
+	
+	/**
+	 * The recoded sequence of a given readA
+	 */
+	private static Character[] sequence;
+	private static int lastInSequence
+	
+	/**
+	 * Length of the recoded sequence of every read
+	 */
+	private static int[] sequenceLengths;
+	private static int lastSequenceLength;	
+	
+	/**
+	 * Temporary space used by procedure $recode()$.
+	 */
+	private static int[] periodicIntervals, points;
+	private static Character newCharacter;
+	private static Tuple tmpTuple;
+
+	
+	
+	
+	
+	/**
+	 * Recodes every read and collects in $alphabet$ all distinct characters.
 	 *
 	 * @param inputFile alignments between reads (readA) and repeats (readB);
 	 * @param maxError alignments with error rate greater than this are discarded.
 	 */
-	private static final void buildAlphabet(String inputFile, double maxError) throws IOException {
+	private static final void buildAlphabet(String inputFile, double maxError, int distanceThreshold) throws IOException {
+		final int ALPHABET_CAPACITY = 100000;  // Arbitrary
+		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
+		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		final int SEQUENCE_LENGTH_CAPACITY = 1000000;  // Arbitrary
 		boolean found;
 		int i, j, k;
-		int lastAlignment, lastInSequence, row, readA, previousReadA;
+		int row, readA, previousReadA;
 		String str;
 		BufferedReader br;
 		Character tmpCharacter;
@@ -332,20 +346,25 @@ System.err.println("}");
 		// Allocating memory
 		if (alphabet==null || alphabet.length<ALPHABET_CAPACITY) alphabet = new Character[ALPHABET_CAPACITY];
 		lastAlphabet=-1;
-		if (tmpArray==null || tmpArray.length<(ALIGNMENTS_CAPACITY)<<1) tmpArray = new int[(ALIGNMENTS_CAPACITY)<<1];
-		if (sequence==null || sequence.length<SEQUENCE_CAPACITY) sequence = new Character[SEQUENCE_CAPACITY];
 		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
 		for (i=0; i<alignments.length; i++) {	
 			if (alignments[i]==null) alignments[i] = new AlignmentRow();
 		}
+		if (sequence==null || sequence.length<SEQUENCE_CAPACITY) sequence = new Character[SEQUENCE_CAPACITY];
+		for (i=0; i<sequence.length; i++) {
+			if (sequence[i]==null) sequence[i] = new Character();
+		}
+		if (points==null || points.length<(ALIGNMENTS_CAPACITY)<<1) points = new int[(ALIGNMENTS_CAPACITY)<<1];
+		if (periodicIntervals==null || periodicIntervals.length<(ALIGNMENTS_CAPACITY)<<1) periodicIntervals = new int[(ALIGNMENTS_CAPACITY)<<1];
+		if (sequenceLengths==null || sequenceLengths.length<SEQUENCE_LENGTH_CAPACITY) sequenceLengths = new int[SEQUENCE_LENGTH_CAPACITY];
+		if (newCharacter==null) newCharacter = new Character();
+		if (tmpTuple==null) tmpTuple = new Tuple();
 		
-		// Collecting all characters (not necessarily distinct), from all recoded
-		// sequences.
-		sequenceLengths = new int[SEQUENCE_LENGTH_CAPACITY];
-		lastSequenceLength=-1;
+		// Collecting all characters (not necessarily distinct) from all recoded reads.
 		br = new BufferedReader(new FileReader(inputFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
-		str=br.readLine(); previousReadA=null; lastAlignment=-1; row=0;
+		str=br.readLine(); 
+		previousReadA=null; lastAlignment=-1; row=0; lastSequenceLength=-1;
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments, "+(lastAlphabet+1)+" characters collected.");
 			Alignments.readAlignmentFile(str);
@@ -356,13 +375,13 @@ System.err.println("}");
 			readA=Alignments.readA-1;
 			if (previousReadA==-1 || readA!=previousReadA) {
 				if (previousReadA!=-1) {
-					lastAlignment=clean(alignments,lastAlignment);
-					lastInSequence=recode(alignments,lastAlignment,sequence,tmpArray);
-					addCharacters2Alphabet(sequence,lastInSequence);
+					cleanAlignments();
+					recodeRead(distanceThreshold);
+					if (lastInSequence>0 || (lastInSequence==0 && !sequence[0].isNonrepetitive())) addCharacters2Alphabet();
 					addSequenceLength(lastInSequence+1);
 				}
 				previousReadA=readA; lastAlignment=0;
-				alignments[0].set(readA,Alignments.startA,Alignments.endA,Alignments.readB-1,Alignments.startB,Alignments.endB,Alignments.orientation,Alignments.diffs);
+				alignments[0].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,Reads.getReadLength(readB)-1),Alignments.orientation,Alignments.diffs);
 			}
 			else {
 				lastAlignment++;
@@ -372,26 +391,235 @@ System.err.println("}");
 					for (i=alignments.length; i<newAlignments.length; i++) newAlignments[i] = new AlignmentRow();
 					alignments=newAlignments;
 				}
-				alignments[lastAlignment].set(readA,Alignments.startA,Alignments.endA,Alignments.readB-1,Alignments.startB,Alignments.endB,Alignments.orientation,Alignments.diffs);
+				alignments[lastAlignment].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,Reads.getReadLength(readB)-1),Alignments.orientation,Alignments.diffs);
 			}
 			str=br.readLine(); row++;
 		}
 		br.close();
 		if (previousReadA!=null) {
-			lastAlignment=clean(alignments,lastAlignment);
-			lastInSequence=recode(alignments,lastAlignment,sequence,tmpArray);
-			addCharacters2Alphabet(sequence,lastInSequence);
+			cleanAlignments();
+			recodeRead(distanceThrehsold);
+			if (lastInSequence>0 || (lastInSequence==0 && !sequence[0].isNonrepetitive())) addCharacters2Alphabet();
 			addSequenceLength(lastInSequence+1);
 		}
 		
 		// Sorting and compacting the alphabet
+		--------------->
+		
+		// Assigning IDs
+		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=i;
+	}
+	
+	
+	private static final void addSequenceLength(int length) {
+		final int GROWTH_RATE = 100000;  // Arbitrary
+		
+		lastSequenceLength++;
+		if (lastSequenceLength==sequenceLengths.length) {
+			int[] newSequenceLengths = new int[sequenceLengths.length+GROWTH_RATE];
+			System.arraycopy(sequenceLengths,0,newSequenceLengths,0,sequenceLengths.length);
+			sequenceLengths=newSequenceLengths;
+		}
+		sequenceLengths[lastSequenceLength]=length;
+	}
+	
+	
+	/**
+	 * [UP TO DATE] Stores in global variable $sequence$ a recoding of the read based on repeat 
+	 * alignments. The procedure collects the endpoints of every maximal range of 
+	 * overlapping periodic alignments, and of every non-periodic alignment that is not 
+	 * contained in a periodic range and that does not straddle another non-periodic 
+	 * alignment. Every other alignment is discarded. Points are clustered, and the 
+	 * resulting chunks of the read become characters of $sequence$.
+	 *
+	 * Remark: the procedure assumes that reads do not contain long low-quality regions.
+	 *
+	 * Remark: endpoint clustering is very simplistic for now, and should be improved.
+	 *
+	 * Remark: the characters of $sequence$ are not elements of $alphabet$, and the 
+	 * procedure does not look them up in $alphabet$: this is left to the caller.
+	 *
+	 * Remark: the procedure uses global arrays $alignments,periodicIntervals,points,
+	 * sequence$.
+	 */
+	private static final void recodeRead(int distanceThreshold) {
+		int i, j, k;
+		int lastPeriodicInterval, currentStart, currentEnd;
+		int firstJForNextI, inPeriodic, lastPoint, previousPoint, numerator, denominator;
+		int startA, endA, newLength;
+		final int lengthA = Reads.getReadLength(alignments[0].readA);
+		
+		if (periodicIntervals.length<(lastAlignment+1)<<1) periodicIntervals = new int[(lastAlignment+1)<<1];
+		if (points.length<(lastAlignment+1)<<1) points = new int[(lastAlignment+1)<<1];
+		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
+		Arrays.sort(alignments,0,lastAlignment+1);
+		
+		// Building maximal periodic intervals
+		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1;
+		for (i=0; i<=lastAlignment; i++) {
+			if (isPeriodic[alignments[i].readB]==0) continue;
+			if (currentStart==-1) {
+				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
+				continue;
+			}
+			if (alignments[i].startA>=currentEnd-distanceThreshold) {
+				periodicIntervals[++lastPeriodicInterval]=currentStart;
+				periodicIntervals[++lastPeriodicInterval]=currentEnd;
+				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
+				continue;
+			}
+			currentEnd=Math.max(currentEnd,alignments[i].endA);
+		}
+		if (currentStart!=-1) {
+			periodicIntervals[++lastPeriodicInterval]=currentStart;
+			periodicIntervals[++lastPeriodicInterval]=currentEnd;
+		}
+		
+		// Clustering readA endpoints of alignments
+		i=0; j=0; firstJForNextI=-1; inPeriodic=-1; lastPoint=-1;
+		while (i<=lastAlignment) {
+			if (j>lastPeriodicInterval || periodicIntervals[j]>=alignments[i].endA-distanceThreshold) {
+				if (inPeriodic==-1) {
+					points[++lastPoint]=alignments[i].startA;
+					points[++lastPoint]=alignments[i].endA;
+				}
+				else if (isPeriodic[alignments[i].readB]!=0) {
+					if (Math.abs(alignments[i].startA,periodicIntervals[inPeriodic])<=distanceThreshold) points[++lastPoint]=alignments[i].startA;
+					if (Math.abs(alignments[i].endA,periodicIntervals[inPeriodic+1])<=distanceThreshold) points[++lastPoint]=alignments[i].endA;
+				}
+				i++; inPeriodic=-1;
+				if (firstJForNextI!=-1) j=firstJForNextI;
+				firstJForNextI=-1;
+				continue;
+			}
+			if (periodicIntervals[j+1]<alignments[i].startA-distanceThreshold) {
+				j+=2;
+				continue;
+			}
+			if (firstJForNextI==-1 && i<lastAlignment && periodicIntervals[j+1]>=alignments[i+1].startA) firstJForNextI=j;
+			if ( Intervals.isApproximatelyContained(alignments[i].startA,alignments[i].endA,periodicIntervals[j],periodicIntervals[j+1]) ||
+				 Intervals.areApproximatelyIdentical(alignments[i].startA,alignments[i].endA,periodicIntervals[j],periodicIntervals[j+1])
+			   ) inPeriodic=j;
+			j+=2;
+		}
+		if (inPeriodic==-1) {
+			points[++lastPoint]=alignments[i].startA;
+			points[++lastPoint]=alignments[i].endA;
+		}
+		else if (isPeriodic[alignments[i].readB]!=0) {
+			if (Math.abs(alignments[i].startA,periodicIntervals[inPeriodic])<=distanceThreshold) points[++lastPoint]=alignments[i].startA;
+			if (Math.abs(alignments[i].endA,periodicIntervals[inPeriodic+1])<=distanceThreshold) points[++lastPoint]=alignments[i].endA;
+		}
+		Arrays.sort(points,0,lastPoint+1);
+		j=-1; previousPoint=points[0]; numerator=points[0]; denominator=1;
+		for (i=1; i<=lastPoint; i++) {
+			if (points[i]<=previousPoint+distanceThreshold) {
+				numerator+=points[i];
+				denominator++;
+				continue;
+			}
+			points[++j]=numerator/denominator;
+			previousPoint=points[i]; numerator=points[i]; denominator=1;
+		}
+		points[++j]=numerator/denominator;
+		lastPoint=j;
+		
+		// Creating the sequence
+		lastInSequence=-1;
+		// First non-repetitive character (if any)
+		i=points[0];
+		if (i>distanceThreshold) {
+			lastInSequence=0;
+			sequence[0].setNonrepetitive(i);
+			sequence[0].openStart=true;
+			sequence[0].openEnd=i>=lengthA-distanceThreshold;
+		}
+		// Middle characters
+		i=1; j=0; firstJForNextI=-1; out=-1;
+		while (i<=lastPoint) {
+			startA=points[i-1]; endA=points[i];
+			if (j>lastAlignment || alignments[j].startA>=endA) {
+				if (newCharacter.lastTuple==-1) newCharacter.setNonrepetitive(endA-startA+1);
+				else newCharacter.clean(endA-startA+1);
+				lastInSequence++;
+				if (lastInSequence==sequence.length) {
+					Character[] newSequence = new Character[sequence.length<<1];
+					System.arraycopy(sequence,0,newSequence,0,sequence.length);
+					for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Chaarcter();
+					sequence=newSequence;
+				}
+				sequence[lastInSequence].copyFrom(newCharacter);
+				sequence[lastInSequence].openStart=startA<=distanceThreshold;
+				sequence[lastInSequence].openEnd=endA>=lengthA-distanceThreshold;
+				i++;
+				if (firstJForNextI!=-1) j=firstJForNextI;
+				firstJForNextI=-1;
+				newCharacter.clear();
+				continue;
+			}
+			else if (alignments[j].endA<=startA) {
+				j++;
+				continue;
+			}
+			if (firstJForNextI==-1 && i<lastPoint && alignments[j].endA>endA) firstJForNextI=j;
+			if ( Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) || 
+				 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
+			   ) newCharacter.add(alignments[j],tmpTuple);
+			j++;
+		}
+		// Last non-repetitive character
+		i=points[lastPoint];
+		if (lengthA-i>distanceThreshold) {
+			lastInSequence++;
+			if (lastInSequence==sequence.length) {
+				Character[] newSequence = new Character[sequence.length<<1];
+				System.arraycopy(sequence,0,newSequence,0,sequence.length);
+				for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Character();
+				sequence=newSequence;
+			}
+			sequence[lastInSequence].setNonrepetitive(lengthA-i);
+			sequence[lastInSequence].openStart=i<=distanceThreshold;
+			sequence[lastInSequence].openEnd=true;
+		}
+	}
+	
+	
+	/**
+	 * [UP TO DATE] Appends all the characters of $sequence$ to the end of $alphabet$.
+	 */
+	private static final void addCharacters2Alphabet() {
+		final int GROWTH_RATE = 100000;  // Arbitrary
+		int i, j;
+		final int newLength = lastAlphabet+lastInSequence+2;
+		
+		if (newLength>alphabet.length) {
+			Character[] newAlphabet = new Character[newLength+GROWTH_RATE];
+			System.arraycopy(alphabet,0,newAlphabet,0,alphabet.length);
+			for (i=alphabet.length; i<newAlphabet.length; i++) newAlphabet[i] = new Character();
+			alphabet=newAlphabet;
+		}
+		j=lastAlphabet;
+		for (i=0; i<=lastInSequence; i++) alphabet[++j].copyFrom(sequence[i]);
+		lastAlphabet=j;
+	}
+	
+	
+	/**
+	 *
+	 *
+	 */
+	private static final void compactAlphabet(int distanceThreshold, int lengthThreshold) {
+		int i, j, k;
+		
 		Arrays.sort(alphabet,0,lastAlphabet+1);
+		
+		// Compacting similar characters
 		k=0;
 		for (i=1; i<=lastAlphabet; i++) {
 			found=false;
 			for (j=k; j>=0; j--) {
 				if (!alphabet[i].sameReadB(alphabet[j])) break;
-				if (alphabet[i].isSimilar(alphabet[j])) {
+				if (alphabet[i].isSimilar(alphabet[j],distanceThreshold,lengthThreshold)) {
 					found=true;
 					break;
 				}
@@ -405,190 +633,18 @@ System.err.println("}");
 		}
 		lastAlphabet=k;
 		
-		// Assigning IDs
-		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=i;
+		// Compacting
+		
+		
 	}
 	
 	
-	private static final void addSequenceLength(int length) {
-		lastSequenceLength++;
-		if (lastSequenceLength==sequenceLengths.length) {
-			int[] newSequenceLengths = new int[sequenceLengths.length<<1];
-			System.arraycopy(sequenceLengths,0,newSequenceLengths,0,sequenceLengths.length);
-			sequenceLengths=newSequenceLengths;
-		}
-		sequenceLengths[lastSequenceLength]=length;
-	}
+	
 	
 	
 	/**
-	 * Stores in $sequence$ a recoding of the read based on repeat mappings. The endpoints
-	 * of all alignments with a non-periodic repeat are collected, as well as the
-	 * endpoints of maximal ranges of overlapping alignments with periodic repeats. Points
-	 * are clustered, and the resulting chunks of the read become characters of 
-	 * $sequence$.
-	 *
-	 * Remark: the characters in $sequence$ are not elements of $alphabet$, and the 
-	 * procedure does not look them up in $alphabet$: this is left to the caller.
-	 *
-	 * @param alignments all the alignments of a given readA;
-	 * @param sequence assumed to be long enough;
-	 * @param periodicIntervals temporary space, with at least $2(lastAlignment+1)$ cells;
-	 * @param points temporary space, with at least $2(lastAlignment+1)$ cells;
-	 * @return the last element in $sequence$.
-	 */
-	private static final int recode(AlignmentRow[] alignments, int lastAlignment, Character[] sequence, int[] periodicIntervals, int[] points) {
-		int i, j;
-		int lastPeriodicInterval, currentStart, currentEnd;
-		int firstJForNextI, inPeriodic, lastPoint, previousPoint, numerator, denominator;
-		
-		int startA, endA, newLength;
-		
-		final int lengthA = Reads.getReadLength(alignments[0].readA);
-		Character character;
-		Character newCharacter = new Character();
-		
-		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
-		Arrays.sort(alignments,0,lastAlignment+1);
-		
-		// Building maximal periodic intervals
-		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1;
-		for (i=0; i<=lastAlignment; i++) {
-			if (!isPeriodic[alignments[i].readB]) continue;
-			if (currentStart==-1) {
-				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
-				continue;
-			}
-			if (alignments[i].startA>=currentEnd-DISTANCE_THRESHOLD) {
-				periodicIntervals[++lastPeriodicInterval]=currentStart;
-				periodicIntervals[++lastPeriodicInterval]=currentEnd;
-				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
-				continue;
-			}
-			currentEnd=Math.max(currentEnd,alignments[i].endA);
-		}
-		if (currentStart!=-1) {
-			periodicIntervals[++lastPeriodicInterval]=currentStart;
-			periodicIntervals[++lastPeriodicInterval]=currentEnd;
-		}
-		
-		// Collecting readA endpoints of alignments
-		i=0; j=0; firstJForNextI=-1; inPeriodic=-1; lastPoint=-1;
-		while (i<=lastAlignment) {
-			if (j>lastPeriodicInterval || periodicIntervals[j]>=alignments[i].endA-DISTANCE_THRESHOLD) {
-				if (inPeriodic!=-1) {
-					points[++lastPoint]=alignments[i].startA;
-					points[++lastPoint]=alignments[i].endA;
-				}
-				else {
-					if (Math.abs(alignments[i].startA,periodicIntervals[inPeriodic])<=DISTANCE_THRESHOLD) points[++lastPoint]=alignments[i].startA;
-					if (Math.abs(alignments[i].endA,periodicIntervals[inPeriodic+1])<=DISTANCE_THRESHOLD) points[++lastPoint]=alignments[i].endA;
-				}
-				i++; inPeriodic=-1;
-				if (firstJForNextI!=-1) j=firstJForNextI;
-				firstJForNextI=-1;
-				continue;
-			}
-			if (periodicIntervals[j+1]<alignments[i].startA-DISTANCE_THRESHOLD) {
-				j+=2;
-				continue;
-			}
-			if (firstJForNextI==-1 && i<lastAlignment && periodicIntervals[j+1]>=alignments[i+1].startA) firstJForNextI=j;
-			if ( Intervals.isApproximatelyContained(alignments[i].startA,alignments[i].endA,periodicIntervals[j],periodicIntervals[j+1]) ||
-				 Intervals.areApproximatelyIdentical(alignments[i].startA,alignments[i].endA,periodicIntervals[j],periodicIntervals[j+1])
-			   ) inPeriodic=j;
-		}
-		if (inPeriodic!=-1) {
-			points[++lastPoint]=alignments[i].startA;
-			points[++lastPoint]=alignments[i].endA;
-		}
-		else {
-			if (Math.abs(alignments[i].startA,periodicIntervals[inPeriodic])<=DISTANCE_THRESHOLD) points[++lastPoint]=alignments[i].startA;
-			if (Math.abs(alignments[i].endA,periodicIntervals[inPeriodic+1])<=DISTANCE_THRESHOLD) points[++lastPoint]=alignments[i].endA;
-		}
-		Arrays.sort(points,0,lastPoint+1);
-		j=-1; previousPoint=points[0]; numerator=points[0]; denominator=1;
-		for (i=1; i<=lastPoint; i++) {
-			if (points[i]<=previousPoint+DISTANCE_THRESHOLD) {
-				numerator+=points[i];
-				denominator++;
-				continue;
-			}
-			points[++j]=numerator/denominator;
-			previousPoint=points[i]; numerator=points[i]; denominator=1;
-		}
-		points[++j]=numerator/denominator;
-		lastPoint=j;
-		
-		// Creating the sequence
-		out=-1;
-		// First non-repetitive character
-		i=points[0];
-		if (i>DISTANCE_THRESHOLD) {
-			sequence[0].setNonrepetitive(i);
-			sequence[0].openStart=true;
-			sequence[0].openEnd=i>=lengthA-DISTANCE_THRESHOLD;
-		}
-		// Middle characters
-		i=1; j=0; firstJForNextI=-1; out=-1;
-		while (i<=lastPoint) {
-			startA=points[i-1]; endA=points[i];
-			if (j>lastAlignment || alignments[j].startA>=endA) {
-				if (newCharacter.lastTuple==-1) newCharacter.setNonrepetitive(endA-startA+1);
-				else Arrays.sort(newCharacter.tuples,0,newCharacter.lastTuple+1);
-				out++;
-				sequence[out].copyFrom(newCharacter);
-				sequence[out].openStart=startA<=DISTANCE_THRESHOLD;
-				sequence[out].openEnd=endA>=lengthA-DISTANCE_THRESHOLD;
-				i++;
-				if (firstJForNextI!=-1) j=firstJForNextI;
-				firstJForNextI=-1;
-				newCharacter.clear();
-				continue;
-			}
-			else if (alignments[j].endA<=startA) {
-				j++;
-				continue;
-			}
-			if (firstJForNextI==-1 && i<lastPoint && alignments[j].endA>=endA) firstJForNextI=j;
-			if ( Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) || 
-				 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
-			   ) newCharacter.add(alignments[j],startA,endA);
-			j++;
-		}
-		// Last non-repetitive character
-		i=points[lastPoint];
-		if (lengthA-i>DISTANCE_THRESHOLD) {
-			out++;
-			sequence[out].setNonrepetitive(lengthA-i);
-			sequence[out].openStart=i<=DISTANCE_THRESHOLD;
-			sequence[out].openEnd=true;
-		}
------->
-		return out;
-	}
-	
-	
-	/**
-	 * Appends all the characters in $sequence$ to the end of $alphabet$.
-	 */
-	private static final void addCharacters2Alphabet(Character[] sequence, int lastCharacter) {
-		if (lastCharacter<2) return;
-		
-		final int newLength = lastAlphabet+1+lastCharacter+1-2;
-		if (newLength>alphabet.length) {
-			Character[] newAlphabet = new Character[(alphabet.length<<1)>newLength?(alphabet.length<<1):newLength<<1];
-			System.arraycopy(alphabet,0,newAlphabet,0,alphabet.length);
-			alphabet=newAlphabet;
-		}
-		System.arraycopy(sequence,1,alphabet,lastAlphabet+1,lastCharacter+1-2);
-		lastAlphabet+=lastCharacter+1-2;
-	}
-	
-	
-	/**
-	 * [ALMOST UP TO DATE] A character of the recoded alphabet, which is a set of substrings of 
-	 * repeats in specific orientations, and with open/closed endpoints in readA.
+	 * [UP TO DATE] A character of the recoded alphabet, which is a set of substrings of 
+	 * repeats in specific orientations and with open/closed endpoints.
 	 */
 	private static class Character implements Comparable {
 		private static final int CAPACITY = 10;  // Arbitrary
@@ -596,8 +652,6 @@ System.err.println("}");
 		public int id;
 		public Tuple[] tuples;
 		public int lastTuple;
-		public boolean openStart;  // TRUE: readA begins close to the start of the char
-		public boolean openEnd;  // TRUE: readA ends close to the end of the char
 		
 		/**
 		 * An empty character
@@ -608,7 +662,7 @@ System.err.println("}");
 		}
 		
 		public void clear() {
-			id=-1; lastTuple=-1; openStart=false; openEnd=false;
+			id=-1; lastTuple=-1;
 		}
 		
 		/**
@@ -617,25 +671,25 @@ System.err.println("}");
 		public Character(int length, boolean openStart, boolean openEnd) {
 			id=-1;
 			tuples = new Tuple[CAPACITY];
-			setNonrepetitive(length);
-			this.openStart=openStart; this.openEnd=openEnd;
+			setNonrepetitive(length,openStart,openEnd);
 		}
 		
 		/**
 		 * Sets the current character to a non-repetitive of given length.
 		 */
-		public final void setNonrepetitive(int length) {
-			tuples[0] = new Tuple(NON_REPETITIVE,true,-1,-1,length);
+		public final void setNonrepetitive(int length, boolean openStart, boolean openEnd) {
+			tuples[0] = new Tuple(NON_REPETITIVE,true,-1,-1,length,openStart,openEnd);
 			lastTuple=0;
 		}
 		
 		public final boolean isNonrepetitive() {
-			return lastTuple==0 && tuples[0].readB.equals(NON_REPETITIVE);
+			return lastTuple==0 && tuples[0].repeat==NON_REPETITIVE;
 		}
 		
 		private final void enlarge() {
 			Tuple[] newTuples = new Tuple[tuples.length<<1];
 			System.arraycopy(tuples,0,newTuples,0,tuples.length);
+			for (int i=tuples.length; i<newTuples.length; i++) newTuples[i] = new Tuple();
 			tuples=newTuples;
 		}
 		
@@ -654,23 +708,21 @@ System.err.println("}");
 			}
 			lastTuple=otherCharacter.lastTuple;
 			for (i=0; i<=lastTuple; i++) tuples[i].copyFrom(otherCharacter.tuples[i]);
-			openStart=otherCharacter.openStart;
-			openEnd=otherCharacter.openEnd;
 		}
 		
 		/**
 		 * Sorting just by $readB,orientation$ of the tuples.
 		 */
 		public int compareTo(Object other) {
-			int i, j;
+			int i;
 			int last;
 			
 			Character otherCharacter = (Character)other;
 			if (lastTuple<otherCharacter.lastTuple) return -1;
 			else if (lastTuple>otherCharacter.lastTuple) return 1;
 			for (i=0; i<=lastTuple; i++) {
-				j=tuples[i].readB.compareTo(otherCharacter.tuples[i].readB);
-				if (j!=0) return j;
+				if (tuples[i].repeat<otherCharacter.tuples[i].repeat) return -1;
+				else if (tuples[i].repeat>otherCharacter.tuples[i].repeat) return 1;
 				if (tuples[i].orientation && !otherCharacter.tuples[i].orientation) return -1;
 				else if (!tuples[i].orientation && otherCharacter.tuples[i].orientation) return 1;
 			}
@@ -688,25 +740,25 @@ System.err.println("}");
 		
 		/**
 		 * @return TRUE iff $otherCharacter$ is identical to this character,
-		 * when considering only the $readB$ and $orientation$ fields of all tuples.
+		 * when considering only the $repeat$ and $orientation$ fields of all tuples.
 		 */
-		public final boolean sameReadB(Character otherCharacter) {
+		public final boolean sameRepeat(Character otherCharacter) {
 			if (lastTuple!=otherCharacter.lastTuple) return false;
 			for (int i=0; i<=lastTuple; i++) {
-				if (!tuples[i].readB.equalsIgnoreCase(otherCharacter.tuples[i].readB) || tuples[i].orientation!=otherCharacter.tuples[i].orientation) return false;
+				if (tuples[i].repeat!=otherCharacter.tuples[i].repeat || tuples[i].orientation!=otherCharacter.tuples[i].orientation) return false;
 			}
 			return true;
 		}
 		
 		/**
 		 * Remark: the procedure assumes that the two characters are similar 
-		 * according to $sameReadB()$.
+		 * according to $sameRepeat()$.
 		 */
-		public final boolean isSimilar(Character otherCharacter) {
+		public final boolean isSimilar(Character otherCharacter, int distanceThrehsold, int lengthThreshold) {
 			for (int i=0; i<=lastTuple; i++) {
-				if ( Math.abs(tuples[i].startB-otherCharacter.tuples[i].startB)>DISTANCE_THRESHOLD || 
-					 Math.abs(tuples[i].endB-otherCharacter.tuples[i].endB)>DISTANCE_THRESHOLD || 
-					 Math.abs(tuples[i].lengthB-otherCharacter.tuples[i].lengthB)>LENGTH_THRESHOLD
+				if ( Math.abs(tuples[i].start-otherCharacter.tuples[i].start)>distanceThrehsold || 
+					 Math.abs(tuples[i].end-otherCharacter.tuples[i].end)>distanceThrehsold || 
+					 Math.abs(tuples[i].length-otherCharacter.tuples[i].length)>lengthThreshold
 				   ) return false;
 			}
 			return true;
@@ -725,9 +777,9 @@ System.err.println("}");
 			
 			out=0;
 			for (i=0; i<=lastTuple; i++) {
-				out+=Math.pow(tuples[i].startB-otherCharacter.tuples[i].startB,2);
-				out+=Math.pow(tuples[i].endB-otherCharacter.tuples[i].endB,2);
-				out+=Math.pow(tuples[i].lengthB-otherCharacter.tuples[i].lengthB,2);
+				out+=Math.pow(tuples[i].start-otherCharacter.tuples[i].start,2);
+				out+=Math.pow(tuples[i].end-otherCharacter.tuples[i].end,2);
+				out+=Math.pow(tuples[i].length-otherCharacter.tuples[i].length,2);
 			}
 			return Math.sqrt(out);
 		}
@@ -739,9 +791,9 @@ System.err.println("}");
 		}
 		
 		public String toString() {
-			if (lastTuple==0 && tuples[0].readB==NON_REPETITIVE) return id+": "+NON_REPETITIVE+","+tuples[0].lengthB;
+			if (lastTuple==0 && tuples[0].read==NON_REPETITIVE) return id+": "+NON_REPETITIVE+","+tuples[0].length;
 			String out = id+": ";
-			for (int i=0; i<=lastTuple; i++) out+=tuples[i].readB+(tuples[i].orientation?"+":"-")+"["+tuples[i].startB+".."+tuples[i].endB+"], ";
+			for (int i=0; i<=lastTuple; i++) out+=tuples[i].read+(tuples[i].orientation?"+":"-")+"["+tuples[i].start+".."+tuples[i].end+"], ";
 			return out;
 		}
 		
@@ -756,101 +808,143 @@ System.err.println("}");
 			return out/(lastTuple+1);
 		}
 		
-		
--------> up to date until here		
 		/**
-		 * Appends the alignment of a non-short-period readB to the current 
-		 * character, which is assumed to correspond to interval $[startA..
-		 * endA]$ in readA.
+		 * Adds an alignment to the current character. If the character already contains 
+		 * an alignment to the same repeat, the new alignment replaces the old one based
+		 * on a canonical (and arbitrary) order.
 		 *
 		 * Remark: tuples might not be sorted after the procedure completes.
+		 *
+		 * @param tmpTuple temporary space.
 		 */
-		public final void add(AlignmentRow alignment, int startA, int endA) {
-			int startB, endB;
-			double ratio;
+		public final void add(AlignmentRow alignment, Tuple tmpTuple) {
+			int i;
+			int found;
 			
-			if (isIdentical(startA,endA,alignment.startA,alignment.endA)) {
-				lastTuple++;
-				if (lastTuple==tuples.length) enlarge();	
-				tuples[lastTuple] = new Tuple(alignment.readB,alignment.orientation,alignment.startB,alignment.endB,0);
-			}
-			else if (isContained(startA,endA,alignment.startA,alignment.endA)) {
-				lastTuple++;
-				if (lastTuple==tuples.length) enlarge();
-				ratio=alignment.getRatio();
-				if (alignment.orientation) {
-					startB=(int)(alignment.startB+(startA-alignment.startA)/ratio);
-					endB=(int)(alignment.endB-(alignment.endA-endA)/ratio);
-				}
-				else {
-					startB=(int)(alignment.startB+(alignment.endA-endA)/ratio);
-					endB=(int)(alignment.endB-(startA-alignment.startA)/ratio);
-				}
-				tuples[lastTuple] = new Tuple(alignment.readB,alignment.orientation,startB,endB,0);
+			tmpTuple.repeat=alignment.readB; tmpTuple.orientation=alignment.orientation;
+			if (isPeriodic[alignment.readB]==0) {
+				tmpTuple.start=alignment.startB;
+				tmpTuple.end=alignment.endB;
+				tmpTuple.length=0;
 			}
 			else {
-				// NOP
+				tmpTuple.start=-1; tmpTuple.end=-1;
+				tmpTuple.length=alignment.endA-alignment.startA+1; // A is correct here
+			}
+			found=-1;
+			for (i=0; i<=lastTuple; i++) {
+				if (tuples[i].repeat==tmpTuple.read && tuples[i].orientation==tmpTuple.orientation) {
+					found=i;
+					break;
+				}
+			}
+			if (found==-1) {
+				lastTuple++;
+				if (lastTuple==tuples.length) enlarge();	
+				tuples[lastTuple].copyFrom(tmpTuple);
+			}
+			else if (isPeriodic[alignment.readB]!=0) tuples[found].length=Math.max(tuples[found].length,tmpTuple.length);
+			else if ( alignment.startB<tuples[found].start || 
+				      (alignment.startB==tuples[found].start && alignment.endB<tuples[found].end)
+			        ) {
+				tuples[found].start=alignment.startB;
+				tuples[found].end=alignment.endB;
 			}
 		}
+		
+		/**
+		 * Sorts $tuples$ and, if the character contains a periodic repeat, removes all 
+		 * non-periodic repeats from the character and sets the length of every periodic
+		 * repeat to $periodicLength$.
+		 */
+		public static final void clean(int periodicLength) {
+			boolean foundPeriodic, foundNonperiodic;
+			int i, j;
+			Tuple tmpTuple;
+			
+			foundPeriodic=false; foundNonperiodic=false;
+			for (i=0; i<=lastTuple; i++) {
+				if (isPeriodic[tuples[i].repeat]!=0) {
+					foundPeriodic=true;
+					tuples[i].length=periodicLength;
+				}
+				else foundNonperiodic=true;
+			}
+			if (!foundPeriodic) {
+				Arrays.sort(tuples,0,lastTuple+1);
+				return;
+			}
+			if (foundNonperiodic) {
+				j=-1;
+				for (i=0; i<=lastTuple; i++) {
+					if (isPeriodic[tuples[i].repeat]==0) continue;
+					j++;
+					tmpTuple=tuples[j];
+					tuples[j]=tuples[i];
+					tuples[i]=tmpTuple;
+				}
+				lastTuple=j;
+			}
+			Arrays.sort(tuples,0,lastTuple+1);
+		}
+		
 	}
 	
 	
 	/**
-	 * [UP TO DATE] A substring of a readB in a specific orientation.
+	 * [UP TO DATE] A substring of a repeat in a specific orientation.
 	 */
 	private static class Tuple implements Comparable {
-		public int readB;
+		public int repeat;
 		public boolean orientation;
-		public int startB;
-		public int endB;
-		public int lengthB;  // >0: non-periodic or short-period; 0: others.
+		public int start, end;
+		public boolean openStart, openEnd;  // The repeat might continue beyond start/end
+		public int length;  // >0: unique or periodic; 0: repetitive non-periodic.
 		
 		public Tuple() {
-			readB=-1; orientation=false; startB=-1; endB=-1; lengthB=-1;
+			repeat=-1; orientation=false; start=-1; end=-1; length=-1;
+			openStart=true; openEnd=true;
 		}
 		
-		public Tuple(String rb, boolean o, int sb, int eb, int lb) {
-			this.readB=rb;
-			this.orientation=o;
-			this.startB=sb;
-			this.endB=eb;
-			this.lengthB=lb;
+		public Tuple(int r, boolean o, int s, int e, int l, boolean os, boolean oe) {
+			repeat=r; orientation=o; start=s; end=e; length=l;
+			openStart=os; openEnd=oe;
 		}
 		
 		public int compareTo(Object other) {
 			Tuple otherTuple = (Tuple)other;
-			int i = readB.compareTo(otherTuple.readB);
-			if (i!=0) return i;
+			if (repeat<otherTuple.repeat) return -1;
+			else if (repeat>otherTuple.repeat) return 1;
 			if (orientation && !otherTuple.orientation) return -1;
 			else if (!orientation && otherTuple.orientation) return 1;
-			if (startB<otherTuple.startB) return -1;
-			else if (startB>otherTuple.startB) return 1;
-			if (endB<otherTuple.endB) return -1;
-			else if (endB>otherTuple.endB) return 1;
-			if (lengthB<otherTuple.lengthB) return -1;
-			else if (lengthB>otherTuple.lengthB) return 1;
+			if (start<otherTuple.start) return -1;
+			else if (start>otherTuple.start) return 1;
+			if (end<otherTuple.end) return -1;
+			else if (end>otherTuple.end) return 1;
+			if (length<otherTuple.length) return -1;
+			else if (length>otherTuple.length) return 1;
 			return 0;
 		}
 		
 		public void copyFrom(Tuple otherTuple) {
-			readB=otherTuple.readB;
+			repeat=otherTuple.repeat;
 			orientation=otherTuple.orientation;
-			startB=otherTuple.startB;
-			endB=otherTuple.endB;
-			lengthB=otherTuple.lengthB;
+			start=otherTuple.start; end=otherTuple.end;
+			length=otherTuple.length;
+			openStart=otherTuple.openStart; openEnd=otherTuple.openEnd;
 		}
 		
 		public boolean equals(Object other) {
 			Tuple otherTuple = (Tuple)other;
-			return readB.equalsIgnoreCase(otherTuple.readB) && orientation==otherTuple.orientation && startB==otherTuple.startB && endB==otherTuple.endB && lengthB==otherTuple.lengthB;
+			return repeat==otherTuple.repeat && orientation==otherTuple.orientation && start==otherTuple.start && end==otherTuple.end && length==otherTuple.length && openStart==otherTuple.openStart && openEnd==otherTuple.openEnd;
 		}
 		
 		public String toString() {
-			return readB+","+orientation+","+startB+","+endB+","+lengthB;
+			return repeat+","+(orientation?"FWD":"REV")+"["+start+".."+end+"] (L="+length+")";
 		}
 		
 		public int getLength() {
-			return (startB==-1||endB==-1)?lengthB:endB-startB+1;
+			return (start==-1||end==-1)?length:end-start+1;
 		}
 	}
 
