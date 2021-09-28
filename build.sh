@@ -15,8 +15,8 @@ fi
 if [ ! -e ${BUILD_DIR} ]; then
 	mkdir ${BUILD_DIR}
 fi
-rm -rf ${BUILD_DIR}
-mkdir ${BUILD_DIR}
+#rm -rf ${BUILD_DIR}
+#mkdir ${BUILD_DIR}
 javac ${COMPILER_FLAGS} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/util/*.java
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/factorize/*.java
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/intervalgraph/*.java
@@ -24,3 +24,4 @@ javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/fr
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/consensus/*.java
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/graphics/*.java
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/biology/*.java
+javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/apps/*.java
