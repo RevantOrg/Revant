@@ -415,6 +415,12 @@ public class RepeatAlphabet {
 		lastAlphabet=j;
 		System.err.println(" DONE  "+(lastAlphabet+1)+" characters after filtering.");
 		
+		
+for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);		
+		
+		
+		
+		
 		System.err.println("Merging surviving characters... ");
 		initializeGraph(lastAlphabet+1);
 		for (i=1; i<lastAlphabet; i++) {
@@ -422,7 +428,7 @@ public class RepeatAlphabet {
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (!alphabet[j].sameRepeat(alphabet[i])) break;
 				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold) && alphabet[j].sameOpen(alphabet[i])) {
-					addEdge(i,j); addEdge(j,i);
+//addEdge(i,j); addEdge(j,i);
 				}
 			}
 		}
