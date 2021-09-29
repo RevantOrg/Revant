@@ -129,7 +129,16 @@ public class RepeatAlphabet {
 		Character tmpCharacter;
 		
 		// Allocating memory
-		if (alphabet==null || alphabet.length<ALPHABET_CAPACITY) alphabet = new Character[ALPHABET_CAPACITY];
+		if (alphabet==null) {
+			alphabet = new Character[ALPHABET_CAPACITY];
+			for (i=0; i<alphabet.length; i++) alphabet[i] = new Character();
+		}
+		else if (alphabet.length<ALPHABET_CAPACITY) {
+			Character[] newAlphabet = new Character[ALPHABET_CAPACITY];
+			System.arraycopy(alphabet,0,newAlphabet,0,alphabet.length);
+			for (i=alphabet.length; i<newAlphabet.length; i++) newAlphabet[i] = new Character();
+			alphabet=newAlphabet;
+		}
 		lastAlphabet=-1;
 		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
 		for (i=0; i<alignments.length; i++) {	
@@ -154,7 +163,7 @@ public class RepeatAlphabet {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments, "+(lastAlphabet+1)+" characters collected.");
 			Alignments.readAlignmentFile(str);
 			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.endB+2)>maxError) {
-				str=br.readLine();
+				str=br.readLine(); row++;
 				continue;
 			}
 			readA=Alignments.readA-1;
@@ -378,10 +387,11 @@ public class RepeatAlphabet {
 		int i, j;
 		Character tmpChar;
 		
-		// Discarding characters that are implied by other characters
+		System.err.println("Discarding characters that are implied by other characters... ");
 		Arrays.sort(alphabet,0,lastAlphabet+1);
 		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=1;
 		for (i=0; i<=lastAlphabet; i++) {
+			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			if (alphabet[i].isNonrepetitive()) continue;
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (!alphabet[j].sameRepeat(alphabet[i])) break;
@@ -403,10 +413,12 @@ public class RepeatAlphabet {
 			alphabet[i]=tmpChar;
 		}
 		lastAlphabet=j;
+		System.err.println(" DONE  "+(lastAlphabet+1)+" characters after filtering.");
 		
-		// Merging surviving characters
+		System.err.println("Merging surviving characters... ");
 		initializeGraph(lastAlphabet+1);
 		for (i=1; i<lastAlphabet; i++) {
+			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (!alphabet[j].sameRepeat(alphabet[i])) break;
 				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold) && alphabet[j].sameOpen(alphabet[i])) {
@@ -414,7 +426,9 @@ public class RepeatAlphabet {
 				}
 			}
 		}
+		System.err.print("Graph built. Computing connected components... ");
 		nComponents=getConnectedComponent(lastAlphabet+1);
+		System.err.println("DONE");
 		if (mergedChars==null) {
 			mergedChars = new Character[nComponents];
 			for (i=0; i<mergedChars.length; i++) mergedChars[i] = new Character();
@@ -434,10 +448,12 @@ public class RepeatAlphabet {
 		for (i=0; i<nComponents; i++) mergedChars[i].normalizeTupleEnds(connectedComponentSize[i]);
 		for (i=0; i<nComponents; i++) alphabet[i].copyFrom(mergedChars[i]);
 		lastAlphabet=nComponents-1;
+		System.err.print("DONE  "+(lastAlphabet+1)+" characters after the merge.");
 		
-		// Sorting the results of the merge
+		System.err.print("Sorting the results of the merge... ");
 		Arrays.sort(alphabet,0,lastAlphabet+1);
 		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=i;
+		System.err.println(" DONE");
 	}
 	
 	
@@ -544,6 +560,7 @@ public class RepeatAlphabet {
 		 */
 		public Character() {
 			tuples = new Tuple[CAPACITY];
+			for (int i=0; i<tuples.length; i++) tuples[i] = new Tuple();
 			reset();
 		}
 		
@@ -590,11 +607,15 @@ public class RepeatAlphabet {
 		public final void copyFrom(Character otherCharacter) {
 			int i;
 			
-			if (tuples==null) tuples = new Tuple[otherCharacter.lastTuple+1];			
+			if (tuples==null) {
+				tuples = new Tuple[otherCharacter.lastTuple+1];
+				for (i=0; i<tuples.length; i++) tuples[i] = new Tuple();
+			}
 			else if (tuples.length<otherCharacter.lastTuple+1) {
 				Tuple[] newTuples = new Tuple[otherCharacter.lastTuple+1];
 				System.arraycopy(tuples,0,newTuples,0,tuples.length);
-				for (i=tuples.length; i<newTuples.length; i++) tuples[i] = new Tuple();
+				for (i=tuples.length; i<newTuples.length; i++) newTuples[i] = new Tuple();
+				tuples=newTuples;
 			}
 			lastTuple=otherCharacter.lastTuple;
 			for (i=0; i<=lastTuple; i++) tuples[i].copyFrom(otherCharacter.tuples[i]);
