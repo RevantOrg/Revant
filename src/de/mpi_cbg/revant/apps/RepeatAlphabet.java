@@ -170,9 +170,12 @@ public class RepeatAlphabet {
 			if (previousReadA==-1 || readA!=previousReadA) {
 				if (previousReadA!=-1) {
 					cleanAlignments(distanceThreshold);
-					recodeRead(distanceThreshold);
-					if (lastInSequence>0) addCharacters2Alphabet();
-					sequenceLengths[previousReadA]=lastInSequence+1;
+					if (lastAlignment!=-1) {
+						recodeRead(distanceThreshold);
+						if (lastInSequence>0) addCharacters2Alphabet();
+						sequenceLengths[previousReadA]=lastInSequence+1;
+					}
+					else sequenceLengths[previousReadA]=0;
 				}
 				previousReadA=readA; lastAlignment=0;
 				alignments[0].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
@@ -192,9 +195,12 @@ public class RepeatAlphabet {
 		br.close();
 		if (previousReadA!=-1) {
 			cleanAlignments(distanceThreshold);
-			recodeRead(distanceThreshold);
-			if (lastInSequence>0) addCharacters2Alphabet();
-			sequenceLengths[previousReadA]=lastInSequence+1;
+			if (lastAlignment!=-1) {
+				recodeRead(distanceThreshold);
+				if (lastInSequence>0) addCharacters2Alphabet();
+				sequenceLengths[previousReadA]=lastInSequence+1;
+			}
+			else sequenceLengths[previousReadA]=0;
 		}
 		
 		// Sorting and compacting the alphabet
@@ -212,8 +218,6 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure assumes that reads do not contain long low-quality regions.
 	 *
-	 * Remark: endpoint clustering is very simplistic for now, and should be improved.
-	 *
 	 * Remark: the characters of $sequence$ are not objects in $alphabet$, and the 
 	 * procedure does not look them up in $alphabet$: this is left to the caller.
 	 *
@@ -223,8 +227,8 @@ public class RepeatAlphabet {
 	public static final void recodeRead(int distanceThreshold) {
 		int i, j, k;
 		int lastPeriodicInterval, currentStart, currentEnd;
-		int firstJForNextI, inPeriodic, lastPoint, previousPoint, numerator, denominator;
-		int startA, endA, newLength;
+		int firstJForNextI, inPeriodic, lastPoint;
+		int startA, endA, newLength, component, nComponents;
 		final int lengthA = Reads.getReadLength(alignments[0].readA);
 		
 		if (periodicIntervals.length<(lastAlignment+1)<<1) periodicIntervals = new int[(lastAlignment+1)<<1];
@@ -280,27 +284,24 @@ public class RepeatAlphabet {
 			   ) inPeriodic=j;
 			j+=2;
 		}
-		if (inPeriodic==-1) {
-			points[++lastPoint]=alignments[i].startA;
-			points[++lastPoint]=alignments[i].endA;
-		}
-		else if (isPeriodic[alignments[i].readB]) {
-			if (Math.abs(alignments[i].startA,periodicIntervals[inPeriodic])<=distanceThreshold) points[++lastPoint]=alignments[i].startA;
-			if (Math.abs(alignments[i].endA,periodicIntervals[inPeriodic+1])<=distanceThreshold) points[++lastPoint]=alignments[i].endA;
-		}
 		Arrays.sort(points,0,lastPoint+1);
-		j=-1; previousPoint=points[0]; numerator=points[0]; denominator=1;
-		for (i=1; i<=lastPoint; i++) {
-			if (points[i]<=previousPoint+distanceThreshold) {
-				numerator+=points[i];
-				denominator++;
-				continue;
+		initializeGraph(lastPoint+1);
+		for (i=0; i<lastPoint; i++) {
+			for (j=i+1; j<=lastPoint; j++) {
+				if (points[j]>points[i]+distanceThreshold) break;
+				addEdge(i,j); addEdge(j,i);
 			}
-			points[++j]=numerator/denominator;
-			previousPoint=points[i]; numerator=points[i]; denominator=1;
 		}
-		points[++j]=numerator/denominator;
-		lastPoint=j;
+		nComponents=getConnectedComponent(lastPoint+1);
+		if (stack.length<(nComponents<<1)) stack = new int[nComponents<<1];
+		for (i=0; i<(nComponents<<1); i++) stack[i]=0;
+		for (i=0; i<=lastPoint; i++) {
+			component=connectedComponent[i]<<1;
+			stack[component]+=points[i];
+			stack[component+1]++;
+		}
+		for (i=0; i<nComponents; i++) points[i]=stack[i<<1]/stack[(i<<1)+1];
+		lastPoint=nComponents-1;
 		
 		// Creating the sequence
 		lastInSequence=-1;
@@ -384,28 +385,31 @@ public class RepeatAlphabet {
 	 * power, since it assumes they have not been added to $alphabet$.
 	 */
 	private static final void compactAlphabet(int distanceThreshold, int lengthThreshold) {
-		int i, j;
+		int i, j, k;
 		Character tmpChar;
+		Tuple tupleI;
 		
-		System.err.println("Discarding characters that are implied by other characters... ");
 		Arrays.sort(alphabet,0,lastAlphabet+1);
-		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=1;
-		for (i=0; i<=lastAlphabet; i++) {
+		for (k=0; k<=lastAlphabet; k++) {
+			if (!alphabet[k].isNonrepetitive()) break;
+		}
+		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+k+" non-repetitive characters)");
+		for (i=k; i<=lastAlphabet; i++) alphabet[i].id=1;
+		for (i=k; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
-			if (alphabet[i].isNonrepetitive()) continue;
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (!alphabet[j].sameRepeat(alphabet[i])) break;
-				if (alphabet[j].isNonrepetitive() || alphabet[j].id==0) continue;
+				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
 			for (j=i-1; j>=0; j--) {
 				if (!alphabet[j].sameRepeat(alphabet[i])) break;
-				if (alphabet[j].isNonrepetitive() || alphabet[j].id==0) continue;
+				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
 		}
-		j=-1;
-		for (i=0; i<=lastAlphabet; i++) {
+		j=k-1;
+		for (i=k; i<=lastAlphabet; i++) {
 			if (alphabet[i].id==0) continue;
 			j++;
 			tmpChar=alphabet[j];
@@ -425,10 +429,11 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 		initializeGraph(lastAlphabet+1);
 		for (i=1; i<lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
+			tupleI=alphabet[i].tuples[0];
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (!alphabet[j].sameRepeat(alphabet[i])) break;
+				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].tooFarAfter(tupleI,distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold) && alphabet[j].sameOpen(alphabet[i])) {
-//addEdge(i,j); addEdge(j,i);
+					addEdge(i,j); addEdge(j,i);
 				}
 			}
 		}
@@ -629,21 +634,20 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 		
 		
 		/**
-		 * Sorting just by $repeat,orientation$ of the tuples.
+		 * Lexicographic order on the sequence of tuples
 		 */
 		public int compareTo(Object other) {
 			int i;
-			int last;
+			int order;
+			final Character otherCharacter = (Character)other;
+			final int last = Math.min(lastTuple,otherCharacter.lastTuple);
 			
-			Character otherCharacter = (Character)other;
+			for (i=0; i<=last; i++) {
+				order=tuples[i].compareTo(otherCharacter.tuples[i]);
+				if (order!=0) return order;
+			}
 			if (lastTuple<otherCharacter.lastTuple) return -1;
 			else if (lastTuple>otherCharacter.lastTuple) return 1;
-			for (i=0; i<=lastTuple; i++) {
-				if (tuples[i].repeat<otherCharacter.tuples[i].repeat) return -1;
-				else if (tuples[i].repeat>otherCharacter.tuples[i].repeat) return 1;
-				if (tuples[i].orientation && !otherCharacter.tuples[i].orientation) return -1;
-				else if (!tuples[i].orientation && otherCharacter.tuples[i].orientation) return 1;
-			}
 			return 0;
 		}
 		
@@ -693,8 +697,7 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 			}
 			return true;			
 		}
-			
-		
+
 		
 		/**
 		 * Remark: the procedure assumes that the two characters are similar 
@@ -725,7 +728,7 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 		
 		
 		public String toString() {
-			String out = id+","+(lastTuple+1)+",";
+			String out = id+","+lastTuple+",";
 			for (int i=0; i<=lastTuple; i++) out+=tuples[i].toString()+",";
 			return out;
 		}
@@ -758,11 +761,11 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 			
 			if (alignment.orientation) {
 				tmpTuple.openStart=alignment.startA<=distanceThreshold;
-				tmpTuple.openEnd=alignment.endA>=repeatLengths[alignment.readB]-distanceThreshold;
+				tmpTuple.openEnd=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
 			}
 			else {
 				tmpTuple.openEnd=alignment.startA<=distanceThreshold;
-				tmpTuple.openStart=alignment.endA>=repeatLengths[alignment.readB]-distanceThreshold;
+				tmpTuple.openStart=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
 			}
 			tmpTuple.repeat=alignment.readB; tmpTuple.orientation=alignment.orientation;
 			if (!isPeriodic[alignment.readB]) {
@@ -948,6 +951,13 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 			if (length<otherTuple.length) return -1;
 			else if (length>otherTuple.length) return 1;
 			return 0;
+		}
+		
+		/**
+		 * Assumes the same order as in $compareTo()$.
+		 */
+		public boolean tooFarAfter(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
+			return start>otherTuple.start+distanceThreshold || end>otherTuple.end+distanceThreshold || length>otherTuple.length+lengthThreshold;
 		}
 		
 		public void copyFrom(Tuple otherTuple) {
