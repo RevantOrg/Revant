@@ -29,6 +29,7 @@ public class RepeatAlphabet {
 	 */
 	public static Character[] alphabet;
 	public static int lastAlphabet;
+	public static int maxOpenLength_nonperiodic;
 	
 	/**
 	 * All alignments of a given readA
@@ -358,7 +359,7 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Appends all the characters of $sequence$ to the end of $alphabet$.
+	 * Appends the characters of $sequence$ to the end of $alphabet$.
 	 */
 	private static final void addCharacters2Alphabet() {
 		final int GROWTH_RATE = 100000;  // Arbitrary
@@ -372,7 +373,13 @@ public class RepeatAlphabet {
 			alphabet=newAlphabet;
 		}
 		j=lastAlphabet;
-		for (i=0; i<=lastInSequence; i++) alphabet[++j].copyFrom(sequence[i]);
+		for (i=0; i<=lastInSequence; i++) {
+			if (sequence[i].isNonrepetitive()) {
+				if (!sequence[i].openStart() && !sequence[i].openEnd()) alphabet[++j].copyFrom(sequence[i]);
+				else maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,sequence[i].getLength());
+			}
+			else alphabet[++j].copyFrom(sequence[i]);
+		}
 		lastAlphabet=j;
 	}
 	
@@ -397,13 +404,14 @@ public class RepeatAlphabet {
 		for (i=k; i<=lastAlphabet; i++) alphabet[i].id=1;
 		for (i=k; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
+			tupleI=alphabet[i].tuples[0];
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (!alphabet[j].sameRepeat(alphabet[i])) break;
+				if (!alphabet[j].sameRepeat(alphabet[i]) /*|| alphabet[j].tuples[0].implies_tooFarAfter(tupleI,distanceThreshold,lengthThreshold)*/) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
 			for (j=i-1; j>=0; j--) {
-				if (!alphabet[j].sameRepeat(alphabet[i])) break;
+				if (!alphabet[j].sameRepeat(alphabet[i]) /*|| alphabet[j].tuples[0].implies_tooFarBefore(tupleI,distanceThreshold,lengthThreshold)*/) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
@@ -417,13 +425,7 @@ public class RepeatAlphabet {
 			alphabet[i]=tmpChar;
 		}
 		lastAlphabet=j;
-		System.err.println(" DONE  "+(lastAlphabet+1)+" characters after filtering.");
-		
-		
-for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);		
-		
-		
-		
+		System.err.println(" DONE  "+(lastAlphabet+1)+" characters after filtering.");	
 		
 		System.err.println("Merging surviving characters... ");
 		initializeGraph(lastAlphabet+1);
@@ -472,6 +474,19 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 		BufferedWriter bw = new BufferedWriter(new FileWriter(path));
 		for (int i=0; i<=lastAlphabet; i++) bw.write(alphabet[i].toString()+"\n");
 		bw.close();
+	}
+	
+	
+	public static final void deserializeAlphabet(String path, int nCharacters) throws IOException {
+		int i;
+		BufferedReader br;
+		
+		alphabet = new Character[nCharacters];
+		lastAlphabet=nCharacters-1;
+		for (i=0; i<=lastAlphabet; i++) alphabet[i] = new Character();
+		br = new BufferedReader(new FileReader(path));
+		for (i=0; i<=lastAlphabet; i++) alphabet[i].deserialize(br.readLine());
+		br.close();
 	}
 	
 	
@@ -884,8 +899,14 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 		
 		
 		/**
+		 * Remark: when changing this procedure, update $implies_tooFar*()$ as well.
+		 *
 		 * Remark: the two characters are assumed both to be repetitive and to satisfy
 		 * $sameRepeat()$.
+		 *
+		 * Remark: the procedure assumes that both characters are nonrepetitive. 
+		 * Nonrepetitive characters are not assumed to imply one another, since fully-open
+		 * and half-open nonrepetitive characters are assumed to have been discarded.
 		 *
 		 * @return TRUE iff no tuple of $otherCharacter$ can add information WRT the
 		 * corresponding tuple of this character.
@@ -914,7 +935,6 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 			}
 			return true;
 		}
-		
 	}
 	
 	
@@ -956,11 +976,11 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 		/**
 		 * Assumes the same order as in $compareTo()$.
 		 */
-		public boolean tooFarAfter(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
+		public final boolean tooFarAfter(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
 			return start>otherTuple.start+distanceThreshold || end>otherTuple.end+distanceThreshold || length>otherTuple.length+lengthThreshold;
 		}
 		
-		public void copyFrom(Tuple otherTuple) {
+		public final void copyFrom(Tuple otherTuple) {
 			repeat=otherTuple.repeat;
 			orientation=otherTuple.orientation;
 			start=otherTuple.start; end=otherTuple.end;
@@ -977,8 +997,30 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 			return repeat+","+(orientation?"1":"0")+","+start+","+end+","+length+","+(openStart?"1":"0")+","+(openEnd?"1":"0");
 		}
 		
-		public int getLength() {
+		public final int getLength() {
 			return (start==-1||end==-1)?length:end-start+1;
+		}
+		
+		/**
+		 * Assumes that the container characters have the same repeats, and uses the same
+		 * criteria as $Character.implies()$.
+		 */
+		public final boolean implies_tooFarAfter(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
+			if (start==-1) {  // Periodic
+				return length>otherTuple.length+lengthThreshold;
+			}
+			else {  // Nonperiodic
+				return start>=otherTuple.end-distanceThreshold;
+			}
+		}
+		
+		public final boolean implies_tooFarBefore(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
+			if (start==-1) {  // Periodic
+				return false;
+			}
+			else {  // Nonperiodic
+				return start<otherTuple.start-distanceThreshold;
+			}
 		}
 	}
 	
@@ -1050,6 +1092,9 @@ for (int x=0; x<=lastAlphabet; x++) System.err.println(alphabet[x]);
 		
 		// Removing non-periodic alignments that straddle other non-periodic alignments
 		// (possibly with the same readB): these do not provide a clear signal.
+// ----> This is not satisfactory, since repeats can straddle one another...
+// Either do like Arne, explicitly modeling this as smaller characters.
+// Or find maximal ranges of straddling alignments like periodic, and assign them a specific type.
 		for (i=0; i<=lastAlignment; i++) alignments[i].flag=true;
 		for (i=0; i<=lastAlignment; i++) {
 			if (isPeriodic[alignments[i].readB]) continue;

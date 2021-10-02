@@ -21,11 +21,11 @@ public class BuildRepeatAlphabet {
 		final String ISPERIODIC_FILE = args[5];
 		final String ALIGNMENTS_FILE = args[6];
 		final double MAX_ERROR = Double.parseDouble(args[7]);
-		
+		final String ALPHABET_FILE = args[8];
 		
 		RepeatAlphabet.initialize(N_READS,READ_IDS_FILE,READ_LENGTHS_FILE,N_REPEATS,REPEAT_LENGTHS_FILE,ISPERIODIC_FILE);
 		RepeatAlphabet.buildAlphabet(ALIGNMENTS_FILE,MAX_ERROR,IO.quantum,IO.quantum<<1);
-	
+		RepeatAlphabet.serializeAlphabet(ALPHABET_FILE);
 	}
 
 
