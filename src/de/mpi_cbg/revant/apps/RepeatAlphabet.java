@@ -17,6 +17,8 @@ public class RepeatAlphabet {
 	 * Marks non-repetitive blocks in a read
 	 */
 	public static final int NON_REPETITIVE = -1;
+	private static final String SEPARATOR_MINOR = ",";
+	private static final String SEPARATOR_MAJOR = ";";
 	
 	/**
 	 * Length of every repeat
@@ -28,7 +30,7 @@ public class RepeatAlphabet {
 	 * The recoded alphabet
 	 */
 	public static Character[] alphabet;
-	public static int lastAlphabet;
+	public static int lastNonrepetitive, lastPeriodic, lastAlphabet;
 	public static int maxOpenLength_nonperiodic;
 	
 	/**
@@ -68,21 +70,9 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Loads read lengths, and repeat lengths and periodicity.
-	 */
-	public static final void initialize(int nReads, String readIDsFile, String readLengthsFile, int nRepeats, String repeatLengthsFile, String isPeriodicFile) throws IOException {
-		Reads.nReads=nReads;
-		Reads.maxReadLength=Reads.loadReadLengths(readLengthsFile);
-		Reads.loadReadIDs(readIDsFile,Reads.nReads);
-		loadRepeatLengths(repeatLengthsFile,nRepeats);
-		loadIsPeriodic(isPeriodicFile,nRepeats);
-	}
-	
-	
-	/**
 	 * Like $Reads.loadReadLengths()$, but for repeats.
 	 */
-	private static final int loadRepeatLengths(String repeatLengthsFile, int nRepeats) throws IOException {
+	public static final int loadRepeatLengths(String repeatLengthsFile, int nRepeats) throws IOException {
 		int i;
 		int length, maxLength;
 		BufferedReader br;
@@ -100,7 +90,7 @@ public class RepeatAlphabet {
 	}
 	
 	
-	private static final void loadIsPeriodic(String isPeriodicFile, int nRepeats) throws IOException {
+	public static final void loadIsPeriodic(String isPeriodicFile, int nRepeats) throws IOException {
 		isPeriodic = new boolean[nRepeats];
 		BufferedReader br = new BufferedReader(new FileReader(isPeriodicFile));
 		for (int i=0; i<nRepeats; i++) isPeriodic[i]=Integer.parseInt(br.readLine())==1;
@@ -112,22 +102,17 @@ public class RepeatAlphabet {
 	 * Recodes every read, and collects in $alphabet[0..lastAlphabet]$ every distinct 
 	 * character with discriminative power.
 	 *
-	 * Remark: the procedure assumes that $initialize()$ has already been called.
-	 *
 	 * @param alignmentsFile alignments between reads (readA) and repeats (readB);
-	 * @param maxError alignments with error rate greater than this are discarded;
-	 * @param read*File of reads, not of repeats.
+	 * @param maxError alignments with error rate greater than this are discarded.
 	 */
 	public static final void buildAlphabet(String alignmentsFile, double maxError, int distanceThreshold, int lengthThreshold) throws IOException {
 		final int ALPHABET_CAPACITY = 100000;  // Arbitrary
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
-		boolean found;
-		int i, j, k;
+		int i;
 		int row, readA, previousReadA;
 		String str;
 		BufferedReader br;
-		Character tmpCharacter;
 		
 		// Allocating memory
 		if (alphabet==null) {
@@ -396,6 +381,7 @@ public class RepeatAlphabet {
 		Character tmpChar;
 		Tuple tupleI;
 		
+		Character.order=Character.ORDER_LEXICOGRAPHIC;
 		Arrays.sort(alphabet,0,lastAlphabet+1);
 		for (k=0; k<=lastAlphabet; k++) {
 			if (!alphabet[k].isNonrepetitive()) break;
@@ -406,12 +392,12 @@ public class RepeatAlphabet {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			tupleI=alphabet[i].tuples[0];
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (!alphabet[j].sameRepeat(alphabet[i]) /*|| alphabet[j].tuples[0].implies_tooFarAfter(tupleI,distanceThreshold,lengthThreshold)*/) break;
+				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarAfter(tupleI,distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
 			for (j=i-1; j>=0; j--) {
-				if (!alphabet[j].sameRepeat(alphabet[i]) /*|| alphabet[j].tuples[0].implies_tooFarBefore(tupleI,distanceThreshold,lengthThreshold)*/) break;
+				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarBefore(tupleI,distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
@@ -464,28 +450,55 @@ public class RepeatAlphabet {
 		System.err.print("DONE  "+(lastAlphabet+1)+" characters after the merge.");
 		
 		System.err.print("Sorting the results of the merge... ");
+		Character.order=Character.ORDER_NONREPETITIVE_PERIODIC_NONPERIODIC;
 		Arrays.sort(alphabet,0,lastAlphabet+1);
-		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=i;
-		System.err.println(" DONE");
+		lastNonrepetitive=-1; lastPeriodic=-1;
+		i=0;
+		while (i<=lastAlphabet && alphabet[i].isNonrepetitive()) {
+			alphabet[i].id=i;
+			lastNonrepetitive=i;
+			i++;
+		}
+		while (i<=lastAlphabet && alphabet[i].tuples[0].start==-1) {
+			alphabet[i].id=i;
+			lastPeriodic=i;
+			i++;
+		}
+		while (i<=lastAlphabet) {
+			alphabet[i].id=i;
+			i++;
+		}
+		System.err.println("DONE");
 	}
 	
 	
 	public static final void serializeAlphabet(String path) throws IOException {
 		BufferedWriter bw = new BufferedWriter(new FileWriter(path));
+		bw.write(lastNonrepetitive+","+lastPeriodic+","+lastAlphabet+","+maxOpenLength_nonperiodic+"\n");
 		for (int i=0; i<=lastAlphabet; i++) bw.write(alphabet[i].toString()+"\n");
 		bw.close();
 	}
 	
 	
-	public static final void deserializeAlphabet(String path, int nCharacters) throws IOException {
-		int i;
+	public static final void deserializeAlphabet(String path) throws IOException {
+		int i, p, q;
+		String str;
 		BufferedReader br;
 		
-		alphabet = new Character[nCharacters];
-		lastAlphabet=nCharacters-1;
-		for (i=0; i<=lastAlphabet; i++) alphabet[i] = new Character();
 		br = new BufferedReader(new FileReader(path));
-		for (i=0; i<=lastAlphabet; i++) alphabet[i].deserialize(br.readLine());
+		str=br.readLine();
+		p=str.indexOf(SEPARATOR_MINOR);
+		lastNonrepetitive=Integer.parseInt(str.substring(0,p));
+		p++; q=str.indexOf(SEPARATOR_MINOR,p+1);
+		lastPeriodic=Integer.parseInt(str.substring(p,q));
+		p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+		lastAlphabet=Integer.parseInt(str.substring(p,q));
+		maxOpenLength_nonperiodic=Integer.parseInt(str.substring(q+1));
+		alphabet = new Character[lastAlphabet+1];
+		for (i=0; i<=lastAlphabet; i++) {
+			alphabet[i] = new Character();
+			alphabet[i].deserialize(br.readLine());
+		}
 		br.close();
 	}
 	
@@ -570,11 +583,265 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * Like $buildAlphabet()$, but looks up in the alphabet every character of a recoded 
+	 * read.
+	 *
+	 * @param outputFile contains the translation of one read per line.
+	 */
+	public static final void translateReads(String alignmentsFile, double maxError, int distanceThreshold, int lengthThreshold, String outputFile) throws IOException {
+		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
+		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
+		int i;
+		int row, readA, previousReadA;
+		String str;
+		BufferedReader br;
+		BufferedWriter bw;
+		
+		// Allocating memory
+		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
+		for (i=0; i<alignments.length; i++) {	
+			if (alignments[i]==null) alignments[i] = new AlignmentRow();
+		}
+		if (sequence==null || sequence.length<SEQUENCE_CAPACITY) sequence = new Character[SEQUENCE_CAPACITY];
+		for (i=0; i<sequence.length; i++) {
+			if (sequence[i]==null) sequence[i] = new Character();
+		}
+		if (points==null || points.length<(ALIGNMENTS_CAPACITY)<<1) points = new int[(ALIGNMENTS_CAPACITY)<<1];
+		if (periodicIntervals==null || periodicIntervals.length<(ALIGNMENTS_CAPACITY)<<1) periodicIntervals = new int[(ALIGNMENTS_CAPACITY)<<1];
+		if (newCharacter==null) newCharacter = new Character();
+		if (tmpTuple==null) tmpTuple = new Tuple();
+		
+		// Translating every read using the alphabet
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		br = new BufferedReader(new FileReader(alignmentsFile));
+		str=br.readLine(); str=br.readLine();  // Skipping header
+		str=br.readLine(); 
+		previousReadA=-1; lastAlignment=-1; row=0;
+		while (str!=null)  {
+			if (row%100000==0) System.err.println("Processed "+row+" alignments");
+			Alignments.readAlignmentFile(str);
+			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.endB+2)>maxError) {
+				str=br.readLine(); row++;
+				continue;
+			}
+			readA=Alignments.readA-1;
+			if (previousReadA==-1 || readA!=previousReadA) {
+				if (previousReadA!=-1) {
+					cleanAlignments(distanceThreshold);
+					if (lastAlignment!=-1) {
+						recodeRead(distanceThreshold);
+						// if (lastInSequence>0) translateRead(bw);
+					}
+				}
+				previousReadA=readA; lastAlignment=0;
+				alignments[0].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
+			}
+			else {
+				lastAlignment++;
+				if (lastAlignment==alignments.length) {
+					AlignmentRow[] newAlignments = new AlignmentRow[alignments.length<<1];
+					System.arraycopy(alignments,0,newAlignments,0,alignments.length);
+					for (i=alignments.length; i<newAlignments.length; i++) newAlignments[i] = new AlignmentRow();
+					alignments=newAlignments;
+				}
+				alignments[lastAlignment].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
+			}
+			str=br.readLine(); row++;
+		}
+		br.close();
+		if (previousReadA!=-1) {
+			cleanAlignments(distanceThreshold);
+			if (lastAlignment!=-1) {
+				recodeRead(distanceThreshold);
+				// if (lastInSequence>0) translateRead(bw);
+			}
+		}
+		bw.close();
+	}
+	
+	
+	/**
+	 *
+	 *
+	 */
+/*	private static final void translateRead(BufferedWriter bw, int lastNonrepetitive, int distanceThreshold, int lengthThreshold) throws IOException {
+		int i;
+		Chaarcter character;
+		
+		
+		// First character
+		character=sequence[0];
+		if (character.isNonrepetitive()) translateRead_nonrepetitive(sequence[0],lastNonrepetitive,lengthThreshold,SEPARATOR_MINOR,bw);		
+		else {
+			
+			
+		}
+		
+		
+		for (i=0; i<=lastInSequence; i++) {
+			if (sequence[i].isNonrepetitive()) {
+				if (!sequence[i].openStart() && !sequence[i].openEnd()) alphabet[++j].copyFrom(sequence[i]);
+				else maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,sequence[i].getLength());
+			}
+			else alphabet[++j].copyFrom(sequence[i]);
+		}
+		
+		
+		
+		
+	}
+*/	
+	
+	/**
+	 * Writes: $X$ if $character$ is closed and has length most similar to $X$; $-1-X$ if
+	 * $character$ is half-open and could be an instance of any closed character $>=X$;
+	 * $lastAlphabet+1$ if $character$ is half-open but longer than any closed character.
+	 */
+	private static final void translate_nonrepetitive(Character character, int lastNonrepetitive, int lengthThreshold, BufferedWriter bw) throws IOException {
+		int i;
+		final int length = character.tuples[0].length;
+		
+		i=Arrays.binarySearch(alphabet,0,lastNonrepetitive+1,character);
+		if (i<0) i=-1-i;
+		if (character.isOpen()) {
+			if (i==lastNonrepetitive+1) bw.write((lastAlphabet+1)+"");
+			else {
+				while (i>=0 && alphabet[i].tuples[0].getLength()>=length-lengthThreshold) i--;
+				i++;
+				bw.write((-1-i)+"");
+			}
+		}
+		else {
+			if (i<=lastNonrepetitive) {
+				if (alphabet[i].tuples[0].length-length<length-alphabet[i-1].tuples[0].length) bw.write(i+SEPARATOR_MINOR);
+				else bw.write((i-1)+"");
+			}
+			else bw.write((i-1)+"");
+		}
+	}
+	
+	
+	/**
+	 * Same logic as $translateRead_nonrepetitive()$.
+	 */
+	private static final void translate_periodic(Character character, int lastNonrepetitive, int lastPeriodic, int lengthThreshold, BufferedWriter bw) throws IOException {
+		int i;
+		final int length = character.getLength();
+		
+		i=Arrays.binarySearch(alphabet,lastNonrepetitive+1,lastPeriodic+1,character);
+		if (i<0) i=-1-i;
+		if (character.isOpen()) {
+			while (i>lastNonrepetitive && alphabet[i].sameRepeat(character) && alphabet[i].getLength()>=length-lengthThreshold) i--;
+			i++;
+			if (!alphabet[i].sameRepeat(character)) {
+				System.err.println("translateRead_periodic> ERROR: open periodic character not found in the alphabet: "+character);
+				System.exit(1);
+			}
+			bw.write((-1-i)+"");
+		}
+		else {
+			if (i<=lastPeriodic && alphabet[i].sameRepeat(character)) {
+				if (i-1>lastNonrepetitive && alphabet[i-1].sameRepeat(character)) {
+					if (alphabet[i].getLength()-length<length-alphabet[i-1].getLength()) bw.write(i+"");
+					else bw.write((i-1)+"");
+				}
+				else bw.write(i+"");
+			}
+			else {
+				if (i-1>lastNonrepetitive && alphabet[i-1].sameRepeat(character)) bw.write((i-1)+"");
+				else {
+					System.err.println("translateRead_periodic> ERROR: closed periodic character not found in the alphabet: "+character);
+					System.exit(1);
+				}
+			}
+		}
+	}
+	
+	
+	/**
+	 * ---------------->
+	 */
+	private static final void translate(Character character, int distanceThreshold, int lengthThreshold, BufferedWriter bw) {
+		final int CAPACITY = 100;  // Arbitrary
+		int i, j;
+		int lastCharacter;
+		
+		if (stack==null) stack = new int[CAPACITY];
+		lastCharacter=-1;
+		i=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,character);
+		if (i<0) i=-1-i;
+		if (character.isOpen()) {
+			for (j=i+1; j<=lastAlphabet; j++) {
+-->				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarAfter(alphabet[i].tuples[0],distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].implies(alphabet[i],distanceThreshold,lengthThreshold) || alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold)) {
+					lastCharacter++;
+					if (lastCharacter==stack.length) {
+						int[] newArray = new int[stack.length<<1];
+						System.arraycopy(stack,0,newArray,0,stack.length);
+						stack=newArray;
+					}
+					stack[lastCharacter]=j;
+				}
+			}
+			for (j=i-1; j>lastPeriodic; j--) {
+-->				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarBefore(alphabet[i].tuples[0],distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].implies(alphabet[i],distanceThreshold,lengthThreshold) || alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold)) {
+					lastCharacter++;
+					if (lastCharacter==stack.length) {
+						int[] newArray = new int[stack.length<<1];
+						System.arraycopy(stack,0,newArray,0,stack.length);
+						stack=newArray;
+					}
+					stack[lastCharacter]=j;
+				}
+			}
+			if (lastCharacter>0) Arrays.sort(stack,0,lastCharacter+1);
+			bw.write(stack[0]+"");
+			for (j=1; j<=lastCharacter; j++) bw.write(SEPARATOR_MINOR+stack[j]);
+		}
+		else {
+			lastCharacter=-1;
+			for (j=i+1; j<=lastAlphabet; j++) {
+-->				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarAfter(alphabet[i].tuples[0],distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold)) {
+					if (lastCharacter!=-1) {
+						System.err.println("translate> ERROR: character similar to multiple characters in the alphabet: "+alphabet[i]);
+						System.exit(1);
+					}
+					lastCharacter=j;
+				}
+			}
+			for (j=i-1; j>lastPeriodic; j--) {
+-->				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarBefore(alphabet[i].tuples[0],distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold)) {
+					if (lastCharacter!=-1) {
+						System.err.println("translate> ERROR: character similar to multiple characters in the alphabet: "+alphabet[i]);
+						System.exit(1);
+					}
+					lastCharacter=j;
+				}
+			}
+			bw.write(j+"");
+		}
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	/**
 	 * A character of the recoded alphabet, which is a set of substrings of repeats in 
 	 * specific orientations and with open/closed endpoints.
 	 */
 	private static class Character implements Comparable {
 		private static final int CAPACITY = 10;  // Arbitrary
+		public static final int ORDER_LEXICOGRAPHIC = 0;
+		public static final int ORDER_NONREPETITIVE_PERIODIC_NONPERIODIC = 1;
+		public static int order;
 		
 		public int id;
 		public Tuple[] tuples;
@@ -652,17 +919,26 @@ public class RepeatAlphabet {
 		 * Lexicographic order on the sequence of tuples
 		 */
 		public int compareTo(Object other) {
-			int i;
-			int order;
+			final boolean isNonrepetitive = isNonrepetitive();
+			final boolean isPeriodic = tuple[0].start==-1;
 			final Character otherCharacter = (Character)other;
+			final boolean otherCharacterIsNonrepetitive = otherCharacter.isNonrepetitive();
+			final boolean otherCharacterIsPeriodic = otherCharacter.tuple[0].start==-1;
 			final int last = Math.min(lastTuple,otherCharacter.lastTuple);
+			int i, j;
 			
+			if (order==ORDER_NONREPETITIVE_PERIODIC_NONPERIODIC) {
+				if (isNonrepetitive && !otherCharacterIsNonrepetitive) return -1;
+				else if (!isNonrepetitive && otherCharacterIsNonrepetitive) return 1;
+				if (isPeriodic && !otherCharacterIsPeriodic) return -1;
+				else if (!isPeriodic && otherCharacterIsPeriodic) return 1;
+			}
 			for (i=0; i<=last; i++) {
-				order=tuples[i].compareTo(otherCharacter.tuples[i]);
-				if (order!=0) return order;
+				j=tuples[i].compareTo(otherCharacter.tuples[i]);
+				if (j!=0) return j;
 			}
 			if (lastTuple<otherCharacter.lastTuple) return -1;
-			else if (lastTuple>otherCharacter.lastTuple) return 1;
+			else if (lastTuple>otherCharacter.lastTuple) return 1;			
 			return 0;
 		}
 		
@@ -746,6 +1022,28 @@ public class RepeatAlphabet {
 			String out = id+","+lastTuple+",";
 			for (int i=0; i<=lastTuple; i++) out+=tuples[i].toString()+",";
 			return out;
+		}
+		
+		
+		public void deserialize(String str) {
+			int i, p, q;
+			
+			p=str.indexOf(SEPARATOR_MINOR);
+			id=Integer.parseInt(str.substring(0,p));
+			q=str.indexOf(SEPARATOR_MINOR,p+1);
+			lastTuple=Integer.parseInt(str.substring(p+1,q));
+			if (tuples==null) {
+				tuples = new Tuple[lastTuple+1];
+				for (i=0; i<=lastTuple; i++) tuples[i] = new Tuple();
+			}
+			else {
+				Tuple[] newArray = new Tuple[lastTuple+1];
+				System.arraycopy(tuples,0,newArray,0,tuples.length);
+				for (i=tuples.length; i<=lastTuple; i++) newArray[i] = new Tuple();
+				tuples=newArray;
+			}
+			p=q+1;
+			for (i=0; i<=lastTuple; i++) p=tuples[i].deserialize(str,p);
 		}
 		
 		
@@ -874,6 +1172,9 @@ public class RepeatAlphabet {
 		public final boolean openEnd() { return tuples[0].openEnd; }
 		
 		
+		public final boolean isOpen() { return tuples[0].openStart || tuples[0].openEnd; }
+
+		
 		/**
 		 * Adds the tuple ends of $otherCharacter$ to those of the current character,
 		 * assuming that $otherCharacter$ satisfies $sameRepeat()$ and $isSimilar()$.
@@ -995,6 +1296,36 @@ public class RepeatAlphabet {
 		
 		public String toString() {
 			return repeat+","+(orientation?"1":"0")+","+start+","+end+","+length+","+(openStart?"1":"0")+","+(openEnd?"1":"0");
+		}
+		
+		/**
+		 * @param p the first position of $str$ to be read;
+		 * @return the value of $p$ when the procedure completes.
+		 */
+		public int deserialize(String str, int p) {
+			int q;
+			
+			q=str.indexOf(SEPARATOR_MINOR,p+1);
+			repeat=Integer.parseInt(str.substring(p,q));
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			orientation=Integer.parseInt(str.substring(p,q))==1;
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			start=Integer.parseInt(str.substring(p,q));
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			end=Integer.parseInt(str.substring(p,q));
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			length=Integer.parseInt(str.substring(p,q));
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			openStart=Integer.parseInt(str.substring(p,q))==1;
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			if (q>=0) {
+				openEnd=Integer.parseInt(str.substring(p,q))==1;
+				return q+1;
+			}
+			else {
+				openEnd=Integer.parseInt(str.substring(p))==1;
+				return str.length();
+			}
 		}
 		
 		public final int getLength() {
