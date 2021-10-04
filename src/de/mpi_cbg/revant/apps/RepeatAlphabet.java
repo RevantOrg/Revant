@@ -135,7 +135,7 @@ public class RepeatAlphabet {
 		str=br.readLine(); 
 		previousReadA=-1; lastAlignment=-1; row=0;
 		while (str!=null)  {
-			if (row%100000==0) System.err.println("Processed "+row+" alignments, "+(lastAlphabet+1)+" characters collected.");
+			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.endB+2)>maxError) {
 				str=br.readLine(); row++;
@@ -354,11 +354,17 @@ public class RepeatAlphabet {
 	 * Removes character instances that can be considered substrings of others, and merges
 	 * all surviving character instances by connected component.
 	 *
+	 * Remark: the sorted alphabet might contain long runs of characters where every pair
+	 * of adjacent characters satisfies $sameRepeat()$ and $isSimilar()$. The procedure 
+	 * replaces such runs with equally-spaced characters, since otherwise a single 
+	 * character would be created that is the average of the entire long run.
+	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
 	 * power, since it assumes they have not been added to $alphabet$.
 	 */
 	public static final void compactInstances(int distanceThreshold, int lengthThreshold) {
 		int i, j, k;
+		int first;
 		Character tmpChar;
 		Tuple tupleI;
 		
@@ -390,8 +396,27 @@ public class RepeatAlphabet {
 			alphabet[i]=tmpChar;
 		}
 		lastAlphabet=j;
-		System.err.println("DONE  "+(lastAlphabet+1)+" characters after filtering.");	
+		System.err.println("DONE  "+(lastAlphabet+1)+" characters after filtering.");
 		
+		System.err.println("Removing runs of similar characters... ");
+		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=0;
+		first=0; alphabet[0].id=1;
+		for (i=1; i<lastAlphabet; i++) {
+			if (i%1000==0) System.err.println("Processed "+i+" characters");
+			if (!alphabet[i].sameRepeat(alphabet[first]) || !alphabet[i].sameOpen(alphabet[first]) || !alphabet[i].isSimilar(alphabet[i-1],distanceThreshold,lengthThreshold) || !alphabet[i].isSimilar(alphabet[first],distanceThreshold,lengthThreshold)) {
+				first=i; alphabet[i].id=1;
+			}			
+		}
+		j=-1;
+		for (i=0; i<=lastAlphabet; i++) {
+			if (alphabet[i].id==0) continue;
+			j++;
+			tmpChar=alphabet[j];
+			alphabet[j]=alphabet[i];
+			alphabet[i]=tmpChar;
+		}
+		lastAlphabet=j;
+
 		System.err.println("Merging surviving characters... ");
 		initializeGraph(lastAlphabet+1);
 		for (i=0; i<lastAlphabet; i++) {
