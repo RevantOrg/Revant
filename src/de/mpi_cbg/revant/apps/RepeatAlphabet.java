@@ -14,8 +14,8 @@ import de.mpi_cbg.revant.factorize.Intervals;
  */
 public class RepeatAlphabet {
 	public static final int NON_REPETITIVE = -1;
-	private static final String SEPARATOR_MINOR = ",";
-	private static final String SEPARATOR_MAJOR = "|";
+	public static final String SEPARATOR_MINOR = ",";
+	public static final String SEPARATOR_MAJOR = "|";
 	
 	/**
 	 * Length of every repeat
@@ -351,20 +351,17 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Removes characters that can be considered substrings of others, and merges all 
-	 * surviving characters by connected component.
+	 * Removes character instances that can be considered substrings of others, and merges
+	 * all surviving character instances by connected component.
 	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
 	 * power, since it assumes they have not been added to $alphabet$.
-	 *
-	 * Remark: this procedure should be parallelized.
 	 */
-	private static final void compactAlphabet(int distanceThreshold, int lengthThreshold) {
+	public static final void compactInstances(int distanceThreshold, int lengthThreshold) {
 		int i, j, k;
 		Character tmpChar;
 		Tuple tupleI;
 		
-		Arrays.sort(alphabet,0,lastAlphabet+1);
 		for (k=0; k<=lastAlphabet; k++) {
 			if (!alphabet[k].isNonrepetitive()) break;
 		}
@@ -455,7 +452,7 @@ public class RepeatAlphabet {
 	
 	public static final void serializeAlphabet(String path) throws IOException {
 		BufferedWriter bw = new BufferedWriter(new FileWriter(path));
-		bw.write(lastNonrepetitive+","+lastPeriodic+","+lastAlphabet+","+maxOpenLength_nonperiodic+"\n");
+		bw.write(lastNonrepetitive+SEPARATOR_MINOR+lastPeriodic+SEPARATOR_MINOR+lastAlphabet+SEPARATOR_MINOR+maxOpenLength_nonperiodic+"\n");
 		for (int i=0; i<=lastAlphabet; i++) bw.write(alphabet[i].toString()+"\n");
 		bw.close();
 	}
@@ -832,7 +829,7 @@ public class RepeatAlphabet {
 	 * A character of the recoded alphabet, which is a set of substrings of repeats in 
 	 * specific orientations and with open/closed endpoints.
 	 */
-	private static class Character implements Comparable {
+	public static class Character implements Comparable {
 		private static final int CAPACITY = 10;  // Arbitrary
 		public static int order;
 		
@@ -938,10 +935,36 @@ public class RepeatAlphabet {
 		 * Sorting strings lexicographically induces the same order as in $compareTo()$.
 		 */
 		public String toString() {
-			String out = (isNonrepetitive()?"0":"1")+","+(tuples[0].start==-1?"0":"1")+","+lastTuple+",";
+			String out = (isNonrepetitive()?"0":"1")+SEPARATOR_MINOR+(tuples[0].start==-1?"0":"1")+SEPARATOR_MINOR+lastTuple+SEPARATOR_MINOR;
 			out+=tuples[0].toString();
-			for (int i=1; i<=lastTuple; i++) out+=","+tuples[i].toString();
+			for (int i=1; i<=lastTuple; i++) out+=SEPARATOR_MINOR+tuples[i].toString();
 			return out;
+		}
+		
+		
+		/**
+		 * Symmetrical to $toString()$.
+		 */
+		public void deserialize(String str) {
+			int i, p, q;
+			
+			id=-1;
+			p=str.indexOf(SEPARATOR_MINOR);  // Skipping
+			p=str.indexOf(SEPARATOR_MINOR,p+1);  // Skipping
+			q=str.indexOf(SEPARATOR_MINOR,p+1);
+			lastTuple=Integer.parseInt(str.substring(p+1,q));
+			if (tuples==null) {
+				tuples = new Tuple[lastTuple+1];
+				for (i=0; i<=lastTuple; i++) tuples[i] = new Tuple();
+			}
+			else if (tuples.length<lastTuple+1) {
+				Tuple[] newArray = new Tuple[lastTuple+1];
+				System.arraycopy(tuples,0,newArray,0,tuples.length);
+				for (i=tuples.length; i<=lastTuple; i++) newArray[i] = new Tuple();
+				tuples=newArray;
+			}
+			p=q+1;
+			for (i=0; i<=lastTuple; i++) p=tuples[i].deserialize(str,p);
 		}
 		
 		
@@ -1017,28 +1040,6 @@ public class RepeatAlphabet {
 			String out = id+",";
 			for (int i=0; i<=lastTuple; i++) out+=tuples[i].toString()+",";
 			return out.hashCode();
-		}
-		
-		
-		public void deserialize(String str) {
-			int i, p, q;
-			
-			p=str.indexOf(SEPARATOR_MINOR);
-			id=Integer.parseInt(str.substring(0,p));
-			q=str.indexOf(SEPARATOR_MINOR,p+1);
-			lastTuple=Integer.parseInt(str.substring(p+1,q));
-			if (tuples==null) {
-				tuples = new Tuple[lastTuple+1];
-				for (i=0; i<=lastTuple; i++) tuples[i] = new Tuple();
-			}
-			else if (tuples.length<lastTuple+1) {
-				Tuple[] newArray = new Tuple[lastTuple+1];
-				System.arraycopy(tuples,0,newArray,0,tuples.length);
-				for (i=tuples.length; i<=lastTuple; i++) newArray[i] = new Tuple();
-				tuples=newArray;
-			}
-			p=q+1;
-			for (i=0; i<=lastTuple; i++) p=tuples[i].deserialize(str,p);
 		}
 		
 		
@@ -1237,7 +1238,7 @@ public class RepeatAlphabet {
 	/**
 	 * A substring of a repeat in a specific orientation
 	 */
-	private static class Tuple implements Comparable {
+	public static class Tuple implements Comparable {
 		public int repeat;
 		public boolean orientation;
 		public int start, end;
@@ -1294,6 +1295,8 @@ public class RepeatAlphabet {
 		}
 		
 		/**
+		 * Symmetrical to $toString()$.
+		 *
 		 * @param p the first position of $str$ to be read;
 		 * @return the value of $p$ when the procedure completes.
 		 */
