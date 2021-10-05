@@ -29,7 +29,7 @@ public class CollectKmers {
 		str=br.readLine(); row=0;
 		while (str!=null) {
 			if (row%1000==0) System.err.println("Processed "+row+" reads, "+kmers.size()+" "+K+"-mers.");
-			RepeatAlphabet.loadTranslatedRead(str,K,kmers,sb);
+			RepeatAlphabet.loadTranslatedRead(str,0,K,kmers,sb);
 			str=br.readLine(); row++;
 		}
 		br.close(); nKmers=kmers.size();

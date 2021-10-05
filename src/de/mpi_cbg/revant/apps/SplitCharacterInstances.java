@@ -6,8 +6,8 @@ import de.mpi_cbg.revant.util.Math;
 
 
 /**
- * Splits the set of all instances into approx. equal-sized parts, aligned with 
- * $sameRepeat()$ boundaries.
+ * Splits the set of all character instances into approx. equal-sized parts, aligned with
+ * repeat boundaries.
  */
 public class SplitCharacterInstances {
 
@@ -33,8 +33,8 @@ public class SplitCharacterInstances {
 		br = new BufferedReader(new FileReader(INPUT_FILE),IO.BUFFER_SIZE);
 		str=br.readLine();
 		while (str!=null) {
-			character.deserialize(str);
-			if (!character.sameRepeat(previousCharacter) && nInstancesInFile>=quantum) {
+			character.deserialize(str,0);
+			if (character.repeat!=previousCharacter.repeat && nInstancesInFile>=quantum) {
 				if (outputFile!=null) {
 					outputFile.close();
 					headerFile.write(lastNonrepetitive+RepeatAlphabet.SEPARATOR_MINOR+lastPeriodic+RepeatAlphabet.SEPARATOR_MINOR+(nInstancesInFile-1)+RepeatAlphabet.SEPARATOR_MINOR+maxOpenLength_nonperiodic);
@@ -47,9 +47,9 @@ public class SplitCharacterInstances {
 				nInstancesInFile=0; lastNonrepetitive=-1; lastPeriodic=-1; maxOpenLength_nonperiodic=-1;
 			}
 			outputFile.write(str); outputFile.newLine(); nInstancesInFile++;
-			if (character.isNonrepetitive()) lastNonrepetitive=nInstancesInFile-1;
-			else if (character.tuples[0].start==-1) lastPeriodic=nInstancesInFile-1;
-			else if (character.isOpen()) maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,character.getLength());
+			if (character.repeat==RepeatAlphabet.NON_REPETITIVE) lastNonrepetitive=nInstancesInFile-1;
+			else if (character.start==-1) lastPeriodic=nInstancesInFile-1;
+			else if (character.isOpen()) maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,character.length);
 			previousCharacter.copyFrom(character);
 			str=br.readLine();
 		}

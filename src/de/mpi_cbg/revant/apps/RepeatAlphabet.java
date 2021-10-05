@@ -40,7 +40,7 @@ public class RepeatAlphabet {
 	/**
 	 * The recoded sequence of a given readA
 	 */
-	public static Character[] sequence;
+	public static Block[] sequence;
 	public static int lastInSequence;
 	
 	/**
@@ -52,8 +52,8 @@ public class RepeatAlphabet {
 	 * Temporary space used by procedure $recode()$.
 	 */
 	private static int[] periodicIntervals, points;
-	private static Character newCharacter;
-	private static Tuple tmpTuple;
+	private static Block newBlock;
+	private static Character tmpCharacter;
 	
 	/**
 	 * Temporary space encoding an undirected graph and its connected components (see
@@ -63,7 +63,7 @@ public class RepeatAlphabet {
 	private static int[] lastNeighbor;
 	private static int[] stack, connectedComponent, connectedComponentSize;
 	private static int nComponents;
-	private static Character[] mergedChars;
+	private static Character[] mergedCharacters;
 	
 	
 	/**
@@ -118,16 +118,15 @@ public class RepeatAlphabet {
 		for (i=0; i<alignments.length; i++) {	
 			if (alignments[i]==null) alignments[i] = new AlignmentRow();
 		}
-		if (sequence==null || sequence.length<SEQUENCE_CAPACITY) sequence = new Character[SEQUENCE_CAPACITY];
+		if (sequence==null || sequence.length<SEQUENCE_CAPACITY) sequence = new Block[SEQUENCE_CAPACITY];
 		for (i=0; i<sequence.length; i++) {
-			if (sequence[i]==null) sequence[i] = new Character();
+			if (sequence[i]==null) sequence[i] = new Block();
 		}
 		if (points==null || points.length<(ALIGNMENTS_CAPACITY)<<1) points = new int[(ALIGNMENTS_CAPACITY)<<1];
 		if (periodicIntervals==null || periodicIntervals.length<(ALIGNMENTS_CAPACITY)<<1) periodicIntervals = new int[(ALIGNMENTS_CAPACITY)<<1];
 		if (sequenceLengths==null || sequenceLengths.length<MAX_SEQUENCE_LENGTH) sequenceLengths = new int[MAX_SEQUENCE_LENGTH];
 		Math.set(sequenceLengths,MAX_SEQUENCE_LENGTH-1,0);
-		if (newCharacter==null) newCharacter = new Character();
-		if (tmpTuple==null) tmpTuple = new Tuple();
+		if (tmpCharacter==null) tmpCharacter = new Character();
 		
 		// Collecting characters from all recoded reads
 		bw = new BufferedWriter(new FileWriter(outputFile));
@@ -188,12 +187,12 @@ public class RepeatAlphabet {
 	 * overlapping periodic alignments, and of every non-periodic alignment that is not 
 	 * contained in a periodic range and that does not straddle another non-periodic 
 	 * alignment. Every other alignment is discarded. Points are clustered, and the 
-	 * resulting chunks of the read become characters of $sequence$.
+	 * resulting blocks of the read become elements of $sequence$.
 	 *
 	 * Remark: the procedure assumes that reads do not contain long low-quality regions.
 	 *
-	 * Remark: the characters of $sequence$ are not objects in $alphabet$, and the 
-	 * procedure does not look them up in $alphabet$: this is left to the caller.
+	 * Remark: the characters in blocks of $sequence$ are not objects in $alphabet$, and 
+	 * the procedure does not look them up in $alphabet$: this is left to the caller.
 	 *
 	 * Remark: the procedure uses global arrays $alignments,periodicIntervals,points,
 	 * sequence$.
@@ -279,31 +278,31 @@ public class RepeatAlphabet {
 		
 		// Creating the sequence
 		lastInSequence=-1;
-		// First non-repetitive character (if any).
+		// First non-repetitive block (if any).
 		i=points[0];
 		if (i>distanceThreshold) {
 			lastInSequence=0;
 			sequence[0].setNonrepetitive(i,true,i>=lengthA-distanceThreshold);
 		}
-		// Middle characters
+		// Middle blocks
 		i=1; j=0; firstJForNextI=-1;
 		while (i<=lastPoint) {
 			startA=points[i-1]; endA=points[i];
 			if (j>lastAlignment || alignments[j].startA>=endA) {
-				if (newCharacter.lastTuple==-1) newCharacter.setNonrepetitive(endA-startA+1,startA<=distanceThreshold,endA>=lengthA-distanceThreshold);
-				else newCharacter.cleanTuples(endA-startA+1);
+				if (newBlock.lastCharacter==-1) newBlock.setNonrepetitive(endA-startA+1,startA<=distanceThreshold,endA>=lengthA-distanceThreshold);
+				else newBlock.cleanCharacters(endA-startA+1);
 				lastInSequence++;
 				if (lastInSequence==sequence.length) {
-					Character[] newSequence = new Character[sequence.length<<1];
+					Block[] newSequence = new Block[sequence.length<<1];
 					System.arraycopy(sequence,0,newSequence,0,sequence.length);
-					for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Character();
+					for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Block();
 					sequence=newSequence;
 				}
-				sequence[lastInSequence].copyFrom(newCharacter);
+				sequence[lastInSequence].copyFrom(newBlock);
 				i++;
 				if (firstJForNextI!=-1) j=firstJForNextI;
 				firstJForNextI=-1;
-				newCharacter.reset();
+				newBlock.reset();
 				continue;
 			}
 			else if (alignments[j].endA<=startA) {
@@ -313,17 +312,17 @@ public class RepeatAlphabet {
 			if (firstJForNextI==-1 && i<lastPoint && alignments[j].endA>endA) firstJForNextI=j;
 			if ( Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) || 
 				 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
-			   ) newCharacter.addTuple(alignments[j],distanceThreshold,tmpTuple);
+			   ) newBlock.addCharacter(alignments[j],distanceThreshold,tmpCharacter);
 			j++;
 		}
-		// Last non-repetitive character (if any).
+		// Last non-repetitive block (if any).
 		i=points[lastPoint];
 		if (lengthA-i>distanceThreshold) {
 			lastInSequence++;
 			if (lastInSequence==sequence.length) {
-				Character[] newSequence = new Character[sequence.length<<1];
+				Block[] newSequence = new Block[sequence.length<<1];
 				System.arraycopy(sequence,0,newSequence,0,sequence.length);
-				for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Character();
+				for (k=sequence.length; k<newSequence.length; k++) newSequence[k] = new Block();
 				sequence=newSequence;
 			}
 			sequence[lastInSequence].setNonrepetitive(lengthA-i,i<=distanceThreshold,true);
@@ -332,20 +331,24 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Appends the characters of $sequence$ to the end of $alphabet$.
+	 * Appends to $bw$ the characters of $sequence$.
 	 */
 	private static final void addCharacterInstances(BufferedWriter bw) throws IOException {	
-		for (int i=0; i<=lastInSequence; i++) {
+		int i, j;
+		
+		for (i=0; i<=lastInSequence; i++) {
 			if (sequence[i].isNonrepetitive()) {
 				if (!sequence[i].openStart() && !sequence[i].openEnd()) {
-					bw.write(sequence[i].toString());
+					bw.write(sequence[i].characters[0].toString());
 					bw.newLine();
 				}
 				else maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,sequence[i].getLength());
 			}
 			else {
-				bw.write(sequence[i].toString());
-				bw.newLine();
+				for (j=0; j<=sequence[i].lastCharacter; j++) {
+					bw.write(sequence[i].characters[j].toString());
+					bw.newLine();
+				}
 			}
 		}
 	}
@@ -356,9 +359,9 @@ public class RepeatAlphabet {
 	 * all surviving character instances by connected component.
 	 *
 	 * Remark: the sorted alphabet might contain long runs of characters where every pair
-	 * of adjacent characters satisfies $sameRepeat()$ and $isSimilar()$. The procedure 
-	 * replaces such runs with equally-spaced characters, since otherwise a single 
-	 * character would be created that is the average of the entire long run.
+	 * of adjacent characters with the same repeat and that satisfy $isSimilar()$. The 
+	 * procedure replaces such runs with equally-spaced characters, since otherwise a 
+	 * single character would be created that is the average of the entire long run.
 	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
 	 * power, since it assumes they have not been added to $alphabet$.
@@ -366,24 +369,23 @@ public class RepeatAlphabet {
 	public static final void compactInstances(int distanceThreshold, int lengthThreshold) {
 		int i, j, k;
 		int first;
-		Character tmpChar;
-		Tuple tupleI;
+		Character tmpChar, charI;
 		
 		for (k=0; k<=lastAlphabet; k++) {
-			if (!alphabet[k].isNonrepetitive()) break;
+			if (alphabet[k].repeat!=NON_REPETITIVE) break;
 		}
 		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+k+" non-repetitive characters)");
 		for (i=k; i<=lastAlphabet; i++) alphabet[i].id=1;
 		for (i=k; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
-			tupleI=alphabet[i].tuples[0];
+			charI=alphabet[i];
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarAfter(tupleI,distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarAfter(charI,distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
 			for (j=i-1; j>=0; j--) {
-				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].implies_tooFarBefore(tupleI,distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarBefore(charI,distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
@@ -404,7 +406,7 @@ public class RepeatAlphabet {
 		first=0; alphabet[0].id=1;
 		for (i=1; i<lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
-			if (!alphabet[i].sameRepeat(alphabet[first]) || !alphabet[i].sameOpen(alphabet[first]) || !alphabet[i].isSimilar(alphabet[i-1],distanceThreshold,lengthThreshold) || !alphabet[i].isSimilar(alphabet[first],distanceThreshold,lengthThreshold)) {
+			if (alphabet[i].repeat!=alphabet[first].repeat || !alphabet[i].sameOpen(alphabet[first]) || !alphabet[i].isSimilar(alphabet[i-1],distanceThreshold,lengthThreshold) || !alphabet[i].isSimilar(alphabet[first],distanceThreshold,lengthThreshold)) {
 				first=i; alphabet[i].id=1;
 			}			
 		}
@@ -422,9 +424,9 @@ public class RepeatAlphabet {
 		initializeGraph(lastAlphabet+1);
 		for (i=0; i<lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
-			tupleI=alphabet[i].tuples[0];
+			charI=alphabet[i];
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (!alphabet[j].sameRepeat(alphabet[i]) || alphabet[j].tuples[0].tooFarAfter(tupleI,distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].tooFarAfter(charI,distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold) && alphabet[j].sameOpen(alphabet[i])) {
 					addEdge(i,j); addEdge(j,i);
 				}
@@ -433,24 +435,24 @@ public class RepeatAlphabet {
 		System.err.print("Graph built. Computing connected components... ");
 		nComponents=getConnectedComponent(lastAlphabet+1);
 		System.err.println("DONE");
-		if (mergedChars==null) {
-			mergedChars = new Character[nComponents];
-			for (i=0; i<mergedChars.length; i++) mergedChars[i] = new Character();
+		if (mergedCharacters==null) {
+			mergedCharacters = new Character[nComponents];
+			for (i=0; i<mergedCharacters.length; i++) mergedCharacters[i] = new Character();
 		}
-		else if (mergedChars.length<nComponents) {
+		else if (mergedCharacters.length<nComponents) {
 			Character[] newArray = new Character[nComponents];
-			System.arraycopy(mergedChars,0,newArray,0,mergedChars.length);
-			for (i=0; i<mergedChars.length; i++) newArray[i].reset();
-			for (i=mergedChars.length; i<newArray.length; i++) newArray[i] = new Character();
-			mergedChars=newArray;
+			System.arraycopy(mergedCharacters,0,newArray,0,mergedCharacters.length);
+			for (i=0; i<mergedCharacters.length; i++) newArray[i].reset();
+			for (i=mergedCharacters.length; i<newArray.length; i++) newArray[i] = new Character();
+			mergedCharacters=newArray;
 		}
 		for (i=0; i<=lastAlphabet; i++) {
-			tmpChar=mergedChars[connectedComponent[i]];
-			if (tmpChar.lastTuple==-1) tmpChar.copyFrom(alphabet[i]);
-			else tmpChar.addTupleEnds(alphabet[i]);
+			tmpChar=mergedCharacters[connectedComponent[i]];
+			if (tmpChar.id==-1) tmpChar.copyFrom(alphabet[i]);
+			else tmpChar.addCharacterEnds(alphabet[i]);
 		}
-		for (i=0; i<nComponents; i++) mergedChars[i].normalizeTupleEnds(connectedComponentSize[i]);
-		for (i=0; i<nComponents; i++) alphabet[i].copyFrom(mergedChars[i]);
+		for (i=0; i<nComponents; i++) mergedCharacters[i].normalizeCharacterEnds(connectedComponentSize[i]);
+		for (i=0; i<nComponents; i++) alphabet[i].copyFrom(mergedCharacters[i]);
 		lastAlphabet=nComponents-1;
 		System.err.print("DONE  "+(lastAlphabet+1)+" characters after the merge.");
 		
@@ -458,12 +460,12 @@ public class RepeatAlphabet {
 		Arrays.sort(alphabet,0,lastAlphabet+1);
 		lastNonrepetitive=-1; lastPeriodic=-1;
 		i=0;
-		while (i<=lastAlphabet && alphabet[i].isNonrepetitive()) {
+		while (i<=lastAlphabet && alphabet[i].repeat==NON_REPETITIVE) {
 			alphabet[i].id=i;
 			lastNonrepetitive=i;
 			i++;
 		}
-		while (i<=lastAlphabet && alphabet[i].tuples[0].start==-1) {
+		while (i<=lastAlphabet && alphabet[i].start==-1) {
 			alphabet[i].id=i;
 			lastPeriodic=i;
 			i++;
@@ -501,7 +503,7 @@ public class RepeatAlphabet {
 		alphabet = new Character[lastAlphabet+1];
 		for (i=0; i<=lastAlphabet; i++) {
 			alphabet[i] = new Character();
-			alphabet[i].deserialize(br.readLine());
+			alphabet[i].deserialize(br.readLine(),0);
 		}
 		br.close();
 	}
@@ -600,10 +602,8 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Like $buildAlphabet()$, but looks up in the alphabet every character of a recoded 
-	 * read.
-	 *
-	 * Remark: this procedure should be parallelized.
+	 * Like $buildAlphabet()$, but looks up in the alphabet every character of every block
+	 * of a recoded read.
 	 *
 	 * @param outputFile contains the translation of one read per line.
 	 */
@@ -621,14 +621,14 @@ public class RepeatAlphabet {
 		for (i=0; i<alignments.length; i++) {	
 			if (alignments[i]==null) alignments[i] = new AlignmentRow();
 		}
-		if (sequence==null || sequence.length<SEQUENCE_CAPACITY) sequence = new Character[SEQUENCE_CAPACITY];
+		if (sequence==null || sequence.length<SEQUENCE_CAPACITY) sequence = new Block[SEQUENCE_CAPACITY];
 		for (i=0; i<sequence.length; i++) {
-			if (sequence[i]==null) sequence[i] = new Character();
+			if (sequence[i]==null) sequence[i] = new Block();
 		}
 		if (points==null || points.length<(ALIGNMENTS_CAPACITY)<<1) points = new int[(ALIGNMENTS_CAPACITY)<<1];
 		if (periodicIntervals==null || periodicIntervals.length<(ALIGNMENTS_CAPACITY)<<1) periodicIntervals = new int[(ALIGNMENTS_CAPACITY)<<1];
-		if (newCharacter==null) newCharacter = new Character();
-		if (tmpTuple==null) tmpTuple = new Tuple();
+		if (newBlock==null) newBlock = new Block();
+		if (tmpCharacter==null) tmpCharacter = new Character();
 		
 		// Translating every read using the alphabet
 		bw = new BufferedWriter(new FileWriter(outputFile));
@@ -697,12 +697,12 @@ public class RepeatAlphabet {
 		int i;
 		
 		if (sequence[0].isNonrepetitive()) translate_nonrepetitive(sequence[0],lengthThreshold,bw);
-		else if (sequence[0].tuples[0].start==-1) translate_periodic(sequence[0],lengthThreshold,bw);
+		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],lengthThreshold,bw);
 		else translate(sequence[0],distanceThreshold,bw);
 		for (i=1; i<=lastInSequence; i++) {
 			bw.write(SEPARATOR_MAJOR);
 			if (sequence[i].isNonrepetitive()) translate_nonrepetitive(sequence[i],lengthThreshold,bw);
-			else if (sequence[i].tuples[0].start==-1) translate_periodic(sequence[i],lengthThreshold,bw);
+			else if (sequence[i].characters[0].start==-1) translate_periodic(sequence[i],lengthThreshold,bw);
 			else translate(sequence[i],distanceThreshold,bw);
 		}
 		bw.newLine();
@@ -710,20 +710,21 @@ public class RepeatAlphabet {
 
 	
 	/**
-	 * Writes: $X$ if $character$ is closed and has length most similar to $X$; $-1-X$ if
-	 * $character$ is half-open and could be an instance of any closed character $>=X$;
-	 * $lastAlphabet+1$ if $character$ is half-open but longer than any closed character.
+	 * Writes: $X$ if $block$ is closed and has length most similar to $X$; $-1-X$ if
+	 * $block$ is half-open and could be an instance of any closed block $>=X$;
+	 * $lastAlphabet+1$ if $block$ is half-open but longer than any closed block.
 	 */
-	private static final void translate_nonrepetitive(Character character, int lengthThreshold, BufferedWriter bw) throws IOException {
+	private static final void translate_nonrepetitive(Block block, int lengthThreshold, BufferedWriter bw) throws IOException {
 		int i;
-		final int length = character.tuples[0].length;
+		final Character character = block.characters[0];
+		final int length = character.length;
 		
 		i=Arrays.binarySearch(alphabet,0,lastNonrepetitive+1,character);
 		if (i<0) i=-1-i;
 		if (character.isOpen()) {
 			if (i==lastNonrepetitive+1) bw.write((lastAlphabet+1)+"");
 			else {
-				while (i>=0 && alphabet[i].tuples[0].getLength()>=length-lengthThreshold) i--;
+				while (i>=0 && alphabet[i].getLength()>=length-lengthThreshold) i--;
 				i++;
 				bw.write((-1-i)+"");
 			}
@@ -731,7 +732,7 @@ public class RepeatAlphabet {
 		else {
 			if (i==0) bw.write("0");
 			else if (i<=lastNonrepetitive) {
-				if (alphabet[i].tuples[0].length-length<length-alphabet[i-1].tuples[0].length) bw.write(i+"");
+				if (alphabet[i].length-length<length-alphabet[i-1].length) bw.write(i+"");
 				else bw.write((i-1)+"");
 			}
 			else bw.write((i-1)+"");
@@ -742,131 +743,145 @@ public class RepeatAlphabet {
 	/**
 	 * Same logic as $translateRead_nonrepetitive()$.
 	 */
-	private static final void translate_periodic(Character character, int lengthThreshold, BufferedWriter bw) throws IOException {
-		int i;
-		final int length = character.getLength();
+	private static final void translate_periodic(Block block, int lengthThreshold, BufferedWriter bw) throws IOException {
+		int i, j;
+		int repeat, length;
+		final int lastCharacter = block.lastCharacter;
+		Character character;
 		
-		i=Arrays.binarySearch(alphabet,lastNonrepetitive+1,lastPeriodic+1,character);
-		if (i<0) i=-1-i;
-		if (character.isOpen()) {
-			if (!alphabet[i].sameRepeat(character)) i--;
-			while (i>lastNonrepetitive && alphabet[i].sameRepeat(character) && alphabet[i].getLength()>=length-lengthThreshold) i--;
-			i++;
-			if (!alphabet[i].sameRepeat(character)) {
-				System.err.println("translateRead_periodic> ERROR: open periodic character not found in the alphabet");
-				System.err.println("query: "+character);
-				System.err.println("first candidate in alphabet: "+alphabet[i]);
-				System.exit(1);
-			}
-			bw.write((-1-i)+"");
-		}
-		else {
-			if (i<=lastPeriodic && alphabet[i].sameRepeat(character)) {
-				if (i-1>lastNonrepetitive && alphabet[i-1].sameRepeat(character)) {
-					if (alphabet[i].getLength()-length<length-alphabet[i-1].getLength()) bw.write(i+"");
-					else bw.write((i-1)+"");
-				}
-				else bw.write(i+"");
-			}
-			else {
-				if (i-1>lastNonrepetitive && alphabet[i-1].sameRepeat(character)) bw.write((i-1)+"");
-				else {
-					System.err.println("translateRead_periodic> ERROR: closed periodic character not found in the alphabet: "+character);
+		for (j=0; j<=lastCharacter; j++) {
+			character=block.characters[j];
+			repeat=character.repeat; length=character.length;
+			i=Arrays.binarySearch(alphabet,lastNonrepetitive+1,lastPeriodic+1,character);
+			if (i<0) i=-1-i;
+			if (character.isOpen()) {
+				if (alphabet[i].repeat!=repeat) i--;
+				while (i>lastNonrepetitive && alphabet[i].repeat==repeat && alphabet[i].length>=length-lengthThreshold) i--;
+				i++;
+				if (alphabet[i].repeat!=repeat) {
+					System.err.println("translateRead_periodic> ERROR: open periodic repeat not found in the alphabet");
+					System.err.println("query: "+character);
+					System.err.println("first candidate in alphabet: "+alphabet[i]);
 					System.exit(1);
 				}
+				bw.write((-1-i)+"");
 			}
+			else {
+				if (i<=lastPeriodic && alphabet[i].repeat==repeat) {
+					if (i-1>lastNonrepetitive && alphabet[i-1].repeat==repeat) {
+						if (alphabet[i].length-length<length-alphabet[i-1].length) bw.write(i+"");
+						else bw.write((i-1)+"");
+					}
+					else bw.write(i+"");
+				}
+				else {
+					if (i-1>lastNonrepetitive && alphabet[i-1].repeat==repeat) bw.write((i-1)+"");
+					else {
+						System.err.println("translateRead_periodic> ERROR: closed periodic character not found in the alphabet:");
+						System.err.println("query: "+character);
+						System.err.println("first candidate in alphabet: "+alphabet[i]);
+						System.exit(1);
+					}
+				}
+			}
+			if (j<lastCharacter) bw.write(SEPARATOR_MINOR);
 		}
 	}
 	
 	
 	/**
-	 * For nonperiodic repeats. If $character$ is half-open, prints the sorted list of all
-	 * characters in $alphabet$ that are similar to or imply $character$. If $character$ 
-	 * is closed, prints the sorted list of all closed characters in $alphabet$ that are 
-	 * similar to $character$.
+	 * For every nonperiodic character $X$ in the block: if $X$ is half-open, prints the 
+	 * sorted list of all characters in $alphabet$ that are similar to or imply $X$. If 
+	 * $X$ is closed, prints the sorted list of all closed characters in $alphabet$ that 
+	 * are similar to $X$.
 	 */
-	private static final void translate(Character character, int distanceThreshold, BufferedWriter bw) throws IOException {
+	private static final void translate(Block block, int distanceThreshold, BufferedWriter bw) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
-		int i, j;
-		int lastCharacter;
+		int i, j, k;
+		int lastCharacter, repeat, length;
+		final int last = block.lastCharacter;
+		Character character;
 		
 		if (stack==null) stack = new int[CAPACITY];
-		lastCharacter=-1;
-		i=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,character);
-		if (i<0) i=-1-i;
-		if (character.isOpen()) {
-			for (j=i+1; j<=lastAlphabet; j++) {
-				if (!alphabet[j].sameRepeat(character) || alphabet[j].tuples[0].implies_tooFarAfter(character.tuples[0],distanceThreshold,Math.POSITIVE_INFINITY)) break;
-				if (alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)) {
-					lastCharacter++;
-					if (lastCharacter==stack.length) {
-						int[] newArray = new int[stack.length<<1];
-						System.arraycopy(stack,0,newArray,0,stack.length);
-						stack=newArray;
-					}
-					stack[lastCharacter]=j;
-				}
-			}
-			for (j=i-1; j>lastPeriodic; j--) {
-				if (!alphabet[j].sameRepeat(character) || alphabet[j].tuples[0].implies_tooFarBefore(character.tuples[0],distanceThreshold,Math.POSITIVE_INFINITY)) break;
-				if (alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)) {
-					lastCharacter++;
-					if (lastCharacter==stack.length) {
-						int[] newArray = new int[stack.length<<1];
-						System.arraycopy(stack,0,newArray,0,stack.length);
-						stack=newArray;
-					}
-					stack[lastCharacter]=j;
-				}
-			}
-			if (lastCharacter>0) Arrays.sort(stack,0,lastCharacter+1);
-			bw.write(stack[0]+"");
-			for (j=1; j<=lastCharacter; j++) bw.write(SEPARATOR_MINOR+stack[j]);
-		}
-		else {
+		for (k=0; k<=last; k++) {
+			character=block.characters[k];
+			repeat=character.repeat; length=character.length;
+			i=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,character);
+			if (i<0) i=-1-i;
 			lastCharacter=-1;
-			for (j=i+1; j<=lastAlphabet; j++) {
-				if (!alphabet[j].sameRepeat(character) || alphabet[j].tuples[0].implies_tooFarAfter(character.tuples[0],distanceThreshold,Math.POSITIVE_INFINITY)) break;
-				if (alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && alphabet[j].sameOpen(character)) {
-					lastCharacter++;
-					if (lastCharacter==stack.length) {
-						int[] newArray = new int[stack.length<<1];
-						System.arraycopy(stack,0,newArray,0,stack.length);
-						stack=newArray;
+			if (character.isOpen()) {
+				for (j=i+1; j<=lastAlphabet; j++) {
+					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarAfter(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
+					if (alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)) {
+						lastCharacter++;
+						if (lastCharacter==stack.length) {
+							int[] newArray = new int[stack.length<<1];
+							System.arraycopy(stack,0,newArray,0,stack.length);
+							stack=newArray;
+						}
+						stack[lastCharacter]=j;
 					}
-					stack[lastCharacter]=j;
 				}
-			}
-			for (j=i-1; j>lastPeriodic; j--) {
-				if (!alphabet[j].sameRepeat(character) || alphabet[j].tuples[0].implies_tooFarBefore(character.tuples[0],distanceThreshold,Math.POSITIVE_INFINITY)) break;
-				if (alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && alphabet[j].sameOpen(character)) {
-					lastCharacter++;
-					if (lastCharacter==stack.length) {
-						int[] newArray = new int[stack.length<<1];
-						System.arraycopy(stack,0,newArray,0,stack.length);
-						stack=newArray;
+				for (j=i-1; j>lastPeriodic; j--) {
+					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarBefore(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
+					if (alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)) {
+						lastCharacter++;
+						if (lastCharacter==stack.length) {
+							int[] newArray = new int[stack.length<<1];
+							System.arraycopy(stack,0,newArray,0,stack.length);
+							stack=newArray;
+						}
+						stack[lastCharacter]=j;
 					}
-					stack[lastCharacter]=j;
 				}
+				if (lastCharacter>0) Arrays.sort(stack,0,lastCharacter+1);
+				bw.write(stack[0]+"");
+				for (j=1; j<=lastCharacter; j++) bw.write(SEPARATOR_MINOR+stack[j]);
 			}
-			if (lastCharacter>0) Arrays.sort(stack,0,lastCharacter+1);
-			bw.write(stack[0]+"");
-			for (j=1; j<=lastCharacter; j++) bw.write(SEPARATOR_MINOR+stack[j]);
+			else {
+				for (j=i+1; j<=lastAlphabet; j++) {
+					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarAfter(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
+					if (alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && alphabet[j].sameOpen(character)) {
+						lastCharacter++;
+						if (lastCharacter==stack.length) {
+							int[] newArray = new int[stack.length<<1];
+							System.arraycopy(stack,0,newArray,0,stack.length);
+							stack=newArray;
+						}
+						stack[lastCharacter]=j;
+					}
+				}
+				for (j=i-1; j>lastPeriodic; j--) {
+					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarBefore(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
+					if (alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && alphabet[j].sameOpen(character)) {
+						lastCharacter++;
+						if (lastCharacter==stack.length) {
+							int[] newArray = new int[stack.length<<1];
+							System.arraycopy(stack,0,newArray,0,stack.length);
+							stack=newArray;
+						}
+						stack[lastCharacter]=j;
+					}
+				}
+				if (lastCharacter>0) Arrays.sort(stack,0,lastCharacter+1);
+				bw.write(stack[0]+"");
+				for (j=1; j<=lastCharacter; j++) bw.write(SEPARATOR_MINOR+stack[j]);
+			}
 		}
 	}
 	
 	
 	/**
 	 * Adds every $k$-mer of the translated read $str$ into $kmers$. The first and last 
-	 * character of the translated read are not used.
+	 * blocks of the translated read are not used.
 	 *
-	 * @param mode how to handle multiple character IDs per position: 0=the entire 
-	 * sequence of IDs is used as a k-mer character ("and"); 1=every ID becomes a distinct
-	 * k-mer character ("or");
+	 * @param mode how to handle multiple block IDs per position: 0=the entire 
+	 * sequence of IDs is used as a k-mer block ("and"); 1=every ID becomes a distinct
+	 * k-mer block ("or");
 	 * @param sb temporary space.
 	 */
-	public static final void loadTranslatedRead(String str, byte mode, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
-		int i, j;
+	public static final void loadTranslatedRead(String str, int mode, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
+/*		int i, j;
 		String key;
 		Integer value;
 		String[] tokens;
@@ -902,122 +917,83 @@ public class RepeatAlphabet {
 				else kmers.put(key,Integer.valueOf(value.intValue()+1));
 			}
 		}
+*/
 	}
 	
 	
 	/**
-	 * A character of the recoded alphabet, which is a set of substrings of repeats in 
-	 * specific orientations and with open/closed endpoints.
+	 * A block of a recoded read, which is a set of characters.
 	 */
-	public static class Character implements Comparable {
+	public static class Block {
 		private static final int CAPACITY = 10;  // Arbitrary
-		public static int order;
-		
-		public int id;
-		public Tuple[] tuples;
-		public int lastTuple;
-		
+				
+		public Character[] characters;
+		public int lastCharacter;
 		
 		/**
-		 * An empty character
+		 * An empty block
 		 */
-		public Character() {
-			tuples = new Tuple[CAPACITY];
-			for (int i=0; i<tuples.length; i++) tuples[i] = new Tuple();
+		public Block() {
+			characters = new Character[CAPACITY];
+			for (int i=0; i<characters.length; i++) characters[i] = new Character();
 			reset();
 		}
 		
-		
-		public void reset() { id=-1; lastTuple=-1; }
-		
+		public void reset() { lastCharacter=-1; }
 		
 		/**
-		 * A non-repetitive character of given length.
+		 * A non-repetitive block of given length.
 		 */
-		public Character(int length, boolean openStart, boolean openEnd) {
-			id=-1;
-			tuples = new Tuple[CAPACITY];
+		public Block(int length, boolean openStart, boolean openEnd) {
+			characters = new Character[CAPACITY];
 			setNonrepetitive(length,openStart,openEnd);
 		}
 		
-		
 		/**
-		 * Sets the current character to a non-repetitive of given length.
+		 * Sets the current block to a non-repetitive of given length.
 		 */
 		public final void setNonrepetitive(int length, boolean openStart, boolean openEnd) {
-			tuples[0] = new Tuple(NON_REPETITIVE,true,-1,-1,length,openStart,openEnd);
-			lastTuple=0;
+			characters[0] = new Character(NON_REPETITIVE,true,-1,-1,length,openStart,openEnd);
+			lastCharacter=0;
 		}
-		
 		
 		public final boolean isNonrepetitive() {
-			return lastTuple==0 && tuples[0].repeat==NON_REPETITIVE;
+			return lastCharacter==0 && characters[0].repeat==NON_REPETITIVE;
 		}
-		
 		
 		private final void enlarge() {
-			Tuple[] newTuples = new Tuple[tuples.length<<1];
-			System.arraycopy(tuples,0,newTuples,0,tuples.length);
-			for (int i=tuples.length; i<newTuples.length; i++) newTuples[i] = new Tuple();
-			tuples=newTuples;
+			Character[] newCharacters = new Character[characters.length<<1];
+			System.arraycopy(characters,0,newCharacters,0,characters.length);
+			for (int i=characters.length; i<newCharacters.length; i++) newCharacters[i] = new Character();
+			characters=newCharacters;
 		}
 		
-		
 		/**
-		 * Makes this character contain the same data as $otherCharacter$ (but all 
+		 * Makes this block contain the same data as $otherBlock$ (but all 
 		 * pointers stay distinct). Field $id$ is not changed.
 		 */
-		public final void copyFrom(Character otherCharacter) {
+		public final void copyFrom(Block otherBlock) {
 			int i;
 			
-			if (tuples==null) {
-				tuples = new Tuple[otherCharacter.lastTuple+1];
-				for (i=0; i<tuples.length; i++) tuples[i] = new Tuple();
+			if (characters==null) {
+				characters = new Character[otherBlock.lastCharacter+1];
+				for (i=0; i<characters.length; i++) characters[i] = new Character();
 			}
-			else if (tuples.length<otherCharacter.lastTuple+1) {
-				Tuple[] newTuples = new Tuple[otherCharacter.lastTuple+1];
-				System.arraycopy(tuples,0,newTuples,0,tuples.length);
-				for (i=tuples.length; i<newTuples.length; i++) newTuples[i] = new Tuple();
-				tuples=newTuples;
+			else if (characters.length<otherBlock.lastCharacter+1) {
+				Character[] newCharacters = new Character[otherBlock.lastCharacter+1];
+				System.arraycopy(characters,0,newCharacters,0,characters.length);
+				for (i=characters.length; i<newCharacters.length; i++) newCharacters[i] = new Character();
+				characters=newCharacters;
 			}
-			lastTuple=otherCharacter.lastTuple;
-			for (i=0; i<=lastTuple; i++) tuples[i].copyFrom(otherCharacter.tuples[i]);
+			lastCharacter=otherBlock.lastCharacter;
+			for (i=0; i<=lastCharacter; i++) characters[i].copyFrom(otherBlock.characters[i]);
 		}
 		
 		
-		/**
-		 * First sorts by nonrepetitive, periodic, nonperiodic; then by number of tuples;
-		 * then lexicographically on the tuples.
-		 */
-		public int compareTo(Object other) {
-			final boolean isNonrepetitive = isNonrepetitive();
-			final boolean isPeriodic = tuples[0].start==-1;
-			final Character otherCharacter = (Character)other;
-			final boolean otherCharacterIsNonrepetitive = otherCharacter.isNonrepetitive();
-			final boolean otherCharacterIsPeriodic = otherCharacter.tuples[0].start==-1;
-			int i, j;
-			
-			if (isNonrepetitive && !otherCharacterIsNonrepetitive) return -1;
-			else if (!isNonrepetitive && otherCharacterIsNonrepetitive) return 1;
-			if (isPeriodic && !otherCharacterIsPeriodic) return -1;
-			else if (!isPeriodic && otherCharacterIsPeriodic) return 1;
-			if (lastTuple<otherCharacter.lastTuple) return -1;
-			else if (lastTuple>otherCharacter.lastTuple) return 1;
-			for (i=0; i<=lastTuple; i++) {
-				j=tuples[i].compareTo(otherCharacter.tuples[i]);
-				if (j!=0) return j;
-			}
-			return 0;
-		}
-		
-		
-		/**
-		 * Sorting strings lexicographically induces the same order as in $compareTo()$.
-		 */
 		public String toString() {
-			String out = (isNonrepetitive()?"0":"1")+SEPARATOR_MINOR+(tuples[0].start==-1?"0":"1")+SEPARATOR_MINOR+lastTuple+SEPARATOR_MINOR;
-			out+=tuples[0].toString();
-			for (int i=1; i<=lastTuple; i++) out+=SEPARATOR_MINOR+tuples[i].toString();
+			String out = (isNonrepetitive()?"0":"1")+SEPARATOR_MINOR+(characters[0].start==-1?"0":"1")+SEPARATOR_MINOR+lastCharacter+SEPARATOR_MINOR;
+			out+=characters[0].toString();
+			for (int i=1; i<=lastCharacter; i++) out+=SEPARATOR_MINOR+characters[i].toString();
 			return out;
 		}
 		
@@ -1028,346 +1004,208 @@ public class RepeatAlphabet {
 		public void deserialize(String str) {
 			int i, p, q;
 			
-			id=-1;
 			p=str.indexOf(SEPARATOR_MINOR);  // Skipping
 			p=str.indexOf(SEPARATOR_MINOR,p+1);  // Skipping
 			q=str.indexOf(SEPARATOR_MINOR,p+1);
-			lastTuple=Integer.parseInt(str.substring(p+1,q));
-			if (tuples==null) {
-				tuples = new Tuple[lastTuple+1];
-				for (i=0; i<=lastTuple; i++) tuples[i] = new Tuple();
+			lastCharacter=Integer.parseInt(str.substring(p+1,q));
+			if (characters==null) {
+				characters = new Character[lastCharacter+1];
+				for (i=0; i<=lastCharacter; i++) characters[i] = new Character();
 			}
-			else if (tuples.length<lastTuple+1) {
-				Tuple[] newArray = new Tuple[lastTuple+1];
-				System.arraycopy(tuples,0,newArray,0,tuples.length);
-				for (i=tuples.length; i<=lastTuple; i++) newArray[i] = new Tuple();
-				tuples=newArray;
+			else if (characters.length<lastCharacter+1) {
+				Character[] newArray = new Character[lastCharacter+1];
+				System.arraycopy(characters,0,newArray,0,characters.length);
+				for (i=characters.length; i<=lastCharacter; i++) newArray[i] = new Character();
+				characters=newArray;
 			}
 			p=q+1;
-			for (i=0; i<=lastTuple; i++) p=tuples[i].deserialize(str,p);
+			for (i=0; i<=lastCharacter; i++) p=characters[i].deserialize(str,p);
 		}
-		
-		
-		public boolean equals(Object other) {
-			Character otherCharacter = (Character)other;
-			if (lastTuple!=otherCharacter.lastTuple) return false;
-			for (int i=0; i<=lastTuple; i++) {
-				if (!tuples[i].equals(otherCharacter.tuples[i])) return false;
-			}
-			return true;
-		}
-		
 		
 		/**
-		 * @return TRUE iff $otherCharacter$ is identical to this character,
-		 * when considering just the $repeat$ and $orientation$ fields of all tuples.
-		 */
-		public final boolean sameRepeat(Character otherCharacter) {
-			if (lastTuple!=otherCharacter.lastTuple) return false;
-			for (int i=0; i<=lastTuple; i++) {
-				if (tuples[i].repeat!=otherCharacter.tuples[i].repeat || tuples[i].orientation!=otherCharacter.tuples[i].orientation) return false;
-			}
-			return true;
-		}
-		
-		
-		/**
-		 * Remark: the procedure assumes that the two characters are similar 
-		 * according to $sameRepeat()$.
-		 */
-		public final boolean isSimilar(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
-			for (int i=0; i<=lastTuple; i++) {
-				if ( Math.abs(tuples[i].start-otherCharacter.tuples[i].start)>distanceThreshold || 
-					 Math.abs(tuples[i].end-otherCharacter.tuples[i].end)>distanceThreshold || 
-					 Math.abs(tuples[i].length-otherCharacter.tuples[i].length)>lengthThreshold
-				   ) return false;
-			}
-			return true;
-		}
-		
-		
-		public final boolean sameOpen(Character otherCharacter) {
-			if (lastTuple!=otherCharacter.lastTuple) return false;
-			for (int i=0; i<=lastTuple; i++) {
-				if (tuples[i].openStart!=otherCharacter.tuples[i].openStart || tuples[i].openEnd!=otherCharacter.tuples[i].openEnd) return false;
-			}
-			return true;			
-		}
-
-		
-		/**
-		 * Remark: the procedure assumes that the two characters are similar 
-		 * acccording to $sameReadB()$.
-		 *
-		 * @return the Euclidean distance between the feature vectors of the two
-		 * characters.
-		 */
-		public final double getDistance(Character otherCharacter) {
-			int i;
-			double out;
-			
-			out=0;
-			for (i=0; i<=lastTuple; i++) {
-				out+=Math.pow(tuples[i].start-otherCharacter.tuples[i].start,2);
-				out+=Math.pow(tuples[i].end-otherCharacter.tuples[i].end,2);
-				out+=Math.pow(tuples[i].length-otherCharacter.tuples[i].length,2);
-			}
-			return Math.sqrt(out);
-		}
-		
-		
-		public int hashCode() {
-			String out = id+",";
-			for (int i=0; i<=lastTuple; i++) out+=tuples[i].toString()+",";
-			return out.hashCode();
-		}
-		
-		
-		/**
-		 * @return the average length of all tuples.
+		 * @return the average length of all characters.
 		 */
 		public int getLength() {
 			int i, out;
 			
 			out=0;
-			for (i=0; i<=lastTuple; i++) out+=tuples[i].getLength();
-			return out/(lastTuple+1);
+			for (i=0; i<=lastCharacter; i++) out+=characters[i].getLength();
+			return out/(lastCharacter+1);
 		}
 		
 		
 		/**
-		 * Adds an alignment to the current character. If the character already contains 
-		 * an alignment to the same repeat, the new alignment replaces the old one based
+		 * Adds an alignment to the current block. If the block already contains an 
+		 * alignment to the same repeat, the new alignment replaces the old one based
 		 * on a canonical (and arbitrary) order.
 		 *
-		 * Remark: tuples might not be sorted after the procedure completes.
+		 * Remark: characters might not be sorted after the procedure completes.
 		 *
-		 * @param tmpTuple temporary space.
+		 * @param tmpCharacter temporary space.
 		 */
-		public final void addTuple(AlignmentRow alignment, int distanceThreshold, Tuple tmpTuple) {
+		public final void addCharacter(AlignmentRow alignment, int distanceThreshold, Character tmpCharacter) {
 			int i;
 			int found;
 			
 			if (alignment.orientation) {
-				tmpTuple.openStart=alignment.startA<=distanceThreshold;
-				tmpTuple.openEnd=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				tmpCharacter.openStart=alignment.startA<=distanceThreshold;
+				tmpCharacter.openEnd=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
 			}
 			else {
-				tmpTuple.openEnd=alignment.startA<=distanceThreshold;
-				tmpTuple.openStart=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				tmpCharacter.openEnd=alignment.startA<=distanceThreshold;
+				tmpCharacter.openStart=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
 			}
-			tmpTuple.repeat=alignment.readB; tmpTuple.orientation=alignment.orientation;
+			tmpCharacter.repeat=alignment.readB; tmpCharacter.orientation=alignment.orientation;
 			if (!isPeriodic[alignment.readB]) {
-				tmpTuple.start=alignment.startB;
-				tmpTuple.end=alignment.endB;
-				tmpTuple.length=0;
+				tmpCharacter.start=alignment.startB;
+				tmpCharacter.end=alignment.endB;
+				tmpCharacter.length=0;
 			}
 			else {
-				tmpTuple.start=-1; tmpTuple.end=-1;
-				tmpTuple.length=alignment.endA-alignment.startA+1; // A is correct here
+				tmpCharacter.start=-1; tmpCharacter.end=-1;
+				tmpCharacter.length=alignment.endA-alignment.startA+1; // A is correct here
 			}
 			found=-1;
-			for (i=0; i<=lastTuple; i++) {
-				if (tuples[i].repeat==tmpTuple.repeat && tuples[i].orientation==tmpTuple.orientation) {
+			for (i=0; i<=lastCharacter; i++) {
+				if (characters[i].repeat==tmpCharacter.repeat && characters[i].orientation==tmpCharacter.orientation) {
 					found=i;
 					break;
 				}
 			}
 			if (found==-1) {
-				lastTuple++;
-				if (lastTuple==tuples.length) enlarge();	
-				tuples[lastTuple].copyFrom(tmpTuple);
+				lastCharacter++;
+				if (lastCharacter==characters.length) enlarge();	
+				characters[lastCharacter].copyFrom(tmpCharacter);
 			}
 			else {
-				if (isPeriodic[alignment.readB]) tuples[found].length=Math.max(tuples[found].length,tmpTuple.length);
-				else if ( alignment.startB<tuples[found].start || 
-						  (alignment.startB==tuples[found].start && alignment.endB<tuples[found].end)
+				if (isPeriodic[alignment.readB]) characters[found].length=Math.max(characters[found].length,tmpCharacter.length);
+				else if ( alignment.startB<characters[found].start || 
+						  (alignment.startB==characters[found].start && alignment.endB<characters[found].end)
 			        	) {
-					tuples[found].start=alignment.startB;
-					tuples[found].end=alignment.endB;
+					characters[found].start=alignment.startB;
+					characters[found].end=alignment.endB;
 				}
-				if (tmpTuple.openStart) tuples[found].openStart=true;
-				if (tmpTuple.openEnd) tuples[found].openEnd=true;
+				if (tmpCharacter.openStart) characters[found].openStart=true;
+				if (tmpCharacter.openEnd) characters[found].openEnd=true;
 			}
 		}
 		
 		
 		/**
-		 * (1) Sorts $tuples$. (2) Makes open marks homogeneous across all tuples. (3) If 
-		 * the character contains a periodic repeat, removes all non-periodic repeats from
-		 * the character and sets the length of every periodic repeat to $periodicLength$.
+		 * (1) Sorts $characters$. (2) Makes open marks homogeneous across all characters.
+		 * (3) If the block contains a periodic repeat, removes all non-periodic repeats 
+		 * from the block and sets the length of every periodic repeat to
+		 * $periodicLength$.
 		 */
-		public final void cleanTuples(int periodicLength) {
+		public final void cleanCharacters(int periodicLength) {
 			boolean foundPeriodic, foundNonperiodic, openLeft, openRight;
 			int i, j;
-			Tuple tmpTuple;
+			Character tmpCharacter;
 			
 			// Enforcing periodic/nonperiodic criteria
 			foundPeriodic=false; foundNonperiodic=false;
-			for (i=0; i<=lastTuple; i++) {
-				if (isPeriodic[tuples[i].repeat]) {
+			for (i=0; i<=lastCharacter; i++) {
+				if (isPeriodic[characters[i].repeat]) {
 					foundPeriodic=true;
-					tuples[i].length=periodicLength;
+					characters[i].length=periodicLength;
 				}
 				else foundNonperiodic=true;
 			}
 			if (!foundPeriodic) {
-				Arrays.sort(tuples,0,lastTuple+1);
+				Arrays.sort(characters,0,lastCharacter+1);
 				return;
 			}
 			if (foundNonperiodic) {
 				j=-1;
-				for (i=0; i<=lastTuple; i++) {
-					if (!isPeriodic[tuples[i].repeat]) continue;
+				for (i=0; i<=lastCharacter; i++) {
+					if (!isPeriodic[characters[i].repeat]) continue;
 					j++;
-					tmpTuple=tuples[j];
-					tuples[j]=tuples[i];
-					tuples[i]=tmpTuple;
+					tmpCharacter=characters[j];
+					characters[j]=characters[i];
+					characters[i]=tmpCharacter;
 				}
-				lastTuple=j;
+				lastCharacter=j;
 			}
 			
 			// Enforcing open criteria
 			openLeft=false; openRight=false;
-			for (i=0; i<=lastTuple; i++) {
-				if ((tuples[i].orientation && tuples[i].openStart) ||  (!tuples[i].orientation && tuples[i].openEnd)) openLeft=true;
-				if ((tuples[i].orientation && tuples[i].openEnd) ||  (!tuples[i].orientation && tuples[i].openStart)) openRight=true;				
+			for (i=0; i<=lastCharacter; i++) {
+				if ((characters[i].orientation && characters[i].openStart) ||  (!characters[i].orientation && characters[i].openEnd)) openLeft=true;
+				if ((characters[i].orientation && characters[i].openEnd) ||  (!characters[i].orientation && characters[i].openStart)) openRight=true;				
 			}
-			for (i=0; i<=lastTuple; i++) {
-				if (tuples[i].orientation) { tuples[i].openStart=openLeft; tuples[i].openEnd=openRight; }
-				else { tuples[i].openStart=openRight; tuples[i].openEnd=openLeft; }
+			for (i=0; i<=lastCharacter; i++) {
+				if (characters[i].orientation) { characters[i].openStart=openLeft; characters[i].openEnd=openRight; }
+				else { characters[i].openStart=openRight; characters[i].openEnd=openLeft; }
 			}			
 			
-			Arrays.sort(tuples,0,lastTuple+1);
+			Arrays.sort(characters,0,lastCharacter+1);
 		}
 		
 		
-		public final boolean openStart() { return tuples[0].openStart; }
+		public final boolean openStart() { return characters[0].openStart; }
 		
 		
-		public final boolean openEnd() { return tuples[0].openEnd; }
-		
-		
-		public final boolean isOpen() { return tuples[0].openStart || tuples[0].openEnd; }
-
-		
-		/**
-		 * Adds the tuple ends of $otherCharacter$ to those of the current character,
-		 * assuming that $otherCharacter$ satisfies $sameRepeat()$ and $isSimilar()$.
-		 */
-		public final void addTupleEnds(Character otherCharacter) {
-			for (int i=0; i<=lastTuple; i++) {
-				tuples[i].start+=otherCharacter.tuples[i].start;
-				tuples[i].end+=otherCharacter.tuples[i].end;
-				tuples[i].length+=otherCharacter.tuples[i].length;
-			}
-		}
-		
-		
-		/**
-		 * Divides every tuple end by $denominator$.
-		 */
-		public final void normalizeTupleEnds(int denominator) {
-			for (int i=0; i<=lastTuple; i++) {
-				tuples[i].start/=denominator; tuples[i].end/=denominator;
-				tuples[i].length/=denominator;
-			}
-		}
-		
-		
-		/**
-		 * Remark: when changing this procedure, update $implies_tooFar*()$ as well.
-		 *
-		 * Remark: the two characters are assumed both to be repetitive and to satisfy
-		 * $sameRepeat()$.
-		 *
-		 * Remark: the procedure assumes that both characters are nonrepetitive. 
-		 * Nonrepetitive characters are not assumed to imply one another, since fully-open
-		 * and half-open nonrepetitive characters are assumed to have been discarded.
-		 *
-		 * @return TRUE iff no tuple of $otherCharacter$ can add information WRT the
-		 * corresponding tuple of this character.
-		 */
-		public final boolean implies(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
-			for (int i=0; i<=lastTuple; i++) {
-				if (tuples[i].start==-1) {  // Periodic
-					if (Math.abs(tuples[i].length,otherCharacter.tuples[i].length)<=lengthThreshold) return false;
-					else if (tuples[i].length<otherCharacter.tuples[i].length) return false;
-					else if ( (!otherCharacter.tuples[i].openStart && !otherCharacter.tuples[i].openEnd) ||
-						      (!otherCharacter.tuples[i].openStart && tuples[i].openStart) ||
-					          (!otherCharacter.tuples[i].openEnd && tuples[i].openEnd)
-							) return false;
-				}
-				else {  // Nonperiodic
-					if (Intervals.areApproximatelyIdentical(otherCharacter.tuples[i].start,otherCharacter.tuples[i].end,tuples[i].start,tuples[i].end)) return false;
-					else if (Intervals.isApproximatelyContained(otherCharacter.tuples[i].start,otherCharacter.tuples[i].end,tuples[i].start,tuples[i].end)) {
-						if ( (Math.abs(tuples[i].start,otherCharacter.tuples[i].start)<=distanceThreshold && !tuples[i].openStart && otherCharacter.tuples[i].openStart) ||
-							 (otherCharacter.tuples[i].start>tuples[i].start+distanceThreshold && !otherCharacter.tuples[i].openStart) ||
-							 (Math.abs(tuples[i].end,otherCharacter.tuples[i].end)<=distanceThreshold && !tuples[i].openEnd && otherCharacter.tuples[i].openEnd) ||
-							 (otherCharacter.tuples[i].end<tuples[i].end-distanceThreshold && !otherCharacter.tuples[i].openEnd)
-						   ) return false;
-					}
-					else return false;
-				}
-			}
-			return true;
-		}
+		public final boolean openEnd() { return characters[0].openEnd; }
 	}
 	
 	
 	/**
-	 * A substring of a repeat in a specific orientation
+	 * A substring of a repeat in a specific orientation and with open/closed endpoints.
 	 */
-	public static class Tuple implements Comparable {
+	public static class Character implements Comparable {
+		public int id;
 		public int repeat;
 		public boolean orientation;
 		public int start, end;
 		public boolean openStart, openEnd;  // The repeat might continue beyond start/end
 		public int length;  // >0: unique or periodic; 0: repetitive non-periodic.
 		
-		public Tuple() {
+		public Character() { reset(); }
+		
+		public void reset() { 
+			id=-1;
 			repeat=-1; orientation=false; start=-1; end=-1; length=-1;
 			openStart=true; openEnd=true;
 		}
 		
-		public Tuple(int r, boolean o, int s, int e, int l, boolean os, boolean oe) {
+		public Character(int r, boolean o, int s, int e, int l, boolean os, boolean oe) {
 			repeat=r; orientation=o; start=s; end=e; length=l;
 			openStart=os; openEnd=oe;
 		}
 		
 		public int compareTo(Object other) {
-			Tuple otherTuple = (Tuple)other;
-			if (repeat<otherTuple.repeat) return -1;
-			else if (repeat>otherTuple.repeat) return 1;
-			if (orientation && !otherTuple.orientation) return -1;
-			else if (!orientation && otherTuple.orientation) return 1;
-			if (start<otherTuple.start) return -1;
-			else if (start>otherTuple.start) return 1;
-			if (end<otherTuple.end) return -1;
-			else if (end>otherTuple.end) return 1;
-			if (length<otherTuple.length) return -1;
-			else if (length>otherTuple.length) return 1;
+			Character otherCharacter = (Character)other;
+			if (repeat<otherCharacter.repeat) return -1;
+			else if (repeat>otherCharacter.repeat) return 1;
+			if (orientation && !otherCharacter.orientation) return -1;
+			else if (!orientation && otherCharacter.orientation) return 1;
+			if (start<otherCharacter.start) return -1;
+			else if (start>otherCharacter.start) return 1;
+			if (end<otherCharacter.end) return -1;
+			else if (end>otherCharacter.end) return 1;
+			if (length<otherCharacter.length) return -1;
+			else if (length>otherCharacter.length) return 1;
 			return 0;
 		}
 		
 		/**
 		 * Assumes the same order as in $compareTo()$.
 		 */
-		public final boolean tooFarAfter(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
-			return start>otherTuple.start+distanceThreshold || end>otherTuple.end+distanceThreshold || length>otherTuple.length+lengthThreshold;
+		public final boolean tooFarAfter(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
+			return start>otherCharacter.start+distanceThreshold || end>otherCharacter.end+distanceThreshold || length>otherCharacter.length+lengthThreshold;
 		}
 		
-		public final void copyFrom(Tuple otherTuple) {
-			repeat=otherTuple.repeat;
-			orientation=otherTuple.orientation;
-			start=otherTuple.start; end=otherTuple.end;
-			length=otherTuple.length;
-			openStart=otherTuple.openStart; openEnd=otherTuple.openEnd;
+		public final void copyFrom(Character otherCharacter) {
+			repeat=otherCharacter.repeat;
+			orientation=otherCharacter.orientation;
+			start=otherCharacter.start; end=otherCharacter.end;
+			length=otherCharacter.length;
+			openStart=otherCharacter.openStart; openEnd=otherCharacter.openEnd;
 		}
 		
 		public boolean equals(Object other) {
-			Tuple otherTuple = (Tuple)other;
-			return repeat==otherTuple.repeat && orientation==otherTuple.orientation && start==otherTuple.start && end==otherTuple.end && length==otherTuple.length && openStart==otherTuple.openStart && openEnd==otherTuple.openEnd;
+			Character otherCharacter = (Character)other;
+			return repeat==otherCharacter.repeat && orientation==otherCharacter.orientation && start==otherCharacter.start && end==otherCharacter.end && length==otherCharacter.length && openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
 		}
 		
 		public String toString() {
@@ -1410,27 +1248,100 @@ public class RepeatAlphabet {
 			return (start==-1||end==-1)?length:end-start+1;
 		}
 		
+		
 		/**
-		 * Assumes that the container characters have the same repeats, and uses the same
-		 * criteria as $Character.implies()$.
+		 * Remark: the two characters are assumed both to be repetitive and to have the
+		 * same repeat. Nonrepetitive characters are not assumed to imply one another, 
+		 * since fully-open and half-open nonrepetitive characters are assumed to have 
+		 * been discarded.
 		 */
-		public final boolean implies_tooFarAfter(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
+		public final boolean implies(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
 			if (start==-1) {  // Periodic
-				return length>otherTuple.length+lengthThreshold;
+				if (Math.abs(length,otherCharacter.length)<=lengthThreshold) return false;
+				else if (length<otherCharacter.length) return false;
+				else if ( (!otherCharacter.openStart && !otherCharacter.openEnd) ||
+					      (!otherCharacter.openStart && openStart) ||
+				          (!otherCharacter.openEnd && openEnd)
+						) return false;
 			}
 			else {  // Nonperiodic
-				return start>=otherTuple.end-distanceThreshold;
+				if (Intervals.areApproximatelyIdentical(otherCharacter.start,otherCharacter.end,start,end)) return false;
+				else if (Intervals.isApproximatelyContained(otherCharacter.start,otherCharacter.end,start,end)) {
+					if ( (Math.abs(start,otherCharacter.start)<=distanceThreshold && !openStart && otherCharacter.openStart) ||
+						 (otherCharacter.start>start+distanceThreshold && !otherCharacter.openStart) ||
+						 (Math.abs(end,otherCharacter.end)<=distanceThreshold && !openEnd && otherCharacter.openEnd) ||
+						 (otherCharacter.end<end-distanceThreshold && !otherCharacter.openEnd)
+					   ) return false;
+				}
+				else return false;
+			}
+			return true;
+		}
+		
+		
+		/**
+		 * Assumes that the container blocks have the same repeats, and uses the same
+		 * criteria as $implies()$.
+		 */
+		public final boolean implies_tooFarAfter(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
+			if (start==-1) {  // Periodic
+				return length>otherCharacter.length+lengthThreshold;
+			}
+			else {  // Nonperiodic
+				return start>=otherCharacter.end-distanceThreshold;
 			}
 		}
 		
-		public final boolean implies_tooFarBefore(Tuple otherTuple, int distanceThreshold, int lengthThreshold) {
+		
+		public final boolean implies_tooFarBefore(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
 			if (start==-1) {  // Periodic
 				return false;
 			}
 			else {  // Nonperiodic
-				return start<otherTuple.start-distanceThreshold;
+				return start<otherCharacter.start-distanceThreshold;
 			}
 		}
+		
+		
+		public final boolean sameOpen(Character otherCharacter) {
+			return openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
+		}
+		
+		
+		/**
+		 * Remark: the procedure assumes that the two characters have the same repeat.
+		 */
+		public final boolean isSimilar(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
+			if ( Math.abs(start,otherCharacter.start)>distanceThreshold || 
+				 Math.abs(end,otherCharacter.end)>distanceThreshold || 
+				 Math.abs(length,otherCharacter.length)>lengthThreshold
+			   ) return false;
+			return true;
+		}
+		
+		
+		/**
+		 * Adds the character ends of $otherCharacter$ to those of the current character, 
+		 * assuming that $otherCharacter$ has the same repeat and satisfies $isSimilar()$.
+		 */
+		public final void addCharacterEnds(Character otherCharacter) {
+			start+=otherCharacter.start;
+			end+=otherCharacter.end;
+			length+=otherCharacter.length;
+		}
+		
+		
+		/**
+		 * Divides every character end by $denominator$.
+		 */
+		public final void normalizeCharacterEnds(int denominator) {
+			start/=denominator; end/=denominator;
+			length/=denominator;
+		}
+		
+		
+		public final boolean isOpen() { return openStart || openEnd; }
+		
 	}
 	
 	
@@ -1502,7 +1413,7 @@ public class RepeatAlphabet {
 		// Removing non-periodic alignments that straddle other non-periodic alignments
 		// (possibly with the same readB): these do not provide a clear signal.
 // ----> This is not satisfactory, since repeats can straddle one another...
-// Either do like Arne, explicitly modeling this as smaller characters.
+// Either do like Arne, explicitly modeling this as smaller blocks.
 // Or find maximal ranges of straddling alignments like periodic, and assign them a specific type.
 		for (i=0; i<=lastAlignment; i++) alignments[i].flag=true;
 		for (i=0; i<=lastAlignment; i++) {
