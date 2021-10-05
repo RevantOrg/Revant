@@ -1,7 +1,8 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Hashtable;
 
 import de.mpi_cbg.revant.util.Math;
 import de.mpi_cbg.revant.factorize.Alignments;
@@ -15,7 +16,7 @@ import de.mpi_cbg.revant.factorize.Intervals;
 public class RepeatAlphabet {
 	public static final int NON_REPETITIVE = -1;
 	public static final String SEPARATOR_MINOR = ",";
-	public static final String SEPARATOR_MAJOR = "|";
+	public static final String SEPARATOR_MAJOR = ":";
 	
 	/**
 	 * Length of every repeat
@@ -609,7 +610,7 @@ public class RepeatAlphabet {
 	public static final void translateReads(String alignmentsFile, double maxError, int distanceThreshold, int lengthThreshold, String outputFile) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
-		int i;
+		int i, j;
 		int row, readA, previousReadA;
 		String str;
 		BufferedReader br;
@@ -634,7 +635,7 @@ public class RepeatAlphabet {
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
 		str=br.readLine(); 
-		previousReadA=-1; lastAlignment=-1; row=0;
+		previousReadA=-1; lastAlignment=-1; row=0; j=0;
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
@@ -645,12 +646,18 @@ public class RepeatAlphabet {
 			readA=Alignments.readA-1;
 			if (previousReadA==-1 || readA!=previousReadA) {
 				if (previousReadA!=-1) {
+					while (Reads.readIDs[j]<previousReadA) {
+						bw.newLine();
+						j++;
+					}
 					cleanAlignments(distanceThreshold);
 					if (lastAlignment!=-1) {
 						recodeRead(distanceThreshold);
 						if (lastInSequence<=0) bw.newLine();
 						else translateRead(bw,distanceThreshold,lengthThreshold);
 					}
+					else bw.newLine();
+					j++;
 				}
 				previousReadA=readA; lastAlignment=0;
 				alignments[0].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
@@ -669,12 +676,18 @@ public class RepeatAlphabet {
 		}
 		br.close();
 		if (previousReadA!=-1) {
+			while (Reads.readIDs[j]<previousReadA) {
+				bw.newLine();
+				j++;
+			}
 			cleanAlignments(distanceThreshold);
 			if (lastAlignment!=-1) {
 				recodeRead(distanceThreshold);
 				if (lastInSequence<=0) bw.newLine();
 				else translateRead(bw,distanceThreshold,lengthThreshold);
 			}
+			else bw.newLine();
+			j++;
 		}
 		bw.close();
 	}
@@ -843,11 +856,53 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
-	
-	
-	
-	
+	/**
+	 * Adds every $k$-mer of the translated read $str$ into $kmers$. The first and last 
+	 * character of the translated read are not used.
+	 *
+	 * @param mode how to handle multiple character IDs per position: 0=the entire 
+	 * sequence of IDs is used as a k-mer character ("and"); 1=every ID becomes a distinct
+	 * k-mer character ("or");
+	 * @param sb temporary space.
+	 */
+	public static final void loadTranslatedRead(String str, byte mode, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
+		int i, j;
+		String key;
+		Integer value;
+		String[] tokens;
+		
+		if (str.length()<3) return;
+		i=-1;
+		while (true) {
+			j=str.indexOf(SEPARATOR_MAJOR,i+1);
+			if (j<0) break;
+			i=j;
+		}
+		if (i+1-2<k) return;
+		tokens=str.split(SEPARATOR_MAJOR);
+		if (mode==0) {
+			for (i=1; i<=tokens.length-1-k; i++) {
+				sb.delete(0,sb.length());
+				for (j=0; j<k; j++) sb.append(tokens[i+j]+SEPARATOR_MAJOR);
+				key=sb.toString(); value=kmers.get(key);
+				if (value==null) kmers.put(key,Integer.valueOf(1));
+				else kmers.put(key,Integer.valueOf(value.intValue()+1));
+			}
+		}
+		else {
+			for (i=1; i<=tokens.length-1-k; i++) {
+				sb.delete(0,sb.length());
+				for (j=0; j<k; j++) {
+					
+					------------------>
+					sb.append(tokens[i+j]+SEPARATOR_MAJOR);
+				}
+				key=sb.toString(); value=kmers.get(key);
+				if (value==null) kmers.put(key,Integer.valueOf(1));
+				else kmers.put(key,Integer.valueOf(value.intValue()+1));
+			}
+		}
+	}
 	
 	
 	/**

@@ -1,13 +1,9 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
-import java.util.*;
 
 import de.mpi_cbg.revant.util.IO;
-import de.mpi_cbg.revant.util.Math;
-import de.mpi_cbg.revant.factorize.Alignments;
 import de.mpi_cbg.revant.factorize.Reads;
-import de.mpi_cbg.revant.factorize.Intervals;
 
 
 public class TranslateReads {
@@ -32,6 +28,5 @@ public class TranslateReads {
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE);
 		RepeatAlphabet.translateReads(ALIGNMENTS_FILE,MAX_ERROR,IO.quantum,IO.quantum<<1,TRANSLATED_FILE);
 	}
-
 
 }
