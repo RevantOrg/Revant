@@ -33,7 +33,7 @@ public class SplitCharacterInstances {
 		br = new BufferedReader(new FileReader(INPUT_FILE),IO.BUFFER_SIZE);
 		str=br.readLine();
 		while (str!=null) {
-			character.deserialize(str,0);
+			character.deserialize(str);
 			if (character.repeat!=previousCharacter.repeat && nInstancesInFile>=quantum) {
 				if (outputFile!=null) {
 					outputFile.close();

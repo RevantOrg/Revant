@@ -25,7 +25,7 @@ REPEAT_ISPERIODIC_FILE="${INPUT_DIR}/repeats-isPeriodic.txt"
 N_REPEATS=$(wc -l < ${REPEAT_LENGTHS_FILE})
 PARTS_PREFIX="${INPUT_DIR}/tmpSplit"
 SORT_OPTIONS=""
-for i in $(seq 1 200); do
+for i in $(seq 1 9); do  # Should be in sync with the serialization of $Character$.
 	SORT_OPTIONS="${SORT_OPTIONS} -k ${i},${i}n"
 done
 

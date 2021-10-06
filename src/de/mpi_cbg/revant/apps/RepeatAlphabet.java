@@ -370,7 +370,7 @@ public class RepeatAlphabet {
 	public static final void compactInstances(int distanceThreshold, int lengthThreshold) {
 		int i, j, k;
 		int first;
-		Character tmpChar, charI;
+		Character tmpChar;
 		
 		for (k=0; k<=lastAlphabet; k++) {
 			if (alphabet[k].repeat!=NON_REPETITIVE) break;
@@ -379,14 +379,13 @@ public class RepeatAlphabet {
 		for (i=k; i<=lastAlphabet; i++) alphabet[i].id=1;
 		for (i=k; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
-			charI=alphabet[i];
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarAfter(charI,distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarAfter(alphabet[i],distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
 			for (j=i-1; j>=0; j--) {
-				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarBefore(charI,distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarBefore(alphabet[i],distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
@@ -405,7 +404,7 @@ public class RepeatAlphabet {
 		System.err.println("Removing runs of similar characters... ");
 		for (i=0; i<=lastAlphabet; i++) alphabet[i].id=0;
 		first=0; alphabet[0].id=1;
-		for (i=1; i<lastAlphabet; i++) {
+		for (i=1; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			if (alphabet[i].repeat!=alphabet[first].repeat || !alphabet[i].sameOpen(alphabet[first]) || !alphabet[i].isSimilar(alphabet[i-1],distanceThreshold,lengthThreshold) || !alphabet[i].isSimilar(alphabet[first],distanceThreshold,lengthThreshold)) {
 				first=i; alphabet[i].id=1;
@@ -425,9 +424,8 @@ public class RepeatAlphabet {
 		initializeGraph(lastAlphabet+1);
 		for (i=0; i<lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
-			charI=alphabet[i];
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].tooFarAfter(charI,distanceThreshold,lengthThreshold)) break;
+				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].tooFarAfter(alphabet[i],distanceThreshold,lengthThreshold)) break;
 				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold) && alphabet[j].sameOpen(alphabet[i])) {
 					addEdge(i,j); addEdge(j,i);
 				}
@@ -504,7 +502,7 @@ public class RepeatAlphabet {
 		alphabet = new Character[lastAlphabet+1];
 		for (i=0; i<=lastAlphabet; i++) {
 			alphabet[i] = new Character();
-			alphabet[i].deserialize(br.readLine(),0);
+			alphabet[i].deserialize(br.readLine());
 		}
 		br.close();
 	}
@@ -1020,7 +1018,7 @@ public class RepeatAlphabet {
 				characters=newArray;
 			}
 			p=q+1;
-			for (i=0; i<=lastCharacter; i++) p=characters[i].deserialize(str,p);
+			for (i=0; i<=lastCharacter; i++) p=characters[i].deserialize(str);
 		}
 		
 		/**
@@ -1176,6 +1174,12 @@ public class RepeatAlphabet {
 		
 		public int compareTo(Object other) {
 			Character otherCharacter = (Character)other;
+			
+			if (repeat==NON_REPETITIVE && otherCharacter.repeat!=NON_REPETITIVE) return -1;
+			else if (repeat!=NON_REPETITIVE && otherCharacter.repeat==NON_REPETITIVE) return 1;
+			if (start==-1 && otherCharacter.start!=-1) return -1;
+			else if (start!=-1 && otherCharacter.start==-1) return 1;
+			
 			if (repeat<otherCharacter.repeat) return -1;
 			else if (repeat>otherCharacter.repeat) return 1;
 			if (orientation && !otherCharacter.orientation) return -1;
@@ -1210,7 +1214,7 @@ public class RepeatAlphabet {
 		}
 		
 		public String toString() {
-			return repeat+","+(orientation?"1":"0")+","+start+","+end+","+length+","+(openStart?"1":"0")+","+(openEnd?"1":"0");
+			return (repeat==NON_REPETITIVE?"0":"1")+SEPARATOR_MINOR+(start==-1?"0":"1")+SEPARATOR_MINOR+repeat+SEPARATOR_MINOR+(orientation?"1":"0")+SEPARATOR_MINOR+start+SEPARATOR_MINOR+end+SEPARATOR_MINOR+length+SEPARATOR_MINOR+(openStart?"1":"0")+SEPARATOR_MINOR+(openEnd?"1":"0");
 		}
 		
 		/**
@@ -1219,9 +1223,11 @@ public class RepeatAlphabet {
 		 * @param p the first position of $str$ to be read;
 		 * @return the value of $p$ when the procedure completes.
 		 */
-		public int deserialize(String str, int p) {
-			int q;
+		public int deserialize(String str) {
+			int p, q;
 			
+			p=str.indexOf(SEPARATOR_MINOR);  // Skipping
+			p=str.indexOf(SEPARATOR_MINOR,p+1)+1;  // Skipping
 			q=str.indexOf(SEPARATOR_MINOR,p+1);
 			repeat=Integer.parseInt(str.substring(p,q));
 			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
