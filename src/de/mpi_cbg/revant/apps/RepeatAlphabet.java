@@ -277,6 +277,7 @@ public class RepeatAlphabet {
 		lastPoint=nComponents-1;
 		
 		// Creating the sequence
+		if (newBlock==null) newBlock = new Block();
 		lastInSequence=-1;
 		// First non-repetitive block (if any).
 		i=points[0];
