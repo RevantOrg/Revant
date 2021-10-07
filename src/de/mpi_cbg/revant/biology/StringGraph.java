@@ -47,7 +47,7 @@ public class StringGraph {
 		str=br.readLine();
 		while (str!=null) {
 			Alignments.readAlignmentFile(str);
-			if ( (2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.endB+2)>MAX_ERROR ||
+			if ( (2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>MAX_ERROR ||
 				 (Alignments.startA>DISTANCE_THRESHOLD && Alignments.endA<READ_LENGTH-DISTANCE_THRESHOLD) ||
 				 (Alignments.startB>DISTANCE_THRESHOLD && Alignments.endB<READ_LENGTH-DISTANCE_THRESHOLD) ||
 				 (Alignments.startA<=DISTANCE_THRESHOLD && Alignments.endA>=READ_LENGTH-DISTANCE_THRESHOLD) ||

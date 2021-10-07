@@ -138,7 +138,7 @@ public class RepeatAlphabet {
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
-			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.endB+2)>maxError) {
+			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError) {
 				str=br.readLine(); row++;
 				continue;
 			}
@@ -361,9 +361,10 @@ public class RepeatAlphabet {
 	 * all surviving character instances by connected component.
 	 *
 	 * Remark: the sorted alphabet might contain long runs of characters where every pair
-	 * of adjacent characters with the same repeat and that satisfy $isSimilar()$. The 
-	 * procedure replaces such runs with equally-spaced characters, since otherwise a 
-	 * single character would be created that is the average of the entire long run.
+	 * of adjacent characters with the same repeat and that satisfy $isSimilar()$ by 
+	 * sliding the window slowly forward. The procedure replaces such runs with equally-
+	 * spaced characters, since otherwise a single character would be created that is the
+	 * average of the entire long run.
 	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
 	 * power, since it assumes they have not been added to $alphabet$.
@@ -619,9 +620,11 @@ public class RepeatAlphabet {
 	 * Like $buildAlphabet()$, but looks up in the alphabet every character of every block
 	 * of a recoded read.
 	 *
+	 * @param lastTranslatedRead the index in $Reads.readIDs$ of the last read that has 
+	 * already been translated (-1 if no read has been translated yet);
 	 * @param outputFile contains the translation of one read per line.
 	 */
-	public static final void translateReads(String alignmentsFile, double maxError, int distanceThreshold, int lengthThreshold, String outputFile) throws IOException {
+	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int distanceThreshold, int lengthThreshold, String outputFile) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		int i, j;
@@ -649,11 +652,11 @@ public class RepeatAlphabet {
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
 		str=br.readLine(); 
-		previousReadA=-1; lastAlignment=-1; row=0; j=0;
+		previousReadA=-1; lastAlignment=-1; row=0; j=lastTranslatedRead+1;
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
-			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.endB+2)>maxError) {
+			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError) {
 				str=br.readLine(); row++;
 				continue;
 			}
