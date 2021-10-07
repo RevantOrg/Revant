@@ -27,7 +27,7 @@ public class SplitCharacterInstances {
 		fileID=0; nInstancesInFile=0;
 		outputFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+".txt"));
 		headerFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+"-header.txt"));
-		lastNonrepetitive=-1; lastPeriodic=-1; maxOpenLength_nonperiodic=-1;
+		lastNonrepetitive=-1; lastPeriodic=-1; maxOpenLength_nonperiodic=0;
 		previousCharacter = new RepeatAlphabet.Character();
 		character = new RepeatAlphabet.Character();
 		br = new BufferedReader(new FileReader(INPUT_FILE),IO.BUFFER_SIZE);
@@ -44,12 +44,12 @@ public class SplitCharacterInstances {
 				fileID++;
 				outputFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+".txt"));
 				headerFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+"-header.txt"));
-				nInstancesInFile=0; lastNonrepetitive=-1; lastPeriodic=-1; maxOpenLength_nonperiodic=-1;
+				nInstancesInFile=0; lastNonrepetitive=-1; lastPeriodic=-1; maxOpenLength_nonperiodic=0;
 			}
 			outputFile.write(str); outputFile.newLine(); nInstancesInFile++;
 			if (character.repeat==RepeatAlphabet.NON_REPETITIVE) lastNonrepetitive=nInstancesInFile-1;
 			else if (character.start==-1) lastPeriodic=nInstancesInFile-1;
-			else if (character.isOpen()) maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,character.length);
+			else if (character.isOpen()) maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,character.getLength());
 			previousCharacter.copyFrom(character);
 			str=br.readLine();
 		}

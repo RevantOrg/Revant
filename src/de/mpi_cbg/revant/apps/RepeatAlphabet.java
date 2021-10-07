@@ -129,6 +129,7 @@ public class RepeatAlphabet {
 		if (tmpCharacter==null) tmpCharacter = new Character();
 		
 		// Collecting characters from all recoded reads
+		maxOpenLength_nonperiodic=0;
 		bw = new BufferedWriter(new FileWriter(outputFile));
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
@@ -380,12 +381,16 @@ public class RepeatAlphabet {
 		for (i=k; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarAfter(alphabet[i],distanceThreshold,lengthThreshold)) break;
+				if ( alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation || 
+					 alphabet[j].implies_tooFarAfter(alphabet[i],distanceThreshold,lengthThreshold)
+				   ) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
 			for (j=i-1; j>=0; j--) {
-				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].implies_tooFarBefore(alphabet[i],distanceThreshold,lengthThreshold)) break;
+				if ( alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation || 
+					 alphabet[j].implies_tooFarBefore(alphabet[i],distanceThreshold,lengthThreshold)
+				   ) break;
 				if (alphabet[j].id==0) continue;
 				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
 			}
@@ -406,7 +411,11 @@ public class RepeatAlphabet {
 		first=0; alphabet[0].id=1;
 		for (i=1; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
-			if (alphabet[i].repeat!=alphabet[first].repeat || !alphabet[i].sameOpen(alphabet[first]) || !alphabet[i].isSimilar(alphabet[i-1],distanceThreshold,lengthThreshold) || !alphabet[i].isSimilar(alphabet[first],distanceThreshold,lengthThreshold)) {
+			if ( alphabet[i].repeat!=alphabet[first].repeat || alphabet[i].orientation!=alphabet[first].orientation || 
+			     !alphabet[i].sameOpen(alphabet[first]) || 
+			     !alphabet[i].isSimilar(alphabet[i-1],distanceThreshold,lengthThreshold) || 
+			     !alphabet[i].isSimilar(alphabet[first],distanceThreshold,lengthThreshold)
+			   ) {
 				first=i; alphabet[i].id=1;
 			}			
 		}
@@ -425,7 +434,9 @@ public class RepeatAlphabet {
 		for (i=0; i<lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			for (j=i+1; j<=lastAlphabet; j++) {
-				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].tooFarAfter(alphabet[i],distanceThreshold,lengthThreshold)) break;
+				if ( alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation || 
+					 alphabet[j].tooFarAfter(alphabet[i],distanceThreshold,lengthThreshold)
+				   ) break;
 				if (alphabet[j].isSimilar(alphabet[i],distanceThreshold,lengthThreshold) && alphabet[j].sameOpen(alphabet[i])) {
 					addEdge(i,j); addEdge(j,i);
 				}
@@ -445,9 +456,13 @@ public class RepeatAlphabet {
 			for (i=mergedCharacters.length; i<newArray.length; i++) newArray[i] = new Character();
 			mergedCharacters=newArray;
 		}
+		for (i=0; i<nComponents; i++) mergedCharacters[i].reset();
 		for (i=0; i<=lastAlphabet; i++) {
 			tmpChar=mergedCharacters[connectedComponent[i]];
-			if (tmpChar.id==-1) tmpChar.copyFrom(alphabet[i]);
+			if (tmpChar.id==-1) {
+				tmpChar.copyFrom(alphabet[i]);
+				tmpChar.id=0;
+			}
 			else tmpChar.addCharacterEnds(alphabet[i]);
 		}
 		for (i=0; i<nComponents; i++) mergedCharacters[i].normalizeCharacterEnds(connectedComponentSize[i]);
@@ -743,11 +758,15 @@ public class RepeatAlphabet {
 	 * Same logic as $translateRead_nonrepetitive()$.
 	 */
 	private static final void translate_periodic(Block block, int lengthThreshold, BufferedWriter bw) throws IOException {
+		final int CAPACITY = 100;  // Arbitrary
 		int i, j;
-		int repeat, length;
+		int repeat, length, last;
 		final int lastCharacter = block.lastCharacter;
 		Character character;
 		
+		// Collecting characters
+		if (stack==null) stack = new int[CAPACITY];
+		last=-1;
 		for (j=0; j<=lastCharacter; j++) {
 			character=block.characters[j];
 			repeat=character.repeat; length=character.length;
@@ -763,18 +782,18 @@ public class RepeatAlphabet {
 					System.err.println("first candidate in alphabet: "+alphabet[i]);
 					System.exit(1);
 				}
-				bw.write((-1-i)+"");
+				last=appendToStack(-1-i,last);
 			}
 			else {
 				if (i<=lastPeriodic && alphabet[i].repeat==repeat) {
 					if (i-1>lastNonrepetitive && alphabet[i-1].repeat==repeat) {
-						if (alphabet[i].length-length<length-alphabet[i-1].length) bw.write(i+"");
-						else bw.write((i-1)+"");
+						if (alphabet[i].length-length<length-alphabet[i-1].length) last=appendToStack(i,last);
+						else last=appendToStack(i-1,last);
 					}
-					else bw.write(i+"");
+					else last=appendToStack(i,last);
 				}
 				else {
-					if (i-1>lastNonrepetitive && alphabet[i-1].repeat==repeat) bw.write((i-1)+"");
+					if (i-1>lastNonrepetitive && alphabet[i-1].repeat==repeat) last=appendToStack(i-1,last);
 					else {
 						System.err.println("translateRead_periodic> ERROR: closed periodic character not found in the alphabet:");
 						System.err.println("query: "+character);
@@ -785,6 +804,31 @@ public class RepeatAlphabet {
 			}
 			if (j<lastCharacter) bw.write(SEPARATOR_MINOR);
 		}
+		
+		// Removing duplicates
+		if (last>0) Arrays.sort(stack,0,last+1);
+		j=stack[0]; bw.write(stack[0]+"");
+		for (i=1; i<=last; i++) {
+			if (stack[i]==j) continue;
+			bw.write(SEPARATOR_MINOR+stack[i]);
+			j=stack[i];
+		}
+	}
+	
+	
+	/**
+	 * @param last last element currently in the stack;
+	 * @return the new value of $last$.
+	 */
+	private static final int appendToStack(int value, int last) {
+		last++;
+		if (last==stack.length) {
+			int[] newArray = new int[stack.length<<1];
+			System.arraycopy(stack,0,newArray,0,stack.length);
+			stack=newArray;
+		}
+		stack[last]=value;
+		return last;
 	}
 	
 	
@@ -797,75 +841,55 @@ public class RepeatAlphabet {
 	private static final void translate(Block block, int distanceThreshold, BufferedWriter bw) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
 		int i, j, k;
-		int lastCharacter, repeat, length;
-		final int last = block.lastCharacter;
+		int last, repeat, length;
+		final int lastCharacter = block.lastCharacter;
 		Character character;
 		
+		// Collecting characters
 		if (stack==null) stack = new int[CAPACITY];
-		for (k=0; k<=last; k++) {
+		last=-1;
+		for (k=0; k<=lastCharacter; k++) {
 			character=block.characters[k];
 			repeat=character.repeat; length=character.length;
 			i=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,character);
 			if (i<0) i=-1-i;
-			lastCharacter=-1;
 			if (character.isOpen()) {
 				for (j=i+1; j<=lastAlphabet; j++) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarAfter(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
-					if (alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)) {
-						lastCharacter++;
-						if (lastCharacter==stack.length) {
-							int[] newArray = new int[stack.length<<1];
-							System.arraycopy(stack,0,newArray,0,stack.length);
-							stack=newArray;
-						}
-						stack[lastCharacter]=j;
-					}
+					if ( alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || 
+						 alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)
+					   ) last=appendToStack(j,last);
 				}
 				for (j=i-1; j>lastPeriodic; j--) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarBefore(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
-					if (alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)) {
-						lastCharacter++;
-						if (lastCharacter==stack.length) {
-							int[] newArray = new int[stack.length<<1];
-							System.arraycopy(stack,0,newArray,0,stack.length);
-							stack=newArray;
-						}
-						stack[lastCharacter]=j;
-					}
+					if ( alphabet[j].implies(character,distanceThreshold,Math.POSITIVE_INFINITY) || 
+					     alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY)
+					   ) last=appendToStack(j,last);
 				}
-				if (lastCharacter>0) Arrays.sort(stack,0,lastCharacter+1);
-				bw.write(stack[0]+"");
-				for (j=1; j<=lastCharacter; j++) bw.write(SEPARATOR_MINOR+stack[j]);
 			}
 			else {
 				for (j=i+1; j<=lastAlphabet; j++) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarAfter(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
-					if (alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && alphabet[j].sameOpen(character)) {
-						lastCharacter++;
-						if (lastCharacter==stack.length) {
-							int[] newArray = new int[stack.length<<1];
-							System.arraycopy(stack,0,newArray,0,stack.length);
-							stack=newArray;
-						}
-						stack[lastCharacter]=j;
-					}
+					if ( alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && 
+					     alphabet[j].sameOpen(character)
+					   ) last=appendToStack(j,last);
 				}
 				for (j=i-1; j>lastPeriodic; j--) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].implies_tooFarBefore(character,distanceThreshold,Math.POSITIVE_INFINITY)) break;
-					if (alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && alphabet[j].sameOpen(character)) {
-						lastCharacter++;
-						if (lastCharacter==stack.length) {
-							int[] newArray = new int[stack.length<<1];
-							System.arraycopy(stack,0,newArray,0,stack.length);
-							stack=newArray;
-						}
-						stack[lastCharacter]=j;
-					}
+					if ( alphabet[j].isSimilar(character,distanceThreshold,Math.POSITIVE_INFINITY) && 
+					     alphabet[j].sameOpen(character)
+					   ) last=appendToStack(j,last);
 				}
-				if (lastCharacter>0) Arrays.sort(stack,0,lastCharacter+1);
-				bw.write(stack[0]+"");
-				for (j=1; j<=lastCharacter; j++) bw.write(SEPARATOR_MINOR+stack[j]);
 			}
+		}
+		
+		// Removing duplicates
+		if (last>0) Arrays.sort(stack,0,last+1);
+		j=stack[0]; bw.write(stack[0]+"");
+		for (i=1; i<=last; i++) {
+			if (stack[i]==j) continue;
+			bw.write(SEPARATOR_MINOR+stack[i]);
+			j=stack[i];
 		}
 	}
 	
