@@ -1239,7 +1239,12 @@ public class RepeatAlphabet {
 						) return false;
 			}
 			else {  // Nonperiodic
-				if (Intervals.areApproximatelyIdentical(otherCharacter.start,otherCharacter.end,start,end)) return false;
+				if (Intervals.areApproximatelyIdentical(otherCharacter.start,otherCharacter.end,start,end)) {
+					if (Math.abs(getLength(),repeatLengths[repeat])<=lengthThreshold) {
+						return (!openStart && otherCharacter.openStart) || (!openEnd && otherCharacter.openEnd);
+					}
+					else return false;
+				}
 				else if (Intervals.isApproximatelyContained(otherCharacter.start,otherCharacter.end,start,end)) {
 					if ( (Math.abs(start,otherCharacter.start)<=distanceThreshold && !openStart && otherCharacter.openStart) ||
 						 (otherCharacter.start>start+distanceThreshold && !otherCharacter.openStart) ||

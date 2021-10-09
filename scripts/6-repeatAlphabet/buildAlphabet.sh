@@ -66,7 +66,7 @@ function compactionThread() {
 	PREFIX_2=$3
 	PREFIX_3=$4
 	cat ${PREFIX_1}${INSTANCES_FILE_ID}-header.txt ${PREFIX_1}${INSTANCES_FILE_ID}.txt > ${PREFIX_2}${INSTANCES_FILE_ID}.txt
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactCharacterInstances ${PREFIX_2}${INSTANCES_FILE_ID}.txt ${PREFIX_3}${INSTANCES_FILE_ID}.txt
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactCharacterInstances ${PREFIX_2}${INSTANCES_FILE_ID}.txt ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${PREFIX_3}${INSTANCES_FILE_ID}.txt
 }
 if [ -e ${PARTS_PREFIX}-5-${SPLIT_IN_PARTS}.txt ]; then
 	TO=${SPLIT_IN_PARTS}
