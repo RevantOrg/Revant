@@ -358,8 +358,8 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Removes character instances that can be considered substrings of others, then 
-	 * quantizes the endpoints of every repeat.
+	 * Quantizes the endpoints of every repeat and removes character instances that can be
+	 * considered substrings of others.
 	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
 	 * power, since it assumes they have not been added to $alphabet$ in ther first place.
@@ -370,23 +370,76 @@ public class RepeatAlphabet {
 		int first;
 		Character tmpChar;
 		
+		System.err.println("Quantizing characters... ");
+		for (i=0; i<=lastAlphabet; i++) {
+boolean fabio = alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==835;
+if (fabio) System.err.println("compactInstances> 1  original character:  "+alphabet[i]);
+			alphabet[i].quantize(QUANTUM);
+if (fabio) System.err.println("compactInstances> 1  quantized character: "+alphabet[i]);
+		}
+		Arrays.sort(alphabet,0,lastAlphabet+1);
+		j=0;
+		for (i=1; i<=lastAlphabet; i++) {
+boolean fabio = (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==800) ||
+	            (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==1400);
+			if ( alphabet[i].repeat!=alphabet[j].repeat || alphabet[i].orientation!=alphabet[j].orientation || 
+				 alphabet[i].start!=alphabet[j].start || alphabet[i].end!=alphabet[j].end || alphabet[i].length!=alphabet[j].length ||
+			     alphabet[i].openStart!=alphabet[j].openStart || alphabet[i].openEnd!=alphabet[j].openEnd
+			   ) {
+if (fabio) System.err.println("compactInstances> 2  character added to quantized alphabet: "+alphabet[i]);				   
+				j++;
+				tmpChar=alphabet[j];
+				alphabet[j]=alphabet[i];
+				alphabet[i]=tmpChar;
+			}
+else {
+	if (fabio) System.err.println("compactInstances> 3  character NOT ADDED to quantized alphabet: "+alphabet[i]);
+}			
+		}
+		lastAlphabet=j;
+		lastUnique=-1; i=0;
+		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) {
+			alphabet[i].id=i;
+			lastUnique=i;
+			i++;
+		}
+		lastPeriodic=lastUnique;
+		while (i<=lastAlphabet && alphabet[i].start==-1) {
+			alphabet[i].id=i;
+			lastPeriodic=i;
+			i++;
+		}
+		while (i<=lastAlphabet) {
+			alphabet[i].id=i;
+			i++;
+		}
+		System.err.println("DONE");
+		
 		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+(lastUnique+1)+" non-repetitive characters)");
 		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].id=1;
 		for (i=lastUnique+1; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if ( alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation || 
-					 alphabet[j].implies_tooFarAfter(alphabet[i],distanceThreshold,lengthThreshold)
+					 alphabet[j].implies_tooFarAfter(alphabet[i])
 				   ) break;
 				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) {
+					alphabet[j].id=0;
+if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) ||
+	 (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==1400)
+   ) System.err.println("compactInstances> 4  character "+alphabet[j]+" is implied by character "+alphabet[i]);
+				}
 			}
 			for (j=i-1; j>=0; j--) {
-				if ( alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation || 
-					 alphabet[j].implies_tooFarBefore(alphabet[i],distanceThreshold,lengthThreshold)
-				   ) break;
+				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation) break;
 				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold,lengthThreshold)) alphabet[j].id=0;
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) {
+					alphabet[j].id=0;
+if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) ||
+	 (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==1400)
+   ) System.err.println("compactInstances> 5  character "+alphabet[j]+" is implied by character "+alphabet[i]);
+				}
 			}
 		}
 		j=lastUnique;
@@ -398,41 +451,10 @@ public class RepeatAlphabet {
 			alphabet[i]=tmpChar;
 		}
 		lastAlphabet=j;
+		lastPeriodic=lastUnique; i=lastUnique+1;
+		while (i<=lastAlphabet && alphabet[i].start==-1) i++;
+		lastPeriodic=i-1;
 		System.err.println("DONE  "+(lastAlphabet+1)+" characters after filtering.");
-		
-		System.err.println("Quantizing the surviving characters... ");
-		for (i=0; i<=lastAlphabet; i++) alphabet[i].quantize(QUANTUM);
-		Arrays.sort(alphabet,0,lastAlphabet+1);
-		j=0;
-		for (i=1; i<=lastAlphabet; i++) {
-			if ( alphabet[i].repeat!=alphabet[j].repeat || alphabet[i].orientation!=alphabet[j].orientation || 
-				 alphabet[i].start!=alphabet[j].start || alphabet[i].end!=alphabet[j].end || alphabet[i].length!=alphabet[j].length ||
-			     alphabet[i].openStart!=alphabet[j].openStart || alphabet[i].openEnd!=alphabet[j].openEnd
-			   ) {
-				j++;
-				tmpChar=alphabet[j];
-				alphabet[j]=alphabet[i];
-				alphabet[i]=tmpChar;
-			}
-		}
-		lastAlphabet=j;
-		lastUnique=-1; lastPeriodic=-1;
-		i=0;
-		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) {
-			alphabet[i].id=i;
-			lastUnique=i;
-			i++;
-		}
-		while (i<=lastAlphabet && alphabet[i].start==-1) {
-			alphabet[i].id=i;
-			lastPeriodic=i;
-			i++;
-		}
-		while (i<=lastAlphabet) {
-			alphabet[i].id=i;
-			i++;
-		}
-		System.err.println("DONE");
 	}
 	
 	
@@ -614,10 +636,7 @@ public class RepeatAlphabet {
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
 						if (lastInSequence<=0) bw.newLine();
-						else {
-if (previousReadA==649064) System.err.println("VITTU> previousReadA="+previousReadA+" lastInSequence="+lastInSequence);
-							translateRead(bw,quantum);
-						}
+						else translateRead(bw,quantum);
 					}
 					else bw.newLine();
 					j++;
@@ -660,33 +679,15 @@ if (previousReadA==649064) System.err.println("VITTU> previousReadA="+previousRe
 		int i, j;
 		
 		for (i=0; i<=sequence[0].lastCharacter; i++) sequence[0].characters[i].quantize(quantum);
-		if (sequence[0].isUnique()) {
-System.err.println("   0 -> 0");
-			translate_unique(sequence[0],bw);
-		}
-		else if (sequence[0].characters[0].start==-1) {
-System.err.println("   0 -> 1");
-			translate_periodic(sequence[0],bw);
-		}
-		else {
-System.err.println("   0 -> 2");
-			translate(sequence[0],quantum,bw);
-		}
+		if (sequence[0].isUnique()) translate_unique(sequence[0],bw);
+		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],bw);
+		else translate(sequence[0],quantum,bw);
 		for (i=1; i<=lastInSequence; i++) {
 			bw.write(SEPARATOR_MAJOR+"");
 			for (j=0; j<=sequence[i].lastCharacter; j++) sequence[i].characters[j].quantize(quantum);
-			if (sequence[i].isUnique()) {
-System.err.println("   "+i+" -> 0");
-				translate_unique(sequence[i],bw);
-			}
-			else if (sequence[i].characters[0].start==-1) {
-System.err.println("   "+i+" -> 1");
-				translate_periodic(sequence[i],bw);
-			}
-			else {
-System.err.println("   "+i+" -> 2");
-				translate(sequence[i],quantum,bw);
-			}
+			if (sequence[i].isUnique()) translate_unique(sequence[i],bw);
+			else if (sequence[i].characters[0].start==-1) translate_periodic(sequence[i],bw);
+			else translate(sequence[i],quantum,bw);
 		}
 		bw.newLine();
 	}
@@ -821,19 +822,15 @@ System.err.println("   "+i+" -> 2");
 				if (i<0) i=-1-i;
 				found=false;
 				for (j=i; j<=lastAlphabet; j++) {
-					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation || alphabet[j].implies_tooFarAfter(character,quantum,Math.POSITIVE_INFINITY)) break;
-					if ( alphabet[j].implies(character,quantum,Math.POSITIVE_INFINITY) || 
-						 alphabet[j].isSimilar(character,quantum,Math.POSITIVE_INFINITY)
-					   ) {
+					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation || alphabet[j].implies_tooFarAfter(character)) break;
+					if (alphabet[j].implies(character,quantum) || alphabet[j].isSimilar(character)) {
 					   found=true;
 					   last=appendToStack(j,last);
 					}
 				}
 				for (j=i-1; j>lastPeriodic; j--) {
-					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation || alphabet[j].implies_tooFarBefore(character,quantum,Math.POSITIVE_INFINITY)) break;
-					if ( alphabet[j].implies(character,quantum,Math.POSITIVE_INFINITY) || 
-					     alphabet[j].isSimilar(character,quantum,Math.POSITIVE_INFINITY)
-					   ) {
+					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation) break;
+					if (alphabet[j].implies(character,quantum) || alphabet[j].isSimilar(character)) {
 						found=true;
 						last=appendToStack(j,last);
 					}
@@ -873,12 +870,11 @@ System.err.println("   "+i+" -> 2");
 	/**
 	 *
 	 * @param characterCount one cell per character of the alphabet, plus one; assumed to 
-	 * be all zeros;
-	 * @param histogram columns: 0=unique; 1=periodic; 2=other; assumed to be all zeros.
+	 * be all zeros.
 	 */
-	public static final void getCharacterStatistics(String str, int[] characterCount, int[][] histogram) {
-		int i, j, k, c;
-		int to, length;
+	public static final void incrementCharacterCounts(String str, long[] characterCount) {
+		int i, j, k;
+		int to, c;
 		String[] tokens;
 		String[][] blocks;
 		
@@ -895,7 +891,6 @@ System.err.println("   "+i+" -> 2");
 		}
 		for (i=0; i<blocks.length; i++) {
 			for (j=0; j<blocks[i].length; j++) {
-if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str);				
 				c=Integer.parseInt(blocks[i][j]);
 				if (c<0) {
 					c=-1-c;
@@ -905,23 +900,6 @@ if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str
 				else characterCount[c]++;
 			}
 		}
-		
-		// Building histogram
-		length=histogram.length;
-		for (i=0; i<=lastUnique; i++) {
-			c=Math.min(characterCount[i],length-1);
-			histogram[c][0]++;
-		}
-		for (i=lastUnique+1; i<=lastPeriodic; i++) {
-			c=Math.min(characterCount[i],length-1);
-			histogram[c][1]++;
-		}
-		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
-			c=Math.min(characterCount[i],length-1);
-			histogram[c][2]++;
-		}
-		c=Math.min(characterCount[lastAlphabet+1],length-1);
-		histogram[c][1]++;
 	}
 	
 	
@@ -1274,13 +1252,6 @@ if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str
 			return 0;
 		}
 		
-		/**
-		 * Assumes the same order as in $compareTo()$.
-		 */
-		public final boolean tooFarAfter(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
-			return start>otherCharacter.start+distanceThreshold || end>otherCharacter.end+distanceThreshold || length>otherCharacter.length+lengthThreshold;
-		}
-		
 		public final void copyFrom(Character otherCharacter) {
 			repeat=otherCharacter.repeat;
 			orientation=otherCharacter.orientation;
@@ -1338,13 +1309,13 @@ if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str
 		
 		
 		/**
-		 * Remark: the two characters are assumed both to be repetitive and to have the
-		 * same repeat. Unique characters are not assumed to imply one another, since 
-		 * fully-open and half-open unique characters are assumed to have been discarded.
+		 * Both characters are assumed to be quantized, and repetitive with the same 
+		 * repeat. Unique characters are not assumed to imply one another, since fully-
+		 * open and half-open unique characters are assumed to have been discarded.
 		 */
-		public final boolean implies(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
+		public final boolean implies(Character otherCharacter, int quantum) {
 			if (start==-1) {  // Periodic
-				if (Math.abs(length,otherCharacter.length)<=lengthThreshold) return false;
+				if (length!=otherCharacter.length) return false;
 				else if (length<otherCharacter.length) return false;
 				else if ( (!otherCharacter.openStart && !otherCharacter.openEnd) ||
 					      (!otherCharacter.openStart && openStart) ||
@@ -1352,17 +1323,20 @@ if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str
 						) return false;
 			}
 			else {  // Nonperiodic
-				if (Intervals.areApproximatelyIdentical(otherCharacter.start,otherCharacter.end,start,end)) {
-					if (Math.abs(getLength(),repeatLengths[repeat])<=lengthThreshold) {
-						return (!openStart && otherCharacter.openStart) || (!openEnd && otherCharacter.openEnd);
+				if (otherCharacter.start==start && otherCharacter.end==end) {
+					if (Math.abs(getLength(),repeatLengths[repeat])<=quantum) {
+						if ( (!openStart && !openEnd && (otherCharacter.openStart || otherCharacter.openEnd)) ||
+							 ((!openStart || !openEnd) && otherCharacter.openStart && otherCharacter.openEnd)
+						   ) return true;
+						else return false;
 					}
 					else return false;
 				}
-				else if (Intervals.isApproximatelyContained(otherCharacter.start,otherCharacter.end,start,end)) {
-					if ( (Math.abs(start,otherCharacter.start)<=distanceThreshold && !openStart && otherCharacter.openStart) ||
-						 (otherCharacter.start>start+distanceThreshold && !otherCharacter.openStart) ||
-						 (Math.abs(end,otherCharacter.end)<=distanceThreshold && !openEnd && otherCharacter.openEnd) ||
-						 (otherCharacter.end<end-distanceThreshold && !otherCharacter.openEnd)
+				else if (Intervals.isContained(otherCharacter.start,otherCharacter.end,start,end)) {
+					if ( (start==otherCharacter.start && openStart && !otherCharacter.openStart) ||
+						 (otherCharacter.start>start && !otherCharacter.openStart) ||
+						 (end==otherCharacter.end && openEnd && !otherCharacter.openEnd) ||
+						 (otherCharacter.end<end && !otherCharacter.openEnd)
 					   ) return false;
 				}
 				else return false;
@@ -1372,25 +1346,15 @@ if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str
 		
 		
 		/**
-		 * Assumes that the container blocks have the same repeats, and uses the same
-		 * criteria as $implies()$.
+		 * Assumes that the characters have the same repeats, and uses the same criteria 
+		 * as $implies()$.
 		 */
-		public final boolean implies_tooFarAfter(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
+		public final boolean implies_tooFarAfter(Character otherCharacter) {
 			if (start==-1) {  // Periodic
-				return length>otherCharacter.length+lengthThreshold;
+				return length>otherCharacter.length;
 			}
 			else {  // Nonperiodic
-				return start>=otherCharacter.end-distanceThreshold;
-			}
-		}
-		
-		
-		public final boolean implies_tooFarBefore(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
-			if (start==-1) {  // Periodic
-				return false;
-			}
-			else {  // Nonperiodic
-				return start<otherCharacter.start-distanceThreshold;
+				return start>=otherCharacter.end;
 			}
 		}
 		
@@ -1401,34 +1365,11 @@ if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str
 		
 		
 		/**
-		 * Remark: the procedure assumes that the two characters have the same repeat.
+		 * Assumes that the characters have the same repeat and are quantized.
 		 */
-		public final boolean isSimilar(Character otherCharacter, int distanceThreshold, int lengthThreshold) {
-			if ( Math.abs(start,otherCharacter.start)>distanceThreshold || 
-				 Math.abs(end,otherCharacter.end)>distanceThreshold || 
-				 Math.abs(length,otherCharacter.length)>lengthThreshold
-			   ) return false;
-			return true;
-		}
-		
-		
-		/**
-		 * Adds the character ends of $otherCharacter$ to those of the current character, 
-		 * assuming that $otherCharacter$ has the same repeat and satisfies $isSimilar()$.
-		 */
-		public final void addCharacterEnds(Character otherCharacter) {
-			start+=otherCharacter.start;
-			end+=otherCharacter.end;
-			length+=otherCharacter.length;
-		}
-		
-		
-		/**
-		 * Divides every character end by $denominator$.
-		 */
-		public final void normalizeCharacterEnds(int denominator) {
-			start/=denominator; end/=denominator;
-			length/=denominator;
+		public final boolean isSimilar(Character otherCharacter) {
+			return start==otherCharacter.start && end==otherCharacter.end && length==otherCharacter.length && 
+				   openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
 		}
 		
 		
