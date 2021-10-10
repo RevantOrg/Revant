@@ -636,7 +636,10 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
 						if (lastInSequence<=0) bw.newLine();
-						else translateRead(bw,quantum);
+						else {
+System.err.println("Translating read "+previousReadA);							
+							translateRead(bw,quantum);
+						}
 					}
 					else bw.newLine();
 					j++;
@@ -666,7 +669,10 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 			if (lastAlignment!=-1) {
 				recodeRead(quantum);
 				if (lastInSequence<=0) bw.newLine();
-				else translateRead(bw,quantum);
+				else {
+System.err.println("Translating read "+previousReadA);
+					translateRead(bw,quantum);
+				}
 			}
 			else bw.newLine();
 			j++;
@@ -677,7 +683,7 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 	
 	private static final void translateRead(BufferedWriter bw, int quantum) throws IOException {
 		int i, j;
-		
+				
 		for (i=0; i<=sequence[0].lastCharacter; i++) sequence[0].characters[i].quantize(quantum);
 		if (sequence[0].isUnique()) translate_unique(sequence[0],bw);
 		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],bw);
@@ -909,7 +915,7 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
      *
 	 * @param sb temporary space, assumed to be empty.
 	 */
-	public static final void getKmers(String str, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
+	public static final void getKmers(String str, int k, Hashtable<String,Long> kmers, StringBuilder sb) {
 		int i;
 		int nBlocks;
 		String[] tokens;
@@ -943,10 +949,10 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 	 *
 	 * @param sb temporary space.
 	 */
-	private static final void loadTranslatedRead_impl(String[][] blocks, int first, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
+	private static final void loadTranslatedRead_impl(String[][] blocks, int first, int k, Hashtable<String,Long> kmers, StringBuilder sb) {
 		int i;
 		int top, row, column, lastChild, length;
-		Integer value;
+		Long value;
 		String key;
 		
 		top=-1;
@@ -955,8 +961,8 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 			row=stack[top]; column=stack[top-1]; lastChild=stack[top-2];
 			if (row==first+k-1) {
 				key=sb.toString(); value=kmers.get(key);
-				if (value==null) kmers.put(key,Integer.valueOf(1));
-				else kmers.put(key,Integer.valueOf(value.intValue()+1));
+				if (value==null) kmers.put(key,Long.valueOf(1));
+				else kmers.put(key,Long.valueOf(value.longValue()+1));
 			}
 			if (row==first+k-1 || lastChild==blocks[row+1].length-1) {
 				top-=3;
