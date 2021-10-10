@@ -37,7 +37,7 @@ public class SplitCharacterInstances {
 			if (character.repeat!=previousCharacter.repeat && nInstancesInFile>=quantum) {
 				if (outputFile!=null) {
 					outputFile.close();
-					headerFile.write(lastUnique+RepeatAlphabet.SEPARATOR_MINOR+lastPeriodic+RepeatAlphabet.SEPARATOR_MINOR+(nInstancesInFile-1)+RepeatAlphabet.SEPARATOR_MINOR+maxOpenLength_nonperiodic);
+					headerFile.write(lastUnique+(RepeatAlphabet.SEPARATOR_MINOR+"")+lastPeriodic+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nInstancesInFile-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+maxOpenLength_nonperiodic);
 					headerFile.newLine(); headerFile.close();
 					System.out.println(nInstancesInFile+" instances");
 				}
@@ -54,7 +54,7 @@ public class SplitCharacterInstances {
 			str=br.readLine();
 		}
 		br.close(); outputFile.close();
-		headerFile.write(lastUnique+RepeatAlphabet.SEPARATOR_MINOR+lastPeriodic+RepeatAlphabet.SEPARATOR_MINOR+(nInstancesInFile-1)+RepeatAlphabet.SEPARATOR_MINOR+maxOpenLength_nonperiodic);
+		headerFile.write(lastUnique+(RepeatAlphabet.SEPARATOR_MINOR+"")+lastPeriodic+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nInstancesInFile-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+maxOpenLength_nonperiodic);
 		headerFile.newLine(); headerFile.close();
 		System.out.println(nInstancesInFile+" instances");
 	}

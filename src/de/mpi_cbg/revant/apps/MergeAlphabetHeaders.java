@@ -25,7 +25,7 @@ public class MergeAlphabetHeaders {
 				br = new BufferedReader(new FileReader(HEADERS_DIR+"/"+files[i]));
 				str=br.readLine();
 				br.close();
-				tokens=str.split(RepeatAlphabet.SEPARATOR_MINOR);
+				tokens=str.split(RepeatAlphabet.SEPARATOR_MINOR+"");
 				p=Integer.parseInt(tokens[0]);
 				q=Integer.parseInt(tokens[1]);
 				r=Integer.parseInt(tokens[2]);
@@ -34,7 +34,7 @@ public class MergeAlphabetHeaders {
 			}
 		}
 		bw = new BufferedWriter(new FileWriter(OUTPUT_FILE));
-		bw.write((nUnique-1)+RepeatAlphabet.SEPARATOR_MINOR+(nUnique+nPeriodic-1)+RepeatAlphabet.SEPARATOR_MINOR+(nCharacters-1)+RepeatAlphabet.SEPARATOR_MINOR+maxOpenLength_nonperiodic);
+		bw.write((nUnique-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nUnique+nPeriodic-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nCharacters-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+maxOpenLength_nonperiodic);
 		bw.newLine(); bw.close();
 	}
 

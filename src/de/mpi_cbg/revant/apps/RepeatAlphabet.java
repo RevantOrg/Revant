@@ -16,8 +16,8 @@ import de.mpi_cbg.revant.factorize.Intervals;
  */
 public class RepeatAlphabet {
 	public static final int UNIQUE = -1;
-	public static final String SEPARATOR_MINOR = ",";
-	public static final String SEPARATOR_MAJOR = ":";
+	public static final char SEPARATOR_MINOR = ',';
+	public static final char SEPARATOR_MAJOR = ':';
 	
 	/**
 	 * Length of every repeat
@@ -62,7 +62,7 @@ public class RepeatAlphabet {
 	 */
 	private static int[][] neighbors;
 	private static int[] lastNeighbor;
-	private static int[] stack, connectedComponent, connectedComponentSize;
+	private static int[] stack, stack2, connectedComponent, connectedComponentSize;
 	private static int nComponents;
 	private static Character[] mergedCharacters;
 	
@@ -438,7 +438,7 @@ public class RepeatAlphabet {
 	
 	public static final void serializeAlphabet(String path) throws IOException {
 		BufferedWriter bw = new BufferedWriter(new FileWriter(path));
-		bw.write(lastUnique+SEPARATOR_MINOR+lastPeriodic+SEPARATOR_MINOR+lastAlphabet+SEPARATOR_MINOR+maxOpenLength_nonperiodic+"\n");
+		bw.write(lastUnique+(SEPARATOR_MINOR+"")+lastPeriodic+(SEPARATOR_MINOR+"")+lastAlphabet+(SEPARATOR_MINOR+"")+maxOpenLength_nonperiodic+"\n");
 		for (int i=0; i<=lastAlphabet; i++) bw.write(alphabet[i].toString()+"\n");
 		bw.close();
 	}
@@ -451,11 +451,11 @@ public class RepeatAlphabet {
 		
 		br = new BufferedReader(new FileReader(path));
 		str=br.readLine();
-		p=str.indexOf(SEPARATOR_MINOR);
+		p=str.indexOf(SEPARATOR_MINOR+"");
 		lastUnique=Integer.parseInt(str.substring(0,p));
-		p++; q=str.indexOf(SEPARATOR_MINOR,p+1);
+		p++; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 		lastPeriodic=Integer.parseInt(str.substring(p,q));
-		p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+		p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 		lastAlphabet=Integer.parseInt(str.substring(p,q));
 		maxOpenLength_nonperiodic=Integer.parseInt(str.substring(q+1));
 		alphabet = new Character[lastAlphabet+1];
@@ -614,7 +614,10 @@ public class RepeatAlphabet {
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
 						if (lastInSequence<=0) bw.newLine();
-						else translateRead(bw,quantum);
+						else {
+if (previousReadA==649064) System.err.println("VITTU> previousReadA="+previousReadA+" lastInSequence="+lastInSequence);
+							translateRead(bw,quantum);
+						}
 					}
 					else bw.newLine();
 					j++;
@@ -657,15 +660,33 @@ public class RepeatAlphabet {
 		int i, j;
 		
 		for (i=0; i<=sequence[0].lastCharacter; i++) sequence[0].characters[i].quantize(quantum);
-		if (sequence[0].isUnique()) translate_unique(sequence[0],bw);
-		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],bw);
-		else translate(sequence[0],quantum,bw);
+		if (sequence[0].isUnique()) {
+System.err.println("   0 -> 0");
+			translate_unique(sequence[0],bw);
+		}
+		else if (sequence[0].characters[0].start==-1) {
+System.err.println("   0 -> 1");
+			translate_periodic(sequence[0],bw);
+		}
+		else {
+System.err.println("   0 -> 2");
+			translate(sequence[0],quantum,bw);
+		}
 		for (i=1; i<=lastInSequence; i++) {
-			bw.write(SEPARATOR_MAJOR);
+			bw.write(SEPARATOR_MAJOR+"");
 			for (j=0; j<=sequence[i].lastCharacter; j++) sequence[i].characters[j].quantize(quantum);
-			if (sequence[i].isUnique()) translate_unique(sequence[i],bw);
-			else if (sequence[i].characters[0].start==-1) translate_periodic(sequence[i],bw);
-			else translate(sequence[i],quantum,bw);
+			if (sequence[i].isUnique()) {
+System.err.println("   "+i+" -> 0");
+				translate_unique(sequence[i],bw);
+			}
+			else if (sequence[i].characters[0].start==-1) {
+System.err.println("   "+i+" -> 1");
+				translate_periodic(sequence[i],bw);
+			}
+			else {
+System.err.println("   "+i+" -> 2");
+				translate(sequence[i],quantum,bw);
+			}
 		}
 		bw.newLine();
 	}
@@ -745,7 +766,6 @@ public class RepeatAlphabet {
 				}
 				last=appendToStack(i,last);
 			}
-			if (j<lastCharacter) bw.write(SEPARATOR_MINOR);
 		}
 		
 		// Removing duplicates
@@ -753,7 +773,7 @@ public class RepeatAlphabet {
 		j=stack[0]; bw.write(stack[0]+"");
 		for (i=1; i<=last; i++) {
 			if (stack[i]==j) continue;
-			bw.write(SEPARATOR_MINOR+stack[i]);
+			bw.write((SEPARATOR_MINOR+"")+stack[i]);
 			j=stack[i];
 		}
 	}
@@ -784,7 +804,7 @@ public class RepeatAlphabet {
 	 */
 	private static final void translate(Block block, int quantum, BufferedWriter bw) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
-		boolean orientation;
+		boolean orientation, found;
 		int i, j, k;
 		int last, repeat, length;
 		final int lastCharacter = block.lastCharacter;
@@ -799,17 +819,30 @@ public class RepeatAlphabet {
 			i=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,character);
 			if (character.isOpen()) {
 				if (i<0) i=-1-i;
-				for (j=i+1; j<=lastAlphabet; j++) {
+				found=false;
+				for (j=i; j<=lastAlphabet; j++) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation || alphabet[j].implies_tooFarAfter(character,quantum,Math.POSITIVE_INFINITY)) break;
 					if ( alphabet[j].implies(character,quantum,Math.POSITIVE_INFINITY) || 
 						 alphabet[j].isSimilar(character,quantum,Math.POSITIVE_INFINITY)
-					   ) last=appendToStack(j,last);
+					   ) {
+					   found=true;
+					   last=appendToStack(j,last);
+					}
 				}
 				for (j=i-1; j>lastPeriodic; j--) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation || alphabet[j].implies_tooFarBefore(character,quantum,Math.POSITIVE_INFINITY)) break;
 					if ( alphabet[j].implies(character,quantum,Math.POSITIVE_INFINITY) || 
 					     alphabet[j].isSimilar(character,quantum,Math.POSITIVE_INFINITY)
-					   ) last=appendToStack(j,last);
+					   ) {
+						found=true;
+						last=appendToStack(j,last);
+					}
+				}
+				if (!found) {
+					System.err.println("translateRead> ERROR: open nonperiodic character not found in the alphabet:");
+					System.err.println("query: "+character);
+					System.err.println("candidate in alphabet: "+alphabet[Math.min(i,lastAlphabet)]);
+					System.exit(1);
 				}
 			}
 			else {
@@ -828,59 +861,139 @@ public class RepeatAlphabet {
 		j=stack[0]; bw.write(stack[0]+"");
 		for (i=1; i<=last; i++) {
 			if (stack[i]==j) continue;
-			bw.write(SEPARATOR_MINOR+stack[i]);
+			bw.write((SEPARATOR_MINOR+"")+stack[i]);
 			j=stack[i];
 		}
 	}
 	
 	
+	
+	
+	
 	/**
-	 * Adds every $k$-mer of the translated read $str$ into $kmers$. The first and last 
-	 * blocks of the translated read are not used.
 	 *
-	 * @param mode how to handle multiple block IDs per position: 0=the entire 
-	 * sequence of IDs is used as a k-mer block ("and"); 1=every ID becomes a distinct
-	 * k-mer block ("or");
+	 * @param characterCount one cell per character of the alphabet, plus one; assumed to 
+	 * be all zeros;
+	 * @param histogram columns: 0=unique; 1=periodic; 2=other; assumed to be all zeros.
+	 */
+	public static final void getCharacterStatistics(String str, int[] characterCount, int[][] histogram) {
+		int i, j, k, c;
+		int to, length;
+		String[] tokens;
+		String[][] blocks;
+		
+		// Building $characterCount$.
+		if (str.length()==0) return;
+		tokens=str.split(SEPARATOR_MAJOR+"");
+		blocks = new String[tokens.length][0];
+		for (i=0; i<=tokens.length-1; i++) {
+			if (tokens[i].indexOf(SEPARATOR_MINOR+"")>=0) blocks[i]=tokens[i].split(SEPARATOR_MINOR+"");
+			else {
+				blocks[i] = new String[1];
+				blocks[i][0]=tokens[i];
+			}
+		}
+		for (i=0; i<blocks.length; i++) {
+			for (j=0; j<blocks[i].length; j++) {
+if (blocks[i][j].length()==0) System.err.println("tokens of length zero?!  "+str);				
+				c=Integer.parseInt(blocks[i][j]);
+				if (c<0) {
+					c=-1-c;
+					to=c<=lastUnique?lastUnique:lastPeriodic;
+					for (k=c; k<=to; k++) characterCount[k]++;
+				}
+				else characterCount[c]++;
+			}
+		}
+		
+		// Building histogram
+		length=histogram.length;
+		for (i=0; i<=lastUnique; i++) {
+			c=Math.min(characterCount[i],length-1);
+			histogram[c][0]++;
+		}
+		for (i=lastUnique+1; i<=lastPeriodic; i++) {
+			c=Math.min(characterCount[i],length-1);
+			histogram[c][1]++;
+		}
+		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
+			c=Math.min(characterCount[i],length-1);
+			histogram[c][2]++;
+		}
+		c=Math.min(characterCount[lastAlphabet+1],length-1);
+		histogram[c][1]++;
+	}
+	
+	
+	/**
+	 * Adds to $kmers$ every k-mer of the translated read $str$. If a block contains 
+	 * multiple characters, every character is used to build a distinct kmer ("or").
+     *
+	 * @param sb temporary space, assumed to be empty.
+	 */
+	public static final void getKmers(String str, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
+		int i;
+		int nBlocks;
+		String[] tokens;
+		String[][] blocks;
+		
+		if (str.length()<(k<<1)-1) return;
+		i=-1; nBlocks=0;
+		while (true) {
+			i=str.indexOf(SEPARATOR_MAJOR+"",i+1);
+			if (i<0) break;
+			else nBlocks++;
+		}
+		nBlocks++;
+		if (nBlocks<k) return;
+		tokens=str.split(SEPARATOR_MAJOR+"");
+		blocks = new String[nBlocks][0];
+		for (i=0; i<=tokens.length-1; i++) {
+			if (tokens[i].indexOf(SEPARATOR_MINOR+"")>=0) blocks[i]=tokens[i].split(SEPARATOR_MINOR+"");
+			else {
+				blocks[i] = new String[1];
+				blocks[i][0]=tokens[i];
+			}
+		}
+		if (stack==null || stack.length<(k+1)*3) stack = new int[(k+1)*3];
+		for (i=0; i<=nBlocks-k; i++) loadTranslatedRead_impl(blocks,i,k,kmers,sb);
+	}
+	
+	
+	/**
+	 * Adds $blocks[first..first+k-1]$ to $kmers$.
+	 *
 	 * @param sb temporary space.
 	 */
-	public static final void loadTranslatedRead(String str, int mode, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
-/*		int i, j;
-		String key;
+	private static final void loadTranslatedRead_impl(String[][] blocks, int first, int k, Hashtable<String,Integer> kmers, StringBuilder sb) {
+		int i;
+		int top, row, column, lastChild, length;
 		Integer value;
-		String[] tokens;
+		String key;
 		
-		if (str.length()<3) return;
-		i=-1;
-		while (true) {
-			j=str.indexOf(SEPARATOR_MAJOR,i+1);
-			if (j<0) break;
-			i=j;
-		}
-		if (i+1-2<k) return;
-		tokens=str.split(SEPARATOR_MAJOR);
-		if (mode==0) {
-			for (i=1; i<=tokens.length-1-k; i++) {
-				sb.delete(0,sb.length());
-				for (j=0; j<k; j++) sb.append(tokens[i+j]+SEPARATOR_MAJOR);
+		top=-1;
+		stack[++top]=-1; stack[++top]=-1; stack[++top]=first-1;
+		while (top>=0) {
+			row=stack[top]; column=stack[top-1]; lastChild=stack[top-2];
+			if (row==first+k-1) {
 				key=sb.toString(); value=kmers.get(key);
 				if (value==null) kmers.put(key,Integer.valueOf(1));
 				else kmers.put(key,Integer.valueOf(value.intValue()+1));
 			}
-		}
-		else {
-			for (i=1; i<=tokens.length-1-k; i++) {
-				sb.delete(0,sb.length());
-				for (j=0; j<k; j++) {
-					
-					------------------>
-					sb.append(tokens[i+j]+SEPARATOR_MAJOR);
-				}
-				key=sb.toString(); value=kmers.get(key);
-				if (value==null) kmers.put(key,Integer.valueOf(1));
-				else kmers.put(key,Integer.valueOf(value.intValue()+1));
+			if (row==first+k-1 || lastChild==blocks[row+1].length-1) {
+				top-=3;
+				i=sb.length()-1;
+				while (i>=0 && sb.charAt(i)!=SEPARATOR_MAJOR) i--;
+				i++;
+				sb.delete(i,sb.length());
+			}
+			else {
+				lastChild++;
+				stack[top-2]=lastChild;
+				stack[++top]=-1; stack[++top]=lastChild; stack[++top]=row+1;
+				sb.append((row<first?"":(SEPARATOR_MAJOR+""))+blocks[row+1][lastChild]);
 			}
 		}
-*/
 	}
 	
 	
@@ -954,7 +1067,7 @@ public class RepeatAlphabet {
 		
 		
 		public String toString() {
-			String out = (isUnique()?"0":"1")+SEPARATOR_MINOR+(characters[0].start==-1?"0":"1")+SEPARATOR_MINOR+lastCharacter+SEPARATOR_MINOR;
+			String out = (isUnique()?"0":"1")+(SEPARATOR_MINOR+"")+(characters[0].start==-1?"0":"1")+(SEPARATOR_MINOR+"")+lastCharacter+(SEPARATOR_MINOR+"");
 			out+=characters[0].toString();
 			for (int i=1; i<=lastCharacter; i++) out+=SEPARATOR_MINOR+characters[i].toString();
 			return out;
@@ -967,9 +1080,9 @@ public class RepeatAlphabet {
 		public void deserialize(String str) {
 			int i, p, q;
 			
-			p=str.indexOf(SEPARATOR_MINOR);  // Skipping
-			p=str.indexOf(SEPARATOR_MINOR,p+1);  // Skipping
-			q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=str.indexOf(SEPARATOR_MINOR+"");  // Skipping
+			p=str.indexOf(SEPARATOR_MINOR+"",p+1);  // Skipping
+			q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			lastCharacter=Integer.parseInt(str.substring(p+1,q));
 			if (characters==null) {
 				characters = new Character[lastCharacter+1];
@@ -1182,7 +1295,7 @@ public class RepeatAlphabet {
 		}
 		
 		public String toString() {
-			return (repeat==UNIQUE?"0":"1")+SEPARATOR_MINOR+(start==-1?"0":"1")+SEPARATOR_MINOR+repeat+SEPARATOR_MINOR+(orientation?"1":"0")+SEPARATOR_MINOR+start+SEPARATOR_MINOR+end+SEPARATOR_MINOR+length+SEPARATOR_MINOR+(openStart?"1":"0")+SEPARATOR_MINOR+(openEnd?"1":"0");
+			return (repeat==UNIQUE?"0":"1")+SEPARATOR_MINOR+(start==-1?"0":"1")+(SEPARATOR_MINOR+"")+repeat+(SEPARATOR_MINOR+"")+(orientation?"1":"0")+(SEPARATOR_MINOR+"")+start+(SEPARATOR_MINOR+"")+end+(SEPARATOR_MINOR+"")+length+(SEPARATOR_MINOR+"")+(openStart?"1":"0")+(SEPARATOR_MINOR+"")+(openEnd?"1":"0");
 		}
 		
 		/**
@@ -1194,21 +1307,21 @@ public class RepeatAlphabet {
 		public int deserialize(String str) {
 			int p, q;
 			
-			p=str.indexOf(SEPARATOR_MINOR);  // Skipping
-			p=str.indexOf(SEPARATOR_MINOR,p+1)+1;  // Skipping
-			q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=str.indexOf(SEPARATOR_MINOR+"");  // Skipping
+			p=str.indexOf(SEPARATOR_MINOR+"",p+1)+1;  // Skipping
+			q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			repeat=Integer.parseInt(str.substring(p,q));
-			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			orientation=Integer.parseInt(str.substring(p,q))==1;
-			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			start=Integer.parseInt(str.substring(p,q));
-			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			end=Integer.parseInt(str.substring(p,q));
-			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			length=Integer.parseInt(str.substring(p,q));
-			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			openStart=Integer.parseInt(str.substring(p,q))==1;
-			p=q+1; q=str.indexOf(SEPARATOR_MINOR,p+1);
+			p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 			if (q>=0) {
 				openEnd=Integer.parseInt(str.substring(p,q))==1;
 				return q+1;
