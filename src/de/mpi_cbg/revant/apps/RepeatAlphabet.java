@@ -66,6 +66,9 @@ public class RepeatAlphabet {
 	private static int nComponents;
 	private static Character[] mergedCharacters;
 	
+	private static String[][] blocks;
+	private static int[] lastInBlock;
+	
 	
 	/**
 	 * Like $Reads.loadReadLengths()$, but for repeats.
@@ -636,10 +639,7 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
 						if (lastInSequence<=0) bw.newLine();
-						else {
-System.err.println("Translating read "+previousReadA);							
-							translateRead(bw,quantum);
-						}
+						else translateRead(bw,quantum);
 					}
 					else bw.newLine();
 					j++;
@@ -669,10 +669,7 @@ System.err.println("Translating read "+previousReadA);
 			if (lastAlignment!=-1) {
 				recodeRead(quantum);
 				if (lastInSequence<=0) bw.newLine();
-				else {
-System.err.println("Translating read "+previousReadA);
-					translateRead(bw,quantum);
-				}
+				else translateRead(bw,quantum);
 			}
 			else bw.newLine();
 			j++;
@@ -870,33 +867,46 @@ System.err.println("Translating read "+previousReadA);
 	}
 	
 	
-	
-	
-	
 	/**
-	 *
-	 * @param characterCount one cell per character of the alphabet, plus one; assumed to 
-	 * be all zeros.
+	 * Adds to $characterCount$ every character instance in a row $str$ of the translated 
+	 * reads file.
+	 * 
+	 * @param characterCount one cell per character of the alphabet, plus one.
 	 */
 	public static final void incrementCharacterCounts(String str, long[] characterCount) {
 		int i, j, k;
-		int to, c;
+		int c, to, nBlocks, last;
 		String[] tokens;
-		String[][] blocks;
 		
-		// Building $characterCount$.
 		if (str.length()==0) return;
+		
+		// Allocating memory
 		tokens=str.split(SEPARATOR_MAJOR+"");
-		blocks = new String[tokens.length][0];
-		for (i=0; i<=tokens.length-1; i++) {
-			if (tokens[i].indexOf(SEPARATOR_MINOR+"")>=0) blocks[i]=tokens[i].split(SEPARATOR_MINOR+"");
+		nBlocks=tokens.length;
+		if (blocks==null) blocks = new String[nBlocks][0];
+		else if (blocks.length<nBlocks) {
+			String[][] newArray = new String[nBlocks][0];
+			System.arraycopy(blocks,0,newArray,0,blocks.length);
+			blocks=newArray;
+		}
+		if (lastInBlock==null || lastInBlock.length<nBlocks) lastInBlock = new int[nBlocks];
+		Math.set(lastInBlock,nBlocks-1,-1);
+		for (i=0; i<nBlocks; i++) {
+			if (tokens[i].indexOf(SEPARATOR_MINOR+"")>=0) {
+				blocks[i]=tokens[i].split(SEPARATOR_MINOR+"");
+				lastInBlock[i]=blocks[i].length-1;
+			}
 			else {
-				blocks[i] = new String[1];
+				if (blocks[i].length==0) blocks[i] = new String[1];
 				blocks[i][0]=tokens[i];
+				lastInBlock[i]=0;
 			}
 		}
-		for (i=0; i<blocks.length; i++) {
-			for (j=0; j<blocks[i].length; j++) {
+		
+		// Counting
+		for (i=0; i<nBlocks; i++) {
+			last=lastInBlock[i];
+			for (j=0; j<=last; j++) {
 				c=Integer.parseInt(blocks[i][j]);
 				if (c<0) {
 					c=-1-c;

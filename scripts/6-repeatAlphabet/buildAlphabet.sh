@@ -43,7 +43,7 @@ function collectionThread() {
 	PREFIX_1=$2
 	PREFIX_2=$3
 	PREFIX_3=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectCharacterInstances ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterInstances ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt | uniq - ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
 }
 if [ -e ${PARTS_PREFIX}-1-${SPLIT_IN_PARTS}.txt ]; then
@@ -83,6 +83,8 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.app
 for THREAD in $(seq 0 ${TO}); do
 	tail -n +2 ${PARTS_PREFIX}-7-${THREAD}.txt >> ${ALPHABET_FILE}
 done
+ALPHABET_SIZE=$( wc -l < ${ALPHABET_FILE} )
+ALPHABET_SIZE=$(( ${ALPHABET_SIZE} - 1 ))
 
 echo "Translating reads..."
 function translationThread() {
@@ -109,3 +111,8 @@ rm -f ${READS_TRANSLATED_FILE}
 for THREAD in $(seq 0 ${TO}); do
 	cat ${PARTS_PREFIX}-8-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 done
+
+echo "Computing character counts..."
+COUNTS_FILE="${INPUT_DIR}/alphabet-counts.txt"
+HISTOGRAM_FILE="${INPUT_DIR}/alphabet-histogram.txt"
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterCounts ${READS_TRANSLATED_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${HISTOGRAM_FILE}

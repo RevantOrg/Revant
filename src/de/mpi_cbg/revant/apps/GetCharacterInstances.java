@@ -10,7 +10,7 @@ import de.mpi_cbg.revant.factorize.Reads;
 import de.mpi_cbg.revant.factorize.Intervals;
 
 
-public class CollectCharacterInstances {
+public class GetCharacterInstances {
 	
 	public static void main(String[] args) throws IOException {
 		final int N_READS = Integer.parseInt(args[0]);
