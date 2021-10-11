@@ -92,24 +92,30 @@ function translationThread() {
 	LAST_TRANSLATED_READ=$2
 	PREFIX_1=$3
 	PREFIX_2=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt
+	PREFIX_3=$5
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
 }
 if [ -e ${PARTS_PREFIX}-1-${SPLIT_IN_PARTS}.txt ]; then
 	TO=${SPLIT_IN_PARTS}
 else
 	TO=$(( ${SPLIT_IN_PARTS} - 1 ))
 fi
-translationThread 0 -1 "${PARTS_PREFIX}-1-" "${PARTS_PREFIX}-8-" &
+translationThread 0 -1 "${PARTS_PREFIX}-1-" "${PARTS_PREFIX}-8-" "${PARTS_PREFIX}-9-" &
 for THREAD in $(seq 1 ${TO}); do
 	LAST_TRANSLATED_READ=$(tail -n 1 ${PARTS_PREFIX}-1-$(( ${THREAD} - 1 )).txt | awk '{ print $1 }' | tr -d , )
 	LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} - 1 ))
-	translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${PARTS_PREFIX}-1-" "${PARTS_PREFIX}-8-" &
+	translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${PARTS_PREFIX}-1-" "${PARTS_PREFIX}-8-" "${PARTS_PREFIX}-9-" &
 done
 wait
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated.txt"
 rm -f ${READS_TRANSLATED_FILE}
 for THREAD in $(seq 0 ${TO}); do
 	cat ${PARTS_PREFIX}-8-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+done
+READS_TRANSLATED_BOUNDARIES="${INPUT_DIR}/reads-translated-boundaries.txt"
+rm -f ${READS_TRANSLATED_BOUNDARIES}
+for THREAD in $(seq 0 ${TO}); do
+	cat ${PARTS_PREFIX}-9-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
 done
 
 echo "Computing character counts..."

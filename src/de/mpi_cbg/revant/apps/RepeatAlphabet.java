@@ -31,6 +31,7 @@ public class RepeatAlphabet {
 	public static Character[] alphabet;
 	public static int lastUnique, lastPeriodic, lastAlphabet;
 	public static int maxOpenLength_nonperiodic;
+	public static long[] alphabetCount;
 	
 	/**
 	 * All alignments of a given readA
@@ -590,16 +591,17 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 	 *
 	 * @param lastTranslatedRead the index in $Reads.readIDs$ of the last read that has 
 	 * already been translated (-1 if no read has been translated yet);
-	 * @param outputFile contains the translation of one read per line.
+	 * @param outputFile_characters translation of every read (one per line);
+	 * @param outputFile_boundaries character boundaries (one read per line).
 	 */
-	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, String outputFile) throws IOException {
+	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, String outputFile_characters, String outputFile_boundaries) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		int i, j;
 		int row, readA, previousReadA;
 		String str;
 		BufferedReader br;
-		BufferedWriter bw;
+		BufferedWriter bw1, bw2;
 		
 		// Allocating memory
 		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
@@ -616,7 +618,8 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 		if (tmpCharacter==null) tmpCharacter = new Character();
 		
 		// Translating every read using the alphabet
-		bw = new BufferedWriter(new FileWriter(outputFile));
+		bw1 = new BufferedWriter(new FileWriter(outputFile_characters));
+		bw2 = new BufferedWriter(new FileWriter(outputFile_boundaries));
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
 		str=br.readLine(); 
@@ -632,16 +635,16 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 			if (previousReadA==-1 || readA!=previousReadA) {
 				if (previousReadA!=-1) {
 					while (Reads.readIDs[j]<previousReadA) {
-						bw.newLine();
+						bw1.newLine(); bw2.newLine();
 						j++;
 					}
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
-						if (lastInSequence<=0) bw.newLine();
-						else translateRead(bw,quantum);
+						if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); }
+						else translateRead(bw1,bw2,quantum);
 					}
-					else bw.newLine();
+					else { bw1.newLine(); bw2.newLine(); }
 					j++;
 				}
 				previousReadA=readA; lastAlignment=0;
@@ -662,37 +665,38 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 		br.close();
 		if (previousReadA!=-1) {
 			while (Reads.readIDs[j]<previousReadA) {
-				bw.newLine();
+				bw1.newLine(); bw2.newLine();
 				j++;
 			}
 			cleanAlignments(quantum);
 			if (lastAlignment!=-1) {
 				recodeRead(quantum);
-				if (lastInSequence<=0) bw.newLine();
-				else translateRead(bw,quantum);
+				if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); }
+				else translateRead(bw1,bw2,quantum);
 			}
-			else bw.newLine();
+			else { bw1.newLine(); bw2.newLine(); }
 			j++;
 		}
-		bw.close();
+		bw1.close(); bw2.close();
 	}
 	
 	
-	private static final void translateRead(BufferedWriter bw, int quantum) throws IOException {
+	private static final void translateRead(BufferedWriter bw1, BufferedWriter bw2, int quantum) throws IOException {
 		int i, j;
 				
 		for (i=0; i<=sequence[0].lastCharacter; i++) sequence[0].characters[i].quantize(quantum);
-		if (sequence[0].isUnique()) translate_unique(sequence[0],bw);
-		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],bw);
-		else translate(sequence[0],quantum,bw);
+		if (sequence[0].isUnique()) translate_unique(sequence[0],bw1);
+		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],bw1);
+		else translate(sequence[0],quantum,bw1);
 		for (i=1; i<=lastInSequence; i++) {
-			bw.write(SEPARATOR_MAJOR+"");
+			bw1.write(SEPARATOR_MAJOR+"");
+			bw2.write((i>1?(SEPARATOR_MINOR+""):"")+points[i-1]);
 			for (j=0; j<=sequence[i].lastCharacter; j++) sequence[i].characters[j].quantize(quantum);
-			if (sequence[i].isUnique()) translate_unique(sequence[i],bw);
-			else if (sequence[i].characters[0].start==-1) translate_periodic(sequence[i],bw);
-			else translate(sequence[i],quantum,bw);
+			if (sequence[i].isUnique()) translate_unique(sequence[i],bw1);
+			else if (sequence[i].characters[0].start==-1) translate_periodic(sequence[i],bw1);
+			else translate(sequence[i],quantum,bw1);
 		}
-		bw.newLine();
+		bw1.newLine(); bw2.newLine();
 	}
 
 	
@@ -876,11 +880,34 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 	public static final void incrementCharacterCounts(String str, long[] characterCount) {
 		int i, j, k;
 		int c, to, nBlocks, last;
-		String[] tokens;
 		
 		if (str.length()==0) return;
+		nBlocks=loadBlocks(str);
+		for (i=0; i<nBlocks; i++) {
+			last=lastInBlock[i];
+			for (j=0; j<=last; j++) {
+				c=Integer.parseInt(blocks[i][j]);
+				if (c<0) {
+					c=-1-c;
+					to=c<=lastUnique?lastUnique:lastPeriodic;
+					for (k=c; k<=to; k++) characterCount[k]++;
+				}
+				else characterCount[c]++;
+			}
+		}
+	}
+	
+	
+	/**
+	 * Loads the recoded read $str$ in global variables $blocks,lastInBlock$.
+	 *
+	 * @return the number of blocks in $blocks$.
+	 */
+	private static final int loadBlocks(String str) {
+		int i;
+		int nBlocks;
+		String[] tokens;
 		
-		// Allocating memory
 		tokens=str.split(SEPARATOR_MAJOR+"");
 		nBlocks=tokens.length;
 		if (blocks==null) blocks = new String[nBlocks][0];
@@ -902,21 +929,98 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 				lastInBlock[i]=0;
 			}
 		}
+		return nBlocks;
+	}
+
+
+	public static final void loadAlphabetCount(String file, int alphabetSize) throws IOException {
+		int i;
+		BufferedReader br;
+
+		alphabetCount = new long[alphabetSize+1];
+		br = new BufferedReader(new FileReader(file));
+		for (i=0; i<=alphabetSize; i++) alphabetCount[i]=Long.parseLong(br.readLine());
+		br.close();
+	}
+	
+	
+	
+	
+	
+	
+	
+	private static Character[] newUnique;
+	private static int lastNewUnique;
+	
+	/**
+	 *
+	 *
+	 */
+/*	public static final String cleanTranslatedRead(String str, long[] characterCount, int minCount) {
 		
-		// Counting
+		
+		Character newCharacter = new Character();
+		
+		if (str.length()==0) return;
+		
+		// Removing rare characters
+		nBlocks=loadBlocks(str);
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
+			k=-1;
 			for (j=0; j<=last; j++) {
 				c=Integer.parseInt(blocks[i][j]);
+				deleted=false;
 				if (c<0) {
 					c=-1-c;
-					to=c<=lastUnique?lastUnique:lastPeriodic;
-					for (k=c; k<=to; k++) characterCount[k]++;
+					if (c>lastUnique) {
+						while (c<=lastPeriodic && characterCount[c]<minCount) c++;
+						if (c>lastPeriodic) deleted=true;
+						else blocks[i][j]=-1-c;
+					}
 				}
-				else characterCount[c]++;
+				else if (characterCount[c]<minCount) deleted=true;
+				if (!deleted) blocks[i][++k]=blocks[i][j];
 			}
+			lastInBlock[i]=k;
 		}
+		
+		// Adding new unique characters
+		for (i=0; i<nBlocks; i++) {
+			if (lastInBlock[i]==-1) {
+				newCharacter.repeat=UNIQUE;
+				newCharacter.orientation=false;
+				newCharacter.start=-1; newCharacter.end=-1;
+				newCharacter.length=
+				
+			}
+			
+			
+		}
+		
+		
 	}
+*/	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	/**
@@ -1230,7 +1334,9 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 		public boolean openStart, openEnd;  // The repeat might continue beyond start/end
 		public int length;  // >0: unique or periodic; 0: repetitive non-periodic.
 		
+		
 		public Character() { reset(); }
+		
 		
 		public void reset() { 
 			id=-1;
@@ -1238,10 +1344,12 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 			openStart=true; openEnd=true;
 		}
 		
+		
 		public Character(int r, boolean o, int s, int e, int l, boolean os, boolean oe) {
 			repeat=r; orientation=o; start=s; end=e; length=l;
 			openStart=os; openEnd=oe;
 		}
+		
 		
 		public int compareTo(Object other) {
 			Character otherCharacter = (Character)other;
@@ -1268,6 +1376,7 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 			return 0;
 		}
 		
+		
 		public final void copyFrom(Character otherCharacter) {
 			repeat=otherCharacter.repeat;
 			orientation=otherCharacter.orientation;
@@ -1276,14 +1385,17 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 			openStart=otherCharacter.openStart; openEnd=otherCharacter.openEnd;
 		}
 		
+		
 		public boolean equals(Object other) {
 			Character otherCharacter = (Character)other;
 			return repeat==otherCharacter.repeat && orientation==otherCharacter.orientation && start==otherCharacter.start && end==otherCharacter.end && length==otherCharacter.length && openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
 		}
 		
+		
 		public String toString() {
 			return (repeat==UNIQUE?"0":"1")+SEPARATOR_MINOR+(start==-1?"0":"1")+(SEPARATOR_MINOR+"")+repeat+(SEPARATOR_MINOR+"")+(orientation?"1":"0")+(SEPARATOR_MINOR+"")+start+(SEPARATOR_MINOR+"")+end+(SEPARATOR_MINOR+"")+length+(SEPARATOR_MINOR+"")+(openStart?"1":"0")+(SEPARATOR_MINOR+"")+(openEnd?"1":"0");
 		}
+		
 		
 		/**
 		 * Symmetrical to $toString()$.
@@ -1318,6 +1430,7 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 				return str.length();
 			}
 		}
+		
 		
 		public final int getLength() {
 			return (start==-1||end==-1)?length:end-start+1;
