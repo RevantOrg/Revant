@@ -30,7 +30,7 @@ public class RepeatAlphabet {
 	 */
 	public static Character[] alphabet;
 	public static int lastUnique, lastPeriodic, lastAlphabet;
-	public static int maxOpenLength_nonperiodic;
+	public static int maxOpenLength_unique;
 	public static long[] alphabetCount;
 	
 	/**
@@ -106,9 +106,10 @@ public class RepeatAlphabet {
 	 * distinct) with discriminative power.
 	 *
 	 * @param alignmentsFile alignments between reads (readA) and repeats (readB);
-	 * @param maxError alignments with error rate greater than this are discarded.
+	 * @param maxError alignments with error rate greater than this are discarded;
+	 * @param uniqueFile the procedure writes just $maxOpenLength_unique$ there.
 	 */
-	public static final void collectCharacterInstances(String alignmentsFile, double maxError, int distanceThreshold, int lengthThreshold, String outputFile) throws IOException {
+	public static final void collectCharacterInstances(String alignmentsFile, double maxError, int distanceThreshold, int lengthThreshold, String outputFile, String uniqueFile) throws IOException {
 		final int ALPHABET_CAPACITY = 100000;  // Arbitrary
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
@@ -135,7 +136,7 @@ public class RepeatAlphabet {
 		if (tmpCharacter==null) tmpCharacter = new Character();
 		
 		// Collecting characters from all recoded reads
-		maxOpenLength_nonperiodic=0;
+		maxOpenLength_unique=0;
 		bw = new BufferedWriter(new FileWriter(outputFile));
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
@@ -184,6 +185,9 @@ public class RepeatAlphabet {
 			}
 			else sequenceLengths[0]++;
 		}
+		bw.close();
+		bw = new BufferedWriter(new FileWriter(uniqueFile));
+		bw.write(maxOpenLength_unique+"\n");
 		bw.close();
 	}
 	
@@ -350,7 +354,7 @@ public class RepeatAlphabet {
 					bw.write(sequence[i].characters[0].toString());
 					bw.newLine();
 				}
-				else maxOpenLength_nonperiodic=Math.max(maxOpenLength_nonperiodic,sequence[i].getLength());
+				else maxOpenLength_unique=Math.max(maxOpenLength_unique,sequence[i].getLength());
 			}
 			else {
 				for (j=0; j<=sequence[i].lastCharacter; j++) {
@@ -409,7 +413,7 @@ public class RepeatAlphabet {
 		}
 		System.err.println("DONE");
 		
-		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+(lastUnique+1)+" non-repetitive characters)");
+		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+(lastUnique+1)+" unique characters)");
 		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].id=1;
 		for (i=lastUnique+1; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
@@ -444,7 +448,7 @@ public class RepeatAlphabet {
 	
 	public static final void serializeAlphabet(String path) throws IOException {
 		BufferedWriter bw = new BufferedWriter(new FileWriter(path));
-		bw.write(lastUnique+(SEPARATOR_MINOR+"")+lastPeriodic+(SEPARATOR_MINOR+"")+lastAlphabet+(SEPARATOR_MINOR+"")+maxOpenLength_nonperiodic+"\n");
+		bw.write(lastUnique+(SEPARATOR_MINOR+"")+lastPeriodic+(SEPARATOR_MINOR+"")+lastAlphabet+(SEPARATOR_MINOR+"")+maxOpenLength_unique+"\n");
 		for (int i=0; i<=lastAlphabet; i++) bw.write(alphabet[i].toString()+"\n");
 		bw.close();
 	}
@@ -463,7 +467,7 @@ public class RepeatAlphabet {
 		lastPeriodic=Integer.parseInt(str.substring(p,q));
 		p=q+1; q=str.indexOf(SEPARATOR_MINOR+"",p+1);
 		lastAlphabet=Integer.parseInt(str.substring(p,q));
-		maxOpenLength_nonperiodic=Integer.parseInt(str.substring(q+1));
+		maxOpenLength_unique=Integer.parseInt(str.substring(q+1));
 		alphabet = new Character[lastAlphabet+1];
 		for (i=0; i<=lastAlphabet; i++) {
 			alphabet[i] = new Character();
@@ -925,39 +929,42 @@ public class RepeatAlphabet {
 		br.close();
 	}
 	
-	
-/*	public static final void loadReadBoundaries(String file, int alphabetSize) throws IOException {
-		int i;
-		BufferedReader br;
 
-		alphabetCount = new long[alphabetSize+1];
-		br = new BufferedReader(new FileReader(file));
-		for (i=0; i<=alphabetSize; i++) alphabetCount[i]=Long.parseLong(br.readLine());
-		br.close();
-	}
-*/	
+
+
+
+
+
 	
 	
 	
 	
 	
 	
-	private static Character[] newUnique;
+	
+	private static Character[] alphabet_newUnique;
 	private static int lastNewUnique;
 	
+	private static int[] boundaries;
+	
+	
 	/**
+	 * Adds to $alphabet_newUnique$ all the new unique characters that result from 
+	 * removing all characters with count smaller than $minCount$.
 	 *
+	 * Remark: the procedure uses global variable $boundaries$.
 	 *
+	 * @param tmpChar* temporary space.
 	 */
-/*	public static final String cleanTranslatedRead(String str, long[] characterCount, int minCount) {
+/*	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, long[] characterCount, int minCount, Character tmpChar1, Character tmpChar2) throws IOException {
+		int i, j, k;
+		int c, nBlocks, length, first, last;
+		String[] tokens;
 		
-		
-		Character newCharacter = new Character();
-		
-		if (str.length()==0) return;
+		if (read2characters.length()==0) return;
 		
 		// Removing rare characters
-		nBlocks=loadBlocks(str);
+		nBlocks=loadBlocks(read2characters);
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
 			k=-1;
@@ -979,21 +986,63 @@ public class RepeatAlphabet {
 		}
 		
 		// Adding new unique characters
-		for (i=0; i<nBlocks; i++) {
-			if (lastInBlock[i]==-1) {
-				newCharacter.repeat=UNIQUE;
-				newCharacter.orientation=false;
-				newCharacter.start=-1; newCharacter.end=-1;
-				newCharacter.length=
-				
-			}
-			
-			
+		if (read2boundaries.indexOf(SEPARATOR_MINOR+"")>=0) {
+			tokens=read2boundaries.split();
+			length=tokens.length;
+			if (boundaries.length<length) boundaries = new int[length];
+			for (i=0; i<length; i++) boundaries[i]=Integer.parseInt(tokens[i]);
 		}
-		
-		
+		else boundaries[0]=Integer.parseInt(boundariesRow);
+		first=-1;
+		i=0; 
+		while (i<nBlocks) {
+			last=lastInBlock[i];
+			if (last>=0) {
+				if (first!=-1) {
+					tmpChar1.repeat=UNIQUE;
+					tmpChar1.orientation=false;
+					tmpChar1.start=-1; tmpChar1.end=-1;
+					tmpChar1.length=(i==nBlocks-1?readLength:boundaries[i])-(first==0?0:boundaries[first-1]);
+					tmpChar1.openStart=i==0;
+					tmpChar1.openEnd=i==nBlocks-1;
+					tmpChar2.copyFrom(tmpChar1);
+					tmpChar2.quantize(quantum);
+					j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar2);
+					if (tmpChar1.isOpen()) {
+						if (j<0) j=-1-j;
+						if (j==lastUnique+1) addCharacter(tmpChar1);
+					}
+					else {
+						if (i<0) addCharacter(tmpChar1);
+					}					
+				}
+				first=-1;
+				i++;
+			}
+			else {
+				if (first==-1) first=i;
+			}
+		}
+		if (first!=-1) {
+			tmpChar1.repeat=UNIQUE;
+			tmpChar1.orientation=false;
+			tmpChar1.start=-1; tmpChar1.end=-1;
+			tmpChar1.length=readLength-(first==0?0:boundaries[first-1]);
+			tmpChar1.openStart=i==0;
+			tmpChar1.openEnd=true;
+			tmpChar2.copyFrom(tmpChar1);
+			tmpChar2.quantize(quantum);
+			j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar2);
+			if (newCharacter.isOpen()) {
+				if (j<0) j=-1-j;
+				if (j==lastUnique+1) addCharacter(tmpChar1);
+			}
+			else {
+				if (i<0) addCharacter(tmpChar1);
+			}
+		}
 	}
-*/	
+*/
 	
 	
 	

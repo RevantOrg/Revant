@@ -43,7 +43,7 @@ function collectionThread() {
 	PREFIX_1=$2
 	PREFIX_2=$3
 	PREFIX_3=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterInstances ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterInstances ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt "${PREFIX_2}unique-${ALIGNMENTS_FILE_ID}.txt"
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt | uniq - ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
 }
 if [ -e ${PARTS_PREFIX}-1-${SPLIT_IN_PARTS}.txt ]; then
@@ -79,7 +79,7 @@ done
 wait
 ALPHABET_FILE="${INPUT_DIR}/alphabet.txt"
 rm -f ${ALPHABET_FILE}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "tmpSplit-7-" ${ALPHABET_FILE}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "tmpSplit-7-" "tmpSplit-2-unique-" ${ALPHABET_FILE}
 for THREAD in $(seq 0 ${TO}); do
 	tail -n +2 ${PARTS_PREFIX}-7-${THREAD}.txt >> ${ALPHABET_FILE}
 done
