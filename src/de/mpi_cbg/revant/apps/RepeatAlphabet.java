@@ -51,9 +51,10 @@ public class RepeatAlphabet {
 	public static int[] sequenceLengths;
 	
 	/**
-	 * Temporary space used by procedure $recode()$.
+	 * Temporary space used by procedure $recodeRead()$.
 	 */
 	private static int[] periodicIntervals, points;
+	private static int lastPoint;
 	private static Block newBlock;
 	private static Character tmpCharacter;
 	
@@ -206,7 +207,7 @@ public class RepeatAlphabet {
 	public static final void recodeRead(int distanceThreshold) {
 		int i, j, k;
 		int lastPeriodicInterval, currentStart, currentEnd;
-		int firstJForNextI, inPeriodic, lastPoint;
+		int firstJForNextI, inPeriodic;
 		int startA, endA, newLength, component, nComponents;
 		final int lengthA = Reads.getReadLength(alignments[0].readA);
 		
@@ -375,30 +376,19 @@ public class RepeatAlphabet {
 		Character tmpChar;
 		
 		System.err.println("Quantizing characters... ");
-		for (i=0; i<=lastAlphabet; i++) {
-boolean fabio = alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==835;
-if (fabio) System.err.println("compactInstances> 1  original character:  "+alphabet[i]);
-			alphabet[i].quantize(QUANTUM);
-if (fabio) System.err.println("compactInstances> 1  quantized character: "+alphabet[i]);
-		}
+		for (i=0; i<=lastAlphabet; i++) alphabet[i].quantize(QUANTUM);
 		Arrays.sort(alphabet,0,lastAlphabet+1);
 		j=0;
 		for (i=1; i<=lastAlphabet; i++) {
-boolean fabio = (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==800) ||
-	            (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==1400);
 			if ( alphabet[i].repeat!=alphabet[j].repeat || alphabet[i].orientation!=alphabet[j].orientation || 
 				 alphabet[i].start!=alphabet[j].start || alphabet[i].end!=alphabet[j].end || alphabet[i].length!=alphabet[j].length ||
 			     alphabet[i].openStart!=alphabet[j].openStart || alphabet[i].openEnd!=alphabet[j].openEnd
 			   ) {
-if (fabio) System.err.println("compactInstances> 2  character added to quantized alphabet: "+alphabet[i]);				   
 				j++;
 				tmpChar=alphabet[j];
 				alphabet[j]=alphabet[i];
 				alphabet[i]=tmpChar;
 			}
-else {
-	if (fabio) System.err.println("compactInstances> 3  character NOT ADDED to quantized alphabet: "+alphabet[i]);
-}			
 		}
 		lastAlphabet=j;
 		lastUnique=-1; i=0;
@@ -428,22 +418,12 @@ else {
 					 alphabet[j].implies_tooFarAfter(alphabet[i])
 				   ) break;
 				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) {
-					alphabet[j].id=0;
-if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) ||
-	 (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==1400)
-   ) System.err.println("compactInstances> 4  character "+alphabet[j]+" is implied by character "+alphabet[i]);
-				}
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].id=0;
 			}
 			for (j=i-1; j>=0; j--) {
 				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation) break;
 				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) {
-					alphabet[j].id=0;
-if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) ||
-	 (alphabet[i].repeat==1114 && alphabet[i].start==0 && alphabet[i].end==1400)
-   ) System.err.println("compactInstances> 5  character "+alphabet[j]+" is implied by character "+alphabet[i]);
-				}
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].id=0;
 			}
 		}
 		j=lastUnique;
@@ -682,15 +662,17 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 	
 	
 	private static final void translateRead(BufferedWriter bw1, BufferedWriter bw2, int quantum) throws IOException {
-		int i, j;
-				
+		int i, j, k;
+		
 		for (i=0; i<=sequence[0].lastCharacter; i++) sequence[0].characters[i].quantize(quantum);
 		if (sequence[0].isUnique()) translate_unique(sequence[0],bw1);
 		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],bw1);
 		else translate(sequence[0],quantum,bw1);
+		k=0;
+		while (k<=lastPoint && points[k]<=quantum) k++;
 		for (i=1; i<=lastInSequence; i++) {
 			bw1.write(SEPARATOR_MAJOR+"");
-			bw2.write((i>1?(SEPARATOR_MINOR+""):"")+points[i-1]);
+			bw2.write((i>1?(SEPARATOR_MINOR+""):"")+points[k++]);
 			for (j=0; j<=sequence[i].lastCharacter; j++) sequence[i].characters[j].quantize(quantum);
 			if (sequence[i].isUnique()) translate_unique(sequence[i],bw1);
 			else if (sequence[i].characters[0].start==-1) translate_periodic(sequence[i],bw1);
@@ -943,6 +925,17 @@ if ( (alphabet[j].repeat==1114 && alphabet[j].start==0 && alphabet[j].end==800) 
 		br.close();
 	}
 	
+	
+/*	public static final void loadReadBoundaries(String file, int alphabetSize) throws IOException {
+		int i;
+		BufferedReader br;
+
+		alphabetCount = new long[alphabetSize+1];
+		br = new BufferedReader(new FileReader(file));
+		for (i=0; i<=alphabetSize; i++) alphabetCount[i]=Long.parseLong(br.readLine());
+		br.close();
+	}
+*/	
 	
 	
 	
