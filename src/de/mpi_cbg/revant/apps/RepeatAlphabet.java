@@ -949,22 +949,79 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Adds to $alphabet_newUnique$ all the new unique characters that result from 
-	 * removing all characters with count smaller than $minCount$.
+	 * Adds to $alphabet_newUnique$ the new unique closed characters that result from 
+	 * removing every character with count smaller than $minCount$, and updates 
+	 * $maxOpenLength_unique$.
 	 *
 	 * Remark: the procedure uses global variable $boundaries$.
 	 *
-	 * @param tmpChar* temporary space.
+	 * @param tmpChar temporary space.
 	 */
-/*	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, long[] characterCount, int minCount, Character tmpChar1, Character tmpChar2) throws IOException {
+	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, long[] characterCount, int minCount, int quantum, Character tmpChar) throws IOException {
 		int i, j, k;
-		int c, nBlocks, length, first, last;
+		int c, nBlocks, length, first;
 		String[] tokens;
 		
 		if (read2characters.length()==0) return;
-		
-		// Removing rare characters
+		if (read2boundaries.indexOf(SEPARATOR_MINOR+"")>=0) {
+			tokens=read2boundaries.split(SEPARATOR_MINOR+"");
+			length=tokens.length;
+			if (boundaries.length<length) boundaries = new int[length];
+			for (i=0; i<length; i++) boundaries[i]=Integer.parseInt(tokens[i]);
+		}
+		else boundaries[0]=Integer.parseInt(read2boundaries);
 		nBlocks=loadBlocks(read2characters);
+		removeRareCharacters(nBlocks,characterCount,minCount);
+		first=-1;
+		for (i=0; i<nBlocks; i++) {
+			if (lastInBlock[i]!=-1) {
+				if (first!=-1) {
+					tmpChar.repeat=UNIQUE;
+					tmpChar.orientation=false;
+					tmpChar.start=-1; tmpChar.end=-1;
+					length=(i==nBlocks-1?readLength:boundaries[i])-(first==0?0:boundaries[first-1]);
+					tmpChar.length=length;
+					tmpChar.openStart=i==0;
+					tmpChar.openEnd=i==nBlocks-1;
+					tmpChar.quantize(quantum);
+					j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar);
+					if (tmpChar.isOpen()) {
+						if (j<0) j=-1-j;
+						if (j==lastUnique+1) maxOpenLength_unique=Math.max(maxOpenLength_unique,length);
+					}
+					else if (j<0) cleanTranslatedRead_addCharacter(tmpChar);
+				}
+				first=-1;
+			}
+			else if (first==-1) first=i;
+		}
+		if (first!=-1) {
+			tmpChar.repeat=UNIQUE;
+			tmpChar.orientation=false;
+			tmpChar.start=-1; tmpChar.end=-1;
+			length=readLength-(first==0?0:boundaries[first-1]);
+			tmpChar.length=length;
+			tmpChar.openStart=i==0;
+			tmpChar.openEnd=true;
+			tmpChar.quantize(quantum);
+			j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar);
+			if (tmpChar.isOpen()) {
+				if (j<0) j=-1-j;
+				if (j==lastUnique+1) maxOpenLength_unique=Math.max(maxOpenLength_unique,length);
+			}
+			else if (j<0) cleanTranslatedRead_addCharacter(tmpChar);
+		}
+	}
+
+	
+	/**
+	 * Removes from $blocks$ all characters with count smaller than $minCount$.
+	 */
+	private static final void removeRareCharacters(int nBlocks, long[] characterCount, int minCount) {
+		boolean deleted;
+		int i, j, k, c;
+		int last;
+		
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
 			k=-1;
@@ -976,79 +1033,30 @@ public class RepeatAlphabet {
 					if (c>lastUnique) {
 						while (c<=lastPeriodic && characterCount[c]<minCount) c++;
 						if (c>lastPeriodic) deleted=true;
-						else blocks[i][j]=-1-c;
+						else blocks[i][j]=c+"";
 					}
 				}
-				else if (characterCount[c]<minCount) deleted=true;
+				else if (c<lastAlphabet && characterCount[c]<minCount) deleted=true;
 				if (!deleted) blocks[i][++k]=blocks[i][j];
 			}
 			lastInBlock[i]=k;
 		}
-		
-		// Adding new unique characters
-		if (read2boundaries.indexOf(SEPARATOR_MINOR+"")>=0) {
-			tokens=read2boundaries.split();
-			length=tokens.length;
-			if (boundaries.length<length) boundaries = new int[length];
-			for (i=0; i<length; i++) boundaries[i]=Integer.parseInt(tokens[i]);
-		}
-		else boundaries[0]=Integer.parseInt(boundariesRow);
-		first=-1;
-		i=0; 
-		while (i<nBlocks) {
-			last=lastInBlock[i];
-			if (last>=0) {
-				if (first!=-1) {
-					tmpChar1.repeat=UNIQUE;
-					tmpChar1.orientation=false;
-					tmpChar1.start=-1; tmpChar1.end=-1;
-					tmpChar1.length=(i==nBlocks-1?readLength:boundaries[i])-(first==0?0:boundaries[first-1]);
-					tmpChar1.openStart=i==0;
-					tmpChar1.openEnd=i==nBlocks-1;
-					tmpChar2.copyFrom(tmpChar1);
-					tmpChar2.quantize(quantum);
-					j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar2);
-					if (tmpChar1.isOpen()) {
-						if (j<0) j=-1-j;
-						if (j==lastUnique+1) addCharacter(tmpChar1);
-					}
-					else {
-						if (i<0) addCharacter(tmpChar1);
-					}					
-				}
-				first=-1;
-				i++;
-			}
-			else {
-				if (first==-1) first=i;
-			}
-		}
-		if (first!=-1) {
-			tmpChar1.repeat=UNIQUE;
-			tmpChar1.orientation=false;
-			tmpChar1.start=-1; tmpChar1.end=-1;
-			tmpChar1.length=readLength-(first==0?0:boundaries[first-1]);
-			tmpChar1.openStart=i==0;
-			tmpChar1.openEnd=true;
-			tmpChar2.copyFrom(tmpChar1);
-			tmpChar2.quantize(quantum);
-			j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar2);
-			if (newCharacter.isOpen()) {
-				if (j<0) j=-1-j;
-				if (j==lastUnique+1) addCharacter(tmpChar1);
-			}
-			else {
-				if (i<0) addCharacter(tmpChar1);
-			}
-		}
 	}
-*/
 	
 	
-	
-	
-	
-	
+	/**
+	 * To $alphabet_newUnique$.
+	 */
+	private static final void cleanTranslatedRead_addCharacter(Character newCharacter) {
+		lastNewUnique++;
+		if (lastNewUnique>alphabet_newUnique.length) {
+			Character[] newArray = new Character[alphabet_newUnique.length<<1];
+			System.arraycopy(alphabet_newUnique,0,newArray,0,alphabet_newUnique.length);
+			for (int i=alphabet_newUnique.length; i<newArray.length; i++) newArray[i] = new Character();
+			alphabet_newUnique=newArray;
+		}
+		alphabet_newUnique[lastNewUnique].copyFrom(newCharacter);
+	}
 	
 	
 	
