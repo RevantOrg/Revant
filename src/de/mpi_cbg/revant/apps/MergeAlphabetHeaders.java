@@ -37,7 +37,6 @@ public class MergeAlphabetHeaders {
 				br = new BufferedReader(new FileReader(HEADERS_DIR+"/"+files[i]));
 				str=br.readLine();
 				br.close();
-System.err.println("VITTU> read "+str+" from file "+files[i]);				
 				maxOpenLength_unique=Math.max(maxOpenLength_unique,Integer.parseInt(str));
 			}
 		}

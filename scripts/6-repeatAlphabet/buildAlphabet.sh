@@ -12,6 +12,7 @@
 INPUT_DIR=$1
 MAX_ALIGNMENT_ERROR="0.2"  # Alignments with more error than this are discarded
 SPLIT_IN_PARTS="4"  # For parallelism
+MIN_CHARACTER_FREQUENCY="5"  # Should be equal to the coverage of one haplotype
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -55,7 +56,7 @@ for THREAD in $(seq 0 ${TO}); do
 	collectionThread ${THREAD} "${PARTS_PREFIX}-1-" "${PARTS_PREFIX}-2-" "${PARTS_PREFIX}-3-" &
 done
 wait
-sort --parallel ${SPLIT_IN_PARTS} -m -n -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-3-*.txt | uniq - ${PARTS_PREFIX}-4.txt
+sort --parallel ${SPLIT_IN_PARTS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-3-*.txt | uniq - ${PARTS_PREFIX}-4.txt
 N_INSTANCES=$(wc -l < ${PARTS_PREFIX}-4.txt)
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${SPLIT_IN_PARTS} ${PARTS_PREFIX}-4.txt ${PARTS_PREFIX}-5-
 
@@ -118,7 +119,27 @@ for THREAD in $(seq 0 ${TO}); do
 	cat ${PARTS_PREFIX}-9-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
 done
 
-echo "Computing character counts..."
+echo "Discarding rare characters..."
 COUNTS_FILE="${INPUT_DIR}/alphabet-counts.txt"
 HISTOGRAM_FILE="${INPUT_DIR}/alphabet-histogram.txt"
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterCounts ${READS_TRANSLATED_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${HISTOGRAM_FILE}
+function cleaningThread() {
+	TRANSLATED_CHARACTERS=$1
+	TRANSLATED_BOUNDARIES=$2
+	PREFIX_1=$3
+	PREFIX_2=$4
+	ID=$5
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
+	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
+}
+split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_FILE} ${INPUT_DIR}/reads-translated-
+split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_BOUNDARIES} ${INPUT_DIR}/reads-translated-boundaries-
+for FILE in $(find ${INPUT_DIR} -name "reads-translated-boundaries-*" ); do
+	THREAD_ID=${FILE#${INPUT_DIR}/reads-translated-boundaries-}
+	cleaningThread ${INPUT_DIR}/reads-translated-${THREAD_ID} ${INPUT_DIR}/reads-translated-boundaries-${THREAD_ID} "${PARTS_PREFIX}-10-" "${PARTS_PREFIX}-11-" ${THREAD_ID}
+done
+wait
+sort --parallel ${SPLIT_IN_PARTS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-11-*.txt | uniq - ${PARTS_PREFIX}-12.txt
+cat ${PARTS_PREFIX}-10-unique-${ID}.txt | sort -n -r > ${PARTS_PREFIX}-10-unique.txt
+CLEANED_ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} $(wc -l < ${PARTS_PREFIX}-12.txt) ${PARTS_PREFIX}-12.txt ${MIN_CHARACTER_FREQUENCY} ${PARTS_PREFIX}-10-unique.txt ${CLEANED_ALPHABET_FILE}

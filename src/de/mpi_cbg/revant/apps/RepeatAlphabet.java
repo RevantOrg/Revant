@@ -68,8 +68,12 @@ public class RepeatAlphabet {
 	private static int nComponents;
 	private static Character[] mergedCharacters;
 	
+	/**
+	 * Temporary space
+	 */
 	private static String[][] blocks;
 	private static int[] lastInBlock;
+	private static int[] boundaries;
 	
 	
 	/**
@@ -925,53 +929,40 @@ public class RepeatAlphabet {
 
 		alphabetCount = new long[alphabetSize+1];
 		br = new BufferedReader(new FileReader(file));
-		for (i=0; i<=alphabetSize; i++) alphabetCount[i]=Long.parseLong(br.readLine());
+		for (i=0; i<alphabetSize; i++) alphabetCount[i]=Long.parseLong(br.readLine());
 		br.close();
 	}
 	
-
-
-
-
-
-
-	
-	
-	
-	
-	
-	
-	
-	private static Character[] alphabet_newUnique;
-	private static int lastNewUnique;
-	
-	private static int[] boundaries;
-	
 	
 	/**
-	 * Adds to $alphabet_newUnique$ the new unique closed characters that result from 
-	 * removing every character with count smaller than $minCount$, and updates 
-	 * $maxOpenLength_unique$.
+	 * Appends to $bw$ the new unique closed characters that result from removing every 
+	 * character with count smaller than $minCount$ from $read2characters$, and updates 
+	 * $maxOpenLength_unique$ as well.
 	 *
-	 * Remark: the procedure uses global variable $boundaries$.
+	 * Remark: the procedure assumes that global variables $alphabet,alphabetCount$ have
+	 * already been initialized, and it uses global temporary variable $boundaries$.
 	 *
+	 * @param read2boundaries boundaries of the characters in $read2characters$;
 	 * @param tmpChar temporary space.
 	 */
-	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, long[] characterCount, int minCount, int quantum, Character tmpChar) throws IOException {
+	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, int minCount, int quantum, BufferedWriter bw, Character tmpChar) throws IOException {
 		int i, j, k;
-		int c, nBlocks, length, first;
+		int c, length, first, nBlocks, nBoundaries;
 		String[] tokens;
 		
 		if (read2characters.length()==0) return;
 		if (read2boundaries.indexOf(SEPARATOR_MINOR+"")>=0) {
 			tokens=read2boundaries.split(SEPARATOR_MINOR+"");
-			length=tokens.length;
-			if (boundaries.length<length) boundaries = new int[length];
-			for (i=0; i<length; i++) boundaries[i]=Integer.parseInt(tokens[i]);
+			nBoundaries=tokens.length;
+			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
+			for (i=0; i<nBoundaries; i++) boundaries[i]=Integer.parseInt(tokens[i]);
 		}
-		else boundaries[0]=Integer.parseInt(read2boundaries);
+		else {
+			nBoundaries=1;
+			boundaries[0]=Integer.parseInt(read2boundaries);
+		}
 		nBlocks=loadBlocks(read2characters);
-		removeRareCharacters(nBlocks,characterCount,minCount);
+		removeRareCharacters(nBlocks,minCount);
 		first=-1;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]!=-1) {
@@ -981,7 +972,7 @@ public class RepeatAlphabet {
 					tmpChar.start=-1; tmpChar.end=-1;
 					length=(i==nBlocks-1?readLength:boundaries[i])-(first==0?0:boundaries[first-1]);
 					tmpChar.length=length;
-					tmpChar.openStart=i==0;
+					tmpChar.openStart=first==0;
 					tmpChar.openEnd=i==nBlocks-1;
 					tmpChar.quantize(quantum);
 					j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar);
@@ -989,7 +980,7 @@ public class RepeatAlphabet {
 						if (j<0) j=-1-j;
 						if (j==lastUnique+1) maxOpenLength_unique=Math.max(maxOpenLength_unique,length);
 					}
-					else if (j<0) cleanTranslatedRead_addCharacter(tmpChar);
+					else if (j<0) bw.write(tmpChar.toString()+"\n");
 				}
 				first=-1;
 			}
@@ -1001,7 +992,7 @@ public class RepeatAlphabet {
 			tmpChar.start=-1; tmpChar.end=-1;
 			length=readLength-(first==0?0:boundaries[first-1]);
 			tmpChar.length=length;
-			tmpChar.openStart=i==0;
+			tmpChar.openStart=first==0; 
 			tmpChar.openEnd=true;
 			tmpChar.quantize(quantum);
 			j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar);
@@ -1009,18 +1000,21 @@ public class RepeatAlphabet {
 				if (j<0) j=-1-j;
 				if (j==lastUnique+1) maxOpenLength_unique=Math.max(maxOpenLength_unique,length);
 			}
-			else if (j<0) cleanTranslatedRead_addCharacter(tmpChar);
+			else if (j<0) bw.write(tmpChar.toString()+"\n");
 		}
 	}
 
 	
 	/**
 	 * Removes from $blocks$ all characters with count smaller than $minCount$.
+	 *
+	 * Remark: the procedure assumes that global variables $alphabet,alphabetCount$ have 
+	 * already been initialized.
 	 */
-	private static final void removeRareCharacters(int nBlocks, long[] characterCount, int minCount) {
+	private static final void removeRareCharacters(int nBlocks, int minCount) {
 		boolean deleted;
-		int i, j, k, c;
-		int last;
+		int i, j, k;
+		int c, last;
 		
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
@@ -1031,12 +1025,16 @@ public class RepeatAlphabet {
 				if (c<0) {
 					c=-1-c;
 					if (c>lastUnique) {
-						while (c<=lastPeriodic && characterCount[c]<minCount) c++;
+						while (c<=lastPeriodic && alphabetCount[c]<minCount) c++;
 						if (c>lastPeriodic) deleted=true;
 						else blocks[i][j]=c+"";
 					}
+					else {
+						// NOP: we don't filter out unique characters, and non-periodic
+						// repeats cannot be negative.
+					}
 				}
-				else if (c<lastAlphabet && characterCount[c]<minCount) deleted=true;
+				else if (c<=lastAlphabet && alphabetCount[c]<minCount) deleted=true;
 				if (!deleted) blocks[i][++k]=blocks[i][j];
 			}
 			lastInBlock[i]=k;
@@ -1045,17 +1043,63 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * To $alphabet_newUnique$.
+	 * Removes from $alphabet$ all characters with $alphabetCount < minCount$, and adds to
+	 * $alphabet$ all new unique characters in $newCharactersFile$.
+	 *
+	 * Remark: $alphabetCount$ is not valid after the procedure completes.
 	 */
-	private static final void cleanTranslatedRead_addCharacter(Character newCharacter) {
-		lastNewUnique++;
-		if (lastNewUnique>alphabet_newUnique.length) {
-			Character[] newArray = new Character[alphabet_newUnique.length<<1];
-			System.arraycopy(alphabet_newUnique,0,newArray,0,alphabet_newUnique.length);
-			for (int i=alphabet_newUnique.length; i<newArray.length; i++) newArray[i] = new Character();
-			alphabet_newUnique=newArray;
+	public static final void cleanTranslatedRead_updateAlphabet(int nNewCharacters, String newCharactersFile, int minCount) throws IOException {
+		int i, j;
+		String str;
+		Character tmpChar;
+		BufferedReader br;
+		Character[] newAlphabet;
+		if (nNewCharacters==0) return;
+		
+		// Removing rare characters
+		j=lastUnique;
+		for (i=lastUnique+1; i<=lastAlphabet; i++) {
+			if (alphabetCount[i]<minCount) continue;
+			j++;
+			tmpChar=alphabet[j];
+			alphabet[j]=alphabet[i];
+			alphabet[i]=tmpChar;
+			if (alphabet[j].start==-1) lastPeriodic=j;
 		}
-		alphabet_newUnique[lastNewUnique].copyFrom(newCharacter);
+		lastAlphabet=j;
+		
+		// Adding new unique characters
+		if (alphabet.length>=lastAlphabet+1+nNewCharacters) {
+			for (i=lastAlphabet; i>lastUnique; i--) {
+				alphabet[i+nNewCharacters]=alphabet[i];
+				alphabet[i]=null;
+			}
+			br = new BufferedReader(new FileReader(newCharactersFile));
+			for (i=0; i<nNewCharacters; i++) {
+				alphabet[lastUnique+1+i] = new Character();
+				alphabet[lastUnique+1+i].deserialize(br.readLine());
+			}
+			br.close();
+			lastUnique+=nNewCharacters; lastPeriodic+=nNewCharacters;
+			Arrays.sort(alphabet,0,lastUnique+1);
+		}
+		else {
+			newAlphabet = new Character[lastAlphabet+1+nNewCharacters];
+			System.arraycopy(alphabet,0,newAlphabet,0,lastUnique+1);
+			br = new BufferedReader(new FileReader(newCharactersFile));
+			for (i=0; i<nNewCharacters; i++) {
+				newAlphabet[lastUnique+1+i] = new Character();
+				newAlphabet[lastUnique+1+i].deserialize(br.readLine());
+			}
+			br.close();
+			i=lastUnique+1+nNewCharacters;
+			Arrays.sort(newAlphabet,0,i);
+			System.arraycopy(alphabet,lastUnique+1,newAlphabet,i,lastPeriodic-lastUnique);
+			i=lastPeriodic+nNewCharacters;
+			System.arraycopy(alphabet,lastPeriodic+1,newAlphabet,i,lastAlphabet-lastPeriodic);
+			alphabet=newAlphabet;
+			lastUnique+=nNewCharacters; lastPeriodic+=nNewCharacters;
+		}
 	}
 	
 	
