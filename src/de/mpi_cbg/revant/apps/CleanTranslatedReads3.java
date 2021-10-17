@@ -21,8 +21,9 @@ public class CleanTranslatedReads3 {
 		final String TRANSLATED_FILE_BOUNDARIES_OLD = args[6];
 		final int MIN_FREQUENCY = Integer.parseInt(args[7]);
 		final String ALPHABET_FILE_NEW = args[8];
-		final String TRANSLATED_FILE_CHARACTERS_NEW = args[9];
-		final String TRANSLATED_FILE_BOUNDARIES_NEW = args[10];		
+		final String OLD2NEW_FILE = args[9];
+		final String TRANSLATED_FILE_CHARACTERS_NEW = args[10];
+		final String TRANSLATED_FILE_BOUNDARIES_NEW = args[11];		
 		
 		int i;
 		int lastUnique_old, lastPeriodic_old, lastAlphabet_old;
@@ -30,6 +31,7 @@ public class CleanTranslatedReads3 {
 		RepeatAlphabet.Character tmpChar = new RepeatAlphabet.Character();
 		BufferedReader br1, br2;
 		BufferedWriter bw1, bw2;
+		int[] old2new;
 		RepeatAlphabet.Character[] oldUnique;
 		
 		// Loading old alphabet
@@ -39,9 +41,10 @@ public class CleanTranslatedReads3 {
 		lastUnique_old=RepeatAlphabet.lastUnique;
 		lastPeriodic_old=RepeatAlphabet.lastPeriodic;
 		lastAlphabet_old=RepeatAlphabet.lastAlphabet;
-		
-		// Computing new positions of frequent characters
-		// ----------->
+		br1 = new BufferedReader(new FileReader(OLD2NEW_FILE));
+		old2new = new int[lastAlphabet_old-lastUnique_old];
+		for (i=0; i<old2new.length; i++) old2new[i]=Integer.parseInt(br1.readLine());
+		br1.close();
 		
 		// Updating the translation
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_NEW,2);
@@ -54,7 +57,7 @@ public class CleanTranslatedReads3 {
 		bw2 = new BufferedWriter(new FileWriter(TRANSLATED_FILE_BOUNDARIES_NEW));
 		i=0; str1=br1.readLine(); str2=br2.readLine();
 		while (str1!=null) {
-			RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldUnique,lastUnique_old,lastPeriodic_old,lastAlphabet_old,Reads.readLengths[i],MIN_FREQUENCY,IO.quantum,bw1,bw2,tmpChar);
+			RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldUnique,lastUnique_old,lastPeriodic_old,lastAlphabet_old,old2new,Reads.readLengths[i],MIN_FREQUENCY,IO.quantum,bw1,bw2,tmpChar);
 			bw1.newLine(); bw2.newLine();
 			i++; str1=br1.readLine(); str2=br2.readLine();
 		}
