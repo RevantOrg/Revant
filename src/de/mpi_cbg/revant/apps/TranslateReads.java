@@ -27,7 +27,7 @@ public class TranslateReads {
 		Reads.loadReadIDs(READ_IDS_FILE,Reads.nReads);
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		RepeatAlphabet.loadIsPeriodic(ISPERIODIC_FILE,N_REPEATS);
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE);
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.translateReads(ALIGNMENTS_FILE,LAST_TRANSLATED_READ,MAX_ERROR,IO.quantum,TRANSLATED_FILE_CHARACTERS,TRANSLATED_FILE_BOUNDARIES);
 	}
 

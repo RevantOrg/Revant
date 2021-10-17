@@ -132,34 +132,35 @@ function cleaningThread() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
 }
-split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_FILE} ${INPUT_DIR}/reads-translated-
-split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_BOUNDARIES} ${INPUT_DIR}/reads-translated-boundaries-
-for FILE in $(find ${INPUT_DIR} -name "reads-translated-boundaries-*" ); do
-	THREAD_ID=${FILE#${INPUT_DIR}/reads-translated-boundaries-}
-	cleaningThread ${INPUT_DIR}/reads-translated-${THREAD_ID} ${INPUT_DIR}/reads-translated-boundaries-${THREAD_ID} "${PARTS_PREFIX}-10-" "${PARTS_PREFIX}-11-" ${THREAD_ID} &
+split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_FILE} "${PARTS_PREFIX}-10-"
+split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_BOUNDARIES} "${PARTS_PREFIX}-11-"
+for FILE in $(find ${INPUT_DIR} -name "tmpSplit-10-*" ); do
+	THREAD_ID=${FILE#${INPUT_DIR}/tmpSplit-10-}
+	cleaningThread "${INPUT_DIR}/tmpSplit-10-${THREAD_ID}" "${INPUT_DIR}/tmpSplit-11-${THREAD_ID}" "${PARTS_PREFIX}-12-" "${PARTS_PREFIX}-13-" ${THREAD_ID} &
 done
 wait
-sort --parallel ${SPLIT_IN_PARTS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-11-*.txt | uniq - ${PARTS_PREFIX}-12.txt
-cat ${PARTS_PREFIX}-10-unique-${ID}.txt | sort -n -r > ${PARTS_PREFIX}-10-unique.txt
+sort --parallel ${SPLIT_IN_PARTS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-13-*.txt | uniq - ${PARTS_PREFIX}-13.txt
+cat ${PARTS_PREFIX}-12-unique-*.txt | sort -n -r > ${PARTS_PREFIX}-12-unique.txt
 ALPHABET_FILE_CLEANED="${INPUT_DIR}/alphabet-cleaned.txt"
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} $(wc -l < ${PARTS_PREFIX}-12.txt) ${PARTS_PREFIX}-12.txt ${MIN_CHARACTER_FREQUENCY} ${PARTS_PREFIX}-10-unique.txt ${ALPHABET_FILE_CLEANED}
+rm -f ${ALPHABET_FILE_CLEANED}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} $(wc -l < ${PARTS_PREFIX}-13.txt) ${PARTS_PREFIX}-13.txt ${MIN_CHARACTER_FREQUENCY} ${PARTS_PREFIX}-12-unique.txt ${ALPHABET_FILE_CLEANED}
 function cleaningThread2() {
 	TRANSLATED_CHARACTERS_OLD=$1
 	TRANSLATED_BOUNDARIES_OLD=$2
 	TRANSLATED_CHARACTERS_NEW=$3
 	TRANSLATED_BOUNDARIES_NEW=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads3 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${TRANSLATED_CHARACTERS_OLD} ${TRANSLATED_BOUNDARIES_OLD} ${MIN_CHARACTER_FREQUENCY} ${ALPHABET_FILE_CLEANED} ${TRANSLATED_CHARACTERS_NEW} ${TRANSLATED_BOUNDARIES_NEW}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads3 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${TRANSLATED_CHARACTERS_OLD} ${TRANSLATED_BOUNDARIES_OLD} ${MIN_CHARACTER_FREQUENCY} ${ALPHABET_FILE_CLEANED} ${TRANSLATED_CHARACTERS_NEW} ${TRANSLATED_BOUNDARIES_NEW}
 }
-for FILE in $(find ${INPUT_DIR} -name "reads-translated-boundaries-*" ); do
-	THREAD_ID=${FILE#${INPUT_DIR}/reads-translated-boundaries-}
-	cleaningThread2 ${INPUT_DIR}/reads-translated-${THREAD_ID} ${INPUT_DIR}/reads-translated-boundaries-${THREAD_ID} ${INPUT_DIR}/reads-translated-new-${THREAD_ID} ${INPUT_DIR}/reads-translated-boundaries-new-${THREAD_ID} &
+for FILE in $(find ${INPUT_DIR} -name "tmpSplit-10-*" ); do
+	THREAD_ID=${FILE#${INPUT_DIR}/tmpSplit-10-}
+	cleaningThread2 "${INPUT_DIR}/tmpSplit-10-${THREAD_ID}" "${INPUT_DIR}/tmpSplit-11-${THREAD_ID}" "${INPUT_DIR}/tmpSplit-14-${THREAD_ID}" "${INPUT_DIR}/tmpSplit-15-${THREAD_ID}" &
 done
 wait
-READS_TRANSLATED_FILE_NEW="${INPUT_DIR}/reads-translated.new.txt"
-READS_TRANSLATED_BOUNDARIES_NEW="${INPUT_DIR}/reads-translated-boundaries.new.txt"
+READS_TRANSLATED_FILE_NEW="${INPUT_DIR}/reads-translated-new.txt"
+READS_TRANSLATED_BOUNDARIES_NEW="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 rm -f ${READS_TRANSLATED_FILE_NEW} ${READS_TRANSLATED_BOUNDARIES_NEW}
-for FILE in $(find -s ${INPUT_DIR} -name "reads-translated-boundaries-*" ); do
-	THREAD_ID=${FILE#${INPUT_DIR}/reads-translated-boundaries-}
-	cat ${INPUT_DIR}/reads-translated-new-${THREAD_ID} >> ${READS_TRANSLATED_FILE_NEW}
-	cat ${INPUT_DIR}/reads-translated-boundaries-new-${THREAD_ID} >> ${READS_TRANSLATED_BOUNDARIES_NEW}
+for FILE in $(find -s ${INPUT_DIR} -name "tmpSplit-14-*" ); do
+	THREAD_ID=${FILE#${INPUT_DIR}/tmpSplit-14-}
+	cat ${INPUT_DIR}/tmpSplit-14-${THREAD_ID} >> ${READS_TRANSLATED_FILE_NEW}
+	cat ${INPUT_DIR}/tmpSplit-15-${THREAD_ID} >> ${READS_TRANSLATED_BOUNDARIES_NEW}
 done

@@ -27,7 +27,7 @@ public class GetCharacterCounts {
 		long[] characterCount;
 		long[][] characterHistogram;
 		
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE);
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		
 		// Collecting character counts
 		characterCount = new long[RepeatAlphabet.lastAlphabet+2];

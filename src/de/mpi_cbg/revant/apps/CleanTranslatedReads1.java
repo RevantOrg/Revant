@@ -31,7 +31,7 @@ public class CleanTranslatedReads1 {
 		Reads.nReads=N_READS;
 		Reads.loadReadIDs(READ_IDS_FILE,Reads.nReads);
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE);
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.loadAlphabetCount(ALPHABET_COUNTS_FILE,RepeatAlphabet.lastAlphabet+1);		
 		br1 = new BufferedReader(new FileReader(TRANSLATED_READS_CHARACTERS_FILE));
 		br2 = new BufferedReader(new FileReader(TRANSLATED_READS_BOUNDARIES_FILE));

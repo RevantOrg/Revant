@@ -17,7 +17,7 @@ public class CleanTranslatedReads2 {
 		final String NEW_UNIQUE_FILE = args[5];  // Sorted in decreasing order
 		final String OUTPUT_FILE = args[6];
 		
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE);
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.loadAlphabetCount(ALPHABET_COUNTS_FILE,RepeatAlphabet.lastAlphabet+1);
 		RepeatAlphabet.cleanTranslatedRead_updateAlphabet(N_NEW_CHARACTERS,NEW_CHARACTERS_FILE,MIN_FREQUENCY);
 		BufferedReader br = new BufferedReader(new FileReader(NEW_UNIQUE_FILE));

@@ -14,7 +14,7 @@ public class CompactCharacterInstances {
 		final String OUTPUT_FILE = args[3];
 		
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
-		RepeatAlphabet.deserializeAlphabet(INSTANCES_FILE);
+		RepeatAlphabet.deserializeAlphabet(INSTANCES_FILE,2);
 		RepeatAlphabet.compactInstances(IO.quantum,IO.quantum<<1);
 		RepeatAlphabet.serializeAlphabet(OUTPUT_FILE);
 	}

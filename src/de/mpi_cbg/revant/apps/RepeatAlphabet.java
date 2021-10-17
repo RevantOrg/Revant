@@ -972,7 +972,7 @@ public class RepeatAlphabet {
 			boundaries[0]=Integer.parseInt(read2boundaries);
 		}
 		nBlocks=loadBlocks(read2characters);
-		removeRareCharacters(nBlocks,minCount);
+		removeRareCharacters(nBlocks,minCount,lastUnique,lastPeriodic,lastAlphabet);
 		first=-1;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]!=-1) {
@@ -1018,10 +1018,10 @@ public class RepeatAlphabet {
 	/**
 	 * Removes from $blocks$ all characters with count smaller than $minCount$.
 	 *
-	 * Remark: the procedure assumes that global variables $alphabet,alphabetCount$ have 
-	 * already been initialized.
+	 * Remark: the procedure assumes that global variable $alphabetCount$ has already been
+	 * initialized.
 	 */
-	private static final void removeRareCharacters(int nBlocks, int minCount) {
+	private static final void removeRareCharacters(int nBlocks, int minCount, int lastUnique, int lastPeriodic, int lastAlphabet) {
 		boolean deleted;
 		int i, j, k;
 		int c, last;
@@ -1114,9 +1114,10 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Updates the translation of a read into characters, assuming that the current 
-	 * $alphabet$ is obtained from the old alphabet by running $cleanTranslatedRead_
-	 * updateAlphabet()$.
+	 * Updates the translation of a read into characters, assuming that:
+	 * - $alphabet$ is obtained from the old alphabet by running $cleanTranslatedRead_
+	 *   updateAlphabet()$;
+	 * - $alphabetCount$ refers to the OLD, ORIGINAL alphabet.
 	 * 
 	 * @param read2characters_old old translation;
 	 * @param read2boundaries_old old block boundaries of the translation;
@@ -1144,7 +1145,7 @@ public class RepeatAlphabet {
 			boundaries[0]=Integer.parseInt(read2boundaries_old);
 		}
 		nBlocks=loadBlocks(read2characters_old);
-		removeRareCharacters(nBlocks,minCount);
+		removeRareCharacters(nBlocks,minCount,lastUnique_old,lastPeriodic_old,lastAlphabet_old);
 		first=-1; appendedBlock=false;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]!=-1) {
@@ -1163,6 +1164,7 @@ public class RepeatAlphabet {
 					read2boundaries_new.write(boundaries[i-1]+""+SEPARATOR_MINOR);
 				}
 				first=-1;
+				if (appendedBlock) read2characters_new.write(SEPARATOR_MAJOR+"");
 				last=lastInBlock[i];
 				for (j=0; j<=last; j++) {
 					c=Integer.parseInt(blocks[i][j]);
@@ -1190,11 +1192,12 @@ public class RepeatAlphabet {
 						translate_unique(tmpChar,read2characters_new);
 					}
 					else {
+if (c+DELTA_NONPERIODIC>lastAlphabet) System.err.println("VITTU> c="+c+" DELTA_NONPERIODIC="+DELTA_NONPERIODIC+" lastPeriodic_old="+lastPeriodic_old+" lastPeriodic="+lastPeriodic+" lastAlphabet="+lastAlphabet);
 						c+=DELTA_NONPERIODIC;
 						read2characters_new.write((j>0?SEPARATOR_MINOR+"":"")+c);
 					}
 				}
-				read2boundaries_new.write(boundaries[i]+""+SEPARATOR_MINOR);
+				if (i!=nBlocks-1) read2boundaries_new.write(boundaries[i]+""+SEPARATOR_MINOR);
 				appendedBlock=true;
 			}
 			else if (first==-1) first=i;
