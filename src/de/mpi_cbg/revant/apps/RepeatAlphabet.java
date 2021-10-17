@@ -458,8 +458,14 @@ public class RepeatAlphabet {
 	}
 	
 	
-	public static final void deserializeAlphabet(String path) throws IOException {
+	/**
+	 * @param lastElement loads just the elements up to this (included): 0=lastUnique; 
+	 * 1=lastPeriodic; 2=lastAlphabet. The $alphabet$ array is set to be big enough to 
+	 * contain all characters, but the entries after $lastElement$ are undefined.
+	 */
+	public static final void deserializeAlphabet(String path, int lastElement) throws IOException {
 		int i, p, q;
+		int last;
 		String str;
 		BufferedReader br;
 		
@@ -473,7 +479,12 @@ public class RepeatAlphabet {
 		lastAlphabet=Integer.parseInt(str.substring(p,q));
 		maxOpenLength_unique=Integer.parseInt(str.substring(q+1));
 		alphabet = new Character[lastAlphabet+1];
-		for (i=0; i<=lastAlphabet; i++) {
+		switch (lastElement) {
+			case 0: last=lastUnique; break;
+			case 1: last=lastPeriodic; break;
+			default: last=lastAlphabet;
+		}
+		for (i=0; i<=last; i++) {
 			alphabet[i] = new Character();
 			alphabet[i].deserialize(br.readLine());
 		}
@@ -673,7 +684,7 @@ public class RepeatAlphabet {
 		int i, j, k;
 		
 		for (i=0; i<=sequence[0].lastCharacter; i++) sequence[0].characters[i].quantize(quantum);
-		if (sequence[0].isUnique()) translate_unique(sequence[0],bw1);
+		if (sequence[0].isUnique()) translate_unique(sequence[0].characters[0],bw1);
 		else if (sequence[0].characters[0].start==-1) translate_periodic(sequence[0],bw1);
 		else translate(sequence[0],quantum,bw1);
 		k=0;
@@ -682,7 +693,7 @@ public class RepeatAlphabet {
 			bw1.write(SEPARATOR_MAJOR+"");
 			bw2.write((i>1?(SEPARATOR_MINOR+""):"")+points[k++]);
 			for (j=0; j<=sequence[i].lastCharacter; j++) sequence[i].characters[j].quantize(quantum);
-			if (sequence[i].isUnique()) translate_unique(sequence[i],bw1);
+			if (sequence[i].isUnique()) translate_unique(sequence[i].characters[0],bw1);
 			else if (sequence[i].characters[0].start==-1) translate_periodic(sequence[i],bw1);
 			else translate(sequence[i],quantum,bw1);
 		}
@@ -691,15 +702,14 @@ public class RepeatAlphabet {
 
 	
 	/**
-	 * Writes: $X$ if $block$ is closed and is identical to character $X$; $-1-X$ if
-	 * $block$ is half-open and could be an instance of any closed block $>=X$;
-	 * $lastAlphabet+1$ if $block$ is half-open but longer than any closed block.
+	 * Writes: $X$ if $character$ is closed and is identical to character $X$; $-1-X$ if
+	 * $character$ is half-open and could be an instance of any closed block $>=X$;
+	 * $lastAlphabet+1$ if $character$ is half-open but longer than any closed block.
 	 *
-	 * @param block its character is assumed to be quantized.
+	 * @param character assumed to be quantized.
 	 */
-	private static final void translate_unique(Block block, BufferedWriter bw) throws IOException {
+	private static final void translate_unique(Character character, BufferedWriter bw) throws IOException {
 		int i;
-		final Character character = block.characters[0];
 		final int length = character.length;
 		
 		i=Arrays.binarySearch(alphabet,0,lastUnique+1,character);
@@ -1103,7 +1113,106 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
+	/**
+	 * Updates the translation of a read into characters, assuming that the current 
+	 * $alphabet$ is obtained from the old alphabet by running $cleanTranslatedRead_
+	 * updateAlphabet()$.
+	 * 
+	 * @param read2characters_old old translation;
+	 * @param read2boundaries_old old block boundaries of the translation;
+	 * @param oldUnique the sorted set of unique characters in the old alphabet;
+	 * @param lastUnique_old block partitions in the old alphabet;
+	 * @param *_new new translation and block boundary files.
+	 */
+	public static final void cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldUnique, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, int readLength, int minCount, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
+		boolean appendedBlock;
+		int i, j;
+		int c, length, first, last, nBlocks, nBoundaries;
+		String[] tokens;
+		final int DELTA_PERIODIC = lastUnique-lastUnique_old;
+		final int DELTA_NONPERIODIC = lastPeriodic-lastPeriodic_old;
+		
+		if (read2characters_old.length()==0) return;
+		if (read2boundaries_old.indexOf(SEPARATOR_MINOR+"")>=0) {
+			tokens=read2boundaries_old.split(SEPARATOR_MINOR+"");
+			nBoundaries=tokens.length;
+			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
+			for (i=0; i<nBoundaries; i++) boundaries[i]=Integer.parseInt(tokens[i]);
+		}
+		else {
+			nBoundaries=1;
+			boundaries[0]=Integer.parseInt(read2boundaries_old);
+		}
+		nBlocks=loadBlocks(read2characters_old);
+		removeRareCharacters(nBlocks,minCount);
+		first=-1; appendedBlock=false;
+		for (i=0; i<nBlocks; i++) {
+			if (lastInBlock[i]!=-1) {
+				if (first!=-1) {
+					tmpChar.repeat=UNIQUE;
+					tmpChar.orientation=false;
+					tmpChar.start=-1; tmpChar.end=-1;
+					length=(i==nBlocks-1?readLength:boundaries[i])-(first==0?0:boundaries[first-1]);
+					tmpChar.length=length;
+					tmpChar.openStart=first==0;
+					tmpChar.openEnd=i==nBlocks-1;
+					tmpChar.quantize(quantum);
+					if (appendedBlock) read2characters_new.write(SEPARATOR_MAJOR+"");
+					translate_unique(tmpChar,read2characters_new);
+					appendedBlock=true;
+					read2boundaries_new.write(boundaries[i-1]+""+SEPARATOR_MINOR);
+				}
+				first=-1;
+				last=lastInBlock[i];
+				for (j=0; j<=last; j++) {
+					c=Integer.parseInt(blocks[i][j]);
+					if (c<0) {
+						c=-1-c;
+						if (c<=lastUnique_old) {
+							if (j>0) read2characters_new.write(SEPARATOR_MINOR+"");
+							translate_unique(oldUnique[c],read2characters_new);
+						}
+						else {
+							c=-1-(c+DELTA_PERIODIC);
+							read2characters_new.write((j>0?SEPARATOR_MINOR+"":"")+c);
+						}
+					}
+					else if (c==lastAlphabet_old+1) {
+						tmpChar.repeat=UNIQUE;
+						tmpChar.orientation=false;
+						tmpChar.start=-1; tmpChar.end=-1;
+						length=(i==nBlocks-1?readLength:boundaries[i])-(i==0?0:boundaries[i-1]);
+						tmpChar.length=length;
+						tmpChar.openStart=i==0;
+						tmpChar.openEnd=i==nBlocks-1;
+						tmpChar.quantize(quantum);
+						if (j>0) read2characters_new.write(SEPARATOR_MINOR+"");
+						translate_unique(tmpChar,read2characters_new);
+					}
+					else {
+						c+=DELTA_NONPERIODIC;
+						read2characters_new.write((j>0?SEPARATOR_MINOR+"":"")+c);
+					}
+				}
+				read2boundaries_new.write(boundaries[i]+""+SEPARATOR_MINOR);
+				appendedBlock=true;
+			}
+			else if (first==-1) first=i;
+		}
+		if (first!=-1) {
+			tmpChar.repeat=UNIQUE;
+			tmpChar.orientation=false;
+			tmpChar.start=-1; tmpChar.end=-1;
+			length=readLength-(first==0?0:boundaries[first-1]);
+			tmpChar.length=length;
+			tmpChar.openStart=first==0;
+			tmpChar.openEnd=true;
+			tmpChar.quantize(quantum);
+			if (appendedBlock) read2characters_new.write(SEPARATOR_MAJOR+"");
+			translate_unique(tmpChar,read2characters_new);
+			appendedBlock=true;
+		}
+	}
 	
 	
 	
