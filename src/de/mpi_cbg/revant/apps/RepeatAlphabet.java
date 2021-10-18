@@ -104,6 +104,9 @@ public class RepeatAlphabet {
 		br.close();
 	}
 	
+
+
+private static int fabio = -1;
 	
 	/**
 	 * Recodes every read, and collects in $outputFile$ every character (not necessarily 
@@ -159,7 +162,10 @@ public class RepeatAlphabet {
 					cleanAlignments(distanceThreshold);
 					if (lastAlignment!=-1) {
 						recodeRead(distanceThreshold);
-						if (lastInSequence>0) addCharacterInstances(bw);
+						if (lastInSequence>0) {
+fabio=previousReadA;							
+							addCharacterInstances(bw);
+						}
 						sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 					}
 					else sequenceLengths[0]++;
@@ -184,7 +190,10 @@ public class RepeatAlphabet {
 			cleanAlignments(distanceThreshold);
 			if (lastAlignment!=-1) {
 				recodeRead(distanceThreshold);
-				if (lastInSequence>0) addCharacterInstances(bw);
+				if (lastInSequence>0) {
+fabio=previousReadA;
+					addCharacterInstances(bw);
+				}
 				sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 			}
 			else sequenceLengths[0]++;
@@ -363,6 +372,11 @@ public class RepeatAlphabet {
 			else {
 				for (j=0; j<=sequence[i].lastCharacter; j++) {
 					bw.write(sequence[i].characters[j].toString());
+					
+					
+if (sequence[i].characters[j].repeat==16 && sequence[i].characters[j].start==-1 && sequence[i].characters[j].length>=500 && sequence[i].characters[j].length<=600 && !sequence[i].characters[j].openStart && sequence[i].characters[j].openEnd) System.err.println("addCharacterInstances> 1  FOUND CHARACTER "+sequence[i].characters[j]+" IN READ "+fabio);
+					
+					
 					bw.newLine();
 				}
 			}
@@ -735,12 +749,13 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Same logic as $translateRead_unique()$, but taking orientation into account.
+	 * Same logic as $translateRead_unique()$, but taking orientation and open status of
+	 * endpoints into account.
 	 */
 	private static final void translate_periodic(Block block, BufferedWriter bw) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
-		boolean orientation;
-		int i, j;
+		boolean orientation, openStart, openEnd;
+		int i, j, k;
 		int repeat, length, last;
 		final int lastCharacter = block.lastCharacter;
 		Character character;
@@ -751,13 +766,17 @@ public class RepeatAlphabet {
 		for (j=0; j<=lastCharacter; j++) {
 			character=block.characters[j];
 			repeat=character.repeat; orientation=character.orientation; length=character.length;
+			openStart=character.openStart; openEnd=character.openEnd;
 			i=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,character);
-			if (character.isOpen()) {
+			if (openStart || openEnd) {
 				if (i<0) i=-1-i;
 				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation) i--;
-				while (i>lastUnique && alphabet[i].repeat==repeat && alphabet[i].orientation==orientation && alphabet[i].length>=length) i--;
-				i++;
-				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation) {
+				k=i;
+				while (k>lastUnique && alphabet[k].repeat==repeat && alphabet[k].orientation==orientation && alphabet[k].length>=length) k--;
+				k++;
+				while (k<i && !alphabet[k].implies(character,-1)) k++;
+				i=k;
+				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation || !alphabet[i].implies(character,-1)) {
 					System.err.println("translateRead_periodic> ERROR: open periodic repeat not found in the alphabet");
 					System.err.println("query: "+character);
 					System.err.println("first candidate in alphabet: "+alphabet[i]);
@@ -878,8 +897,9 @@ public class RepeatAlphabet {
 	 * @param characterCount one cell per character of the alphabet, plus one.
 	 */
 	public static final void incrementCharacterCounts(String str, long[] characterCount) {
+		boolean orientation;
 		int i, j, k;
-		int c, to, nBlocks, last;
+		int c, to, nBlocks, last, repeat;
 		
 		if (str.length()==0) return;
 		nBlocks=loadBlocks(str);
@@ -889,12 +909,127 @@ public class RepeatAlphabet {
 				c=Integer.parseInt(blocks[i][j]);
 				if (c<0) {
 					c=-1-c;
-					to=c<=lastUnique?lastUnique:lastPeriodic;
-					for (k=c; k<=to; k++) characterCount[k]++;
+					if (c<=lastUnique) {
+						for (k=c; k<=lastUnique; k++) characterCount[k]++;
+					}
+					else {
+						repeat=alphabet[c].repeat; orientation=alphabet[c].orientation;
+						for (k=c; k<=lastPeriodic; k++) {
+							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
+							if (alphabet[k].implies(alphabet[c],-1)) characterCount[k]++;
+						}
+					}
 				}
 				else characterCount[c]++;
 			}
 		}
+	}
+	
+	
+	/**
+	 * Sets $characterCount[x]$ and $characterCount[y]$ to the sum of their values for 
+	 * every $x,y$ that are the reverse-complement of each other.
+	 *
+	 * @param marked temporary space, of size at least $lastAlphabet+1$.
+	 */
+	public static final void symmetrizeCharacterCounts(long[] characterCount, boolean[] marked) {
+		boolean orientation, openStart, openEnd, isHalfOpen;
+		int i, j;
+		int repeat, start, end, length;
+		
+		Math.set(marked,lastAlphabet,false);
+		
+		// Periodic
+		for (i=lastUnique+1; i<lastPeriodic; i++) {
+			if (marked[i]) continue;
+			repeat=alphabet[i].repeat; orientation=alphabet[i].orientation;
+			length=alphabet[i].length; 
+			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
+			isHalfOpen=openStart!=openEnd;
+			for (j=i+1; j<=lastPeriodic; j++) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].length==length && alphabet[j].orientation!=orientation) {
+					if ( (isHalfOpen && alphabet[j].openStart!=openStart && alphabet[j].openEnd!=openEnd) ||
+						 (!isHalfOpen && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd)
+					   ) {
+						characterCount[i]+=characterCount[j];
+						characterCount[j]=characterCount[i];
+						marked[j]=true;
+						break;
+					}
+				}
+			}
+		}
+		
+		// Nonperiodic
+		for (i=lastPeriodic+1; i<lastAlphabet; i++) {
+			if (marked[i]) continue;
+			repeat=alphabet[i].repeat; orientation=alphabet[i].orientation;
+			start=alphabet[i].start; end=alphabet[i].end;
+			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
+			isHalfOpen=openStart!=openEnd;
+			for (j=i+1; j<=lastAlphabet; j++) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].start==start && alphabet[j].end==end && alphabet[j].orientation!=orientation) {
+					if ( (isHalfOpen && alphabet[j].openStart!=openStart && alphabet[j].openEnd!=openEnd) ||
+						 (!isHalfOpen && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd)
+					   ) {
+						characterCount[i]+=characterCount[j];
+						characterCount[j]=characterCount[i];
+						marked[j]=true;
+						break;
+					}
+				}
+			}
+		}
+	}
+	
+	
+	/**
+	 * Builds a histogram of symmetrized $characterCount$ values. Rows: counts. Columns:
+	 * 0: unique, open; 
+	 * 1: unique, closed;
+	 * 2: periodic, open;
+	 * 3: periodic, closed; 
+	 * 4: nonperiodic, open;
+	 * 5: nonperiodic, closed.
+	 *
+	 * @param marked the same array used by $symmetrizeCharacterCounts()$, after that
+	 * procedure completes.
+	 */
+	public static final long[][] getCharacterHistogram(long[] characterCount, boolean[] marked, int maxFrequency) throws IOException {
+		int i;
+		long count;
+		long[][] characterHistogram;
+
+		// Unique
+		characterHistogram = new long[maxFrequency+1][3<<1];
+		Math.set(characterHistogram,0);
+		for (i=0; i<=RepeatAlphabet.lastUnique; i++) {
+			count=characterCount[i];
+			if (count>maxFrequency) count=maxFrequency;
+			characterHistogram[(int)count][1/*All closed*/]++;
+		}
+		count=characterCount[lastAlphabet+1];
+		if (count>maxFrequency) count=maxFrequency;
+		characterHistogram[(int)count][0/*Open*/]++;
+		// Periodic
+		for (i=RepeatAlphabet.lastUnique+1; i<=RepeatAlphabet.lastPeriodic; i++) {
+			if (marked[i]) continue;
+			count=characterCount[i];
+			if (count>maxFrequency) count=maxFrequency;
+			characterHistogram[(int)count][RepeatAlphabet.alphabet[i].isOpen()?2:3]++;
+		}		
+		// Nonperiodic
+		for (i=RepeatAlphabet.lastPeriodic+1; i<=RepeatAlphabet.lastAlphabet; i++) {
+			if (marked[i]) continue;
+			count=characterCount[i];
+			if (count>maxFrequency) count=maxFrequency;
+			characterHistogram[(int)count][RepeatAlphabet.alphabet[i].isOpen()?4:5]++;
+		}
+		return characterHistogram;
 	}
 	
 	
@@ -939,7 +1074,7 @@ public class RepeatAlphabet {
 
 		alphabetCount = new long[alphabetSize+1];
 		br = new BufferedReader(new FileReader(file));
-		for (i=0; i<alphabetSize; i++) alphabetCount[i]=Long.parseLong(br.readLine());
+		for (i=0; i<alphabetSize+1; i++) alphabetCount[i]=Long.parseLong(br.readLine());
 		br.close();
 	}
 	
@@ -1022,9 +1157,9 @@ public class RepeatAlphabet {
 	 * initialized.
 	 */
 	private static final void removeRareCharacters(int nBlocks, int minCount, int lastUnique, int lastPeriodic, int lastAlphabet) {
-		boolean deleted;
-		int i, j, k;
-		int c, last;
+		boolean found, deleted, orientation;
+		int i, j, k, h;
+		int c, last, repeat;
 		
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
@@ -1035,16 +1170,27 @@ public class RepeatAlphabet {
 				if (c<0) {
 					c=-1-c;
 					if (c>lastUnique) {
-						while (c<=lastPeriodic && alphabetCount[c]<minCount) c++;
-						if (c>lastPeriodic) deleted=true;
-						else blocks[i][j]=c+"";
+						if (alphabetCount[c]<minCount) {
+							repeat=alphabet[c].repeat; orientation=alphabet[c].orientation;
+							h=c+1; found=false;
+							while (h<=lastPeriodic) {
+								if (alphabet[h].repeat!=repeat || alphabet[h].orientation!=orientation) break;
+								if (alphabetCount[h]>=minCount && alphabet[h].implies(alphabet[c],-1)) {
+									found=true;
+									break;
+								}
+								h++;
+							}
+							if (!found) deleted=true;
+							else blocks[i][j]=h+"";
+						}
 					}
 					else {
 						// NOP: we don't filter out unique characters, and non-periodic
 						// repeats cannot be negative.
 					}
 				}
-				else if (c<=lastAlphabet && alphabetCount[c]<minCount) deleted=true;
+				else if (alphabetCount[c]<minCount) deleted=true;
 				if (!deleted) blocks[i][++k]=blocks[i][j];
 			}
 			lastInBlock[i]=k;
@@ -1154,7 +1300,15 @@ public class RepeatAlphabet {
 			boundaries[0]=Integer.parseInt(read2boundaries_old);
 		}
 		nBlocks=loadBlocks(read2characters_old);
+		
+		
+		// ----> This procedure needs the old alphabet, whereas what follows needs the
+		// new alphabet...
 		removeRareCharacters(nBlocks,minCount,lastUnique_old,lastPeriodic_old,lastAlphabet_old);
+		
+		
+		
+		
 		first=-1; nAppendedBlocks=0;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]!=-1) {
@@ -1208,7 +1362,6 @@ public class RepeatAlphabet {
 						translate_unique(oldUnique[c],read2characters_new);
 					}
 					else {
-if (c==58382) System.err.println("VITTU> c="+c+" lastUnique_old="+lastUnique_old+" lastUnique="+lastUnique+" old2new["+(c-lastUnique_old-1)+"]="+old2new[c-lastUnique_old-1]);
 						c=lastUnique+1+old2new[c-lastUnique_old-1];
 						read2characters_new.write((j>0?SEPARATOR_MINOR+"":"")+c);
 					}
