@@ -27,17 +27,18 @@ public class CleanTranslatedReads3 {
 		
 		int i;
 		int lastUnique_old, lastPeriodic_old, lastAlphabet_old;
+		int lastUnique_new, lastPeriodic_new, lastAlphabet_new;
 		String str1, str2;
 		RepeatAlphabet.Character tmpChar = new RepeatAlphabet.Character();
 		BufferedReader br1, br2;
 		BufferedWriter bw1, bw2;
 		int[] old2new;
-		RepeatAlphabet.Character[] oldUnique;
+		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
 		
 		// Loading old alphabet
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,0);
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,2);
 		RepeatAlphabet.loadAlphabetCount(ALPHABET_COUNTS_FILE_OLD,RepeatAlphabet.lastAlphabet+1);
-		oldUnique=RepeatAlphabet.alphabet;
+		oldAlphabet=RepeatAlphabet.alphabet;
 		lastUnique_old=RepeatAlphabet.lastUnique;
 		lastPeriodic_old=RepeatAlphabet.lastPeriodic;
 		lastAlphabet_old=RepeatAlphabet.lastAlphabet;
@@ -48,6 +49,10 @@ public class CleanTranslatedReads3 {
 		
 		// Updating the translation
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_NEW,2);
+		newAlphabet=RepeatAlphabet.alphabet;
+		lastUnique_new=RepeatAlphabet.lastUnique;
+		lastPeriodic_new=RepeatAlphabet.lastPeriodic;
+		lastAlphabet_new=RepeatAlphabet.lastAlphabet;
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
 		Reads.loadReadIDs(READ_IDS_FILE,Reads.nReads);
@@ -56,8 +61,8 @@ public class CleanTranslatedReads3 {
 		bw1 = new BufferedWriter(new FileWriter(TRANSLATED_FILE_CHARACTERS_NEW));
 		bw2 = new BufferedWriter(new FileWriter(TRANSLATED_FILE_BOUNDARIES_NEW));
 		i=0; str1=br1.readLine(); str2=br2.readLine();
-		while (str1!=null) {
-			RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldUnique,lastUnique_old,lastPeriodic_old,lastAlphabet_old,old2new,Reads.readLengths[i],MIN_FREQUENCY,IO.quantum,bw1,bw2,tmpChar);
+		while (str1!=null) {		
+			RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,old2new,Reads.readLengths[i],MIN_FREQUENCY,IO.quantum,bw1,bw2,tmpChar);
 			bw1.newLine(); bw2.newLine();
 			i++; str1=br1.readLine(); str2=br2.readLine();
 		}

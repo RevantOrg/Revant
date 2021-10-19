@@ -372,11 +372,6 @@ fabio=previousReadA;
 			else {
 				for (j=0; j<=sequence[i].lastCharacter; j++) {
 					bw.write(sequence[i].characters[j].toString());
-					
-					
-if (sequence[i].characters[j].repeat==16 && sequence[i].characters[j].start==-1 && sequence[i].characters[j].length>=500 && sequence[i].characters[j].length<=600 && !sequence[i].characters[j].openStart && sequence[i].characters[j].openEnd) System.err.println("addCharacterInstances> 1  FOUND CHARACTER "+sequence[i].characters[j]+" IN READ "+fabio);
-					
-					
 					bw.newLine();
 				}
 			}
@@ -927,7 +922,7 @@ if (sequence[i].characters[j].repeat==16 && sequence[i].characters[j].start==-1 
 	
 	
 	/**
-	 * Sets $characterCount[x]$ and $characterCount[y]$ to the sum of their values for 
+	 * Resets $characterCount[x]$ and $characterCount[y]$ to the sum of their values for 
 	 * every $x,y$ that are the reverse-complement of each other.
 	 *
 	 * @param marked temporary space, of size at least $lastAlphabet+1$.
@@ -1271,19 +1266,17 @@ if (sequence[i].characters[j].repeat==16 && sequence[i].characters[j].start==-1 
 	
 	
 	/**
-	 * Updates the translation of a read into characters, assuming that:
-	 * - $alphabet$ is obtained from the old alphabet by running $cleanTranslatedRead_
-	 *   updateAlphabet()$;
-	 * - $alphabetCount$ refers to the OLD, ORIGINAL alphabet.
+	 * Updates the translation of a read into characters, assuming that $alphabetCount$ 
+	 * refers to the OLD alphabet before $cleanTranslatedRead_updateAlphabet()$.
 	 * 
 	 * @param read2characters_old old translation;
 	 * @param read2boundaries_old old block boundaries of the translation;
-	 * @param oldUnique the sorted set of unique characters in the old alphabet;
-	 * @param lastUnique_old block partitions in the old alphabet;
+	 * @param newAlphabet obtained from the old alphabet by running $cleanTranslatedRead_
+	 * updateAlphabet()$;
 	 * @param old2new the output of $cleanTranslatedRead_updateAlphabet()$;
-	 * @param *_new new translation and block boundary files.
+	 * @param read2characters_new,read2boundaries_new output files.
 	 */
-	public static final void cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldUnique, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, int[] old2new, int readLength, int minCount, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
+	public static final void cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, int minCount, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
 		int i, j;
 		int c, length, first, last, nBlocks, nBoundaries, nAppendedBlocks;
 		String[] tokens;
@@ -1300,15 +1293,9 @@ if (sequence[i].characters[j].repeat==16 && sequence[i].characters[j].start==-1 
 			boundaries[0]=Integer.parseInt(read2boundaries_old);
 		}
 		nBlocks=loadBlocks(read2characters_old);
-		
-		
-		// ----> This procedure needs the old alphabet, whereas what follows needs the
-		// new alphabet...
+		alphabet=oldAlphabet; lastUnique=lastUnique_old; lastPeriodic=lastPeriodic_old; lastAlphabet=lastAlphabet_old;
 		removeRareCharacters(nBlocks,minCount,lastUnique_old,lastPeriodic_old,lastAlphabet_old);
-		
-		
-		
-		
+		alphabet=newAlphabet; lastUnique=lastUnique_new; lastPeriodic=lastPeriodic_new; lastAlphabet=lastAlphabet_new;
 		first=-1; nAppendedBlocks=0;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]!=-1) {
@@ -1338,7 +1325,7 @@ if (sequence[i].characters[j].repeat==16 && sequence[i].characters[j].start==-1 
 						c=-1-c;
 						if (c<=lastUnique_old) {
 							if (j>0) read2characters_new.write(SEPARATOR_MINOR+"");
-							translate_unique(oldUnique[c],read2characters_new);
+							translate_unique(oldAlphabet[c],read2characters_new);
 						}
 						else {
 							c=-1-(lastUnique+1+old2new[c-lastUnique_old-1]);
@@ -1359,7 +1346,7 @@ if (sequence[i].characters[j].repeat==16 && sequence[i].characters[j].start==-1 
 					}
 					else if (c<=lastUnique_old) {
 						if (j>0) read2characters_new.write(SEPARATOR_MINOR+"");
-						translate_unique(oldUnique[c],read2characters_new);
+						translate_unique(oldAlphabet[c],read2characters_new);
 					}
 					else {
 						c=lastUnique+1+old2new[c-lastUnique_old-1];

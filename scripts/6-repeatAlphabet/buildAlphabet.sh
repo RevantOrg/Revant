@@ -12,7 +12,7 @@
 INPUT_DIR=$1
 MAX_ALIGNMENT_ERROR="0.2"  # Alignments with more error than this are discarded
 SPLIT_IN_PARTS="4"  # For parallelism
-MIN_CHARACTER_FREQUENCY="5"  # Should be equal to the coverage of one haplotype
+MIN_CHARACTER_FREQUENCY="5"  # Should equal the coverage of one haplotype
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
