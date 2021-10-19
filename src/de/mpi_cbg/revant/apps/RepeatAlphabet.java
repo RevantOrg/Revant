@@ -104,9 +104,10 @@ public class RepeatAlphabet {
 		br.close();
 	}
 	
-
-
-private static int fabio = -1;
+	
+	
+	
+	// ------------ ALPHABET CONSTRUCTION AND READ TRANSLATION PROCEDURES ----------------
 	
 	/**
 	 * Recodes every read, and collects in $outputFile$ every character (not necessarily 
@@ -162,10 +163,7 @@ private static int fabio = -1;
 					cleanAlignments(distanceThreshold);
 					if (lastAlignment!=-1) {
 						recodeRead(distanceThreshold);
-						if (lastInSequence>0) {
-fabio=previousReadA;							
-							addCharacterInstances(bw);
-						}
+						if (lastInSequence>0) addCharacterInstances(bw);
 						sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 					}
 					else sequenceLengths[0]++;
@@ -190,10 +188,7 @@ fabio=previousReadA;
 			cleanAlignments(distanceThreshold);
 			if (lastAlignment!=-1) {
 				recodeRead(distanceThreshold);
-				if (lastInSequence>0) {
-fabio=previousReadA;
-					addCharacterInstances(bw);
-				}
+				if (lastInSequence>0) addCharacterInstances(bw);
 				sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 			}
 			else sequenceLengths[0]++;
@@ -1026,7 +1021,7 @@ fabio=previousReadA;
 		}
 		return characterHistogram;
 	}
-	
+
 	
 	/**
 	 * Loads the recoded read $str$ in global variables $blocks,lastInBlock$.
@@ -1062,6 +1057,10 @@ fabio=previousReadA;
 		return nBlocks;
 	}
 
+
+
+	
+	// ----------------------- ALPHABET CLEANING PROCEDURES ------------------------------
 
 	public static final void loadAlphabetCount(String file, int alphabetSize) throws IOException {
 		int i;
@@ -1379,18 +1378,11 @@ fabio=previousReadA;
 			nAppendedBlocks++;
 		}
 	}
+
 	
+
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+	// ------------------------------ KMER PROCEDURES ------------------------------------
 	
 	/**
 	 * Adds to $kmers$ every k-mer of the translated read $str$. If a block contains 
