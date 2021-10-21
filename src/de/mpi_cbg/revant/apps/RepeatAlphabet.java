@@ -74,6 +74,7 @@ public class RepeatAlphabet {
 	private static String[][] blocks;
 	private static int[] lastInBlock;
 	private static int[] boundaries;
+	private static int[][] intBlocks;
 	
 	
 	/**
@@ -1056,6 +1057,27 @@ public class RepeatAlphabet {
 		}
 		return nBlocks;
 	}
+	
+	
+	/**
+	 * Assumes that $loadBlocks()$ has already been called.
+	 */
+	private static final void loadIntBlocks(int nBlocks) {
+		int i, j;
+		int last;
+		
+		if (intBlocks==null) intBlocks = new int[nBlocks][0];
+		else if (intBlocks.length<nBlocks) {
+			int[][] newArray = new int[nBlocks][0];
+			System.arraycopy(intBlocks,0,newArray,0,intBlocks.length);
+			intBlocks=newArray;
+		}
+		for (i=0; i<nBlocks; i++) {
+			last=lastInBlock[i];
+			if (intBlocks[i].length<last+1) intBlocks[i] = new int[last+1];
+			for (j=0; j<=last; j++) intBlocks[i][j]=Integer.parseInt(blocks[i][j]);
+		}
+	}
 
 
 
@@ -1385,14 +1407,19 @@ public class RepeatAlphabet {
 	// ------------------------------ KMER PROCEDURES ------------------------------------
 	
 	/**
-	 * Adds to $kmers$ every k-mer of the translated read $str$. If a block contains 
-	 * multiple characters, every character is used to build a distinct kmer ("or").
+	 * Adds to $kmers$ every k-mer of the translated read $str$ that starts and ends with
+	 * a non-unique character. If a block contains multiple characters, every character is
+	 * used to build a distinct kmer ("or").
      *
+	 * 
+	 * 
 	 * @param sb temporary space, assumed to be empty.
 	 */
-	public static final void getKmers(String str, int k, Hashtable<String,Long> kmers, StringBuilder sb) {
+	public static final void getKmers(String str, int k, Hashtable<String,Long> kmers, int uniqueMode, boolean openMode, boolean onlyClosed, StringBuilder sb) {
 		int i;
-		int nBlocks;
+		int nBlocks, sum;
+		Character tmpChar = new Character();
+		int[] tmpArray = new int[k<<1];
 		String[] tokens;
 		String[][] blocks;
 		
@@ -1405,56 +1432,226 @@ public class RepeatAlphabet {
 		}
 		nBlocks++;
 		if (nBlocks<k) return;
-		tokens=str.split(SEPARATOR_MAJOR+"");
-		blocks = new String[nBlocks][0];
-		for (i=0; i<=tokens.length-1; i++) {
-			if (tokens[i].indexOf(SEPARATOR_MINOR+"")>=0) blocks[i]=tokens[i].split(SEPARATOR_MINOR+"");
-			else {
-				blocks[i] = new String[1];
-				blocks[i][0]=tokens[i];
-			}
-		}
-		if (stack==null || stack.length<(k+1)*3) stack = new int[(k+1)*3];
-		for (i=0; i<=nBlocks-k; i++) loadTranslatedRead_impl(blocks,i,k,kmers,sb);
+		loadBlocks(str); loadIntBlocks(nBlocks);
+		sum=0;
+		for (i=0; i<nBlocks; i++) sum+=lastInBlock[i];
+		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
+		if (stack2==null || stack2.length<k) stack2 = new int[k];
+		for (i=0; i<=nBlocks-k; i++) loadTranslatedRead_impl(i,k,uniqueMode,openMode,multiMode,kmers,tmpChar,stack,stack2,tmpArray);
 	}
 	
 	
 	/**
-	 * Adds $blocks[first..first+k-1]$ to $kmers$.
+	 * Adds $intBlocks[first..first+k-1]$ to $kmers$.
 	 *
-	 * @param sb temporary space.
+	 * @param key temporary space;
+	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
+	 * elements in $intBlocks$;
+	 * @param tmpArray2 temporary space, of size at least k;
+	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final void loadTranslatedRead_impl(String[][] blocks, int first, int k, Hashtable<String,Long> kmers, StringBuilder sb) {
+	private static final void loadTranslatedRead_impl(int first, int k, int uniqueMode, boolean openMode, boolean multiMode, Hashtable<Kmer,Long> kmers, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
 		int i;
-		int top, row, column, lastChild, length;
+		int top1, top2, row, column, lastChild, length;
 		Long value;
-		String key;
 		
-		top=-1;
-		stack[++top]=-1; stack[++top]=-1; stack[++top]=first-1;
-		while (top>=0) {
-			row=stack[top]; column=stack[top-1]; lastChild=stack[top-2];
-			if (row==first+k-1) {
-				key=sb.toString(); value=kmers.get(key);
-				if (value==null) kmers.put(key,Long.valueOf(1));
+		top1=-1; top2=-1;
+		tmpArray1[++top1]=-1; tmpArray1[++top1]=-1; tmpArray1[++top1]=first-1;
+		while (top1>=0) {
+			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
+			if (row==first+k-1 && isValidKmer(first,k,uniqueMode,openMode,multiMode)) {
+				key.set(tmpArray2,0,k); key.canonize(k,tmpArray3);
+				value=kmers.get(key);
+				if (value==null) kmers.put(new Kmer(key),Long.valueOf(1));
 				else kmers.put(key,Long.valueOf(value.longValue()+1));
 			}
-			if (row==first+k-1 || lastChild==blocks[row+1].length-1) {
-				top-=3;
-				i=sb.length()-1;
-				while (i>=0 && sb.charAt(i)!=SEPARATOR_MAJOR) i--;
-				i++;
-				sb.delete(i,sb.length());
-			}
+			if (row==first+k-1 || lastChild==lastInBlock[row+1]) { top1-=3; top2--; }
 			else {
 				lastChild++;
-				stack[top-2]=lastChild;
-				stack[++top]=-1; stack[++top]=lastChild; stack[++top]=row+1;
-				sb.append((row<first?"":(SEPARATOR_MAJOR+""))+blocks[row+1][lastChild]);
+				tmpArray1[top1-2]=lastChild;
+				tmpArray1[++top1]=-1; tmpArray1[++top1]=lastChild; tmpArray1[++top1]=row+1;
+				tmpArray2[++top2]=intBlocks[row+1][lastChild];
 			}
 		}
 	}
 	
+	/**
+	 * Tells whether the k-mer $intBlocks[first..first+k-1]$ satisfies the following:
+	 *
+	 * @param uniqueMode 0=no constraint; 1=the first and last character are not unique;
+	 * 2=no character in the k-mer is unique;
+	 * @param openMode TRUE=no constraint; FALSE=the k-mer contains no open block;
+	 * @param multiMode TRUE=no constraint; FALSE=the k-mer contains no block with 
+	 * multiple characters.
+	 */
+	private static final boolean isValidKmer(int first, int k, int uniqueMode, boolean openMode, boolean multiMode) {
+		int i, c;
+		
+		if ( uniqueMode==1 && 
+		     ( (lastInBlock[first]==0 && (intBlocks[first][0]==lastAlphabet+1 || intBlocks[first][0]<=lastUnique)) ||   
+		       (lastInBlock[first+k-1]==0 && (intBlocks[first+k-1][0]==lastAlphabet+1 || intBlocks[first+k-1][0]<=lastUnique))
+			 )
+		   ) return false;
+		if (!openMode || !multiMode) {
+			for (i=0; i<k; i++) {
+				c=intBlocks[first+i][0];
+				if (!openMode && (c==lastAlphabet+1 || alphabet[c].isOpen()) return false;
+				if (!multiMode && lastInBlock[first+i]>0) return false;
+			}
+		}
+		return true;
+	}
+	
+	
+	
+	
+	/**
+	 *
+	 */
+	public static class Kmer {
+		public int[] sequence;
+		
+		public Kmer() { }
+		
+		public Kmer(Kmer otherKmer, int k) {
+			sequence = new int[k];
+			System.arraycopy(otherKmer.sequence,0,sequence,0,k);
+		}
+		
+		public void set(int[] fromArray, int first, int k) {
+			sequence = new int[k];
+			System.arraycopy(fromArray,first,first+k);
+		}
+		
+		/**
+		 * Resets $sequence$ to the lexicographically smallest between $sequence$ with all
+		 * characters canonized, and the reverse of $sequence$ with the complement of 
+		 * every character canonized.
+		 * 
+		 * @tmpArray temporary space of length at least 2k.
+		 */
+		public void canonize(int k, int[] tmpArray) {
+			boolean smaller;
+			int i;
+			
+			for (i=0; i<k; i++) tmpArray[i]=canonize(sequence[i],true);
+			for (i=0; i<k; i++) tmpArray[k+i]=canonize(sequence[k-1-i],false);
+			smaller=true;
+			for (i=0; i<k; i++) {
+				if (tmpArray[i]<tmpArray[k+i]) break;
+				else if (tmpArray[i]>tmpArray[k+i]) {
+					smaller=false; break;
+				}
+			}
+			System.arraycopy(tmpArray,smaller?0:k,sequence,0,k);
+		}
+		
+		public int hashCode() {
+			return Arrays.hashCode(sequence);
+		}
+	}
+	
+	
+	
+	/**
+	 * Returns the smallest position in $alphabet$ of a character with the same 
+	 * repeat, start/end (or length), and orientation, as $alphabet[characterID]$.
+	 *
+	 * @param sameOrientation TRUE=keeps the same orientation; FALSE=reverse-
+	 * complements the orientation of the character.
+	 */
+	private static final int canonize(int characterID, boolean sameOrientation) {
+		boolean orientation;
+		int i;
+		int last, repeat, length, start, end;
+		
+		if (characterID==lastAlphabet+1 || characterID<=lastUnique) return characterID;
+		else if (characterID<=lastPeriodic) {
+			repeat=alphabet[characterID].repeat;
+			orientation=alphabet[characterID].orientation;
+			length=alphabet[characterID].length;
+			last=-1;
+			if (orientation) {
+				if (sameOrientation) {
+					for (i=characterID-1; i>lastUnique; i--) {
+						if (alphabet[i].repeat!=repeat) break;
+						if (alphabet[i].length==length) last=i;
+					}
+				}
+				else {
+					for (i=characterID+1; i<=lastPeriodic; i++) {
+						if (alphabet[i].repeat!=repeat) break;
+						if (!alphabet[i].orientation && alphabet[i].length==length) {
+							last=i;
+							break;
+						}
+					}
+				}
+			}
+			else {
+				if (sameOrientation) {
+					for (i=characterID-1; i>lastUnique; i--) {
+						if (alphabet[i].repeat!=repeat || alphabet[i].orientation) break;
+						if (alphabet[i].length==length) last=i;
+					}
+				}
+				else {
+					for (i=characterID-1; i>lastUnique; i--) {
+						if (alphabet[i].repeat!=repeat) break;
+						if (alphabet[i].orientation && alphabet[i].length==length) last=i;
+					}
+				}
+			}
+			return last==-1?characterID:last;
+		}
+		else {
+			repeat=alphabet[characterID].repeat;
+			orientation=alphabet[characterID].orientation;
+			start=alphabet[characterID].start; end=alphabet[characterID].end;
+			last=-1;
+			if (orientation) {
+				if (sameOrientation) {
+					for (i=characterID-1; i>lastPeriodic; i--) {
+						if (alphabet[i].repeat!=repeat) break;
+						if (alphabet[i].length==length) last=i;
+					}
+				}
+				else {
+					for (i=characterID+1; i<=lastAlphabet; i++) {
+						if (alphabet[i].repeat!=repeat) break;
+						if (!alphabet[i].orientation && alphabet[i].start==start && alphabet[i].end==end) {
+							last=i;
+							break;
+						}
+					}
+				}
+			}
+			else {
+				if (sameOrientation) {
+					for (i=characterID-1; i>lastPeriodic; i--) {
+						if (alphabet[i].repeat!=repeat || alphabet[i].orientation) break;
+						if (alphabet[i].start==start && alphabet[i].end==end) last=i;
+					}
+				}
+				else {
+					for (i=characterID-1; i>lastPeriodic; i--) {
+						if (alphabet[i].repeat!=repeat) break;
+						if (alphabet[i].orientation && alphabet[i].start==start && alphabet[i].end==end) last=i;
+					}
+				}
+			}
+			return last==-1?characterID:last;
+		}
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	// ------------------------------ DATA STRUCTURES ------------------------------------
 	
 	/**
 	 * A block of a recoded read, which is a set of characters.
