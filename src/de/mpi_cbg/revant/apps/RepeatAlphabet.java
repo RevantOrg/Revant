@@ -2,7 +2,7 @@ package de.mpi_cbg.revant.apps;
 
 import java.io.*;
 import java.util.Arrays;
-import java.util.Hashtable;
+import java.util.HashMap;
 
 import de.mpi_cbg.revant.util.Math;
 import de.mpi_cbg.revant.util.IO;
@@ -75,6 +75,7 @@ public class RepeatAlphabet {
 	private static int[] lastInBlock;
 	private static int[] boundaries;
 	private static int[][] intBlocks;
+	private static boolean[] isBlockUnique, isBlockOpen;
 	
 	
 	/**
@@ -1060,22 +1061,70 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Assumes that $loadBlocks()$ has already been called.
+	 * Transforms string matrix $blocks$ into integer matrix $intBlocks$, expanding every 
+	 * negative ID into a list of positive IDs, and builds arrays $isBlock{Unique,Open}$.
+	 *
+	 * Remark: the procedure follows the logic of $incrementCharacterCounts()$.
 	 */
 	private static final void loadIntBlocks(int nBlocks) {
-		int i, j;
-		int last;
+		boolean orientation;
+		int i, j, k, c;
+		int to, last, value, nElements, repeat;
 		
+		// Allocating memory
 		if (intBlocks==null) intBlocks = new int[nBlocks][0];
 		else if (intBlocks.length<nBlocks) {
 			int[][] newArray = new int[nBlocks][0];
 			System.arraycopy(intBlocks,0,newArray,0,intBlocks.length);
 			intBlocks=newArray;
 		}
+		if (isBlockUnique==null || isBlockUnique.length<nBlocks) isBlockUnique = new boolean[nBlocks];
+		Math.set(isBlockUnique,nBlocks-1,false);
+		if (isBlockOpen==null || isBlockOpen.length<nBlocks) isBlockOpen = new boolean[nBlocks];
+		Math.set(isBlockOpen,nBlocks-1,false);
+		
+		// Building arrays
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
-			if (intBlocks[i].length<last+1) intBlocks[i] = new int[last+1];
-			for (j=0; j<=last; j++) intBlocks[i][j]=Integer.parseInt(blocks[i][j]);
+			nElements=0;
+			for (j=0; j<=last; j++) {
+				value=Integer.parseInt(blocks[i][j]);
+				if (value>=0) nElements++;
+				else {
+					value=-1-value;
+					if (value<=lastUnique) nElements+=lastUnique+1-value;
+					else {
+						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
+						for (k=value; k<=lastPeriodic; k++) {
+							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
+							if (alphabet[k].implies(alphabet[value],-1)) nElements++;
+						}
+					}
+				}
+			}
+			if (intBlocks[i].length<nElements) intBlocks[i] = new int[nElements];
+			k=-1;
+			for (j=0; j<=last; j++) {
+				value=Integer.parseInt(blocks[i][j]);
+				if (value>=0) {
+					intBlocks[i][++k]=value;
+					if (value==lastAlphabet+1 || alphabet[value].isOpen()) isBlockOpen[i]=true;
+				}
+				else {
+					value=-1-value;
+					if (value<=lastUnique) {
+						for (c=value; c<=lastUnique; c++) intBlocks[i][++k]=c;
+					}
+					else {
+						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
+						for (c=value; c<=lastPeriodic; c++) {
+							if (alphabet[c].repeat!=repeat || alphabet[c].orientation!=orientation) break;
+							if (alphabet[c].implies(alphabet[value],-1)) intBlocks[i][++k]=c;
+						}
+					}
+					isBlockOpen[i]=true;
+				}
+			}
 		}
 	}
 
@@ -1404,20 +1453,21 @@ public class RepeatAlphabet {
 	
 
 	
-	// ------------------------------ KMER PROCEDURES ------------------------------------
+	// ------------------------------ K-MER PROCEDURES -----------------------------------
 	
 	/**
 	 * Adds to $kmers$ every k-mer of the translated read $str$ that starts and ends with
 	 * a non-unique character. If a block contains multiple characters, every character is
-	 * used to build a distinct kmer ("or").
+	 * used to build a distinct k-mer.
      *
 	 * Remark: the procedure uses global variables $stack$.
 	 * 
+	 * @param uniqueMode.openMode,multiMode see $isValidKmer()$;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	public static final void getKmers(String str, int k, int uniqueMode, boolean openMode, boolean multiMode, Hashtable<Kmer,Long> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
+	public static final void getKmers(String str, int k, int uniqueMode, boolean openMode, boolean multiMode, HashMap<Kmer,Long> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
 		int i;
 		int nBlocks, sum;
 		
@@ -1434,7 +1484,41 @@ public class RepeatAlphabet {
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
-		for (i=0; i<=nBlocks-k; i++) loadTranslatedRead_impl(i,k,uniqueMode,openMode,multiMode,kmers,tmpKmer,stack,tmpArray2,tmpArray3);
+		for (i=0; i<=nBlocks-k; i++) {
+			if (isValidWindow(i,k,uniqueMode,openMode,multiMode)) getKmers_impl(i,k,kmers,tmpKmer,stack,tmpArray2,tmpArray3);
+		}
+	}
+	
+	
+	/**
+	 * Tells whether window $blocks[first..first+k-1]$ satisfies the following:
+	 *
+	 * @param uniqueMode 0=no constraint; 1=the first and last character are not unique;
+	 * 2=no character in the window is unique;
+	 * @param openMode TRUE=no constraint; FALSE=the window contains no open block;
+	 * @param multiMode TRUE=no constraint; FALSE=the window contains no block with 
+	 * multiple characters.
+	 */
+	private static final boolean isValidWindow(int first, int k, int uniqueMode, boolean openMode, boolean multiMode) {
+		int i;
+		
+		if (uniqueMode==1 && (isBlockUnique[first] || isBlockUnique[first+k-1])) return false;
+		if (uniqueMode==2) {
+			for (i=1; i<k-1; i++) {
+				if (isBlockUnique[first+i]) return false;
+			}
+		}
+		if (!openMode) {
+			for (i=0; i<=k-1; i++) {
+				if (isBlockOpen[first+i]) return false;
+			}
+		}
+		if (!multiMode) {
+			for (i=0; i<=k-1; i++) {
+				if (intBlocks[first+i].length>1) return false;
+			}
+		}
+		return true;
 	}
 	
 	
@@ -1447,7 +1531,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final void loadTranslatedRead_impl(int first, int k, int uniqueMode, boolean openMode, boolean multiMode, Hashtable<Kmer,Long> kmers, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+	private static final void getKmers_impl(int first, int k, HashMap<Kmer,Long> kmers, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
 		int i;
 		int top1, top2, row, column, lastChild, length;
 		Long value;
@@ -1456,11 +1540,11 @@ public class RepeatAlphabet {
 		tmpArray1[++top1]=-1; tmpArray1[++top1]=-1; tmpArray1[++top1]=first-1;
 		while (top1>=0) {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
-			if (row==first+k-1 && isValidKmer(first,k,uniqueMode,openMode,multiMode)) {
+			if (row==first+k-1) {
 				key.set(tmpArray2,0,k); key.canonize(k,tmpArray3);
 				value=kmers.get(key);
 				if (value==null) kmers.put(new Kmer(key,k),Long.valueOf(1));
-				else kmers.put(key,Long.valueOf(value.longValue()+1));
+				else kmers.put(new Kmer(key,k),Long.valueOf(value.longValue()+1));
 			}
 			if (row==first+k-1 || lastChild==lastInBlock[row+1]) { top1-=3; top2--; }
 			else {
@@ -1470,34 +1554,6 @@ public class RepeatAlphabet {
 				tmpArray2[++top2]=intBlocks[row+1][lastChild];
 			}
 		}
-	}
-	
-	
-	/**
-	 * Tells whether the k-mer $intBlocks[first..first+k-1]$ satisfies the following:
-	 *
-	 * @param uniqueMode 0=no constraint; 1=the first and last character are not unique;
-	 * 2=no character in the k-mer is unique;
-	 * @param openMode TRUE=no constraint; FALSE=the k-mer contains no open block;
-	 * @param multiMode TRUE=no constraint; FALSE=the k-mer contains no block with 
-	 * multiple characters.
-	 */
-	private static final boolean isValidKmer(int first, int k, int uniqueMode, boolean openMode, boolean multiMode) {
-		int i, c;
-		
-		if ( uniqueMode==1 && 
-		     ( (lastInBlock[first]==0 && (intBlocks[first][0]==lastAlphabet+1 || intBlocks[first][0]<=lastUnique)) ||   
-		       (lastInBlock[first+k-1]==0 && (intBlocks[first+k-1][0]==lastAlphabet+1 || intBlocks[first+k-1][0]<=lastUnique))
-			 )
-		   ) return false;
-		if (!openMode || !multiMode) {
-			for (i=0; i<k; i++) {
-				c=intBlocks[first+i][0];
-				if (!openMode && (c==lastAlphabet+1 || alphabet[c].isOpen())) return false;
-				if (!multiMode && lastInBlock[first+i]>0) return false;
-			}
-		}
-		return true;
 	}
 	
 	
@@ -1634,6 +1690,15 @@ public class RepeatAlphabet {
 				}
 			}
 			System.arraycopy(tmpArray,smaller?0:k,sequence,0,k);
+		}
+		
+		public boolean equals(Object other) {
+			Kmer otherKmer = (Kmer)other;
+			final int k = sequence.length;
+			for (int i=0; i<k; i++) {
+				if (sequence[i]!=otherKmer.sequence[i]) return false;
+			}
+			return true;
 		}
 		
 		public int hashCode() {

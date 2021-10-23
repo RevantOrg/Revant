@@ -1,7 +1,7 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
-import java.util.Hashtable;
+import java.util.HashMap;
 
 import de.mpi_cbg.revant.util.Math;
 
@@ -12,7 +12,7 @@ public class CollectKmers {
 		final int K = Integer.parseInt(args[0]);
 		final String TRANSLATED_FILE = args[1];
 		final String ALPHABET_FILE = args[2];
-		final int UNIQUE_MODE = Integer.parseInt(args[3]);
+		final int UNIQUE_MODE = Integer.parseInt(args[3]);  // See $RepeatAlphabet.isValidKmer()$
 		final boolean OPEN_MODE = Integer.parseInt(args[4])==1;
 		final boolean MULTI_MODE = Integer.parseInt(args[5])==1;
 		final int MAX_HISTOGRAM_FREQUENCY = Integer.parseInt(args[6]);
@@ -28,7 +28,7 @@ public class CollectKmers {
 		BufferedReader br;
 		BufferedWriter bw;
 		RepeatAlphabet.Kmer tmpKmer = new RepeatAlphabet.Kmer();
-		Hashtable<RepeatAlphabet.Kmer,Long> kmers;
+		HashMap<RepeatAlphabet.Kmer,Long> kmers;
 		int[] tmpArray2 = new int[K];
 		int[] tmpArray3 = new int[2*K];
 		int[] histogram;
@@ -36,7 +36,7 @@ public class CollectKmers {
 		
 		System.err.println("Collecting "+K+"-mers...");
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
-		kmers = new Hashtable<RepeatAlphabet.Kmer,Long>();
+		kmers = new HashMap<RepeatAlphabet.Kmer,Long>();
 		br = new BufferedReader(new FileReader(TRANSLATED_FILE));
 		str=br.readLine(); row=0;
 		while (str!=null) {

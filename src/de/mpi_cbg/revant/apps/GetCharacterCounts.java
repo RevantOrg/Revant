@@ -1,7 +1,6 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
-import java.util.Hashtable;
 
 import de.mpi_cbg.revant.util.Math;
 
