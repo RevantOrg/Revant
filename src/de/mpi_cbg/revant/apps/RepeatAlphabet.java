@@ -1411,17 +1411,15 @@ public class RepeatAlphabet {
 	 * a non-unique character. If a block contains multiple characters, every character is
 	 * used to build a distinct kmer ("or").
      *
+	 * Remark: the procedure uses global variables $stack$.
 	 * 
-	 * 
-	 * @param sb temporary space, assumed to be empty.
+	 * @param tmpKmer temporary space;
+	 * @param tmpArray2 temporary space, of size at least k;
+	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	public static final void getKmers(String str, int k, Hashtable<String,Long> kmers, int uniqueMode, boolean openMode, boolean onlyClosed, StringBuilder sb) {
+	public static final void getKmers(String str, int k, int uniqueMode, boolean openMode, boolean multiMode, Hashtable<Kmer,Long> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
 		int i;
 		int nBlocks, sum;
-		Character tmpChar = new Character();
-		int[] tmpArray = new int[k<<1];
-		String[] tokens;
-		String[][] blocks;
 		
 		if (str.length()<(k<<1)-1) return;
 		i=-1; nBlocks=0;
@@ -1434,10 +1432,9 @@ public class RepeatAlphabet {
 		if (nBlocks<k) return;
 		loadBlocks(str); loadIntBlocks(nBlocks);
 		sum=0;
-		for (i=0; i<nBlocks; i++) sum+=lastInBlock[i];
+		for (i=0; i<nBlocks; i++) sum+=lastInBlock[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
-		if (stack2==null || stack2.length<k) stack2 = new int[k];
-		for (i=0; i<=nBlocks-k; i++) loadTranslatedRead_impl(i,k,uniqueMode,openMode,multiMode,kmers,tmpChar,stack,stack2,tmpArray);
+		for (i=0; i<=nBlocks-k; i++) loadTranslatedRead_impl(i,k,uniqueMode,openMode,multiMode,kmers,tmpKmer,stack,tmpArray2,tmpArray3);
 	}
 	
 	
@@ -1462,7 +1459,7 @@ public class RepeatAlphabet {
 			if (row==first+k-1 && isValidKmer(first,k,uniqueMode,openMode,multiMode)) {
 				key.set(tmpArray2,0,k); key.canonize(k,tmpArray3);
 				value=kmers.get(key);
-				if (value==null) kmers.put(new Kmer(key),Long.valueOf(1));
+				if (value==null) kmers.put(new Kmer(key,k),Long.valueOf(1));
 				else kmers.put(key,Long.valueOf(value.longValue()+1));
 			}
 			if (row==first+k-1 || lastChild==lastInBlock[row+1]) { top1-=3; top2--; }
@@ -1474,6 +1471,7 @@ public class RepeatAlphabet {
 			}
 		}
 	}
+	
 	
 	/**
 	 * Tells whether the k-mer $intBlocks[first..first+k-1]$ satisfies the following:
@@ -1495,7 +1493,7 @@ public class RepeatAlphabet {
 		if (!openMode || !multiMode) {
 			for (i=0; i<k; i++) {
 				c=intBlocks[first+i][0];
-				if (!openMode && (c==lastAlphabet+1 || alphabet[c].isOpen()) return false;
+				if (!openMode && (c==lastAlphabet+1 || alphabet[c].isOpen())) return false;
 				if (!multiMode && lastInBlock[first+i]>0) return false;
 			}
 		}
@@ -1503,69 +1501,24 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
-	
 	/**
-	 *
-	 */
-	public static class Kmer {
-		public int[] sequence;
-		
-		public Kmer() { }
-		
-		public Kmer(Kmer otherKmer, int k) {
-			sequence = new int[k];
-			System.arraycopy(otherKmer.sequence,0,sequence,0,k);
-		}
-		
-		public void set(int[] fromArray, int first, int k) {
-			sequence = new int[k];
-			System.arraycopy(fromArray,first,first+k);
-		}
-		
-		/**
-		 * Resets $sequence$ to the lexicographically smallest between $sequence$ with all
-		 * characters canonized, and the reverse of $sequence$ with the complement of 
-		 * every character canonized.
-		 * 
-		 * @tmpArray temporary space of length at least 2k.
-		 */
-		public void canonize(int k, int[] tmpArray) {
-			boolean smaller;
-			int i;
-			
-			for (i=0; i<k; i++) tmpArray[i]=canonize(sequence[i],true);
-			for (i=0; i<k; i++) tmpArray[k+i]=canonize(sequence[k-1-i],false);
-			smaller=true;
-			for (i=0; i<k; i++) {
-				if (tmpArray[i]<tmpArray[k+i]) break;
-				else if (tmpArray[i]>tmpArray[k+i]) {
-					smaller=false; break;
-				}
-			}
-			System.arraycopy(tmpArray,smaller?0:k,sequence,0,k);
-		}
-		
-		public int hashCode() {
-			return Arrays.hashCode(sequence);
-		}
-	}
-	
-	
-	
-	/**
-	 * Returns the smallest position in $alphabet$ of a character with the same 
-	 * repeat, start/end (or length), and orientation, as $alphabet[characterID]$.
+	 * Returns the smallest position in $alphabet$ of a character with the same
+	 * repeat, start/end (or length), and orientation, as $alphabet[characterID]$. This is
+	 * done to merge all instances of the same substring of the same repeat, regardless of
+	 * the open status of their endpoints.
 	 *
 	 * @param sameOrientation TRUE=keeps the same orientation; FALSE=reverse-
 	 * complements the orientation of the character.
 	 */
-	private static final int canonize(int characterID, boolean sameOrientation) {
+	private static final int canonizeCharacter(int characterID, boolean sameOrientation) {
 		boolean orientation;
 		int i;
 		int last, repeat, length, start, end;
 		
-		if (characterID==lastAlphabet+1 || characterID<=lastUnique) return characterID;
+		if (characterID==lastAlphabet+1 || characterID<=lastUnique) {
+			// Unique characters have no orientation and are all closed
+			return characterID;
+		}
 		else if (characterID<=lastPeriodic) {
 			repeat=alphabet[characterID].repeat;
 			orientation=alphabet[characterID].orientation;
@@ -1613,7 +1566,7 @@ public class RepeatAlphabet {
 				if (sameOrientation) {
 					for (i=characterID-1; i>lastPeriodic; i--) {
 						if (alphabet[i].repeat!=repeat) break;
-						if (alphabet[i].length==length) last=i;
+						if (alphabet[i].start==start && alphabet[i].end==end) last=i;
 					}
 				}
 				else {
@@ -1643,6 +1596,54 @@ public class RepeatAlphabet {
 			return last==-1?characterID:last;
 		}
 	}
+	
+	
+	public static class Kmer {
+		public int[] sequence;  // Positions in $alphabet$.
+		
+		public Kmer() { }
+		
+		public Kmer(Kmer otherKmer, int k) {
+			sequence = new int[k];
+			System.arraycopy(otherKmer.sequence,0,sequence,0,k);
+		}
+		
+		public void set(int[] fromArray, int first, int k) {
+			sequence = new int[k];
+			System.arraycopy(fromArray,first,sequence,0,k);
+		}
+		
+		/**
+		 * Resets $sequence$ to the lexicographically smallest between $sequence$ with
+		 * every character canonized, and the reverse of $sequence$ with the complement of 
+		 * every character canonized.
+		 * 
+		 * @tmpArray temporary space of size at least 2k.
+		 */
+		public void canonize(int k, int[] tmpArray) {
+			boolean smaller;
+			int i;
+			
+			for (i=0; i<k; i++) tmpArray[i]=canonizeCharacter(sequence[i],true);
+			for (i=0; i<k; i++) tmpArray[k+i]=canonizeCharacter(sequence[k-1-i],false);
+			smaller=true;
+			for (i=0; i<k; i++) {
+				if (tmpArray[i]<tmpArray[k+i]) break;
+				else if (tmpArray[i]>tmpArray[k+i]) {
+					smaller=false; break;
+				}
+			}
+			System.arraycopy(tmpArray,smaller?0:k,sequence,0,k);
+		}
+		
+		public int hashCode() {
+			return Arrays.hashCode(sequence);
+		}
+	}
+	
+	
+	
+	
 	
 	
 	
