@@ -1,7 +1,7 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
-import java.util.HashMap;
+import java.util.*;
 
 import de.mpi_cbg.revant.util.Math;
 
@@ -12,7 +12,7 @@ public class CollectKmers {
 		final int K = Integer.parseInt(args[0]);
 		final String TRANSLATED_FILE = args[1];
 		final String ALPHABET_FILE = args[2];
-		final int UNIQUE_MODE = Integer.parseInt(args[3]);  // See $RepeatAlphabet.isValidKmer()$
+		final int UNIQUE_MODE = Integer.parseInt(args[3]);  // See $RepeatAlphabet.isValidWindow()$
 		final boolean OPEN_MODE = Integer.parseInt(args[4])==1;
 		final boolean MULTI_MODE = Integer.parseInt(args[5])==1;
 		final int MAX_HISTOGRAM_FREQUENCY = Integer.parseInt(args[6]);
@@ -28,15 +28,15 @@ public class CollectKmers {
 		BufferedReader br;
 		BufferedWriter bw;
 		RepeatAlphabet.Kmer tmpKmer = new RepeatAlphabet.Kmer();
-		HashMap<RepeatAlphabet.Kmer,Long> kmers;
+		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
 		int[] tmpArray2 = new int[K];
 		int[] tmpArray3 = new int[2*K];
 		int[] histogram;
-		Long[] values;
+		RepeatAlphabet.Kmer[] values;
 		
 		System.err.println("Collecting "+K+"-mers...");
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
-		kmers = new HashMap<RepeatAlphabet.Kmer,Long>();
+		kmers = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
 		br = new BufferedReader(new FileReader(TRANSLATED_FILE));
 		str=br.readLine(); row=0;
 		while (str!=null) {
@@ -48,12 +48,12 @@ public class CollectKmers {
 		System.err.println("DONE  "+nKmers+" total distinct "+K+"-mers (uniqueMode="+UNIQUE_MODE+", openMode="+OPEN_MODE+", multiMode="+MULTI_MODE+")");
 		
 		System.err.println("Computing frequency histogram... ");
-		values = new Long[nKmers];
+		values = new RepeatAlphabet.Kmer[nKmers];
 		kmers.values().toArray(values);
 		histogram = new int[MAX_HISTOGRAM_FREQUENCY+1];
 		Math.set(histogram,MAX_HISTOGRAM_FREQUENCY,0);
 		for (i=0; i<nKmers; i++) {
-			count=values[i].longValue();
+			count=values[i].count;
 			intCount=count<=MAX_HISTOGRAM_FREQUENCY?((int)count):MAX_HISTOGRAM_FREQUENCY;
 			histogram[intCount]++;
 		}
@@ -61,6 +61,27 @@ public class CollectKmers {
 		for (i=0; i<=MAX_HISTOGRAM_FREQUENCY; i++) bw.write(i+","+histogram[i]+"\n");
 		bw.close();
 		System.err.println("DONE");
+		
+		
+		
+		
+		
+		
+Set<Map.Entry<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>> set = kmers.entrySet();
+Iterator<Map.Entry<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>> iterator = set.iterator();
+while (iterator.hasNext()) {
+	Map.Entry<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> entry = iterator.next();
+	if (entry.getValue().count==1) {
+		RepeatAlphabet.Kmer key = entry.getKey();
+		System.err.print(K+"-mer with just one count?! "+key+"     ");
+		for (int x=0; x<K; x++) System.err.print(RepeatAlphabet.alphabet[key.sequence[x]]+"\t");
+		System.err.println();
+	}
+}
+	
+	
+		
+		
 	}
 
 }

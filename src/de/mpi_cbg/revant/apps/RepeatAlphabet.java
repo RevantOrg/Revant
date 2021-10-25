@@ -72,7 +72,7 @@ public class RepeatAlphabet {
 	 * Temporary space
 	 */
 	private static String[][] blocks;
-	private static int[] lastInBlock;
+	private static int[] lastInBlock, lastInBlock_int;
 	private static int[] boundaries;
 	private static int[][] intBlocks;
 	private static boolean[] isBlockUnique, isBlockOpen;
@@ -1067,7 +1067,7 @@ public class RepeatAlphabet {
 	 * Remark: the procedure follows the logic of $incrementCharacterCounts()$.
 	 */
 	private static final void loadIntBlocks(int nBlocks) {
-		boolean orientation;
+		boolean orientation, unique;
 		int i, j, k, c;
 		int to, last, value, nElements, repeat;
 		
@@ -1078,12 +1078,14 @@ public class RepeatAlphabet {
 			System.arraycopy(intBlocks,0,newArray,0,intBlocks.length);
 			intBlocks=newArray;
 		}
+		if (lastInBlock_int==null || lastInBlock_int.length<nBlocks) lastInBlock_int = new int[nBlocks];
 		if (isBlockUnique==null || isBlockUnique.length<nBlocks) isBlockUnique = new boolean[nBlocks];
 		Math.set(isBlockUnique,nBlocks-1,false);
 		if (isBlockOpen==null || isBlockOpen.length<nBlocks) isBlockOpen = new boolean[nBlocks];
 		Math.set(isBlockOpen,nBlocks-1,false);
 		
 		// Building arrays
+		isBlockOpen[0]=true; isBlockOpen[nBlocks-1]=true;
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
 			nElements=0;
@@ -1103,17 +1105,19 @@ public class RepeatAlphabet {
 				}
 			}
 			if (intBlocks[i].length<nElements) intBlocks[i] = new int[nElements];
-			k=-1;
+			k=-1; unique=false;
 			for (j=0; j<=last; j++) {
 				value=Integer.parseInt(blocks[i][j]);
 				if (value>=0) {
 					intBlocks[i][++k]=value;
 					if (value==lastAlphabet+1 || alphabet[value].isOpen()) isBlockOpen[i]=true;
+					if (value==lastAlphabet+1 || value<=lastUnique) unique=true;
 				}
 				else {
 					value=-1-value;
 					if (value<=lastUnique) {
 						for (c=value; c<=lastUnique; c++) intBlocks[i][++k]=c;
+						unique=true;
 					}
 					else {
 						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
@@ -1125,6 +1129,7 @@ public class RepeatAlphabet {
 					isBlockOpen[i]=true;
 				}
 			}
+			lastInBlock_int[i]=k; isBlockUnique[i]=unique;
 		}
 	}
 
@@ -1456,18 +1461,27 @@ public class RepeatAlphabet {
 	// ------------------------------ K-MER PROCEDURES -----------------------------------
 	
 	/**
-	 * Adds to $kmers$ every k-mer of the translated read $str$ that starts and ends with
-	 * a non-unique character. If a block contains multiple characters, every character is
-	 * used to build a distinct k-mer.
+	 * Uses every block that satisfies the conditions in $uniqueMode,openMode,multiMode$ 
+	 * (see procedure $isValidKmer()$ for details) to add a k-mer to $kmers$. If a block 
+	 * contains multiple characters, every character can be used to build a k-mer. K-mers
+	 * are canonized before being added to $kmers$ (see $Kmer.canonize()$).
      *
-	 * Remark: the procedure uses global variables $stack$.
+	 * Remark: 1-mers collected by this procedure might have a different (and even 
+	 * smaller) count than the one produced by the $getCharacterHistogram()$ pipeline, 
+	 * because of the constraints and of canonization. E.g. a 1-mer might be rare in this 
+	 * procedure but frequent in $getCharacterHistogram()$, if the latter counted all the
+	 * occurrences of the character but the former counts just closed occurrences.
+	 *
+	 * Remark: often several characters map to the same block in practice, and most of 
+	 * the k-mers (k>=2) that result from this are rare.
+	 *
+	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 * 
-	 * @param uniqueMode.openMode,multiMode see $isValidKmer()$;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	public static final void getKmers(String str, int k, int uniqueMode, boolean openMode, boolean multiMode, HashMap<Kmer,Long> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
+	public static final void getKmers(String str, int k, int uniqueMode, boolean openMode, boolean multiMode, HashMap<Kmer,Kmer> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
 		int i;
 		int nBlocks, sum;
 		
@@ -1485,7 +1499,7 @@ public class RepeatAlphabet {
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		for (i=0; i<=nBlocks-k; i++) {
-			if (isValidWindow(i,k,uniqueMode,openMode,multiMode)) getKmers_impl(i,k,kmers,tmpKmer,stack,tmpArray2,tmpArray3);
+			if (isValidWindow(i,k,uniqueMode,openMode,multiMode)) getKmers_impl(i,k,kmers,tmpKmer,stack,tmpArray2,tmpArray3,str);
 		}
 	}
 	
@@ -1531,10 +1545,10 @@ public class RepeatAlphabet {
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final void getKmers_impl(int first, int k, HashMap<Kmer,Long> kmers, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+	private static final void getKmers_impl(int first, int k, HashMap<Kmer,Kmer> kmers, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, String str) {
 		int i;
 		int top1, top2, row, column, lastChild, length;
-		Long value;
+		Kmer value, newKey;
 		
 		top1=-1; top2=-1;
 		tmpArray1[++top1]=-1; tmpArray1[++top1]=-1; tmpArray1[++top1]=first-1;
@@ -1543,10 +1557,13 @@ public class RepeatAlphabet {
 			if (row==first+k-1) {
 				key.set(tmpArray2,0,k); key.canonize(k,tmpArray3);
 				value=kmers.get(key);
-				if (value==null) kmers.put(new Kmer(key,k),Long.valueOf(1));
-				else kmers.put(new Kmer(key,k),Long.valueOf(value.longValue()+1));
+				if (value==null) {
+					newKey = new Kmer(key,k); newKey.count=1;
+					kmers.put(newKey,newKey);
+				}
+				else value.count++;
 			}
-			if (row==first+k-1 || lastChild==lastInBlock[row+1]) { top1-=3; top2--; }
+			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
 			else {
 				lastChild++;
 				tmpArray1[top1-2]=lastChild;
@@ -1656,21 +1673,24 @@ public class RepeatAlphabet {
 	
 	public static class Kmer {
 		public int[] sequence;  // Positions in $alphabet$.
+		public long count;
 		
 		public Kmer() { }
 		
 		public Kmer(Kmer otherKmer, int k) {
 			sequence = new int[k];
 			System.arraycopy(otherKmer.sequence,0,sequence,0,k);
+			count=0;
 		}
 		
 		public void set(int[] fromArray, int first, int k) {
 			sequence = new int[k];
 			System.arraycopy(fromArray,first,sequence,0,k);
+			count=0;
 		}
 		
 		/**
-		 * Resets $sequence$ to the lexicographically smallest between $sequence$ with
+		 * Resets $sequence$ to the lexicographically smaller between $sequence$ with
 		 * every character canonized, and the reverse of $sequence$ with the complement of 
 		 * every character canonized.
 		 * 
@@ -1703,6 +1723,13 @@ public class RepeatAlphabet {
 		
 		public int hashCode() {
 			return Arrays.hashCode(sequence);
+		}
+		
+		public String toString() {
+			final int k = sequence.length;
+			String out = sequence[0]+"";
+			for (int i=1; i<k; i++) out+=","+sequence[i];
+			return out;
 		}
 	}
 	
