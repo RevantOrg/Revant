@@ -1,6 +1,8 @@
 #!/bin/bash
 # 
-# 
+# Recodes every read into a sequence of "characters", that are substrings of a repeat in
+# a specific orientation. Builds an alphabet of all distinct characters. Discards rare
+# characters and recodes the reads again in the cleaned-up alphabet.
 #
 # Remark: the script assumes that environment variable $REVANT_BINARIES$ is already set
 # to the directory that contains REVANT's binaries, i.e. to the directory that contains
@@ -11,8 +13,8 @@
 #
 INPUT_DIR=$1
 MAX_ALIGNMENT_ERROR="0.2"  # Alignments with more error than this are discarded
-SPLIT_IN_PARTS="4"  # For parallelism
-MIN_CHARACTER_FREQUENCY="5"  # Should equal the coverage of one haplotype
+N_THREADS="4"
+MIN_CHARACTER_FREQUENCY="5"  # Should be the coverage of one haplotype
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -35,8 +37,8 @@ echo "Splitting the alignments file..."
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
 LAST_READA_FILE="${INPUT_DIR}/LAshow-lastReadA.txt"
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${SPLIT_IN_PARTS} ${ALIGNMENTS_FILE} ${PARTS_PREFIX}-1- ${LAST_READA_FILE}
-echo "Alignments filtered and split in ${SPLIT_IN_PARTS} parts"
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${PARTS_PREFIX}-1- ${LAST_READA_FILE}
+echo "Alignments filtered and split in ${N_THREADS} parts"
 
 echo "Collecting character instances..."
 function collectionThread() {
@@ -47,18 +49,18 @@ function collectionThread() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterInstances ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt "${PREFIX_2}unique-${ALIGNMENTS_FILE_ID}.txt"
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt | uniq - ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
 }
-if [ -e ${PARTS_PREFIX}-1-${SPLIT_IN_PARTS}.txt ]; then
-	TO=${SPLIT_IN_PARTS}
+if [ -e ${PARTS_PREFIX}-1-${N_THREADS}.txt ]; then
+	TO=${N_THREADS}
 else
-	TO=$(( ${SPLIT_IN_PARTS} - 1 ))
+	TO=$(( ${N_THREADS} - 1 ))
 fi
 for THREAD in $(seq 0 ${TO}); do
 	collectionThread ${THREAD} "${PARTS_PREFIX}-1-" "${PARTS_PREFIX}-2-" "${PARTS_PREFIX}-3-" &
 done
 wait
-sort --parallel ${SPLIT_IN_PARTS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-3-*.txt | uniq - ${PARTS_PREFIX}-4.txt
+sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-3-*.txt | uniq - ${PARTS_PREFIX}-4.txt
 N_INSTANCES=$(wc -l < ${PARTS_PREFIX}-4.txt)
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${SPLIT_IN_PARTS} ${PARTS_PREFIX}-4.txt ${PARTS_PREFIX}-5-
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${PARTS_PREFIX}-4.txt ${PARTS_PREFIX}-5-
 
 echo "Compacting character instances..."
 function compactionThread() {
@@ -69,10 +71,10 @@ function compactionThread() {
 	cat ${PREFIX_1}${INSTANCES_FILE_ID}-header.txt ${PREFIX_1}${INSTANCES_FILE_ID}.txt > ${PREFIX_2}${INSTANCES_FILE_ID}.txt
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactCharacterInstances ${PREFIX_2}${INSTANCES_FILE_ID}.txt ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${PREFIX_3}${INSTANCES_FILE_ID}.txt
 }
-if [ -e ${PARTS_PREFIX}-5-${SPLIT_IN_PARTS}.txt ]; then
-	TO=${SPLIT_IN_PARTS}
+if [ -e ${PARTS_PREFIX}-5-${N_THREADS}.txt ]; then
+	TO=${N_THREADS}
 else
-	TO=$(( ${SPLIT_IN_PARTS} - 1 ))
+	TO=$(( ${N_THREADS} - 1 ))
 fi
 for THREAD in $(seq 0 ${TO}); do
 	compactionThread ${THREAD} "${PARTS_PREFIX}-5-" "${PARTS_PREFIX}-6-" "${PARTS_PREFIX}-7-" &
@@ -96,10 +98,10 @@ function translationThread() {
 	PREFIX_3=$5
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
 }
-if [ -e ${PARTS_PREFIX}-1-${SPLIT_IN_PARTS}.txt ]; then
-	TO=${SPLIT_IN_PARTS}
+if [ -e ${PARTS_PREFIX}-1-${N_THREADS}.txt ]; then
+	TO=${N_THREADS}
 else
-	TO=$(( ${SPLIT_IN_PARTS} - 1 ))
+	TO=$(( ${N_THREADS} - 1 ))
 fi
 translationThread 0 -1 "${PARTS_PREFIX}-1-" "${PARTS_PREFIX}-8-" "${PARTS_PREFIX}-9-" &
 for THREAD in $(seq 1 ${TO}); do
@@ -132,14 +134,14 @@ function cleaningThread() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
 }
-split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_FILE} "${PARTS_PREFIX}-10-"
-split -l $(( ${N_READS} / ${SPLIT_IN_PARTS} )) ${READS_TRANSLATED_BOUNDARIES} "${PARTS_PREFIX}-11-"
+split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${PARTS_PREFIX}-10-"
+split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${PARTS_PREFIX}-11-"
 for FILE in $(find ${INPUT_DIR} -name "tmpSplit-10-*" ); do
 	THREAD_ID=${FILE#${INPUT_DIR}/tmpSplit-10-}
 	cleaningThread "${INPUT_DIR}/tmpSplit-10-${THREAD_ID}" "${INPUT_DIR}/tmpSplit-11-${THREAD_ID}" "${PARTS_PREFIX}-12-" "${PARTS_PREFIX}-13-" ${THREAD_ID} &
 done
 wait
-sort --parallel ${SPLIT_IN_PARTS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-13-*.txt | uniq - ${PARTS_PREFIX}-13.txt
+sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS} ${PARTS_PREFIX}-13-*.txt | uniq - ${PARTS_PREFIX}-13.txt
 cat ${PARTS_PREFIX}-12-unique-*.txt | sort -n -r > ${PARTS_PREFIX}-12-unique.txt
 ALPHABET_FILE_CLEANED="${INPUT_DIR}/alphabet-cleaned.txt"
 rm -f ${ALPHABET_FILE_CLEANED}
