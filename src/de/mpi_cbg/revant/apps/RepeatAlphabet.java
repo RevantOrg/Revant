@@ -382,6 +382,13 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
 	 * power, since it assumes they have not been added to $alphabet$ in ther first place.
+	 * 
+	 * Remark: assume that the repeat database contains a repeat that occurs in full just 
+	 * once in the genome, and that is longer than every read. At the end of the procedure 
+	 * this corresponds to an open prefix character and an open suffix character. A 
+	 * similar observation holds also for a repeat with a long substring that occurs just 
+	 * once in the genome, and for a long short-period repeat that occurs just once in the
+	 * genome.
 	 */
 	public static final void compactInstances(int distanceThreshold, int lengthThreshold) {
 		final int QUANTUM = IO.quantum;
@@ -1481,7 +1488,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	public static final void getKmers(String str, int k, int uniqueMode, boolean openMode, boolean multiMode, HashMap<Kmer,Kmer> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
+	public static final void getKmers(String str, int k, int uniqueMode, int openMode, int multiMode, HashMap<Kmer,Kmer> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
 		int i;
 		int nBlocks, sum;
 		
@@ -1507,29 +1514,43 @@ public class RepeatAlphabet {
 	/**
 	 * Tells whether window $blocks[first..first+k-1]$ satisfies the following:
 	 *
-	 * @param uniqueMode 0=no constraint; 1=the first and last character are not unique;
-	 * 2=no character in the window is unique;
-	 * @param openMode TRUE=no constraint; FALSE=the window contains no open block;
-	 * @param multiMode TRUE=no constraint; FALSE=the window contains no block with 
-	 * multiple characters.
+	 * @param uniqueMode blocks with unique characters:
+	 * 0: are allowed; 
+	 * 1: are allowed everywhere, except in the first and last block of the window;
+	 * 2: are not allowed;
+	 * @param openMode open blocks:
+	 * 0: are allowed; 
+	 * 1: are not allowed;
+	 * @param multiMode blocks with multiple characters:
+	 * 0: are allowed; 
+	 * 1: are not allowed if they are open (open blocks are more likely to match several 
+	 *    characters because they contain just a fraction of a character);
+	 * 2: are not allowed.
 	 */
-	private static final boolean isValidWindow(int first, int k, int uniqueMode, boolean openMode, boolean multiMode) {
+	private static final boolean isValidWindow(int first, int k, int uniqueMode, int openMode, int multiMode) {
 		int i;
 		
-		if (uniqueMode==1 && (isBlockUnique[first] || isBlockUnique[first+k-1])) return false;
-		if (uniqueMode==2) {
-			for (i=1; i<k-1; i++) {
+		if (uniqueMode==1) {
+			if (isBlockUnique[first] || isBlockUnique[first+k-1]) return false;
+		}
+		else if (uniqueMode==2) {
+			for (i=0; i<=k-1; i++) {
 				if (isBlockUnique[first+i]) return false;
 			}
 		}
-		if (!openMode) {
+		if (openMode==1) {
 			for (i=0; i<=k-1; i++) {
 				if (isBlockOpen[first+i]) return false;
 			}
 		}
-		if (!multiMode) {
+		if (multiMode==1) {
 			for (i=0; i<=k-1; i++) {
-				if (intBlocks[first+i].length>1) return false;
+				if (lastInBlock_int[first+i]>0 && isBlockOpen[first+i]) return false;
+			}
+		}
+		else if (multiMode==2) {
+			for (i=0; i<=k-1; i++) {
+				if (lastInBlock_int[first+i]>0) return false;
 			}
 		}
 		return true;
@@ -1671,7 +1692,7 @@ public class RepeatAlphabet {
 	}
 	
 	
-	public static class Kmer {
+	public static class Kmer implements Comparable {
 		public int[] sequence;  // Positions in $alphabet$.
 		public long count;
 		
@@ -1719,6 +1740,16 @@ public class RepeatAlphabet {
 				if (sequence[i]!=otherKmer.sequence[i]) return false;
 			}
 			return true;
+		}
+		
+		public int compareTo(Object other) {
+			Kmer otherKmer = (Kmer)other;
+			final int k = sequence.length;
+			for (int i=0; i<k; i++) {
+				if (sequence[i]<otherKmer.sequence[i]) return -1;
+				else if (sequence[i]>otherKmer.sequence[i]) return 1;
+			}
+			return 0;
 		}
 		
 		public int hashCode() {
