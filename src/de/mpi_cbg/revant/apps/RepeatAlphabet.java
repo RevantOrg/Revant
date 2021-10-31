@@ -1632,7 +1632,7 @@ public class RepeatAlphabet {
 				}
 				else {
 					value=oldKmers.get(key);
-					if (value!=null) return Math.round((int)value.count,haplotypeCoverage);
+					if (value!=null) return (int)(value.count/haplotypeCoverage);
 				}
 			}
 			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
@@ -1824,6 +1824,51 @@ public class RepeatAlphabet {
 	}
 	
 	
+	
+	
+	// ------------------------- UNIQUE INTERVALS PROCEDURES -----------------------------
+	
+	private static int[][] uniqueIntervals;
+	private static int uniqueIntervals_last;
+	private static int[] uniqueIntervals_reads;
+	
+	
+	/**
+	 * Loads all the unique intervals from every read that contains one.
+	 */
+	public static final void loadUniqueIntervals(String intervalsFile) throws IOException {
+		final int GROWTH_RATE = 1000;  // Arbitrary
+		int i;
+		int read;
+		String str;
+		BufferedReader br;
+		String[] tokens;
+		
+		br = new BufferedReader(new FileReader(intervalsFile));
+		str=br.readLine(); read=-1; uniqueIntervals_last=-1;
+		while (str!=null) {
+			read++; 
+			if (str.length()==0) {
+				str=br.readLine();
+				continue;
+			}
+			uniqueIntervals_last++;
+			if (uniqueIntervals_last>uniqueIntervals.length) {
+				int[][] newArray = new int[uniqueIntervals.length+GROWTH_RATE][0];
+				System.arraycopy(uniqueIntervals,0,newArray,0,uniqueIntervals.length);
+				uniqueIntervals=newArray;
+				int[] newArray2 = new int[uniqueIntervals.length+GROWTH_RATE];
+				System.arraycopy(uniqueIntervals_reads,0,newArray2,0,uniqueIntervals_reads.length);
+				uniqueIntervals_reads=newArray2;
+			}
+			uniqueIntervals_reads[uniqueIntervals_last]=read;
+			tokens=str.split(",");
+			uniqueIntervals[uniqueIntervals_last] = new int[tokens.length];
+			for (i=0; i<tokens.length; i++) uniqueIntervals[uniqueIntervals_last][i]=Integer.parseInt(tokens[i]);
+			str=br.readLine();
+		}
+		br.close();
+	}
 	
 	
 	

@@ -15,7 +15,7 @@
 INPUT_DIR=$1
 N_HAPLOTYPES="2"
 HAPLOTYPE_COVERAGE="5"  # Of one haplotype
-MAX_K="10"  # Unique k-mers have length at most this
+MAX_K="10"  # Stops finding unique k-mers after this length. Should be set using the histogram of recoded lengths.
 N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
@@ -91,4 +91,9 @@ for K in $(seq 1 ${MAX_K}); do
 		intervalsThread ${K} ${FILE} ${UNIQUE_KMERS_FILE} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-intervals-${THREAD_ID} &
 	done
 	wait
+done
+FINAL_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
+rm -f ${FINAL_INTERVALS_FILE}
+for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_PATH}-${MAX_K}-intervals-*" ); do
+	cat ${FILE} >> ${FINAL_INTERVALS_FILE}
 done
