@@ -2,6 +2,7 @@ package de.mpi_cbg.revant.apps;
 
 import java.io.*;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.HashMap;
 
 import de.mpi_cbg.revant.util.Math;
@@ -1468,10 +1469,18 @@ public class RepeatAlphabet {
 	// ------------------------------ K-MER PROCEDURES -----------------------------------
 	
 	/**
-	 * Uses every block that satisfies the conditions in $uniqueMode,openMode,multiMode$ 
-	 * (see procedure $isValidKmer()$ for details) to add a k-mer to $kmers$. If a block 
-	 * contains multiple characters, every character can be used to build a k-mer. K-mers
-	 * are canonized before being added to $kmers$ (see $Kmer.canonize()$).
+	 * If $newKmers$ is not null, the procedure uses every length-k window that satisfies 
+	 * the conditions in $uniqueMode,openMode,multiMode$ (see procedure $isValidKmer()$ 
+	 * for details) to add a k-mer to $newKmers$. If a block contains multiple characters, 
+	 * every character can be used to build a k-mer. K-mers are canonized before being 
+	 * added to $newKmers$ (see $Kmer.canonize()$). Array $avoidedIntervals$ contains 
+	 * tuples (position,length,nHaplotypes) sorted by position: if a window contains one 
+	 * such interval, it is not used to build k-mers.
+	 *
+	 * If $newKmers$ is null, the procedure checks instead if a window contains a k-mer in 
+	 * $oldKmers$, and if so it appends a (position,length,nHaplotypes) tuple to 
+	 * $avoidedIntervals$ ($nHaplotypes$ is decided according to $haplotypeCoverage$).
+	 * The new value of $lastAvoidedInterval$ is returned in output.
      *
 	 * Remark: 1-mers collected by this procedure might have a different (and even 
 	 * smaller) count than the one produced by the $getCharacterHistogram()$ pipeline, 
@@ -1484,15 +1493,18 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 * 
+	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	public static final void getKmers(String str, int k, int uniqueMode, int openMode, int multiMode, HashMap<Kmer,Kmer> kmers, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
-		int i;
-		int nBlocks, sum;
+	public static final int getKmers(String str, int k, int uniqueMode, int openMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
+		int i, j;
+		int nBlocks, sum, start, end, nHaplotypes, out;
 		
-		if (str.length()<(k<<1)-1) return;
+		// Loading blocks
+		out=lastAvoidedInterval;
+		if (str.length()<(k<<1)-1) return out;
 		i=-1; nBlocks=0;
 		while (true) {
 			i=str.indexOf(SEPARATOR_MAJOR+"",i+1);
@@ -1500,14 +1512,22 @@ public class RepeatAlphabet {
 			else nBlocks++;
 		}
 		nBlocks++;
-		if (nBlocks<k) return;
+		if (nBlocks<k) return out;
 		loadBlocks(str); loadIntBlocks(nBlocks);
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
+		
+		// Loading k-mers
+		j=0;
 		for (i=0; i<=nBlocks-k; i++) {
-			if (isValidWindow(i,k,uniqueMode,openMode,multiMode)) getKmers_impl(i,k,kmers,tmpKmer,stack,tmpArray2,tmpArray3,str);
+			while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
+			if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
+			if (!isValidWindow(i,k,uniqueMode,openMode,multiMode)) continue;
+			nHaplotypes=getKmers_impl(i,k,newKmers,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
+			if (newKmers==null && nHaplotypes!=-1) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
 		}
+		return out;
 	}
 	
 	
@@ -1558,7 +1578,11 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Adds $intBlocks[first..first+k-1]$ to $kmers$.
+	 * If $newKmers$ is not null, adds every possible canonized instance of 
+	 * $intBlocks[first..first+k-1]$ to $newKmers$. Otherwise, checks whether one of the 
+	 * possible canonized instances of $intBlocks[first..first+k-1]$ belongs to
+	 * $oldKmers$, and if so returns an estimate of the number of haplotypes in which it
+	 * occurs (returns -1 otherwise).
 	 *
 	 * @param key temporary space;
 	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
@@ -1566,7 +1590,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final void getKmers_impl(int first, int k, HashMap<Kmer,Kmer> kmers, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, String str) {
+	private static final int getKmers_impl(int first, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int haplotypeCoverage, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
 		int i;
 		int top1, top2, row, column, lastChild, length;
 		Kmer value, newKey;
@@ -1577,12 +1601,18 @@ public class RepeatAlphabet {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
 				key.set(tmpArray2,0,k); key.canonize(k,tmpArray3);
-				value=kmers.get(key);
-				if (value==null) {
-					newKey = new Kmer(key,k); newKey.count=1;
-					kmers.put(newKey,newKey);
+				if (newKmers!=null) {
+					value=newKmers.get(key);
+					if (value==null) {
+						newKey = new Kmer(key,k); newKey.count=1;
+						newKmers.put(newKey,newKey);
+					}
+					else value.count++;
 				}
-				else value.count++;
+				else {
+					value=oldKmers.get(key);
+					if (value!=null) return Math.round((int)value.count,haplotypeCoverage);
+				}
 			}
 			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
 			else {
@@ -1592,6 +1622,7 @@ public class RepeatAlphabet {
 				tmpArray2[++top2]=intBlocks[row+1][lastChild];
 			}
 		}
+		return -1;
 	}
 	
 	
@@ -1702,6 +1733,13 @@ public class RepeatAlphabet {
 			sequence = new int[k];
 			System.arraycopy(otherKmer.sequence,0,sequence,0,k);
 			count=0;
+		}
+		
+		public Kmer(String str, int k) {
+			sequence = new int[k];
+			String[] tokens = str.split(",");
+			for (int i=0; i<k; i++) sequence[i]=Integer.parseInt(tokens[i]);
+			count=Long.parseLong(tokens[k]);
 		}
 		
 		public void set(int[] fromArray, int first, int k) {

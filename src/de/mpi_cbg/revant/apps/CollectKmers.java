@@ -6,7 +6,8 @@ import java.util.HashMap;
 
 /**
  * Collects all distinct k-mers from a chunk of translated reads, and prints them sorted
- * in output.
+ * in output. If a list of intervals is provided, the program avoids every window of a 
+ * sequence of blocks that contains an interval.
  */
 public class CollectKmers {
 	
@@ -17,37 +18,57 @@ public class CollectKmers {
 		final int UNIQUE_MODE = Integer.parseInt(args[3]);  // See $RepeatAlphabet.isValidWindow()$
 		final int OPEN_MODE = Integer.parseInt(args[4]);
 		final int MULTI_MODE = Integer.parseInt(args[5]);
-		final String OUTPUT_FILE = args[6];
+		final String AVOIDED_INTERVALS_FILE = args[6];  // NULL to discard it
+		final String KMERS_FILE = args[7];  // Output file
+		
+		boolean INTERVALS_FILE_EXISTS = !AVOIDED_INTERVALS_FILE.equalsIgnoreCase("null");
 		
 		int i;
-		int row, nKmers;
-		String str;
-		BufferedReader br;
+		int row, nKmers, lastAvoidedInterval;
+		String str1, str2;
+		BufferedReader br1, br2;
 		BufferedWriter bw;
 		RepeatAlphabet.Kmer tmpKmer = new RepeatAlphabet.Kmer();
 		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
+		int[] avoidedIntervals;
 		int[] tmpArray2 = new int[K];
 		int[] tmpArray3 = new int[(K)<<1];
+		String[] tokens;
 		RepeatAlphabet.Kmer[] keys;
 		
 		// Collecting k-mers
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		kmers = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
-		br = new BufferedReader(new FileReader(TRANSLATED_FILE));
-		str=br.readLine(); row=0;
-		while (str!=null) {
-			if (row%100000==0) System.err.println("Processed "+row+" reads, "+kmers.size()+" distinct "+K+"-mers.");
-			RepeatAlphabet.getKmers(str,K,UNIQUE_MODE,OPEN_MODE,MULTI_MODE,kmers,tmpKmer,tmpArray2,tmpArray3);
-			str=br.readLine(); row++;
+		br1 = new BufferedReader(new FileReader(TRANSLATED_FILE));
+		if (INTERVALS_FILE_EXISTS) {
+			br2 = new BufferedReader(new FileReader(AVOIDED_INTERVALS_FILE));
+			avoidedIntervals = new int[10];  // Arbitrary, multiple of 2.
 		}
-		br.close(); nKmers=kmers.size();
+		else { br2=null; avoidedIntervals=null; }
+		str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; row=0;
+		while (str1!=null) {
+			if (row%100000==0) System.err.println("Processed "+row+" reads, "+kmers.size()+" distinct "+K+"-mers.");
+			if (INTERVALS_FILE_EXISTS) {
+				if (str2.length()==0) lastAvoidedInterval=-1;
+				else {
+					tokens=str2.split(","); lastAvoidedInterval=tokens.length-1;
+					if (lastAvoidedInterval>=avoidedIntervals.length) avoidedIntervals = new int[lastAvoidedInterval+1];
+					for (i=0; i<=lastAvoidedInterval; i++) avoidedIntervals[i]=Integer.parseInt(tokens[i]);
+				}
+			}
+			else lastAvoidedInterval=-1;
+			RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,OPEN_MODE,MULTI_MODE,kmers,null,avoidedIntervals,lastAvoidedInterval,-1,tmpKmer,tmpArray2,tmpArray3);
+			str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; row++;
+		}
+		br1.close(); nKmers=kmers.size();
+		if (INTERVALS_FILE_EXISTS) br2.close();
 		System.err.println(nKmers+" total distinct "+K+"-mers (uniqueMode="+UNIQUE_MODE+", openMode="+OPEN_MODE+", multiMode="+MULTI_MODE+")");
 		
 		// Serializing sorted k-mers
 		keys = new RepeatAlphabet.Kmer[nKmers];
 		kmers.keySet().toArray(keys);
 		if (nKmers>1) Arrays.sort(keys,0,nKmers);
-		bw = new BufferedWriter(new FileWriter(OUTPUT_FILE));
+		bw = new BufferedWriter(new FileWriter(KMERS_FILE));
 		for (i=0; i<nKmers; i++) bw.write(keys[i].toString()+","+keys[i].count+"\n");
 		bw.close();
 	}
