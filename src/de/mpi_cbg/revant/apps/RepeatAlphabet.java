@@ -607,14 +607,16 @@ public class RepeatAlphabet {
 	 * @param outputFile_characters translation of every read (one per line);
 	 * @param outputFile_boundaries character boundaries (one read per line).
 	 */
-	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, String outputFile_characters, String outputFile_boundaries) throws IOException {
+	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
+		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
 		int i, j;
 		int row, readA, previousReadA;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw1, bw2;
+		long[] histogram;
 		
 		// Allocating memory
 		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
@@ -629,6 +631,8 @@ public class RepeatAlphabet {
 		if (periodicIntervals==null || periodicIntervals.length<(ALIGNMENTS_CAPACITY)<<1) periodicIntervals = new int[(ALIGNMENTS_CAPACITY)<<1];
 		if (newBlock==null) newBlock = new Block();
 		if (tmpCharacter==null) tmpCharacter = new Character();
+		histogram = new long[MAX_HISTOGRAM_LENGTH+1];
+		Math.set(histogram,MAX_HISTOGRAM_LENGTH,0L);
 		
 		// Translating every read using the alphabet
 		bw1 = new BufferedWriter(new FileWriter(outputFile_characters));
@@ -648,16 +652,19 @@ public class RepeatAlphabet {
 			if (previousReadA==-1 || readA!=previousReadA) {
 				if (previousReadA!=-1) {
 					while (Reads.readIDs[j]<previousReadA) {
-						bw1.newLine(); bw2.newLine();
+						bw1.newLine(); bw2.newLine(); histogram[0]++;
 						j++;
 					}
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
-						if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); }
-						else translateRead(bw1,bw2,quantum);
+						if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); histogram[0]++; }
+						else {
+							translateRead(bw1,bw2,quantum);
+							histogram[lastInSequence+1]++;
+						}
 					}
-					else { bw1.newLine(); bw2.newLine(); }
+					else { bw1.newLine(); bw2.newLine(); histogram[0]++; }
 					j++;
 				}
 				previousReadA=readA; lastAlignment=0;
@@ -678,19 +685,25 @@ public class RepeatAlphabet {
 		br.close();
 		if (previousReadA!=-1) {
 			while (Reads.readIDs[j]<previousReadA) {
-				bw1.newLine(); bw2.newLine();
+				bw1.newLine(); bw2.newLine(); histogram[0]++;
 				j++;
 			}
 			cleanAlignments(quantum);
 			if (lastAlignment!=-1) {
 				recodeRead(quantum);
-				if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); }
-				else translateRead(bw1,bw2,quantum);
+				if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); histogram[0]++; }
+				else {
+					translateRead(bw1,bw2,quantum);
+					histogram[lastInSequence+1]++;
+				}
 			}
-			else { bw1.newLine(); bw2.newLine(); }
+			else { bw1.newLine(); bw2.newLine(); histogram[0]++; }
 			j++;
 		}
 		bw1.close(); bw2.close();
+		bw1 = new BufferedWriter(new FileWriter(outputFile_histogram));
+		for (i=0; i<=MAX_HISTOGRAM_LENGTH; i++) bw1.write(histogram[i]+"\n");
+		bw1.close();
 	}
 	
 	
@@ -1357,14 +1370,15 @@ public class RepeatAlphabet {
 	 * @param newAlphabet obtained from the old alphabet by running $cleanTranslatedRead_
 	 * updateAlphabet()$;
 	 * @param old2new the output of $cleanTranslatedRead_updateAlphabet()$;
-	 * @param read2characters_new,read2boundaries_new output files.
+	 * @param read2characters_new,read2boundaries_new output files;
+	 * @return the number of blocks in the new translation.
 	 */
-	public static final void cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, int minCount, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
+	public static final int cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, int minCount, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
 		int i, j;
 		int c, length, first, last, nBlocks, nBoundaries, nAppendedBlocks;
 		String[] tokens;
 		
-		if (read2characters_old.length()==0) return;
+		if (read2characters_old.length()==0) return 0;
 		if (read2boundaries_old.indexOf(SEPARATOR_MINOR+"")>=0) {
 			tokens=read2boundaries_old.split(SEPARATOR_MINOR+"");
 			nBoundaries=tokens.length;
@@ -1445,22 +1459,29 @@ public class RepeatAlphabet {
 			else if (first==-1) first=i;
 		}
 		if (first!=-1) {
-			tmpChar.repeat=UNIQUE;
-			tmpChar.orientation=false;
-			tmpChar.start=-1; tmpChar.end=-1;
-			length=readLength-(first==0?0:boundaries[first-1]);
-			tmpChar.length=length;
-			tmpChar.openStart=first==0;
-			tmpChar.openEnd=true;
-			tmpChar.quantize(quantum);
-			if (nAppendedBlocks>0) read2characters_new.write(SEPARATOR_MAJOR+"");
-			translate_unique(tmpChar,read2characters_new);
-			if (first>0) {
-				if (nAppendedBlocks>1) read2boundaries_new.write(SEPARATOR_MINOR+"");
-				read2boundaries_new.write(boundaries[first-1]+"");
+			if (nAppendedBlocks>0) {
+				tmpChar.repeat=UNIQUE;
+				tmpChar.orientation=false;
+				tmpChar.start=-1; tmpChar.end=-1;
+				length=readLength-(first==0?0:boundaries[first-1]);
+				tmpChar.length=length;
+				tmpChar.openStart=first==0;
+				tmpChar.openEnd=true;
+				tmpChar.quantize(quantum);
+				if (nAppendedBlocks>0) read2characters_new.write(SEPARATOR_MAJOR+"");
+				translate_unique(tmpChar,read2characters_new);
+				if (first>0) {
+					if (nAppendedBlocks>1) read2boundaries_new.write(SEPARATOR_MINOR+"");
+					read2boundaries_new.write(boundaries[first-1]+"");
+				}
+				nAppendedBlocks++;
 			}
-			nAppendedBlocks++;
+			else {
+				// Reads with a single unique block are recoded to have no block
+				return 0;
+			}
 		}
+		return nAppendedBlocks;
 	}
 
 	
