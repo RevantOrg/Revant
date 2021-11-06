@@ -43,10 +43,10 @@ echo "Alignments filtered and split in ${N_THREADS} parts"
 
 echo "Collecting character instances..."
 function collectionThread() {
-	ALIGNMENTS_FILE_ID=$1
-	PREFIX_1=$2
-	PREFIX_2=$3
-	PREFIX_3=$4
+	local ALIGNMENTS_FILE_ID=$1
+	local PREFIX_1=$2
+	local PREFIX_2=$3
+	local PREFIX_3=$4
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterInstances ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt "${PREFIX_2}unique-${ALIGNMENTS_FILE_ID}.txt"
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt | uniq - ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
 }
@@ -65,10 +65,10 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.app
 
 echo "Compacting character instances..."
 function compactionThread() {
-	INSTANCES_FILE_ID=$1
-	PREFIX_1=$2
-	PREFIX_2=$3
-	PREFIX_3=$4
+	local INSTANCES_FILE_ID=$1
+	local PREFIX_1=$2
+	local PREFIX_2=$3
+	local PREFIX_3=$4
 	cat ${PREFIX_1}${INSTANCES_FILE_ID}-header.txt ${PREFIX_1}${INSTANCES_FILE_ID}.txt > ${PREFIX_2}${INSTANCES_FILE_ID}.txt
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactCharacterInstances ${PREFIX_2}${INSTANCES_FILE_ID}.txt ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${PREFIX_3}${INSTANCES_FILE_ID}.txt
 }
@@ -92,24 +92,26 @@ ALPHABET_SIZE=$(( ${ALPHABET_SIZE} - 1 ))
 
 echo "Translating reads..."
 function translationThread() {
-	ALIGNMENTS_FILE_ID=$1
-	LAST_TRANSLATED_READ=$2
-	PREFIX_1=$3
-	PREFIX_2=$4
-	PREFIX_3=$5
-	PREFIX_4=$6
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_4}${ALIGNMENTS_FILE_ID}.txt
+	local ALIGNMENTS_FILE_ID=$1
+	local LAST_TRANSLATED_READ=$2
+	local PREFIX_1=$3
+	local PREFIX_2=$4
+	local PREFIX_3=$5
+	local PREFIX_4=$6
+	local PREFIX_5=$7
+	local PREFIX_6=$8
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_4}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_5}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_6}${ALIGNMENTS_FILE_ID}.txt
 }
 if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 	TO=${N_THREADS}
 else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
-translationThread 0 -1 "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" &
+translationThread 0 -1 "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" &
 for THREAD in $(seq 1 ${TO}); do
 	LAST_TRANSLATED_READ=$(tail -n 1 ${TMPFILE_PATH}-1-$(( ${THREAD} - 1 )).txt | awk '{ print $1 }' | tr -d , )
 	LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} - 1 ))
-	translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" &
+	translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" &
 done
 wait
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated.txt"
@@ -130,59 +132,69 @@ for i in $(seq 2 $((${TO} + 1))); do
 done
 PASTE_OPTIONS="${PASTE_OPTIONS}}'"
 paste ${TMPFILE_PATH}-9-hist-*.txt | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}
+FULLY_UNIQUE_FILE="${INPUT_DIR}/reads-fullyUnique.txt"
+rm -f ${FULLY_UNIQUE_FILE}
+for THREAD in $(seq 0 ${TO}); do
+	cat ${TMPFILE_PATH}-10-${THREAD}.txt >> ${FULLY_UNIQUE_FILE}
+done
+FULLY_CONTAINED_FILE="${INPUT_DIR}/reads-fullyContained.txt"
+rm -f ${FULLY_CONTAINED_FILE}
+for THREAD in $(seq 0 ${TO}); do
+	cat ${TMPFILE_PATH}-11-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
+done
 
 echo "Discarding rare characters..."
 COUNTS_FILE="${INPUT_DIR}/alphabet-counts.txt"
 HISTOGRAM_FILE="${INPUT_DIR}/alphabet-histogram.txt"
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterCounts ${READS_TRANSLATED_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${HISTOGRAM_FILE}
 function cleaningThread() {
-	TRANSLATED_CHARACTERS=$1
-	TRANSLATED_BOUNDARIES=$2
-	PREFIX_1=$3
-	PREFIX_2=$4
-	ID=$5
+	local TRANSLATED_CHARACTERS=$1
+	local TRANSLATED_BOUNDARIES=$2
+	local PREFIX_1=$3
+	local PREFIX_2=$4
+	local ID=$5
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
 }
-split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-10-"
-split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${TMPFILE_PATH}-11-"
-for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-10-*" ); do
-	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-10-}
-	cleaningThread "${INPUT_DIR}/${TMPFILE_NAME}-10-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-11-${THREAD_ID}" "${TMPFILE_PATH}-12-" "${TMPFILE_PATH}-13-" ${THREAD_ID} &
+split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-12-"
+split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${TMPFILE_PATH}-13-"
+for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do
+	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-12-}
+	cleaningThread "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${TMPFILE_PATH}-14-" "${TMPFILE_PATH}-15-" ${THREAD_ID} &
 done
 wait
-sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-13-*.txt | uniq - ${TMPFILE_PATH}-13.txt
-cat ${TMPFILE_PATH}-12-unique-*.txt | sort -n -r > ${TMPFILE_PATH}-12-unique.txt
+sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-15-*.txt | uniq - ${TMPFILE_PATH}-15.txt
+cat ${TMPFILE_PATH}-14-unique-*.txt | sort -n -r > ${TMPFILE_PATH}-14-unique.txt
 ALPHABET_FILE_CLEANED="${INPUT_DIR}/alphabet-cleaned.txt"
 rm -f ${ALPHABET_FILE_CLEANED}
 OLD2NEW_FILE="${INPUT_DIR}/alphabet-old2new.txt"
 rm -f ${OLD2NEW_FILE}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} $(wc -l < ${TMPFILE_PATH}-13.txt) ${TMPFILE_PATH}-13.txt ${MIN_CHARACTER_FREQUENCY} ${TMPFILE_PATH}-12-unique.txt ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} $(wc -l < ${TMPFILE_PATH}-15.txt) ${TMPFILE_PATH}-15.txt ${MIN_CHARACTER_FREQUENCY} ${TMPFILE_PATH}-14-unique.txt ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE}
 function cleaningThread2() {
-	TRANSLATED_CHARACTERS_OLD=$1
-	TRANSLATED_BOUNDARIES_OLD=$2
-	TRANSLATED_CHARACTERS_NEW=$3
-	TRANSLATED_BOUNDARIES_NEW=$4
-	HISTOGRAM_FILE=$5
+	local TRANSLATED_CHARACTERS_OLD=$1
+	local TRANSLATED_BOUNDARIES_OLD=$2
+	local TRANSLATED_CHARACTERS_NEW=$3
+	local TRANSLATED_BOUNDARIES_NEW=$4
+	local HISTOGRAM_FILE=$5
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads3 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${TRANSLATED_CHARACTERS_OLD} ${TRANSLATED_BOUNDARIES_OLD} ${MIN_CHARACTER_FREQUENCY} ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE} ${TRANSLATED_CHARACTERS_NEW} ${TRANSLATED_BOUNDARIES_NEW} ${HISTOGRAM_FILE}
 }
-for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-10-*" ); do
-	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-10-}
-	cleaningThread2 "${INPUT_DIR}/${TMPFILE_NAME}-10-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-11-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-14-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-15-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-16-${THREAD_ID}" &
+for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do
+	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-12-}
+	cleaningThread2 "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-16-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-17-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-18-${THREAD_ID}" &
 done
 wait
 READS_TRANSLATED_FILE_NEW="${INPUT_DIR}/reads-translated-new.txt"
 READS_TRANSLATED_BOUNDARIES_NEW="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 HISTOGRAM_FILE="${INPUT_DIR}/reads-translated-histogram-new.txt"
 rm -f ${READS_TRANSLATED_FILE_NEW} ${READS_TRANSLATED_BOUNDARIES_NEW}
-for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-14-*" ); do
-	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-14-}
-	cat ${INPUT_DIR}/${TMPFILE_NAME}-14-${THREAD_ID} >> ${READS_TRANSLATED_FILE_NEW}
-	cat ${INPUT_DIR}/${TMPFILE_NAME}-15-${THREAD_ID} >> ${READS_TRANSLATED_BOUNDARIES_NEW}
+for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-16-*" ); do
+	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-16-}
+	cat ${INPUT_DIR}/${TMPFILE_NAME}-16-${THREAD_ID} >> ${READS_TRANSLATED_FILE_NEW}
+	cat ${INPUT_DIR}/${TMPFILE_NAME}-17-${THREAD_ID} >> ${READS_TRANSLATED_BOUNDARIES_NEW}
 done
 PASTE_OPTIONS="awk '{print \$1"
 for i in $(seq 2 ${N_THREADS}); do
 	PASTE_OPTIONS="${PASTE_OPTIONS}+\$$i"
 done
 PASTE_OPTIONS="${PASTE_OPTIONS}}'"
-paste ${INPUT_DIR}/${TMPFILE_NAME}-16-* | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}
+paste ${INPUT_DIR}/${TMPFILE_NAME}-18-* | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}

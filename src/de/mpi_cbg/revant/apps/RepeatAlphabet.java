@@ -229,7 +229,7 @@ public class RepeatAlphabet {
 		if (periodicIntervals.length<(lastAlignment+1)<<1) periodicIntervals = new int[(lastAlignment+1)<<1];
 		if (points.length<(lastAlignment+1)<<1) points = new int[(lastAlignment+1)<<1];
 		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
-		Arrays.sort(alignments,0,lastAlignment+1);
+		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
 		
 		// Building maximal periodic intervals
 		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1;
@@ -279,7 +279,7 @@ public class RepeatAlphabet {
 			   ) inPeriodic=j;
 			j+=2;
 		}
-		Arrays.sort(points,0,lastPoint+1);
+		if (lastPoint>0) Arrays.sort(points,0,lastPoint+1);
 		initializeGraph(lastPoint+1);
 		for (i=0; i<lastPoint; i++) {
 			for (j=i+1; j<=lastPoint; j++) {
@@ -604,10 +604,15 @@ public class RepeatAlphabet {
 	 *
 	 * @param lastTranslatedRead the index in $Reads.readIDs$ of the last read that has 
 	 * already been translated (-1 if no read has been translated yet);
-	 * @param outputFile_characters translation of every read (one per line);
-	 * @param outputFile_boundaries character boundaries (one read per line).
+	 * @param outputFile_characters translation of every read (one per line); a read has
+	 * an empty line if it contains no repeat, or if it is fully contained in a single
+	 * repeat;
+	 * @param outputFile_boundaries character boundaries (one read per line);
+	 * @param outputFile_fullyUniqueReads list of IDs of reads that contain no repeat;
+	 * @param outputFile_oneRepeatReads list of IDs of reads that are fully contained in a
+	 * single repeat.
 	 */
-	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram) throws IOException {
+	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram, String outputFile_fullyUniqueReads, String outputFile_oneRepeatReads) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
@@ -615,7 +620,7 @@ public class RepeatAlphabet {
 		int row, readA, previousReadA;
 		String str;
 		BufferedReader br;
-		BufferedWriter bw1, bw2;
+		BufferedWriter bw1, bw2, bw3, bw4;
 		long[] histogram;
 		
 		// Allocating memory
@@ -637,6 +642,8 @@ public class RepeatAlphabet {
 		// Translating every read using the alphabet
 		bw1 = new BufferedWriter(new FileWriter(outputFile_characters));
 		bw2 = new BufferedWriter(new FileWriter(outputFile_boundaries));
+		bw3 = new BufferedWriter(new FileWriter(outputFile_fullyUniqueReads));
+		bw4 = new BufferedWriter(new FileWriter(outputFile_oneRepeatReads));
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
 		str=br.readLine(); 
@@ -653,18 +660,30 @@ public class RepeatAlphabet {
 				if (previousReadA!=-1) {
 					while (Reads.readIDs[j]<previousReadA) {
 						bw1.newLine(); bw2.newLine(); histogram[0]++;
+						bw3.write(Reads.readIDs[j]+"\n");
 						j++;
 					}
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
-						if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); histogram[0]++; }
+						if (lastInSequence==-1) { 
+							bw1.newLine(); bw2.newLine(); histogram[0]++;
+							bw3.write(previousReadA+"\n");
+						}
+						else if (lastInSequence==0) { 
+							bw1.newLine(); bw2.newLine(); histogram[0]++;
+							if (sequence[0].isUnique()) bw3.write(previousReadA+"\n");
+							else bw4.write(previousReadA+"\n");
+						}
 						else {
 							translateRead(bw1,bw2,quantum);
 							histogram[lastInSequence+1]++;
 						}
 					}
-					else { bw1.newLine(); bw2.newLine(); histogram[0]++; }
+					else { 
+						bw1.newLine(); bw2.newLine(); histogram[0]++; 
+						bw3.write(previousReadA+"\n");
+					}
 					j++;
 				}
 				previousReadA=readA; lastAlignment=0;
@@ -686,21 +705,33 @@ public class RepeatAlphabet {
 		if (previousReadA!=-1) {
 			while (Reads.readIDs[j]<previousReadA) {
 				bw1.newLine(); bw2.newLine(); histogram[0]++;
+				bw3.write(Reads.readIDs[j]+"\n");
 				j++;
 			}
 			cleanAlignments(quantum);
 			if (lastAlignment!=-1) {
 				recodeRead(quantum);
-				if (lastInSequence<=0) { bw1.newLine(); bw2.newLine(); histogram[0]++; }
+				if (lastInSequence==-1) { 
+					bw1.newLine(); bw2.newLine(); histogram[0]++; 
+					bw3.write(previousReadA+"\n");
+				}
+				else if (lastInSequence==0) { 
+					bw1.newLine(); bw2.newLine(); histogram[0]++; 
+					if (sequence[0].isUnique()) bw3.write(previousReadA+"\n");
+					else bw4.write(previousReadA+"\n");
+				}
 				else {
 					translateRead(bw1,bw2,quantum);
 					histogram[lastInSequence+1]++;
 				}
 			}
-			else { bw1.newLine(); bw2.newLine(); histogram[0]++; }
+			else { 
+				bw1.newLine(); bw2.newLine(); histogram[0]++;
+				bw3.write(previousReadA+"\n");
+			}
 			j++;
 		}
-		bw1.close(); bw2.close();
+		bw1.close(); bw2.close(); bw3.close(); bw4.close();
 		bw1 = new BufferedWriter(new FileWriter(outputFile_histogram));
 		for (i=0; i<=MAX_HISTOGRAM_LENGTH; i++) bw1.write(histogram[i]+"\n");
 		bw1.close();
@@ -1847,7 +1878,7 @@ public class RepeatAlphabet {
 		br = new BufferedReader(new FileReader(intervalsFile));
 		str=br.readLine(); read=-1; uniqueIntervals_last=-1;
 		while (str!=null) {
-			read++; 
+			read++;
 			if (str.length()==0) {
 				str=br.readLine();
 				continue;
@@ -1869,6 +1900,7 @@ public class RepeatAlphabet {
 		}
 		br.close();
 	}
+	
 	
 	
 	

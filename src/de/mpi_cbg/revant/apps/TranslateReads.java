@@ -22,6 +22,8 @@ public class TranslateReads {
 		final String TRANSLATED_FILE_CHARACTERS = args[10];
 		final String TRANSLATED_FILE_BOUNDARIES = args[11];
 		final String TRANSLATED_FILE_HISTOGRAM = args[12];
+		final String FULLY_UNIQUE_READS = args[13];
+		final String FULLY_CONTAINED_READS = args[14];
 		
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
@@ -29,7 +31,7 @@ public class TranslateReads {
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		RepeatAlphabet.loadIsPeriodic(ISPERIODIC_FILE,N_REPEATS);
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
-		RepeatAlphabet.translateReads(ALIGNMENTS_FILE,LAST_TRANSLATED_READ,MAX_ERROR,IO.quantum,TRANSLATED_FILE_CHARACTERS,TRANSLATED_FILE_BOUNDARIES,TRANSLATED_FILE_HISTOGRAM);
+		RepeatAlphabet.translateReads(ALIGNMENTS_FILE,LAST_TRANSLATED_READ,MAX_ERROR,IO.quantum,TRANSLATED_FILE_CHARACTERS,TRANSLATED_FILE_BOUNDARIES,TRANSLATED_FILE_HISTOGRAM,FULLY_UNIQUE_READS,FULLY_CONTAINED_READS);
 	}
 
 }
