@@ -1862,6 +1862,7 @@ public class RepeatAlphabet {
 	private static int[][] uniqueIntervals;
 	private static int uniqueIntervals_last;
 	private static int[] uniqueIntervals_reads;
+	private static int[] fullyUnique, fullyContained;
 	
 	
 	/**
@@ -1902,6 +1903,258 @@ public class RepeatAlphabet {
 	}
 	
 	
+	public static final void loadReadsFully(String fullyUniqueFile, int nFullyUnique, String fullyContainedFile, int nFullyContained) throws IOException {
+		int i;
+		BufferedReader br;
+		
+		fullyUnique = new int[nFullyUnique];
+		br = new BufferedReader(new FileReader(fullyUniqueFile));
+		for (i=0; i<nFullyUnique; i++) fullyUnique[i]=Integer.parseInt(br.readLine());
+		br.close();
+		fullyContained = new int[nFullyContained];
+		br = new BufferedReader(new FileReader(fullyContainedFile));
+		for (i=0; i<nFullyContained; i++) fullyContained[i]=Integer.parseInt(br.readLine());
+		br.close();
+	}
+	
+	
+	/**
+	 * Loads the entire boundaries file
+	 */
+	public static final void loadBoundaries(String path) throws IOException {
+		
+		
+		
+	}
+	
+	
+	private static final int[][] boundaries;
+	private static final byte[][] isNonrepetitive;
+	
+		
+	
+	/**
+	 * 
+	 */
+	public static final void loadIsNonrepetitive(String path) throws IOException {
+		int cell, mask;
+		
+		str=br.readLine(); read=0; r=-1;
+		while (str!=null) {
+			if (str.length()==0) {
+				str=br.readLine();
+				read++;
+				continue;
+			}
+			nBlocks=loadBlocks(str);
+			loadIntBlocks(nBlocks);
+			r++;
+			nBytes=Math.ceil(nBlocks,8);
+			isNonrepetitive[r] = new byte[nBytes];
+			for (i=0; i<nBytes; i++) {
+				cell=0; mask=1;
+				for (j=0; j<8; j++) {
+					if (isBlockUnique[i*8+j]) isNonrepetitive[r][i]|=mask;
+					mask<<=1;
+				}
+				isNonrepetitive[r][i]=(byte)mask;
+			}
+			
+			
+			
+			
+			str=br.readLine(); read++;
+		}
+		
+		
+		
+		
+	}
+	
+	
+	/**
+	 *
+	 *
+	 */
+	public static final void filterAlignments(String alignmentsFile, String outputFile, int minIntersection) throws IOException {
+		int i;
+		int row, lastFullyUnique, lastFullyContained;
+		final int fullyUniqueLength = fullyUnique.length;
+		final int fullyContainedLength = fullyContained.length;
+		String str;
+		BufferedReader br;
+		BufferedWriter bw;
+		
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		br = new BufferedReader(new FileReader(alignmentsFile));
+		str=br.readLine(); str=br.readLine();  // Skipping header
+		str=br.readLine(); row=0; lastFullyUnique=0; lastFullyContained=0; lastUniqueInterval=0;
+		while (str!=null)  {
+			if (row%100000==0) System.err.println("Processed "+row+" alignments");
+			Alignments.readAlignmentFile(str);
+			// Checking fully-unique and fully-contained reads
+			readA=Alignments.readA-1;
+			while (lastFullyUnique<fullyUniqueLength && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
+			while (lastFullyContained<fullyContainedLength && fullyContained[lastFullyContained]<readA) lastFullyContained++;
+			if (lastFullyUnique<fullyUniqueLength && fullyUnique[lastFullyUnique]==readA) {
+				bw.write("1\n");
+				str=br.readLine();
+				continue;
+			}
+			if (lastFullyContained<fullyContainedLength && fullyContained[lastFullyContained]==readA) {
+				bw.write("0\n");
+				str=br.readLine();
+				continue;
+			}
+			readB=Alignments.readB-1;
+			if (readInArray(readB,fullyUnique,lastFullyUnique)) {
+				bw.write("1\n");
+				str=br.readLine();
+				continue;
+			}
+			else if (readInArray(readB,fullyContained,lastFullyContained)) {
+				bw.write("0\n");
+				str=br.readLine();
+				continue;
+			}
+			// Checking unique intervals
+			startA=Alignments.startA; endA=Alignments.endA;
+			while (lastUniqueInterval<uniqueIntervals.length && uniqueIntervals_reads[lastUniqueInterval]<readA) lastUniqueInterval++;
+			if (lastUniqueInterval>uniqueIntervals.length || uniqueIntervals_reads[lastUniqueInterval]!=readA) {
+				// No unique signal in readA
+				p=Arrays.binarySearch(uniqueIntervals_reads,0,uniqueIntervals_reads.length,readB);
+				if (p<0) {
+					// No unique signal in readB
+					bw.write("0\n");
+					str=br.readLine();
+					continue;
+				}
+				p=hasUniqueSignal(startA,endA,p, int[] boundaries,Reads.getReadLength(readB),minIntersection);
+				
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError) {
+				str=br.readLine(); row++;
+				continue;
+			}
+			readA=Alignments.readA-1;
+			if (previousReadA==-1 || readA!=previousReadA) {
+				if (previousReadA!=-1) {
+					while (Reads.readIDs[j]<previousReadA) {
+						bw1.newLine(); bw2.newLine(); histogram[0]++;
+						bw3.write(Reads.readIDs[j]+"\n");
+						j++;
+					}
+					cleanAlignments(quantum);
+					if (lastAlignment!=-1) {
+						recodeRead(quantum);
+						if (lastInSequence==-1) { 
+							bw1.newLine(); bw2.newLine(); histogram[0]++;
+							bw3.write(previousReadA+"\n");
+						}
+						else if (lastInSequence==0) { 
+							bw1.newLine(); bw2.newLine(); histogram[0]++;
+							if (sequence[0].isUnique()) bw3.write(previousReadA+"\n");
+							else bw4.write(previousReadA+"\n");
+						}
+						else {
+							translateRead(bw1,bw2,quantum);
+							histogram[lastInSequence+1]++;
+						}
+					}
+					else { 
+						bw1.newLine(); bw2.newLine(); histogram[0]++; 
+						bw3.write(previousReadA+"\n");
+					}
+					j++;
+				}
+				previousReadA=readA; lastAlignment=0;
+				alignments[0].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
+			}
+			else {
+				lastAlignment++;
+				if (lastAlignment==alignments.length) {
+					AlignmentRow[] newAlignments = new AlignmentRow[alignments.length<<1];
+					System.arraycopy(alignments,0,newAlignments,0,alignments.length);
+					for (i=alignments.length; i<newAlignments.length; i++) newAlignments[i] = new AlignmentRow();
+					alignments=newAlignments;
+				}
+				alignments[lastAlignment].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
+			}
+			str=br.readLine(); row++;
+		}
+		br.close(); bw.close();
+		
+		
+		
+		
+	}
+	
+	
+	/**
+	 * Tells whether interval $[intervalStart..intervalEnd]$ in the $r$-th read of 
+	 * $uniqueIntervals$ is likely to come from a unique region of the genome.
+	 *
+	 * Remark: the procedure assumes the translated read to be stored in
+	 * $sequence[0..lastSequence]$.
+	 *
+	 * @return -1=no unique signal; 0=the interval intersects a non-repetitive block of 
+	 * the read by at least $minIntersection$ bps; X=the interval contains an element of
+	 * $uniqueIntervals[r]$ that occurs in X haplotypes.
+	 */
+	private static final int hasUniqueSignal(int intervalStart, int intervalEnd, int r, int[] boundaries, int readLength, int minIntersection) {
+		int i;
+		int start, end, firstBlock, lastBlock;
+		
+		for (i=0; i<uniqueIntervals_last[r]; i+=3) {
+			firstBlock=uniqueIntervals[r][i];
+			start=firstBlock==0?0:boundaries[firstBlock-1];
+			lastBlock=firstBlock+uniqueIntervals[r][i+1]-1;
+			end=lastBlock==lastSequence?readLength-1:boundaries[lastBlock];
+			if ( Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd) ||
+				 Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd)
+			   ) return uniqueIntervals[r][i+2];
+		}
+		if (sequence[0].isUnique() && Intervals.intersectionLength(intervalStart,intervalEnd,0,boundaries[0])>=minIntersection) return 0;
+		for (i=1; i<lastSequence; i++) {
+			if (sequence[i].isUnique() && Intervals.intersectionLength(intervalStart,intervalEnd,boundaries[i-1],boundaries[i])>=minIntersection) return 0;
+		}
+		if (sequence[lastSequence].isUnique() && Intervals.intersectionLength(intervalStart,intervalEnd,boundaries[lastSequence-1],readLength-1)>=minIntersection) return 0;
+		return -1;
+	}
+	
+	
+	/**
+	 * @param position an arbitrary position of $array$;
+	 * @return TRUE iff $read$ belongs to $array$, which is assumed to be sorted.
+	 */
+	private static final boolean readInArray(int read, int[] array, int position) {
+		final int arrayLength = array.length;
+		
+		if (position<arrayLength) {
+			if (array[position]==read) return true;
+			else if (read<array[position]) {
+				if (Arrays.binarySearch(array,0,position,read)>=0) return true;
+			}
+			else {
+				if (Arrays.binarySearch(array,position+1,arrayLength,read)>=0) return true;
+			}
+		}
+		else {
+			if (Arrays.binarySearch(array,0,arrayLength,read)>=0) return true;
+		}
+		return false;
+	}
 	
 	
 	

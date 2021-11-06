@@ -41,14 +41,14 @@ THREAD_PREFIX="thread-"
 
 # ------------------------------------ A THREAD ------------------------------------------
 function run() {
-	FILES_LIST=$1
+	local FILES_LIST=$1
 	for FILE1 in $(cat ${FILES_LIST}); do
-		ID1=$(basename ${FILE1})
-		ID1=${ID1%.*}
-		N_READS=$(wc -l < ${GRAPHS_DIR}/${ID1}-reads-ids.txt | tr -d ' ')
+		local ID1=$(basename ${FILE1})
+		local ID1=${ID1%.*}
+		local N_READS=$(wc -l < ${GRAPHS_DIR}/${ID1}-reads-ids.txt | tr -d ' ')
 		mkdir ${GRAPHS_DIR}/${ID1}-clusters/
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.intervalgraph.IntervalGraphStep2 ${GRAPHS_DIR}/${ID1}.graph ${GRAPHS_DIR}/${ID1}-clusters 1 3 ${MIN_ALIGNMENT_LENGTH} 1 ${TAGS_DIR} ${ID1} ${N_READS}
-		EXIT_STATUS=$?
+		local EXIT_STATUS=$?
 		if [ ${EXIT_STATUS} -ne 0 ]; then
 		    echo "The following command returned error ${EXIT_STATUS}:"
 			echo "java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.intervalgraph.IntervalGraphStep2 ${GRAPHS_DIR}/${ID1}.graph ${GRAPHS_DIR}/${ID1}-clusters 1 3 ${MIN_ALIGNMENT_LENGTH} 1 ${TAGS_DIR} ${ID1} ${N_READS}"
@@ -64,22 +64,22 @@ function run() {
 			cp "${GRAPHS_DIR}/${ID1}-alignments-shortPeriod.txt" "${GRAPHS_DIR}/${ID1}-clusters/${ID1}-alignments-shortPeriod.txt"
 		fi
 		for FILE2 in $(find ${GRAPHS_DIR}/${ID1}-clusters -maxdepth 1 -type f -name "*.graph"); do
-			ID2=$(basename ${FILE2})
-			ID2=${ID2%.*}
-			N_READS=$(wc -l < ${GRAPHS_DIR}/${ID1}-clusters/${ID2}-reads-ids.txt | tr -d ' ')
-			N_ALIGNMENTS=$(wc -l < ${GRAPHS_DIR}/${ID1}-clusters/${ID2}-alignments.txt | tr -d ' ')
+			local ID2=$(basename ${FILE2})
+			local ID2=${ID2%.*}
+			local N_READS=$(wc -l < ${GRAPHS_DIR}/${ID1}-clusters/${ID2}-reads-ids.txt | tr -d ' ')
+			local N_ALIGNMENTS=$(wc -l < ${GRAPHS_DIR}/${ID1}-clusters/${ID2}-alignments.txt | tr -d ' ')
 			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.intervalgraph.IntervalGraphStep3 ${GRAPHS_DIR}/${ID1}-clusters ${ID2} 1 3 ${MIN_ALIGNMENT_LENGTH} 50000 ${N_READS} ${PROJECT_DIR}/qualityThresholds.txt ${N_ALIGNMENTS} ${TAGS_DIR} ${ID1} ${KERNEL_LENGTHS_LOG}
-			EXIT_STATUS=$?
+			local EXIT_STATUS=$?
 			if [ ${EXIT_STATUS} -ne 0 ]; then
 			    echo "The following command returned error ${EXIT_STATUS}:"
 				echo "java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.intervalgraph.IntervalGraphStep3 ${GRAPHS_DIR}/${ID1}-clusters ${ID2} 1 3 ${MIN_ALIGNMENT_LENGTH} 50000 ${N_READS} ${PROJECT_DIR}/qualityThresholds.txt ${N_ALIGNMENTS} ${TAGS_DIR} ${ID1} ${KERNEL_LENGTHS_LOG}"
 				exit ${EXIT_STATUS}
 			fi
 		done
-		N_ALIGNMENTS=$(wc -l < ${GRAPHS_DIR}/${ID1}-alignments.txt | tr -d ' ')
-		N_READS=$(wc -l < ${GRAPHS_DIR}/${ID1}-reads-ids.txt | tr -d ' ')
+		local N_ALIGNMENTS=$(wc -l < ${GRAPHS_DIR}/${ID1}-alignments.txt | tr -d ' ')
+		local N_READS=$(wc -l < ${GRAPHS_DIR}/${ID1}-reads-ids.txt | tr -d ' ')
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.intervalgraph.IntervalGraphStep4 ${GRAPHS_DIR} ${ID1} ${N_ALIGNMENTS} ${N_READS} ${MIN_ALIGNMENT_LENGTH} ${PROJECT_DIR}/qualityThresholds.txt 1 3
-		EXIT_STATUS=$?
+		local EXIT_STATUS=$?
 		if [ ${EXIT_STATUS} -eq 255 ]; then
 			if [ -n "$(ls ${TAGS_DIR}/basin-${ID1}-* 2> /dev/null)" ]; then
 				cp ${TAGS_DIR}/basin-${ID1}-* ${STEP4_DIR}/
