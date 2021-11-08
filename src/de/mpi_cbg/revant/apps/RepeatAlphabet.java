@@ -1859,50 +1859,20 @@ public class RepeatAlphabet {
 	
 	// ------------------------- UNIQUE INTERVALS PROCEDURES -----------------------------
 	
-	private static int[][] uniqueIntervals;
-	private static int uniqueIntervals_last;
-	private static int[] uniqueIntervals_reads;
-	private static int[] fullyUnique, fullyContained;
+	private static int[][] blueIntervals;
+	private static int blueIntervals_last;
+	private static int[] blueIntervals_reads;
+	
+	private static int[] translated, fullyUnique, fullyContained;  // Read IDs
+	private static int[][] boundaries_all;
+	private static byte[][] isBlockUnique_all;
 	
 	
 	/**
-	 * Loads all the unique intervals from every read that contains one.
+	 * Initializes global variables $fullyUnique,fullyContained$ to the sorted list of IDs
+	 * of reads that are fully nonrepetitive and fully contained in a single repeat block,
+	 * respectively.
 	 */
-	public static final void loadUniqueIntervals(String intervalsFile) throws IOException {
-		final int GROWTH_RATE = 1000;  // Arbitrary
-		int i;
-		int read;
-		String str;
-		BufferedReader br;
-		String[] tokens;
-		
-		br = new BufferedReader(new FileReader(intervalsFile));
-		str=br.readLine(); read=-1; uniqueIntervals_last=-1;
-		while (str!=null) {
-			read++;
-			if (str.length()==0) {
-				str=br.readLine();
-				continue;
-			}
-			uniqueIntervals_last++;
-			if (uniqueIntervals_last>uniqueIntervals.length) {
-				int[][] newArray = new int[uniqueIntervals.length+GROWTH_RATE][0];
-				System.arraycopy(uniqueIntervals,0,newArray,0,uniqueIntervals.length);
-				uniqueIntervals=newArray;
-				int[] newArray2 = new int[uniqueIntervals.length+GROWTH_RATE];
-				System.arraycopy(uniqueIntervals_reads,0,newArray2,0,uniqueIntervals_reads.length);
-				uniqueIntervals_reads=newArray2;
-			}
-			uniqueIntervals_reads[uniqueIntervals_last]=read;
-			tokens=str.split(",");
-			uniqueIntervals[uniqueIntervals_last] = new int[tokens.length];
-			for (i=0; i<tokens.length; i++) uniqueIntervals[uniqueIntervals_last][i]=Integer.parseInt(tokens[i]);
-			str=br.readLine();
-		}
-		br.close();
-	}
-	
-	
 	public static final void loadReadsFully(String fullyUniqueFile, int nFullyUnique, String fullyContainedFile, int nFullyContained) throws IOException {
 		int i;
 		BufferedReader br;
@@ -1919,68 +1889,146 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Loads the entire boundaries file
+	 * Loads the entire boundaries file in $boundaries_all$, and stores in 
+	 * $isBlockUnique_all$ a bitmap for every block of every read.
 	 */
-	public static final void loadBoundaries(String path) throws IOException {
+	public static final void loadAllBoundaries(String translatedFile, String boundariesFile) throws IOException {
+		int i, j, r;
+		int read, cell, mask, nBlocks, nBytes, nReads, nBoundaries;
+		String str;
+		BufferedReader br;
+		String[] tokens;
 		
+		// Computing the set of translated reads
+		br = new BufferedReader(new FileReader(translatedFile));
+		str=br.readLine();
+		nReads=0;
+		while (str!=null) {
+			if (str.length()!=0) nReads++;
+			str=br.readLine();
+		}
+		br.close();
+		translated = new int[nReads];
+		br = new BufferedReader(new FileReader(translatedFile));
+		str=br.readLine(); r=0; i=-1;
+		while (str!=null) {
+			if (str.length()!=0) translated[++i]=r;
+			str=br.readLine(); r++;
+		}
+		br.close();
 		
-		
-	}
-	
-	
-	private static final int[][] boundaries;
-	private static final byte[][] isNonrepetitive;
-	
-		
-	
-	/**
-	 * 
-	 */
-	public static final void loadIsNonrepetitive(String path) throws IOException {
-		int cell, mask;
-		
-		str=br.readLine(); read=0; r=-1;
+		// Loading $isNonrepetitive$.
+		isBlockUnique_all = new byte[nReads][0];
+		br = new BufferedReader(new FileReader(translatedFile));
+		str=br.readLine(); r=-1;
 		while (str!=null) {
 			if (str.length()==0) {
 				str=br.readLine();
-				read++;
 				continue;
 			}
+			r++;
 			nBlocks=loadBlocks(str);
 			loadIntBlocks(nBlocks);
-			r++;
 			nBytes=Math.ceil(nBlocks,8);
-			isNonrepetitive[r] = new byte[nBytes];
+			isBlockUnique_all[r] = new byte[nBytes];
 			for (i=0; i<nBytes; i++) {
 				cell=0; mask=1;
 				for (j=0; j<8; j++) {
-					if (isBlockUnique[i*8+j]) isNonrepetitive[r][i]|=mask;
+					if (isBlockUnique[i*8+j]) cell|=mask;
 					mask<<=1;
 				}
-				isNonrepetitive[r][i]=(byte)mask;
+				isBlockUnique_all[r][i]=(byte)mask;
 			}
-			
-			
-			
-			
-			str=br.readLine(); read++;
+			str=br.readLine();
 		}
+		br.close();
 		
-		
-		
-		
+		// Loading $boundaries_all$.
+		boundaries_all = new int[nReads][0];
+		br = new BufferedReader(new FileReader(boundariesFile));
+		str=br.readLine(); r=-1;
+		while (str!=null) {
+			if (str.length()==0) {
+				str=br.readLine();
+				continue;
+			}
+			r++;
+			if (str.indexOf(SEPARATOR_MINOR+"")>=0) {
+				tokens=str.split(SEPARATOR_MINOR+"");
+				nBoundaries=tokens.length;
+				boundaries_all[r] = new int[nBoundaries];
+				for (i=0; i<nBoundaries; i++) boundaries_all[r][i]=Integer.parseInt(tokens[i]);
+			}
+			else {
+				boundaries_all[r] = new int[1];
+				boundaries_all[r][0]=Integer.parseInt(str);
+			}
+			str=br.readLine();
+		}
+		br.close();
 	}
 	
 	
 	/**
-	 *
-	 *
+	 * Loads all the \emph{blue intervals}, i.e. sequences of repeat and unique characters
+	 * that are likely to occur just once in the genome, from all reads that contain one.
 	 */
-	public static final void filterAlignments(String alignmentsFile, String outputFile, int minIntersection) throws IOException {
+	public static final void loadBlueIntervals(String intervalsFile) throws IOException {
+		final int GROWTH_RATE = 1000;  // Arbitrary
 		int i;
-		int row, lastFullyUnique, lastFullyContained;
-		final int fullyUniqueLength = fullyUnique.length;
-		final int fullyContainedLength = fullyContained.length;
+		int read;
+		String str;
+		BufferedReader br;
+		String[] tokens;
+		
+		br = new BufferedReader(new FileReader(intervalsFile));
+		str=br.readLine(); read=-1; blueIntervals_last=-1;
+		while (str!=null) {
+			read++;
+			if (str.length()==0) {
+				str=br.readLine();
+				continue;
+			}
+			blueIntervals_last++;
+			if (blueIntervals_last>blueIntervals.length) {
+				int[][] newArray = new int[blueIntervals.length+GROWTH_RATE][0];
+				System.arraycopy(blueIntervals,0,newArray,0,blueIntervals.length);
+				blueIntervals=newArray;
+				int[] newArray2 = new int[blueIntervals.length+GROWTH_RATE];
+				System.arraycopy(blueIntervals_reads,0,newArray2,0,blueIntervals_reads.length);
+				blueIntervals_reads=newArray2;
+			}
+			blueIntervals_reads[blueIntervals_last]=read;
+			tokens=str.split(SEPARATOR_MINOR+"");
+			blueIntervals[blueIntervals_last] = new int[tokens.length];
+			for (i=0; i<tokens.length; i++) blueIntervals[blueIntervals_last][i]=Integer.parseInt(tokens[i]);
+			str=br.readLine();
+		}
+		br.close();
+	}
+	
+	
+	/**
+	 * Writes to $outputFile$ a zero for every alignment of $alignmentsFile$ that belongs 
+	 * to a \emph{red region} on both readA and readB, i.e. to a region that fully belongs
+	 * to a repeat, or to a sequence of repeats, that is likely to occur multiple times in 
+	 * the genome. The intervals of the alignment in the two reads might cover mismatching 
+	 * sequences of boundaries and different characters, but we can safely discard the 
+	 * alignment anyway, since it just encodes a similarity between substrings of 
+	 * (possibly different) repeats.
+	 *
+	 * @param minIntersection min. length of a non-repetitive substring of the alignment 
+	 * for the alignment not to be considered red.
+	 */
+	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection) throws IOException {
+		boolean isRepetitive;
+		int p;
+		int row, readA, readB;
+		int lastFullyContained, lastFullyUnique, lastTranslated, lastUniqueInterval;
+		final int nFullyContained = fullyContained.length;
+		final int nFullyUnique = fullyUnique.length;
+		final int nTranslated = translated.length;
+		final int nUniqueIntervals = blueIntervals.length;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
@@ -1988,173 +2036,220 @@ public class RepeatAlphabet {
 		bw = new BufferedWriter(new FileWriter(outputFile));
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
-		str=br.readLine(); row=0; lastFullyUnique=0; lastFullyContained=0; lastUniqueInterval=0;
+		str=br.readLine(); row=0; 
+		lastFullyContained=0; lastFullyUnique=0; lastTranslated=0; lastUniqueInterval=0;
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
-			// Checking fully-unique and fully-contained reads
 			readA=Alignments.readA-1;
-			while (lastFullyUnique<fullyUniqueLength && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
-			while (lastFullyContained<fullyContainedLength && fullyContained[lastFullyContained]<readA) lastFullyContained++;
-			if (lastFullyUnique<fullyUniqueLength && fullyUnique[lastFullyUnique]==readA) {
-				bw.write("1\n");
-				str=br.readLine();
+			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
+			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
+				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
-			if (lastFullyContained<fullyContainedLength && fullyContained[lastFullyContained]==readA) {
-				bw.write("0\n");
-				str=br.readLine();
+			isRepetitive=false;
+			while (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]<readA) lastFullyContained++;
+			if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) isRepetitive=true;
+			else {
+				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
+				while (lastUniqueInterval<nUniqueIntervals && blueIntervals_reads[lastUniqueInterval]<readA) lastUniqueInterval++;
+				if (inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastUniqueInterval<nUniqueIntervals&&blueIntervals_reads[lastUniqueInterval]==readA?lastUniqueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) isRepetitive=true;
+			}
+			if (!isRepetitive) {
+				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
 			readB=Alignments.readB-1;
-			if (readInArray(readB,fullyUnique,lastFullyUnique)) {
-				bw.write("1\n");
-				str=br.readLine();
+			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
+				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
-			else if (readInArray(readB,fullyContained,lastFullyContained)) {
-				bw.write("0\n");
-				str=br.readLine();
+			else if (readInArray(readB,fullyContained,nFullyContained-1,lastFullyContained)>=0) {
+				bw.write("0\n"); str=br.readLine(); row++;
 				continue;
 			}
-			// Checking unique intervals
-			startA=Alignments.startA; endA=Alignments.endA;
-			while (lastUniqueInterval<uniqueIntervals.length && uniqueIntervals_reads[lastUniqueInterval]<readA) lastUniqueInterval++;
-			if (lastUniqueInterval>uniqueIntervals.length || uniqueIntervals_reads[lastUniqueInterval]!=readA) {
-				// No unique signal in readA
-				p=Arrays.binarySearch(uniqueIntervals_reads,0,uniqueIntervals_reads.length,readB);
-				if (p<0) {
-					// No unique signal in readB
-					bw.write("0\n");
-					str=br.readLine();
-					continue;
-				}
-				p=hasUniqueSignal(startA,endA,p, int[] boundaries,Reads.getReadLength(readB),minIntersection);
-				
-			}
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError) {
-				str=br.readLine(); row++;
-				continue;
-			}
-			readA=Alignments.readA-1;
-			if (previousReadA==-1 || readA!=previousReadA) {
-				if (previousReadA!=-1) {
-					while (Reads.readIDs[j]<previousReadA) {
-						bw1.newLine(); bw2.newLine(); histogram[0]++;
-						bw3.write(Reads.readIDs[j]+"\n");
-						j++;
-					}
-					cleanAlignments(quantum);
-					if (lastAlignment!=-1) {
-						recodeRead(quantum);
-						if (lastInSequence==-1) { 
-							bw1.newLine(); bw2.newLine(); histogram[0]++;
-							bw3.write(previousReadA+"\n");
-						}
-						else if (lastInSequence==0) { 
-							bw1.newLine(); bw2.newLine(); histogram[0]++;
-							if (sequence[0].isUnique()) bw3.write(previousReadA+"\n");
-							else bw4.write(previousReadA+"\n");
-						}
-						else {
-							translateRead(bw1,bw2,quantum);
-							histogram[lastInSequence+1]++;
-						}
-					}
-					else { 
-						bw1.newLine(); bw2.newLine(); histogram[0]++; 
-						bw3.write(previousReadA+"\n");
-					}
-					j++;
-				}
-				previousReadA=readA; lastAlignment=0;
-				alignments[0].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
-			}
-			else {
-				lastAlignment++;
-				if (lastAlignment==alignments.length) {
-					AlignmentRow[] newAlignments = new AlignmentRow[alignments.length<<1];
-					System.arraycopy(alignments,0,newAlignments,0,alignments.length);
-					for (i=alignments.length; i<newAlignments.length; i++) newAlignments[i] = new AlignmentRow();
-					alignments=newAlignments;
-				}
-				alignments[lastAlignment].set(readA,Math.max(Alignments.startA,0),Math.min(Alignments.endA,Reads.getReadLength(readA)-1),Alignments.readB-1,Math.max(Alignments.startB,0),Math.min(Alignments.endB,repeatLengths[Alignments.readB-1]-1),Alignments.orientation,Alignments.diffs);
-			}
+			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
+			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastUniqueInterval,Reads.getReadLength(readB),minIntersection);			
+			bw.write(isRepetitive?"0\n":"1\n"); 
 			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
-		
-		
-		
-		
 	}
 	
 	
 	/**
-	 * Tells whether interval $[intervalStart..intervalEnd]$ in the $r$-th read of 
-	 * $uniqueIntervals$ is likely to come from a unique region of the genome.
-	 *
-	 * Remark: the procedure assumes the translated read to be stored in
-	 * $sequence[0..lastSequence]$.
-	 *
-	 * @return -1=no unique signal; 0=the interval intersects a non-repetitive block of 
-	 * the read by at least $minIntersection$ bps; X=the interval contains an element of
-	 * $uniqueIntervals[r]$ that occurs in X haplotypes.
+	 * Tells whether interval $readID[intervalStart..intervalEnd]$ fully belongs to a 
+	 * repeat, or to a sequence of repeats, that is likely to occur multiple times in the
+	 * genome.
+	 * 
+	 * @param boundariesAllID position of the read in $boundaries_all$ and 
+	 * $isBlockUnique_all$ (the read is assumed to contain more than one block);
+	 * @param blueIntervalsID position of the read in $blueIntervals$, or -1 if the 
+	 * read does not occur in $blueIntervals$, or -2 if the ID of the read in 
+	 * $blueIntervals$ is unknown;
+	 * @param blueIntervalsPosition a position in $blueIntervals$ from which to start
+	 * the search when $blueIntervalsID=-2$;
+	 * @param minIntersection min. length of a non-repetitive substring of the alignment 
+	 * for the alignment to be considered non-repetitive.
 	 */
-	private static final int hasUniqueSignal(int intervalStart, int intervalEnd, int r, int[] boundaries, int readLength, int minIntersection) {
-		int i;
-		int start, end, firstBlock, lastBlock;
+	private static final boolean inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
+		boolean found;
+		int i, j;
+		int mask, cell, start, end, blockStart, blockEnd, firstBlock, lastBlock;
+		final int nBlocks = boundaries_all[boundariesAllID].length+1;
+		final int nBytes = Math.ceil(nBlocks,8);
 		
-		for (i=0; i<uniqueIntervals_last[r]; i+=3) {
-			firstBlock=uniqueIntervals[r][i];
-			start=firstBlock==0?0:boundaries[firstBlock-1];
-			lastBlock=firstBlock+uniqueIntervals[r][i+1]-1;
-			end=lastBlock==lastSequence?readLength-1:boundaries[lastBlock];
-			if ( Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd) ||
-				 Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd)
-			   ) return uniqueIntervals[r][i+2];
+		// Checking the nonrepetitive blocks of the read, if any.
+		found=false;
+		for (i=0; i<nBytes; i++) {
+			if (isBlockUnique_all[boundariesAllID][i]!=0) {
+				found=true;
+				break;
+			}
 		}
-		if (sequence[0].isUnique() && Intervals.intersectionLength(intervalStart,intervalEnd,0,boundaries[0])>=minIntersection) return 0;
-		for (i=1; i<lastSequence; i++) {
-			if (sequence[i].isUnique() && Intervals.intersectionLength(intervalStart,intervalEnd,boundaries[i-1],boundaries[i])>=minIntersection) return 0;
+		if (found) {
+			cell=isBlockUnique_all[boundariesAllID][0]; mask=1;
+			blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
+			if ( (cell&mask)!=0 && 
+				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+				   )
+				 )
+			   ) return false;
+			mask<<=1;
+			for (j=1; j<8; j++) {
+				if (j==nBlocks-1) break;
+				blockStart=boundaries_all[boundariesAllID][j-1];
+				blockEnd=boundaries_all[boundariesAllID][j];
+				if ( (cell&mask)!=0 && 
+					 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) || 
+					   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+					   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+					   )
+					 ) 
+				   ) return false;
+				mask<<=1;
+			}
+			for (i=1; i<nBytes; i++) {
+				cell=isBlockUnique_all[boundariesAllID][i]; mask=1;
+				for (j=0; j<8; j++) {
+					if ((i<<3)+j==nBlocks-1) break;
+					blockStart=boundaries_all[boundariesAllID][(i<<3)+j-1];
+					blockEnd=boundaries_all[boundariesAllID][(i<<3)+j];
+					if ( (cell&mask)!=0 && 
+						 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+						   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+						   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+							  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+						   )
+						 )
+					   ) return false;
+					mask<<=1;
+				}
+			}
+			cell=isBlockUnique_all[boundariesAllID][nBytes-1]; 
+			mask=1<<((nBlocks%8)-1);
+			blockStart=boundaries_all[boundariesAllID][nBlocks-2];
+			blockEnd=readLength-1;
+			if ( (cell&mask)!=0 && 
+				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+					  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+				   )
+				 )
+			   ) return false;
+			
 		}
-		if (sequence[lastSequence].isUnique() && Intervals.intersectionLength(intervalStart,intervalEnd,boundaries[lastSequence-1],readLength-1)>=minIntersection) return 0;
+		
+		// Checking the repetitive blocks of the read, if any.
+		if (blueIntervalsID!=-1) {
+			if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
+			if (blueIntervalsID!=-1) {
+				for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
+					firstBlock=blueIntervals[blueIntervalsID][i];
+					start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
+					lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
+					end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
+					if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
+						 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
+					   ) return false;
+				}
+			}
+		}
+		
+		return true;
+	}
+	
+	
+	/**
+	 * @param array sorted;
+	 * @param position an arbitrary position in $array$ (might be greater than $last$);
+	 * @return the position of $read$ in $array[0..last]$, or -1 if it does not occur.
+	 */
+	private static final int readInArray(int read, int[] array, int last, int position) {
+		final int MAX_DIFF = 100;  // Arbitrary
+		int i;
+		int value;
+		
+		if (position<=last) {
+			value=array[position];
+			if (value==read) return position;
+			else if (read<value) {
+				if (read>=value-MAX_DIFF) {
+					for (i=position-1; i>=0; i--) {
+						if (array[i]==read) return i;
+					}
+				}
+				else {
+					i=Arrays.binarySearch(array,0,position,read);
+					if (i>=0) return i;
+				}
+			}
+			else {
+				if (read<=value+MAX_DIFF) {
+					for (i=position+1; i<=last; i++) {
+						if (array[i]==read) return i;
+					}
+				}
+				else {
+					i=Arrays.binarySearch(array,position+1,last+1,read);
+					if (i>=0) return i;
+				}
+			}
+		}
+		else {
+			i=Arrays.binarySearch(array,0,last+1,read);
+			if (i>=0) return i;
+		}
 		return -1;
 	}
 	
 	
+	
 	/**
-	 * @param position an arbitrary position of $array$;
-	 * @return TRUE iff $read$ belongs to $array$, which is assumed to be sorted.
+	 * Writes to $outputFile$ a one for every alignment of $alignmentsFile$ that contains
+	 * a unique region in both readA and readB. If $mode=TRUE$, we additionally require 
+	 * the intervals of the alignment in the two reads to cover matching sequences of 
+	 * boundaries and matching characters.
 	 */
-	private static final boolean readInArray(int read, int[] array, int position) {
-		final int arrayLength = array.length;
+	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode) throws IOException {
 		
-		if (position<arrayLength) {
-			if (array[position]==read) return true;
-			else if (read<array[position]) {
-				if (Arrays.binarySearch(array,0,position,read)>=0) return true;
-			}
-			else {
-				if (Arrays.binarySearch(array,position+1,arrayLength,read)>=0) return true;
-			}
-		}
-		else {
-			if (Arrays.binarySearch(array,0,arrayLength,read)>=0) return true;
-		}
-		return false;
+		
+		
 	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
