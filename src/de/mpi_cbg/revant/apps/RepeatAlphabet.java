@@ -414,43 +414,31 @@ public class RepeatAlphabet {
 		}
 		lastAlphabet=j;
 		lastUnique=-1; i=0;
-		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) {
-			alphabet[i].id=i;
-			lastUnique=i;
-			i++;
-		}
+		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) lastUnique=i++;
 		lastPeriodic=lastUnique;
-		while (i<=lastAlphabet && alphabet[i].start==-1) {
-			alphabet[i].id=i;
-			lastPeriodic=i;
-			i++;
-		}
-		while (i<=lastAlphabet) {
-			alphabet[i].id=i;
-			i++;
-		}
+		while (i<=lastAlphabet && alphabet[i].start==-1) lastPeriodic=i++;
 		System.err.println("DONE");
 		
 		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+(lastUnique+1)+" unique characters)");
-		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].id=1;
+		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].flag=1;
 		for (i=lastUnique+1; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if ( alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation || 
 					 alphabet[j].implies_tooFarAfter(alphabet[i])
 				   ) break;
-				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].id=0;
+				if (alphabet[j].flag==0) continue;
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].flag=0;
 			}
 			for (j=i-1; j>=0; j--) {
 				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation) break;
-				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].id=0;
+				if (alphabet[j].flag==0) continue;
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].flag=0;
 			}
 		}
 		j=lastUnique;
 		for (i=lastUnique+1; i<=lastAlphabet; i++) {
-			if (alphabet[i].id==0) continue;
+			if (alphabet[i].flag==0) continue;
 			j++;
 			tmpChar=alphabet[j];
 			alphabet[j]=alphabet[i];
@@ -461,6 +449,153 @@ public class RepeatAlphabet {
 		while (i<=lastAlphabet && alphabet[i].start==-1) i++;
 		lastPeriodic=i-1;
 		System.err.println("DONE  "+(lastAlphabet+1)+" characters after filtering.");
+	}
+	
+	
+	/**
+	 * Ensures that the reverse-complement of every character in the alphabet, is also in
+	 * the alphabet. Reverse-complement pairs do not need to have the same open
+	 * information.
+	 */
+	public static final void closeAlphabetByRC() {
+		final int QUANTUM = 1000;  // Arbitrary
+		int i, j, k;
+		int from, newFrom, repeat, start, end, length, found, nAdded, lastPeriodicNew;
+		Character[] newAlphabet;
+		
+		// Unique
+		newAlphabet = new Character[lastAlphabet+1];
+		System.arraycopy(alphabet,0,newAlphabet,0,lastUnique+1);
+		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].flag=0;
+		System.err.println("Adding reverse-complement characters... ");
+		nAdded=0;
+		
+		// Periodic
+		k=lastUnique; from=lastUnique+1; newFrom=from;
+		for (i=lastUnique+1; i<=lastPeriodic; i++) {
+			if (i%1000==0) System.err.println("Processed "+i+" characters");
+			repeat=alphabet[i].repeat;
+			if (repeat!=alphabet[from].repeat) {
+				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+				from=i; newFrom=k+1;
+			}
+			k++;
+			if (k==newAlphabet.length) {
+				Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+				System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+				newAlphabet=newArray;
+			}
+			newAlphabet[k]=alphabet[i];
+			if (alphabet[i].flag==1) continue;
+			length=alphabet[i].length;
+			if (alphabet[i].orientation) {
+				found=-1;
+				for (j=i+1; j<=lastPeriodic; j++) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (!alphabet[j].orientation && alphabet[j].length==length) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,false,-1,-1,length,alphabet[i].openEnd,alphabet[i].openStart);
+					nAdded++;
+				}
+				else alphabet[found].flag=1;
+			}
+			else {
+				found=-1;
+				for (j=i-1; j>lastUnique; j--) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (alphabet[j].orientation && alphabet[j].length==length) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,true,-1,-1,length,alphabet[i].openEnd,alphabet[i].openStart);
+					nAdded++;
+				}
+			}
+		}
+		if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+		lastPeriodicNew=k;
+		
+		// Nonperiodic
+		from=lastPeriodic+1; newFrom=k+1;
+		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
+			if (i%1000==0) System.err.println("Processed "+i+" characters");
+			repeat=alphabet[i].repeat;
+			if (repeat!=alphabet[from].repeat) {
+				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+				from=i; newFrom=k+1;
+			}			
+			k++;
+			if (k==newAlphabet.length) {
+				Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+				System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+				newAlphabet=newArray;
+			}
+			newAlphabet[k]=alphabet[i];
+			if (alphabet[i].flag==1) continue;
+			start=alphabet[i].start; end=alphabet[i].end;
+			if (alphabet[i].orientation) {
+				found=-1;
+				for (j=i+1; j<=lastAlphabet; j++) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (!alphabet[j].orientation && alphabet[j].start==start && alphabet[j].end==end) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,false,start,end,0,alphabet[i].openEnd,alphabet[i].openStart);
+					nAdded++;
+				}
+				else alphabet[found].flag=1;
+			}
+			else {
+				found=-1;
+				for (j=i-1; j>lastUnique; j--) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (alphabet[j].orientation && alphabet[j].start==start && alphabet[j].end==end) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,true,start,end,0,alphabet[i].openEnd,alphabet[i].openStart);
+					nAdded++;
+				}
+			}
+		}
+		if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+		lastAlphabet=k; lastPeriodic=lastPeriodicNew;
+		System.err.println("DONE "+nAdded+" reverse-complement characters added ("+(lastAlphabet+1)+" total characters)");
 	}
 	
 	
@@ -2781,21 +2916,21 @@ public class RepeatAlphabet {
 	 * A substring of a repeat in a specific orientation and with open/closed endpoints.
 	 */
 	public static class Character implements Comparable {
-		public int id;
 		public int repeat;
 		public boolean orientation;
 		public int start, end;
 		public boolean openStart, openEnd;  // The repeat might continue beyond start/end
 		public int length;  // >0: unique or periodic; 0: repetitive non-periodic.
 		
+		public int flag;  // Temporary space
+		
 		
 		public Character() { reset(); }
 		
 		
 		public void reset() { 
-			id=-1;
 			repeat=-1; orientation=false; start=-1; end=-1; length=-1;
-			openStart=true; openEnd=true;
+			openStart=true; openEnd=true; flag=-1;
 		}
 		
 		
