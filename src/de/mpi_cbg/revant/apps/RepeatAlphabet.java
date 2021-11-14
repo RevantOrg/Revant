@@ -1051,7 +1051,7 @@ public class RepeatAlphabet {
 		// Unique
 		characterHistogram = new long[maxFrequency+1][3<<1];
 		Math.set(characterHistogram,0);
-		for (i=0; i<=RepeatAlphabet.lastUnique; i++) {
+		for (i=0; i<=lastUnique; i++) {
 			count=characterCount[i];
 			if (count>maxFrequency) count=maxFrequency;
 			characterHistogram[(int)count][1/*All closed*/]++;
@@ -1060,18 +1060,18 @@ public class RepeatAlphabet {
 		if (count>maxFrequency) count=maxFrequency;
 		characterHistogram[(int)count][0/*Open*/]++;
 		// Periodic
-		for (i=RepeatAlphabet.lastUnique+1; i<=RepeatAlphabet.lastPeriodic; i++) {
+		for (i=lastUnique+1; i<=lastPeriodic; i++) {
 			if (marked[i]) continue;
 			count=characterCount[i];
 			if (count>maxFrequency) count=maxFrequency;
-			characterHistogram[(int)count][RepeatAlphabet.alphabet[i].isOpen()?2:3]++;
+			characterHistogram[(int)count][alphabet[i].isOpen()?2:3]++;
 		}		
 		// Nonperiodic
-		for (i=RepeatAlphabet.lastPeriodic+1; i<=RepeatAlphabet.lastAlphabet; i++) {
+		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
 			if (marked[i]) continue;
 			count=characterCount[i];
 			if (count>maxFrequency) count=maxFrequency;
-			characterHistogram[(int)count][RepeatAlphabet.alphabet[i].isOpen()?4:5]++;
+			characterHistogram[(int)count][alphabet[i].isOpen()?4:5]++;
 		}
 		return characterHistogram;
 	}
@@ -1859,13 +1859,28 @@ public class RepeatAlphabet {
 	
 	// ------------------------- UNIQUE INTERVALS PROCEDURES -----------------------------
 	
+	/**
+	 * Tuples (position,length,nHaplotypes). Could be an array of bytes, since there are
+	 * fewer than 128 blocks per read in practice: we keep it as an array of 32-bit 
+	 * integers to be fully generic.
+	 */
 	private static int[][] blueIntervals;
 	private static int blueIntervals_last;
-	private static int[] blueIntervals_reads;
 	
-	private static int[] translated, fullyUnique, fullyContained;  // Read IDs
+	/**
+	 * Sorted lists of read IDs: with a blue interval; fully non-repetitive; fully 
+	 * contained in a single repeat block; translated into several blocks.
+	 */
+	private static int[] blueIntervals_reads;
+	private static int[] fullyUnique, fullyContained, translated;
+	
+	/**
+	 * For every read in $translated$: block boundaries; flags marking non-repetitive
+	 * blocks; full translation.
+	 */ 
 	private static int[][] boundaries_all;
 	private static byte[][] isBlockUnique_all;
+	private static int[][][] translation_all;
 	
 	
 	/**
@@ -1891,8 +1906,12 @@ public class RepeatAlphabet {
 	/**
 	 * Loads the entire boundaries file in $boundaries_all$, and stores in 
 	 * $isBlockUnique_all$ a bitmap for every block of every read.
+	 *
+	 * @param loadIsBlockUnique loads the bitvector $isBlockUnique_all$;
+	 * @param loadTranslation loads in $translation_all$ the translation of every read 
+	 * that has one.
 	 */
-	public static final void loadAllBoundaries(String translatedFile, String boundariesFile) throws IOException {
+	public static final void loadAllBoundaries(String translatedFile, boolean loadIsBlockUnique, boolean loadTranslation, String boundariesFile) throws IOException {
 		int i, j, r;
 		int read, cell, mask, nBlocks, nBytes, nReads, nBoundaries;
 		String str;
@@ -1914,32 +1933,6 @@ public class RepeatAlphabet {
 		while (str!=null) {
 			if (str.length()!=0) translated[++i]=r;
 			str=br.readLine(); r++;
-		}
-		br.close();
-		
-		// Loading $isNonrepetitive$.
-		isBlockUnique_all = new byte[nReads][0];
-		br = new BufferedReader(new FileReader(translatedFile));
-		str=br.readLine(); r=-1;
-		while (str!=null) {
-			if (str.length()==0) {
-				str=br.readLine();
-				continue;
-			}
-			r++;
-			nBlocks=loadBlocks(str);
-			loadIntBlocks(nBlocks);
-			nBytes=Math.ceil(nBlocks,8);
-			isBlockUnique_all[r] = new byte[nBytes];
-			for (i=0; i<nBytes; i++) {
-				cell=0; mask=1;
-				for (j=0; j<8; j++) {
-					if (isBlockUnique[i*8+j]) cell|=mask;
-					mask<<=1;
-				}
-				isBlockUnique_all[r][i]=(byte)mask;
-			}
-			str=br.readLine();
 		}
 		br.close();
 		
@@ -1966,6 +1959,57 @@ public class RepeatAlphabet {
 			str=br.readLine();
 		}
 		br.close();
+		
+		// Loading $isBlockUnique_all$.
+		if (loadIsBlockUnique) {
+			isBlockUnique_all = new byte[nReads][0];
+			br = new BufferedReader(new FileReader(translatedFile));
+			str=br.readLine(); r=-1;
+			while (str!=null) {
+				if (str.length()==0) {
+					str=br.readLine();
+					continue;
+				}
+				r++;
+				nBlocks=loadBlocks(str);
+				loadIntBlocks(nBlocks);
+				nBytes=Math.ceil(nBlocks,8);
+				isBlockUnique_all[r] = new byte[nBytes];
+				for (i=0; i<nBytes; i++) {
+					cell=0; mask=1;
+					for (j=0; j<8; j++) {
+						if (isBlockUnique[i*8+j]) cell|=mask;
+						mask<<=1;
+					}
+					isBlockUnique_all[r][i]=(byte)mask;
+				}
+				str=br.readLine();
+			}
+			br.close();
+		}
+		
+		// Loading $translation_all$.
+		if (loadTranslation) {
+			translation_all = new int[nReads][0][0];
+			br = new BufferedReader(new FileReader(translatedFile));
+			str=br.readLine(); r=-1;
+			while (str!=null) {
+				if (str.length()==0) {
+					str=br.readLine();
+					continue;
+				}
+				r++;
+				nBlocks=loadBlocks(str);
+				loadIntBlocks(nBlocks);
+				translation_all[r] = new int[nBlocks][0];
+				for (i=0; i<nBlocks; i++) {
+					translation_all[r][i] = new int[lastInBlock_int[i]+1];
+					System.arraycopy(intBlocks[i],0,translation_all[r][i],0,lastInBlock_int[i]+1);
+				}
+				str=br.readLine();
+			}
+			br.close();
+		}
 	}
 	
 	
@@ -2017,18 +2061,21 @@ public class RepeatAlphabet {
 	 * alignment anyway, since it just encodes a similarity between substrings of 
 	 * (possibly different) repeats.
 	 *
-	 * @param minIntersection min. length of a non-repetitive substring of the alignment 
+	 * Remark: the procedure needs the following arrays: 
+	 * fullyUnique, fullyContained, boundaries_all, isBlockUnique_all, blueIntervals, blueIntervals_reads.
+	 *
+	 * @param alignmentsFile output of LAshow, assumed to be sorted by readA;
+	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
 	 * for the alignment not to be considered red.
 	 */
 	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection) throws IOException {
 		boolean isRepetitive;
 		int p;
 		int row, readA, readB;
-		int lastFullyContained, lastFullyUnique, lastTranslated, lastUniqueInterval;
+		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval;
 		final int nFullyContained = fullyContained.length;
 		final int nFullyUnique = fullyUnique.length;
 		final int nTranslated = translated.length;
-		final int nUniqueIntervals = blueIntervals.length;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
@@ -2037,10 +2084,11 @@ public class RepeatAlphabet {
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
 		str=br.readLine(); row=0; 
-		lastFullyContained=0; lastFullyUnique=0; lastTranslated=0; lastUniqueInterval=0;
+		lastFullyContained=0; lastFullyUnique=0; lastTranslated=0; lastBlueInterval=0;
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
+			// Processing readA
 			readA=Alignments.readA-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
 			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
@@ -2052,13 +2100,14 @@ public class RepeatAlphabet {
 			if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) isRepetitive=true;
 			else {
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
-				while (lastUniqueInterval<nUniqueIntervals && blueIntervals_reads[lastUniqueInterval]<readA) lastUniqueInterval++;
-				if (inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastUniqueInterval<nUniqueIntervals&&blueIntervals_reads[lastUniqueInterval]==readA?lastUniqueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) isRepetitive=true;
+				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
+				if (inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) isRepetitive=true;
 			}
 			if (!isRepetitive) {
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
+			// Processing readB
 			readB=Alignments.readB-1;
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
 				bw.write("1\n"); str=br.readLine(); row++;
@@ -2069,7 +2118,7 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastUniqueInterval,Reads.getReadLength(readB),minIntersection);			
+			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);			
 			bw.write(isRepetitive?"0\n":"1\n"); 
 			str=br.readLine(); row++;
 		}
@@ -2079,37 +2128,33 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Tells whether interval $readID[intervalStart..intervalEnd]$ fully belongs to a 
-	 * repeat, or to a sequence of repeats, that is likely to occur multiple times in the
-	 * genome.
+	 * single repeat character, or to a sequence of repeat characters, that is likely to 
+	 * occur multiple times in the genome.
+	 *
+	 * Remark: the procedure needs the following arrays: 
+	 * boundaries_all, isBlockUnique_all, blueIntervals, blueIntervals_reads.
 	 * 
-	 * @param boundariesAllID position of the read in $boundaries_all$ and 
-	 * $isBlockUnique_all$ (the read is assumed to contain more than one block);
-	 * @param blueIntervalsID position of the read in $blueIntervals$, or -1 if the 
-	 * read does not occur in $blueIntervals$, or -2 if the ID of the read in 
+	 * @param readID assumed to contain more than one block;
+	 * @param boundariesAllID position of the read in $boundaries_all,isBlockUnique_all,
+	 * tranlsation_all$;
+	 * @param blueIntervalsID position of the read in $blueIntervals$; or -1 if the 
+	 * read does not occur in $blueIntervals$; or -2 if the ID of the read in 
 	 * $blueIntervals$ is unknown;
-	 * @param blueIntervalsPosition a position in $blueIntervals$ from which to start
+	 * @param blueIntervalsStart a position in $blueIntervals$ from which to start
 	 * the search when $blueIntervalsID=-2$;
-	 * @param minIntersection min. length of a non-repetitive substring of the alignment 
+	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
 	 * for the alignment to be considered non-repetitive.
 	 */
 	private static final boolean inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
-		boolean found;
 		int i, j;
 		int mask, cell, start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
 		final int nBytes = Math.ceil(nBlocks,8);
 		
 		// Checking the nonrepetitive blocks of the read, if any.
-		found=false;
-		for (i=0; i<nBytes; i++) {
-			if (isBlockUnique_all[boundariesAllID][i]!=0) {
-				found=true;
-				break;
-			}
-		}
-		if (found) {
-			cell=isBlockUnique_all[boundariesAllID][0]; mask=1;
-			blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
+		cell=isBlockUnique_all[boundariesAllID][0]; 
+		if (cell!=0) {
+			mask=1; blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
 			if ( (cell&mask)!=0 && 
 				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
@@ -2133,24 +2178,28 @@ public class RepeatAlphabet {
 				   ) return false;
 				mask<<=1;
 			}
-			for (i=1; i<nBytes; i++) {
-				cell=isBlockUnique_all[boundariesAllID][i]; mask=1;
-				for (j=0; j<8; j++) {
-					if ((i<<3)+j==nBlocks-1) break;
-					blockStart=boundaries_all[boundariesAllID][(i<<3)+j-1];
-					blockEnd=boundaries_all[boundariesAllID][(i<<3)+j];
-					if ( (cell&mask)!=0 && 
-						 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-						   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-						   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-							  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
-						   )
-						 )
-					   ) return false;
-					mask<<=1;
-				}
+		}
+		for (i=1; i<nBytes; i++) {
+			cell=isBlockUnique_all[boundariesAllID][i]; 
+			if (cell==0) continue;
+			mask=1;
+			for (j=0; j<8; j++) {
+				if ((i<<3)+j==nBlocks-1) break;
+				blockStart=boundaries_all[boundariesAllID][(i<<3)+j-1];
+				blockEnd=boundaries_all[boundariesAllID][(i<<3)+j];
+				if ( (cell&mask)!=0 && 
+					 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+					   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+					   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+					   )
+					 )
+				   ) return false;
+				mask<<=1;
 			}
-			cell=isBlockUnique_all[boundariesAllID][nBytes-1]; 
+		}
+		cell=isBlockUnique_all[boundariesAllID][nBytes-1]; 
+		if (cell!=0) {
 			mask=1<<((nBlocks%8)-1);
 			blockStart=boundaries_all[boundariesAllID][nBlocks-2];
 			blockEnd=readLength-1;
@@ -2162,22 +2211,19 @@ public class RepeatAlphabet {
 				   )
 				 )
 			   ) return false;
-			
 		}
 		
 		// Checking the repetitive blocks of the read, if any.
+		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
 		if (blueIntervalsID!=-1) {
-			if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
-			if (blueIntervalsID!=-1) {
-				for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
-					firstBlock=blueIntervals[blueIntervalsID][i];
-					start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
-					lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
-					end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
-					if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
-						 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
-					   ) return false;
-				}
+			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
+				firstBlock=blueIntervals[blueIntervalsID][i];
+				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
+				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
+				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
+				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
+					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
+				   ) return false;
 			}
 		}
 		
@@ -2187,7 +2233,8 @@ public class RepeatAlphabet {
 	
 	/**
 	 * @param array sorted;
-	 * @param position an arbitrary position in $array$ (might be greater than $last$);
+	 * @param position an arbitrary position in $array$ from which to start the search
+	 * (might be greater than $last$);
 	 * @return the position of $read$ in $array[0..last]$, or -1 if it does not occur.
 	 */
 	private static final int readInArray(int read, int[] array, int last, int position) {
@@ -2229,28 +2276,250 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
 	/**
 	 * Writes to $outputFile$ a one for every alignment of $alignmentsFile$ that contains
-	 * a unique region in both readA and readB. If $mode=TRUE$, we additionally require 
-	 * the intervals of the alignment in the two reads to cover matching sequences of 
-	 * boundaries and matching characters.
+	 * a unique region in both readA and readB. If $mode=TRUE$, the procedure additionally
+	 * requires that the intervals of the alignment in the two reads cover matching 
+	 * sequences of boundaries and matching characters.
 	 */
-	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode) throws IOException {
+	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection) throws IOException {
+		boolean isFullyUniqueA;
+		int p;
+		int row, readA, readB;
+		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval;
+		final int nFullyContained = fullyContained.length;
+		final int nFullyUnique = fullyUnique.length;
+		final int nTranslated = translated.length;
+		String str;
+		BufferedReader br;
+		BufferedWriter bw;
+		
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		br = new BufferedReader(new FileReader(alignmentsFile));
+		str=br.readLine(); str=br.readLine();  // Skipping header
+		str=br.readLine(); row=0; 
+		lastFullyContained=0; lastFullyUnique=0; lastTranslated=0; lastBlueInterval=0;
+		while (str!=null)  {
+			if (row%100000==0) System.err.println("Processed "+row+" alignments");
+			Alignments.readAlignmentFile(str);
+			// Processing readA
+			readA=Alignments.readA-1;
+			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
+			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
+				isFullyUniqueA=true;
+				if (mode) {
+					readB=Alignments.readB-1;
+					if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) bw.write("1\n");
+					else bw.write("0\n");
+					str=br.readLine(); row++;
+					continue;
+				}
+			}
+			else {
+				isFullyUniqueA=false;
+				while (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]<readA) lastFullyContained++;
+				if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) {
+					bw.write("0\n"); str=br.readLine(); row++;
+					continue;
+				}
+				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
+				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
+				if (!inBlueRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) {
+					bw.write("0\n"); str=br.readLine(); row++;
+					continue;
+				}
+			}
+			// Processing readB
+			readB=Alignments.readB-1;
+			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
+				if (mode) bw.write(isFullyUniqueA?"1\n":"0\n");
+				else bw.write("1\n");
+				str=br.readLine(); row++;
+				continue;
+			}
+			else if (readInArray(readB,fullyContained,nFullyContained-1,lastFullyContained)>=0) {
+				bw.write("0\n"); str=br.readLine(); row++;
+				continue;
+			}
+			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
+			if (inBlueRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection)) {
+				if (mode) {
+					
+					//-------->
+					
+					
+				}
+				else bw.write("1\n");
+			}
+			else bw.write("0\n"); 
+			str=br.readLine(); row++;
+		}
+		br.close(); bw.close();
+	}
+	
+	
+	/**
+	 * The dual of $inRedRegion()$: tells whether interval $readID[intervalStart..
+	 * intervalEnd]$ fully belongs to a non-repetitive region, or straddles a non-
+	 * repetitive region, or is contained in a sequence of repeat characters that is 
+	 * likely to occur just once in the genome.
+	 *
+	 * Remark: the procedure needs the following arrays: 
+	 * boundaries_all, translation_all, blueIntervals, blueIntervals_reads.
+	 */
+	private static final boolean inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
+		int i, j;
+		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
+		final int nBlocks = boundaries_all[boundariesAllID].length+1;
+		final int nBytes = Math.ceil(nBlocks,8);
+		
+		// Checking the nonrepetitive blocks of the read, if any.
+		blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
+		if ( translation_all[boundariesAllID][0].length==1 && (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1) &&
+			 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+			   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+			   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+			      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+			   )
+			 )
+		   ) return true;
+		for (i=1; i<nBlocks-1; i++) {
+			blockStart=boundaries_all[boundariesAllID][i-1];
+			blockEnd=boundaries_all[boundariesAllID][i];
+			if ( translation_all[boundariesAllID][i].length==1 && (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1) &&
+				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+				   )
+				 )
+			   ) return true;
+		}
+		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
+		blockEnd=readLength-1;
+		if ( translation_all[boundariesAllID][nBlocks-1].length==1 && (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1) &&
+			 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+			   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+			   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+			      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+			   )
+			 )
+		   ) return true;
+		
+		// Checking the repetitive blocks of the read, if any.
+		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
+		if (blueIntervalsID!=-1) {
+			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
+				firstBlock=blueIntervals[blueIntervalsID][i];
+				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
+				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
+				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
+				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
+					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
+				   ) return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	
+	/**
+	 * @param read* index in $translated_all$;
+	 * @return TRUE iff the alignments intersect the same number of blocks, with 
+	 * boundaries at similar positions, and with at least one matching character per 
+	 * block.
+	 */
+	private static final boolean sameFactorization(int readA, int startA, int endA, int readB, int startB, int endB, boolean orientation) {
+		final int IDENTITY_THRESHOLD = IO.quantum;
+		int i;
+		final int nBlocksA = translation_all[readA].length;
+		final int nBlocksB = translation_all[readB].length;
+		int nBlocks, blockEnd, firstBlockA, firstBlockB, lastBlockA, lastBlockB;
+		double ratio;
+		
+		// Computing first and last block of readA and readB
+		firstBlockA=-1;
+		for (i=0; i<=nBlocksA-2; i++) {
+			blockEnd=boundaries_all[readA][i];
+			if (startA<blockEnd-IDENTITY_THRESHOLD) {
+				firstBlockA=i;
+				break;
+			}
+		}
+		if (firstBlockA==-1) firstBlockA=nBlocksA-1;		
+		lastBlockA=-1;
+		for (i=firstBlockA; i<=nBlocksA-2; i++) {
+			blockEnd=boundaries_all[readA][i];
+			if (endA<=blockEnd+IDENTITY_THRESHOLD) {
+				lastBlockA=i;
+				break;
+			}
+		}
+		if (lastBlockA==-1) lastBlockA=nBlocksA-1;
+		firstBlockB=-1;
+		for (i=0; i<=nBlocksB-2; i++) {
+			blockEnd=boundaries_all[readB][i];
+			if (startA<blockEnd-IDENTITY_THRESHOLD) {
+				firstBlockB=i;
+				break;
+			}
+		}
+		if (firstBlockB==-1) firstBlockB=nBlocksB-1;		
+		lastBlockB=-1;	
+		for (i=firstBlockB; i<=nBlocksB-2; i++) {
+			blockEnd=boundaries_all[readB][i];
+			if (endA<=blockEnd+IDENTITY_THRESHOLD) {
+				lastBlockB=i;
+				break;
+			}
+		}
+		if (lastBlockB==-1) lastBlockB=nBlocksB-1;
+		
+		// Finding matching blocks
+		nBlocks=lastBlockA-firstBlockA+1;
+		if (nBlocks!=lastBlockB-firstBlockB+1) return false;
+		ratio=((double)(endB-startB+1))/(endA-startA+1);
+		if (orientation) {
+			for (i=0; i<nBlocks-1; i++) {
+				if ( Math.abs((boundaries_all[readA][firstBlockA+i]-startA)*ratio-(boundaries_all[readB][firstBlockB+i]-startB))>IDENTITY_THRESHOLD ||
+					 !Math.nonemptyIntersection(translation_all[readA][firstBlockA+i],0,translation_all[readA][firstBlockA+i].length-1,translation_all[readB][firstBlockB+i],0,translation_all[readB][firstBlockB+i].length-1)
+				   ) return false;
+			}
+			if (!Math.nonemptyIntersection(translation_all[readA][lastBlockA],0,translation_all[readA][lastBlockA].length-1,translation_all[readB][lastBlockB],0,translation_all[readB][lastBlockB].length-1)) return false;
+		}
+		else {
+			for (i=0; i<nBlocks-1; i++) {
+				if ( Math.abs((boundaries_all[readA][firstBlockA+i]-startA)*ratio-(endB-boundaries_all[readB][lastBlockB-i-1]))>IDENTITY_THRESHOLD ||
+---->   			 !Math.nonemptyIntersection(translation_all[readA][firstBlockA+i],0,translation_all[readA][firstBlockA+i].length-1,translation_all[readB][lastBlockB-i],0,translation_all[readB][lastBlockB-i].length-1)
+				   ) return false;
+			}
+			if (!Math.nonemptyIntersection(translation_all[readA][lastBlockA],0,translation_all[readA][lastBlockA].length-1,translation_all[readB][firstBlockB],0,translation_all[readB][firstBlockB].length-1)) return false;
+		}
+		return true;
+	}
+	
+	
+	/**
+	 * Variant of $Math.nonemptyIntersection()$ that handles characters in the reverse orientation.
+	 * ------------->
+	 */
+	private static final boolean nonemptyIntersectionRC(int[] x1, int from1, int last1, int[] x2, int from2, int last2) {
+		
+		
+		int i1, i2;
+		
+		i1=from1; i2=from2;
+		while (i1<=last1 && i2<=last2) {
+			if (x1[i1]<x2[i2]) i1++;
+			else if (x1[i1]>x2[i2]) i2++;
+			else return true;
+		}
+		return false;
 		
 		
 		
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	
 	
