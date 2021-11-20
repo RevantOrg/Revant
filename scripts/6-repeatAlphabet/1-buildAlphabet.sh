@@ -108,11 +108,13 @@ else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
 translationThread 0 -1 "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" &
-for THREAD in $(seq 1 ${TO}); do
-	LAST_TRANSLATED_READ=$(tail -n 1 ${TMPFILE_PATH}-1-$(( ${THREAD} - 1 )).txt | awk '{ print $1 }' | tr -d , )
-	LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} - 1 ))
-	translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" &
-done
+if [ ${TO} -ge 1 ]; then
+	for THREAD in $(seq 1 ${TO}); do
+		LAST_TRANSLATED_READ=$(tail -n 1 ${TMPFILE_PATH}-1-$(( ${THREAD} - 1 )).txt | awk '{ print $1 }' | tr -d , )
+		LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} - 1 ))
+		translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" &
+	done
+fi
 wait
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated.txt"
 rm -f ${READS_TRANSLATED_FILE}
@@ -127,9 +129,11 @@ done
 HISTOGRAM_FILE="${INPUT_DIR}/reads-translated-histogram.txt"
 rm -f ${HISTOGRAM_FILE}
 PASTE_OPTIONS="awk '{print \$1"
-for i in $(seq 2 $((${TO} + 1))); do
-	PASTE_OPTIONS="${PASTE_OPTIONS}+\$$i"
-done
+if [ ${TO}+1 -ge 2 ]; then 
+	for i in $(seq 2 $((${TO} + 1))); do
+		PASTE_OPTIONS="${PASTE_OPTIONS}+\$$i"
+	done
+fi
 PASTE_OPTIONS="${PASTE_OPTIONS}}'"
 paste ${TMPFILE_PATH}-9-hist-*.txt | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}
 FULLY_UNIQUE_FILE="${INPUT_DIR}/reads-fullyUnique.txt"
@@ -193,8 +197,10 @@ for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-16-*" ); do
 	cat ${INPUT_DIR}/${TMPFILE_NAME}-17-${THREAD_ID} >> ${READS_TRANSLATED_BOUNDARIES_NEW}
 done
 PASTE_OPTIONS="awk '{print \$1"
-for i in $(seq 2 ${N_THREADS}); do
-	PASTE_OPTIONS="${PASTE_OPTIONS}+\$$i"
-done
+if [ ${N_THREADS} -ge 2 ]; then
+	for i in $(seq 2 ${N_THREADS}); do
+		PASTE_OPTIONS="${PASTE_OPTIONS}+\$$i"
+	done
+fi
 PASTE_OPTIONS="${PASTE_OPTIONS}}'"
 paste ${INPUT_DIR}/${TMPFILE_NAME}-18-* | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}

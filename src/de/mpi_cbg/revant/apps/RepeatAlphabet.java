@@ -595,6 +595,7 @@ public class RepeatAlphabet {
 		}
 		if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
 		lastAlphabet=k; lastPeriodic=lastPeriodicNew;
+		alphabet=newAlphabet;
 		System.err.println("DONE "+nAdded+" reverse-complement characters added ("+(lastAlphabet+1)+" total characters)");
 	}
 	
