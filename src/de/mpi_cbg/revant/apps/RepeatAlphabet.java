@@ -381,6 +381,8 @@ public class RepeatAlphabet {
 	 * Quantizes the endpoints of every repeat and removes character instances that can be
 	 * considered substrings of others.
 	 *
+	 * Remark: the procedure compacts only characters in the same orientation.
+	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
 	 * power, since it assumes they have not been added to $alphabet$ in ther first place.
 	 * 
@@ -414,43 +416,31 @@ public class RepeatAlphabet {
 		}
 		lastAlphabet=j;
 		lastUnique=-1; i=0;
-		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) {
-			alphabet[i].id=i;
-			lastUnique=i;
-			i++;
-		}
+		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) lastUnique=i++;
 		lastPeriodic=lastUnique;
-		while (i<=lastAlphabet && alphabet[i].start==-1) {
-			alphabet[i].id=i;
-			lastPeriodic=i;
-			i++;
-		}
-		while (i<=lastAlphabet) {
-			alphabet[i].id=i;
-			i++;
-		}
-		System.err.println("DONE");
+		while (i<=lastAlphabet && alphabet[i].start==-1) lastPeriodic=i++;
+		System.err.println("DONE");		
 		
 		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+(lastUnique+1)+" unique characters)");
-		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].id=1;
+		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].flag=1;
 		for (i=lastUnique+1; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if ( alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation || 
 					 alphabet[j].implies_tooFarAfter(alphabet[i])
 				   ) break;
-				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].id=0;
+				if (alphabet[j].flag==0) continue;
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].flag=0;
 			}
 			for (j=i-1; j>=0; j--) {
 				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation) break;
-				if (alphabet[j].id==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].id=0;
+				if (alphabet[j].flag==0) continue;
+				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].flag=0;
 			}
 		}
 		j=lastUnique;
 		for (i=lastUnique+1; i<=lastAlphabet; i++) {
-			if (alphabet[i].id==0) continue;
+			if (alphabet[i].flag==0) continue;
 			j++;
 			tmpChar=alphabet[j];
 			alphabet[j]=alphabet[i];
@@ -461,6 +451,156 @@ public class RepeatAlphabet {
 		while (i<=lastAlphabet && alphabet[i].start==-1) i++;
 		lastPeriodic=i-1;
 		System.err.println("DONE  "+(lastAlphabet+1)+" characters after filtering.");
+	}
+	
+	
+	/**
+	 * Ensures that the reverse-complement of every character in the alphabet, is also in
+	 * the alphabet. Reverse-complement pairs have symmetrical open status.
+	 */
+	public static final void closeAlphabetByRC() {
+		final int QUANTUM = 1000;  // Arbitrary
+		boolean openStart, openEnd;
+		int i, j, k;
+		int from, newFrom, repeat, start, end, length, found, nAdded, lastPeriodicNew;
+		Character[] newAlphabet;
+		
+		// Unique
+		newAlphabet = new Character[lastAlphabet+1];
+		System.arraycopy(alphabet,0,newAlphabet,0,lastUnique+1);
+		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].flag=0;
+		System.err.println("Adding reverse-complement characters... ");
+		nAdded=0;
+		
+		// Periodic
+		k=lastUnique; from=lastUnique+1; newFrom=from;
+		for (i=lastUnique+1; i<=lastPeriodic; i++) {
+			if (i%1000==0) System.err.println("Processed "+i+" characters");
+			repeat=alphabet[i].repeat;
+			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
+			if (repeat!=alphabet[from].repeat) {
+				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+				from=i; newFrom=k+1;
+			}
+			k++;
+			if (k==newAlphabet.length) {
+				Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+				System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+				newAlphabet=newArray;
+			}
+			newAlphabet[k]=alphabet[i];
+			if (alphabet[i].flag==1) continue;
+			length=alphabet[i].length;
+			if (alphabet[i].orientation) {
+				found=-1;
+				for (j=i+1; j<=lastPeriodic; j++) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (!alphabet[j].orientation && alphabet[j].length==length && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,false,-1,-1,length,openEnd,openStart);
+					nAdded++;
+				}
+				else alphabet[found].flag=1;
+			}
+			else {
+				found=-1;
+				for (j=i-1; j>lastUnique; j--) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (alphabet[j].orientation && alphabet[j].length==length && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,true,-1,-1,length,openEnd,openStart);
+					nAdded++;
+				}
+			}
+		}
+		if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+		lastPeriodicNew=k;
+		
+		// Nonperiodic
+		from=lastPeriodic+1; newFrom=k+1;
+		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
+			if (i%1000==0) System.err.println("Processed "+i+" characters");
+			repeat=alphabet[i].repeat;
+			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
+			if (repeat!=alphabet[from].repeat) {
+				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+				from=i; newFrom=k+1;
+			}			
+			k++;
+			if (k==newAlphabet.length) {
+				Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+				System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+				newAlphabet=newArray;
+			}
+			newAlphabet[k]=alphabet[i];
+			if (alphabet[i].flag==1) continue;
+			start=alphabet[i].start; end=alphabet[i].end;
+			if (alphabet[i].orientation) {
+				found=-1;
+				for (j=i+1; j<=lastAlphabet; j++) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (!alphabet[j].orientation && alphabet[j].start==start && alphabet[j].end==end && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,false,start,end,0,openEnd,openStart);
+					nAdded++;
+				}
+				else alphabet[found].flag=1;
+			}
+			else {
+				found=-1;
+				for (j=i-1; j>lastUnique; j--) {
+					if (alphabet[j].repeat!=repeat) break;
+					if (alphabet[j].orientation && alphabet[j].start==start && alphabet[j].end==end && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						found=j;
+						break;
+					}
+				}
+				if (found==-1) {
+					k++;
+					if (k==newAlphabet.length) {
+						Character[] newArray = new Character[newAlphabet.length+QUANTUM];
+						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
+						newAlphabet=newArray;
+					}
+					newAlphabet[k] = new Character(repeat,true,start,end,0,openEnd,openStart);
+					nAdded++;
+				}
+			}
+		}
+		if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+		lastAlphabet=k; lastPeriodic=lastPeriodicNew;
+		alphabet=newAlphabet;
+		System.err.println("DONE "+nAdded+" reverse-complement characters added ("+(lastAlphabet+1)+" total characters)");
 	}
 	
 	
@@ -818,7 +958,7 @@ public class RepeatAlphabet {
 				k=i;
 				while (k>lastUnique && alphabet[k].repeat==repeat && alphabet[k].orientation==orientation && alphabet[k].length>=length) k--;
 				k++;
-				while (k<i && !alphabet[k].implies(character,-1)) k++;
+				while (k<=lastPeriodic && alphabet[k].repeat==repeat && alphabet[k].orientation==orientation && !alphabet[k].implies(character,-1)) k++;
 				i=k;
 				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation || !alphabet[i].implies(character,-1)) {
 					System.err.println("translateRead_periodic> ERROR: open periodic repeat not found in the alphabet");
@@ -971,37 +1111,53 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Resets $characterCount[x]$ and $characterCount[y]$ to the sum of their values for 
-	 * every $x,y$ that are the reverse-complement of each other.
+	 * Let $alphabet[x_0,x_1,...,x_n]$ be all and only the characters that correspond to 
+	 * the same substring of the same repeat, regardless of orientation and open status.
+	 * The procedure sets $characterCount'[x_i] = \sum_{j=0}^{n} characterCount[x_j]$ for 
+	 * every $i$.
+	 *
+	 * Remark: discarding open status is necessary, because $Character.implies()$ works 
+	 * only in one orientation, so the same substring of the same repeat might have 
+	 * different open status in different orientations.
 	 *
 	 * @param marked temporary space, of size at least $lastAlphabet+1$.
 	 */
 	public static final void symmetrizeCharacterCounts(long[] characterCount, boolean[] marked) {
-		boolean orientation, openStart, openEnd, isHalfOpen;
 		int i, j;
 		int repeat, start, end, length;
+		long sum;
 		
 		Math.set(marked,lastAlphabet,false);
 		
 		// Periodic
 		for (i=lastUnique+1; i<lastPeriodic; i++) {
 			if (marked[i]) continue;
-			repeat=alphabet[i].repeat; orientation=alphabet[i].orientation;
-			length=alphabet[i].length; 
-			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
-			isHalfOpen=openStart!=openEnd;
+			repeat=alphabet[i].repeat; length=alphabet[i].length; sum=characterCount[i];
 			for (j=i+1; j<=lastPeriodic; j++) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].length==length && alphabet[j].orientation!=orientation) {
-					if ( (isHalfOpen && alphabet[j].openStart!=openStart && alphabet[j].openEnd!=openEnd) ||
-						 (!isHalfOpen && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd)
-					   ) {
-						characterCount[i]+=characterCount[j];
-						characterCount[j]=characterCount[i];
-						marked[j]=true;
-						break;
-					}
+				if (alphabet[j].length==length) sum+=characterCount[j];
+			}
+			for (j=i-1; j>lastUnique; j--) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].length==length) sum+=characterCount[j];
+			}
+			characterCount[i]=sum;
+			for (j=i+1; j<=lastPeriodic; j++) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].length==length) {
+					characterCount[j]=sum;
+					marked[j]=true;
+				}
+			}
+			for (j=i-1; j>lastUnique; j--) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].length==length) {
+					characterCount[j]=sum;
+					marked[j]=true;
 				}
 			}
 		}
@@ -1009,23 +1165,28 @@ public class RepeatAlphabet {
 		// Nonperiodic
 		for (i=lastPeriodic+1; i<lastAlphabet; i++) {
 			if (marked[i]) continue;
-			repeat=alphabet[i].repeat; orientation=alphabet[i].orientation;
-			start=alphabet[i].start; end=alphabet[i].end;
-			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
-			isHalfOpen=openStart!=openEnd;
+			repeat=alphabet[i].repeat; start=alphabet[i].start; end=alphabet[i].end;
+			sum=characterCount[i];
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].start==start && alphabet[j].end==end && alphabet[j].orientation!=orientation) {
-					if ( (isHalfOpen && alphabet[j].openStart!=openStart && alphabet[j].openEnd!=openEnd) ||
-						 (!isHalfOpen && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd)
-					   ) {
-						characterCount[i]+=characterCount[j];
-						characterCount[j]=characterCount[i];
-						marked[j]=true;
-						break;
-					}
-				}
+				if (alphabet[j].start==start && alphabet[j].end==end) sum+=characterCount[j];
+			}
+			for (j=i-1; j>lastPeriodic; j--) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].start==start && alphabet[j].end==end) sum+=characterCount[j];
+			}
+			characterCount[i]=sum;
+			for (j=i+1; j<=lastAlphabet; j++) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].start==start && alphabet[j].end==end) characterCount[j]=sum;
+			}
+			for (j=i-1; j>lastPeriodic; j--) {
+				if (alphabet[j].repeat!=repeat) break;
+				if (marked[j]) continue;
+				if (alphabet[j].start==start && alphabet[j].end==end) characterCount[j]=sum;
 			}
 		}
 	}
@@ -1035,10 +1196,8 @@ public class RepeatAlphabet {
 	 * Builds a histogram of symmetrized $characterCount$ values. Rows: counts. Columns:
 	 * 0: unique, open; 
 	 * 1: unique, closed;
-	 * 2: periodic, open;
-	 * 3: periodic, closed; 
-	 * 4: nonperiodic, open;
-	 * 5: nonperiodic, closed.
+	 * 2: periodic;
+	 * 3: nonperiodic.
 	 *
 	 * @param marked the same array used by $symmetrizeCharacterCounts()$, after that
 	 * procedure completes.
@@ -1049,7 +1208,7 @@ public class RepeatAlphabet {
 		long[][] characterHistogram;
 
 		// Unique
-		characterHistogram = new long[maxFrequency+1][3<<1];
+		characterHistogram = new long[maxFrequency+1][4];
 		Math.set(characterHistogram,0);
 		for (i=0; i<=lastUnique; i++) {
 			count=characterCount[i];
@@ -1064,14 +1223,14 @@ public class RepeatAlphabet {
 			if (marked[i]) continue;
 			count=characterCount[i];
 			if (count>maxFrequency) count=maxFrequency;
-			characterHistogram[(int)count][alphabet[i].isOpen()?2:3]++;
+			characterHistogram[(int)count][2]++;
 		}		
 		// Nonperiodic
 		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
 			if (marked[i]) continue;
 			count=characterCount[i];
 			if (count>maxFrequency) count=maxFrequency;
-			characterHistogram[(int)count][alphabet[i].isOpen()?4:5]++;
+			characterHistogram[(int)count][3]++;
 		}
 		return characterHistogram;
 	}
@@ -1707,6 +1866,7 @@ public class RepeatAlphabet {
 						if (alphabet[i].repeat!=repeat) break;
 						if (alphabet[i].length==length) last=i;
 					}
+					return last==-1?characterID:last;
 				}
 				else {
 					for (i=characterID+1; i<=lastPeriodic; i++) {
@@ -1716,6 +1876,11 @@ public class RepeatAlphabet {
 							break;
 						}
 					}
+					if (last==-1) {
+						System.err.println("canonizeCharacter> ERROR: reverse-complement of the following character not found in the alphabet: "+alphabet[characterID]);
+						System.exit(1);
+					}
+					return last;
 				}
 			}
 			else {
@@ -1724,15 +1889,20 @@ public class RepeatAlphabet {
 						if (alphabet[i].repeat!=repeat || alphabet[i].orientation) break;
 						if (alphabet[i].length==length) last=i;
 					}
+					return last==-1?characterID:last;
 				}
 				else {
 					for (i=characterID-1; i>lastUnique; i--) {
 						if (alphabet[i].repeat!=repeat) break;
 						if (alphabet[i].orientation && alphabet[i].length==length) last=i;
 					}
+					if (last==-1) {
+						System.err.println("canonizeCharacter> ERROR: reverse-complement of the following character not found in the alphabet: "+alphabet[characterID]);
+						System.exit(1);
+					}
+					return last;
 				}
 			}
-			return last==-1?characterID:last;
 		}
 		else {
 			repeat=alphabet[characterID].repeat;
@@ -1745,6 +1915,7 @@ public class RepeatAlphabet {
 						if (alphabet[i].repeat!=repeat) break;
 						if (alphabet[i].start==start && alphabet[i].end==end) last=i;
 					}
+					return last==-1?characterID:last;
 				}
 				else {
 					for (i=characterID+1; i<=lastAlphabet; i++) {
@@ -1754,6 +1925,11 @@ public class RepeatAlphabet {
 							break;
 						}
 					}
+					if (last==-1) {
+						System.err.println("canonizeCharacter> ERROR: reverse-complement of the following character not found in the alphabet: "+alphabet[characterID]);
+						System.exit(1);
+					}
+					return last;
 				}
 			}
 			else {
@@ -1762,15 +1938,20 @@ public class RepeatAlphabet {
 						if (alphabet[i].repeat!=repeat || alphabet[i].orientation) break;
 						if (alphabet[i].start==start && alphabet[i].end==end) last=i;
 					}
+					return last==-1?characterID:last;
 				}
 				else {
 					for (i=characterID-1; i>lastPeriodic; i--) {
 						if (alphabet[i].repeat!=repeat) break;
 						if (alphabet[i].orientation && alphabet[i].start==start && alphabet[i].end==end) last=i;
 					}
+					if (last==-1) {
+						System.err.println("canonizeCharacter> ERROR: reverse-complement of the following character not found in the alphabet: "+alphabet[characterID]);
+						System.exit(1);
+					}
+					return last;
 				}
 			}
-			return last==-1?characterID:last;
 		}
 	}
 	
@@ -2061,8 +2242,8 @@ public class RepeatAlphabet {
 	 * alignment anyway, since it just encodes a similarity between substrings of 
 	 * (possibly different) repeats.
 	 *
-	 * Remark: the procedure needs the following arrays: 
-	 * fullyUnique, fullyContained, boundaries_all, isBlockUnique_all, blueIntervals, blueIntervals_reads.
+	 * Remark: the procedure does not need $alphabet$, but it needs the following arrays: 
+	 * isBlockUnique_all | fullyUnique, fullyContained, boundaries_all, blueIntervals, blueIntervals_reads. 
 	 *
 	 * @param alignmentsFile output of LAshow, assumed to be sorted by readA;
 	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
@@ -2132,7 +2313,7 @@ public class RepeatAlphabet {
 	 * occur multiple times in the genome.
 	 *
 	 * Remark: the procedure needs the following arrays: 
-	 * boundaries_all, isBlockUnique_all, blueIntervals, blueIntervals_reads.
+	 * isBlockUnique_all, boundaries_all, blueIntervals, blueIntervals_reads.
 	 * 
 	 * @param readID assumed to contain more than one block;
 	 * @param boundariesAllID position of the read in $boundaries_all,isBlockUnique_all,
@@ -2281,11 +2462,14 @@ public class RepeatAlphabet {
 	 * a unique region in both readA and readB. If $mode=TRUE$, the procedure additionally
 	 * requires that the intervals of the alignment in the two reads cover matching 
 	 * sequences of boundaries and matching characters.
+	 *
+	 * Remark: the procedure needs the following arrays: 
+	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, blueIntervals, blueIntervals_reads.
 	 */
 	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection) throws IOException {
 		boolean isFullyUniqueA;
 		int p;
-		int row, readA, readB;
+		int row, readA, readB, startA, endA, startB, endB;
 		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval;
 		final int nFullyContained = fullyContained.length;
 		final int nFullyUnique = fullyUnique.length;
@@ -2303,12 +2487,13 @@ public class RepeatAlphabet {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			// Processing readA
-			readA=Alignments.readA-1;
+			readA=Alignments.readA-1; readB=Alignments.readB-1;
+			startA=Alignments.startA; endA=Alignments.endA;
+			startB=Alignments.startB; endB=Alignments.endB;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
 			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
 				isFullyUniqueA=true;
 				if (mode) {
-					readB=Alignments.readB-1;
 					if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) bw.write("1\n");
 					else bw.write("0\n");
 					str=br.readLine(); row++;
@@ -2324,13 +2509,12 @@ public class RepeatAlphabet {
 				}
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				if (!inBlueRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) {
+				if (!inBlueRegion(readA,startA,endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
 				}
 			}
 			// Processing readB
-			readB=Alignments.readB-1;
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
 				if (mode) bw.write(isFullyUniqueA?"1\n":"0\n");
 				else bw.write("1\n");
@@ -2342,12 +2526,10 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			if (inBlueRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection)) {
+			if (inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection)) {
 				if (mode) {
-					
-					//-------->
-					
-					
+					if (sameFactorization(readA,startA,endA,readB,startB,endB,Alignments.orientation)) bw.write("1\n");
+					else bw.write("0\n");
 				}
 				else bw.write("1\n");
 			}
@@ -2361,8 +2543,8 @@ public class RepeatAlphabet {
 	/**
 	 * The dual of $inRedRegion()$: tells whether interval $readID[intervalStart..
 	 * intervalEnd]$ fully belongs to a non-repetitive region, or straddles a non-
-	 * repetitive region, or is contained in a sequence of repeat characters that is 
-	 * likely to occur just once in the genome.
+	 * repetitive region, or contains a sequence of repeat characters that is likely to 
+	 * occur just once in the genome.
 	 *
 	 * Remark: the procedure needs the following arrays: 
 	 * boundaries_all, translation_all, blueIntervals, blueIntervals_reads.
@@ -2426,9 +2608,9 @@ public class RepeatAlphabet {
 	
 	/**
 	 * @param read* index in $translated_all$;
-	 * @return TRUE iff the alignments intersect the same number of blocks, with 
-	 * boundaries at similar positions, and with at least one matching character per 
-	 * block.
+	 * @return TRUE iff $readA[startA..endA]$ intersects the same number of blocks as
+	 * $read[startB..endB]$, with boundaries at similar positions, and with at least one 
+	 * matching character per block.
 	 */
 	private static final boolean sameFactorization(int readA, int startA, int endA, int readB, int startB, int endB, boolean orientation) {
 		final int IDENTITY_THRESHOLD = IO.quantum;
@@ -2491,42 +2673,38 @@ public class RepeatAlphabet {
 		else {
 			for (i=0; i<nBlocks-1; i++) {
 				if ( Math.abs((boundaries_all[readA][firstBlockA+i]-startA)*ratio-(endB-boundaries_all[readB][lastBlockB-i-1]))>IDENTITY_THRESHOLD ||
----->   			 !Math.nonemptyIntersection(translation_all[readA][firstBlockA+i],0,translation_all[readA][firstBlockA+i].length-1,translation_all[readB][lastBlockB-i],0,translation_all[readB][lastBlockB-i].length-1)
+					 !nonemptyIntersectionRC(readA,firstBlockA+i,readB,lastBlockB-i)
 				   ) return false;
 			}
-			if (!Math.nonemptyIntersection(translation_all[readA][lastBlockA],0,translation_all[readA][lastBlockA].length-1,translation_all[readB][firstBlockB],0,translation_all[readB][firstBlockB].length-1)) return false;
+			if (!nonemptyIntersectionRC(readA,lastBlockA,readB,firstBlockB)) return false;
 		}
 		return true;
 	}
 	
 	
 	/**
-	 * Variant of $Math.nonemptyIntersection()$ that handles characters in the reverse orientation.
-	 * ------------->
+	 * Remark: the procedure uses global array $stack$ as temporary space.
+	 *
+	 * @return TRUE iff array $translation_all[readA][blockA]$ has at least one character 
+	 * in common with the reverse-complemented characters of array 
+	 * $translation_all[readB][blockB]$.
 	 */
-	private static final boolean nonemptyIntersectionRC(int[] x1, int from1, int last1, int[] x2, int from2, int last2) {
+	private static final boolean nonemptyIntersectionRC(int readA, int blockA, int readB, int blockB) {
+		int i;
+		final int lengthB = translation_all[readB][blockB].length;
 		
-		
-		int i1, i2;
-		
-		i1=from1; i2=from2;
-		while (i1<=last1 && i2<=last2) {
-			if (x1[i1]<x2[i2]) i1++;
-			else if (x1[i1]>x2[i2]) i2++;
-			else return true;
-		}
-		return false;
-		
-		
-		
+		if (stack==null || stack.length<lengthB) stack = new int[lengthB];
+		for (i=0; i<lengthB; i++) stack[i]=canonizeCharacter(translation_all[readB][blockB][i],false);
+		if (lengthB>1) Arrays.sort(stack,0,lengthB);
+		return Math.nonemptyIntersection(translation_all[readA][blockA],0,translation_all[readA][blockA].length-1,stack,0,lengthB-1);
 	}
+
 	
 	
 	
-	
-	
-	
-	
+
+
+
 	
 	// ------------------------------ DATA STRUCTURES ------------------------------------
 	
@@ -2762,21 +2940,21 @@ public class RepeatAlphabet {
 	 * A substring of a repeat in a specific orientation and with open/closed endpoints.
 	 */
 	public static class Character implements Comparable {
-		public int id;
 		public int repeat;
 		public boolean orientation;
 		public int start, end;
 		public boolean openStart, openEnd;  // The repeat might continue beyond start/end
 		public int length;  // >0: unique or periodic; 0: repetitive non-periodic.
 		
+		public int flag;  // Temporary space
+		
 		
 		public Character() { reset(); }
 		
 		
 		public void reset() { 
-			id=-1;
 			repeat=-1; orientation=false; start=-1; end=-1; length=-1;
-			openStart=true; openEnd=true;
+			openStart=true; openEnd=true; flag=-1;
 		}
 		
 		
@@ -2874,13 +3052,13 @@ public class RepeatAlphabet {
 		
 		/**
 		 * Both characters are assumed to be quantized, and repetitive with the same 
-		 * repeat. Unique characters are not assumed to imply one another, since fully-
-		 * open and half-open unique characters are assumed to have been discarded.
+		 * repeat and in the same orientation. Unique characters are not assumed to imply 
+		 * one another, since fully-open and half-open unique characters are assumed to 
+		 * have been discarded.
 		 */
 		public final boolean implies(Character otherCharacter, int quantum) {
 			if (start==-1) {  // Periodic
 				if (length!=otherCharacter.length) return false;
-				else if (length<otherCharacter.length) return false;
 				else if ( (!otherCharacter.openStart && !otherCharacter.openEnd) ||
 					      (!otherCharacter.openStart && openStart) ||
 				          (!otherCharacter.openEnd && openEnd)
