@@ -419,7 +419,7 @@ public class RepeatAlphabet {
 		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) lastUnique=i++;
 		lastPeriodic=lastUnique;
 		while (i<=lastAlphabet && alphabet[i].start==-1) lastPeriodic=i++;
-		System.err.println("DONE");		
+		System.err.println("DONE");
 		
 		System.err.println("Discarding repetitive characters that are implied by other repetitive characters... ("+(lastUnique+1)+" unique characters)");
 		for (i=lastUnique+1; i<=lastAlphabet; i++) alphabet[i].flag=1;
