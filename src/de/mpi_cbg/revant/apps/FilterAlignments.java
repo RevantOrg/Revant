@@ -35,6 +35,7 @@ public class FilterAlignments {
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
 		Reads.loadReadIDs(READ_IDS_FILE,N_READS);
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadBlueIntervals(UNIQUE_INTERVALS_FILE);
 		if (MODE==0) {
@@ -43,7 +44,6 @@ public class FilterAlignments {
 		}
 		else {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,false,true,TRANSLATED_BOUNDARIES_FILE);
-			RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,OUTPUT_FILE,MODE==1?false:true,MIN_INTERSECTION);
 		}
 	}

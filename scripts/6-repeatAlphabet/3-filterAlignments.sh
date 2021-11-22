@@ -34,15 +34,15 @@ echo "Alignments filtered and split in ${N_THREADS} parts"
 echo "Filtering alignments..."
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
 READS_TRANSLATED_BOUNDARIES="${INPUT_DIR}/reads-translated-boundaries-new.txt"
-FULLY_UNIQUE_FILE="${INPUT_DIR}/reads-fullyUnique.txt"
+FULLY_UNIQUE_FILE="${INPUT_DIR}/reads-fullyUnique-new.txt"
 N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
-FULLY_CONTAINED_FILE="${INPUT_DIR}/reads-fullyContained.txt"
+FULLY_CONTAINED_FILE="${INPUT_DIR}/reads-fullyContained-new.txt"
 N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
 UNIQUE_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 function filterThread() {
 	local ALIGNMENTS_FILE_ID=$1
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${INPUT_DIR}/${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID} ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${MAX_K_UNIQUE_INTERVALS} ${FILTERING_MODE} ${ALPHABET_FILE} ${INPUT_DIR}/${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${INPUT_DIR}/unique-intervals-k1-${MAX_K_UNIQUE_INTERVALS}.txt ${FILTERING_MODE} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}
 }
 if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 	TO=${N_THREADS}
@@ -57,5 +57,5 @@ echo "Alignments filtered successfully"
 OUTPUT_BITVECTOR="${ALIGNMENTS_FILE}.mode${FILTERING_MODE}.bitvector"
 rm -f ${OUTPUT_BITVECTOR}
 for THREAD in $(seq 0 ${TO}); do
-	cat ${INPUT_DIR}/${TMPFILE_PATH}-2-${THREAD} >> ${OUTPUT_BITVECTOR}
+	cat ${TMPFILE_PATH}-2-${THREAD} >> ${OUTPUT_BITVECTOR}
 done

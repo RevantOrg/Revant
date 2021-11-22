@@ -26,6 +26,8 @@ public class CleanTranslatedReads3 {
 		final String TRANSLATED_FILE_CHARACTERS_NEW = args[10];
 		final String TRANSLATED_FILE_BOUNDARIES_NEW = args[11];
 		final String HISTOGRAM_FILE = args[12];
+		final String FULLY_UNIQUE_FILE_NEW = args[13];
+		final int LAST_TRANSLATED_READ = Integer.parseInt(args[14]);  // Same as in $TranslateReads.java$. -1 if no read has been updated yet.
 		
 		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
 		
@@ -36,7 +38,7 @@ public class CleanTranslatedReads3 {
 		String str1, str2;
 		RepeatAlphabet.Character tmpChar = new RepeatAlphabet.Character();
 		BufferedReader br1, br2;
-		BufferedWriter bw1, bw2;
+		BufferedWriter bw1, bw2, bw3;
 		int[] old2new;
 		long[] blocksHistogram;
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
@@ -68,14 +70,16 @@ public class CleanTranslatedReads3 {
 		br2 = new BufferedReader(new FileReader(TRANSLATED_FILE_BOUNDARIES_OLD));
 		bw1 = new BufferedWriter(new FileWriter(TRANSLATED_FILE_CHARACTERS_NEW));
 		bw2 = new BufferedWriter(new FileWriter(TRANSLATED_FILE_BOUNDARIES_NEW));
-		i=0; str1=br1.readLine(); str2=br2.readLine();
-		while (str1!=null) {		
-			nBlocks=RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,old2new,Reads.readLengths[i],MIN_FREQUENCY,IO.quantum,bw1,bw2,tmpChar);
+		bw3 = new BufferedWriter(new FileWriter(FULLY_UNIQUE_FILE_NEW));
+		i=LAST_TRANSLATED_READ+1; str1=br1.readLine(); str2=br2.readLine();
+		while (str1!=null && i<N_READS) {
+			nBlocks=RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,old2new,Reads.getReadLength(i),MIN_FREQUENCY,IO.quantum,bw1,bw2,tmpChar);
 			blocksHistogram[nBlocks]++;
 			bw1.newLine(); bw2.newLine();
+			if (nBlocks==0) bw3.write(Reads.readIDs[i]+"\n");
 			i++; str1=br1.readLine(); str2=br2.readLine();
 		}
-		br1.close(); br2.close(); bw1.close(); bw2.close();
+		br1.close(); br2.close(); bw1.close(); bw2.close(); bw3.close();
 		bw1 = new BufferedWriter(new FileWriter(HISTOGRAM_FILE));
 		for (i=0; i<=MAX_HISTOGRAM_LENGTH; i++) bw1.write(blocksHistogram[i]+"\n");
 		bw1.close();

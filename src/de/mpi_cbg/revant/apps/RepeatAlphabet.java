@@ -748,9 +748,10 @@ public class RepeatAlphabet {
 	 * an empty line if it contains no repeat, or if it is fully contained in a single
 	 * repeat;
 	 * @param outputFile_boundaries character boundaries (one read per line);
-	 * @param outputFile_fullyUniqueReads list of IDs of reads that contain no repeat;
+	 * @param outputFile_fullyUniqueReads list of IDs of reads that contain no repeat
+	 * (zero-based);
 	 * @param outputFile_oneRepeatReads list of IDs of reads that are fully contained in a
-	 * single repeat.
+	 * single repeat (zero-based).
 	 */
 	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram, String outputFile_fullyUniqueReads, String outputFile_oneRepeatReads) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
@@ -2094,7 +2095,7 @@ public class RepeatAlphabet {
 	 */
 	public static final void loadAllBoundaries(String translatedFile, boolean loadIsBlockUnique, boolean loadTranslation, String boundariesFile) throws IOException {
 		int i, j, r;
-		int read, cell, mask, nBlocks, nBytes, nReads, nBoundaries;
+		int read, cell, mask, block, nBlocks, nBytes, nReads, nBoundaries;
 		String str;
 		BufferedReader br;
 		String[] tokens;
@@ -2159,10 +2160,12 @@ public class RepeatAlphabet {
 				for (i=0; i<nBytes; i++) {
 					cell=0; mask=1;
 					for (j=0; j<8; j++) {
-						if (isBlockUnique[i*8+j]) cell|=mask;
+						block=i*8+j;
+						if (block==nBlocks) break;
+						if (isBlockUnique[block]) cell|=mask;
 						mask<<=1;
 					}
-					isBlockUnique_all[r][i]=(byte)mask;
+					isBlockUnique_all[r][i]=(byte)cell;
 				}
 				str=br.readLine();
 			}
@@ -2206,6 +2209,8 @@ public class RepeatAlphabet {
 		BufferedReader br;
 		String[] tokens;
 		
+		blueIntervals = new int[GROWTH_RATE][0];
+		blueIntervals_reads = new int[GROWTH_RATE];
 		br = new BufferedReader(new FileReader(intervalsFile));
 		str=br.readLine(); read=-1; blueIntervals_last=-1;
 		while (str!=null) {
@@ -2215,7 +2220,7 @@ public class RepeatAlphabet {
 				continue;
 			}
 			blueIntervals_last++;
-			if (blueIntervals_last>blueIntervals.length) {
+			if (blueIntervals_last==blueIntervals.length) {
 				int[][] newArray = new int[blueIntervals.length+GROWTH_RATE][0];
 				System.arraycopy(blueIntervals,0,newArray,0,blueIntervals.length);
 				blueIntervals=newArray;
@@ -2299,6 +2304,10 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
+			if (p<0) {
+				System.err.println("filterAlignments_loose> ERROR: read "+readB+" is neither translated, nor fully unique, nor fully contained in a repeat.");
+				System.exit(1);
+			}
 			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);			
 			bw.write(isRepetitive?"0\n":"1\n"); 
 			str=br.readLine(); row++;
@@ -2317,7 +2326,7 @@ public class RepeatAlphabet {
 	 * 
 	 * @param readID assumed to contain more than one block;
 	 * @param boundariesAllID position of the read in $boundaries_all,isBlockUnique_all,
-	 * tranlsation_all$;
+	 * translation_all$;
 	 * @param blueIntervalsID position of the read in $blueIntervals$; or -1 if the 
 	 * read does not occur in $blueIntervals$; or -2 if the ID of the read in 
 	 * $blueIntervals$ is unknown;

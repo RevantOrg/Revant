@@ -63,8 +63,8 @@ public class Reads {
 
 	
 	/**
-	 * Loads a sorted set of $nr$ read IDs, which identify the reads in a subset of 
-	 * the entire read set.
+	 * Loads a sorted set of $nr$ read IDs (zero-based), which identify the reads in a 
+	 * subset of the entire read set.
 	 */
 	public static final void loadReadIDs(String path, int nr) throws IOException {
 		int i;
