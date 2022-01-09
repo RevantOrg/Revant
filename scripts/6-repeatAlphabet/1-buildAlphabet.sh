@@ -151,7 +151,7 @@ echo "Discarding rare characters..."
 COUNTS_FILE="${INPUT_DIR}/alphabet-counts.txt"
 HISTOGRAM_FILE="${INPUT_DIR}/alphabet-histogram.txt"
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterCounts ${READS_TRANSLATED_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${HISTOGRAM_FILE}
-function cleaningThread() {
+function cleaningThread1() {
 	local TRANSLATED_CHARACTERS=$1
 	local TRANSLATED_BOUNDARIES=$2
 	local PREFIX_1=$3
@@ -164,7 +164,7 @@ split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PA
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${TMPFILE_PATH}-13-"
 for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do
 	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-12-}
-	cleaningThread "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${TMPFILE_PATH}-14-" "${TMPFILE_PATH}-15-" ${THREAD_ID} &
+	cleaningThread1 "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${TMPFILE_PATH}-14-" "${TMPFILE_PATH}-15-" ${THREAD_ID} &
 done
 wait
 sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-15-*.txt | uniq - ${TMPFILE_PATH}-15.txt
@@ -174,7 +174,7 @@ rm -f ${ALPHABET_FILE_CLEANED}
 OLD2NEW_FILE="${INPUT_DIR}/alphabet-old2new.txt"
 rm -f ${OLD2NEW_FILE}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} $(wc -l < ${TMPFILE_PATH}-15.txt) ${TMPFILE_PATH}-15.txt ${MIN_CHARACTER_FREQUENCY} ${TMPFILE_PATH}-14-unique.txt ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE}
-function cleaningThread2() {
+function cleaningThread3() {
 	local TRANSLATED_CHARACTERS_OLD=$1
 	local TRANSLATED_BOUNDARIES_OLD=$2
 	local TRANSLATED_CHARACTERS_NEW=$3
@@ -187,7 +187,7 @@ function cleaningThread2() {
 LAST_TRANSLATED_READ="-1"
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do
 	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-12-}
-	cleaningThread2 "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-16-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-17-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-18-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-19-${THREAD_ID}" ${LAST_TRANSLATED_READ} &
+	cleaningThread3 "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-16-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-17-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-18-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-19-${THREAD_ID}" ${LAST_TRANSLATED_READ} &
 	LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} + $(wc -l < "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}") ))
 done
 wait
@@ -211,5 +211,4 @@ if [ ${N_THREADS} -ge 2 ]; then
 fi
 PASTE_OPTIONS="${PASTE_OPTIONS}}'"
 paste ${INPUT_DIR}/${TMPFILE_NAME}-18-* | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}
-echo java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Setminus ${FULLY_CONTAINED_FILE} ${FULLY_UNIQUE_FILE_NEW} > ${FULLY_CONTAINED_FILE_NEW}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Setminus ${FULLY_CONTAINED_FILE} ${FULLY_UNIQUE_FILE_NEW} > ${FULLY_CONTAINED_FILE_NEW}

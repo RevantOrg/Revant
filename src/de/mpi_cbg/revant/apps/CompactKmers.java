@@ -6,8 +6,8 @@ import de.mpi_cbg.revant.util.Math;
 
 /**
  * Given a sorted file that contains the k-mers extracted by several threads, the program
- * sums up all counts of the same k-mer, it discards k-mers whose total count is outside a 
- * given range, and it prints a histogram of total counts for all k-mers.
+ * sums up all the counts of the same k-mer, it discards k-mers whose total count is 
+ * outside a given range, and it prints a histogram of total counts for all k-mers.
  */
 public class CompactKmers {
 	

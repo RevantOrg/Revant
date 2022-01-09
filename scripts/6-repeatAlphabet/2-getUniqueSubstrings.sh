@@ -81,7 +81,7 @@ for K in $(seq 1 ${MAX_K}); do
 	echo "Finding unique ${K}-mers..."
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} ${MAX_FREQUENCY_UNIQUE} ${UNIQUE_KMERS_FILE} ${MAX_HISTOGRAM_COUNT} ${OUTPUT_FILE_HISTOGRAM}
 	echo "Updating shortest unique intervals file..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*" ); do
+	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 		if [ ${K} -le 1 ]; then
 			PREVIOUS_INTERVALS="null"

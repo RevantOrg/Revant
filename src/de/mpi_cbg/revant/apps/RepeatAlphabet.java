@@ -1112,10 +1112,10 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Let $alphabet[x_0,x_1,...,x_n]$ be all and only the characters that correspond to 
-	 * the same substring of the same repeat, regardless of orientation and open status.
-	 * The procedure sets $characterCount'[x_i] = \sum_{j=0}^{n} characterCount[x_j]$ for 
-	 * every $i$.
+	 * Let $alphabet[x_0],...,alphabet[x_n]$ be all and only the characters that 
+	 * correspond to the same substring of the same repeat, regardless of orientation and 
+	 * open status. The procedure resets $characterCount[x_i]$ to $\sum_{j=0}^{n} 
+	 * characterCount[x_j]$ for every $i$.
 	 *
 	 * Remark: discarding open status is necessary, because $Character.implies()$ works 
 	 * only in one orientation, so the same substring of the same repeat might have 
@@ -1482,13 +1482,14 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Removes from $alphabet$ all characters with $alphabetCount < minCount$, and adds to
-	 * $alphabet$ all new unique characters in $newCharactersFile$.
+	 * $alphabet$ all the new unique characters in $newCharactersFile$.
 	 *
 	 * Remark: $alphabetCount$ is not valid after the procedure completes.
 	 *
 	 * @return an array that maps every non-unique character in the original $alphabet$ to
-	 * its position in the new $alphabet$. Positions are relative to the corresponding
-	 * values of $lastUnique+1$.
+	 * its position in the new $alphabet$ (or to -1 if the character does not appear in 
+	 * the new alphabet). Positions are relative to the corresponding values of 
+	 * $lastUnique+1$.
 	 */
 	public static final int[] cleanTranslatedRead_updateAlphabet(int nNewCharacters, String newCharactersFile, int minCount) throws IOException {
 		int i, j;
@@ -2248,7 +2249,8 @@ public class RepeatAlphabet {
 	 * (possibly different) repeats.
 	 *
 	 * Remark: the procedure does not need $alphabet$, but it needs the following arrays: 
-	 * isBlockUnique_all | fullyUnique, fullyContained, boundaries_all, blueIntervals, blueIntervals_reads. 
+	 * isBlockUnique_all | fullyUnique, fullyContained, boundaries_all, blueIntervals, 
+	 * blueIntervals_reads. 
 	 *
 	 * @param alignmentsFile output of LAshow, assumed to be sorted by readA;
 	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
@@ -2473,7 +2475,8 @@ public class RepeatAlphabet {
 	 * sequences of boundaries and matching characters.
 	 *
 	 * Remark: the procedure needs the following arrays: 
-	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, blueIntervals, blueIntervals_reads.
+	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, 
+	 * blueIntervals, blueIntervals_reads.
 	 */
 	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection) throws IOException {
 		boolean isFullyUniqueA;
@@ -2700,12 +2703,15 @@ public class RepeatAlphabet {
 	 */
 	private static final boolean nonemptyIntersectionRC(int readA, int blockA, int readB, int blockB) {
 		int i;
+		final int lengthA = translation_all[readA][blockA].length;
 		final int lengthB = translation_all[readB][blockB].length;
 		
-		if (stack==null || stack.length<lengthB) stack = new int[lengthB];
-		for (i=0; i<lengthB; i++) stack[i]=canonizeCharacter(translation_all[readB][blockB][i],false);
-		if (lengthB>1) Arrays.sort(stack,0,lengthB);
-		return Math.nonemptyIntersection(translation_all[readA][blockA],0,translation_all[readA][blockA].length-1,stack,0,lengthB-1);
+		if (stack==null || stack.length<lengthA+lengthB) stack = new int[lengthA+lengthB];
+		for (i=0; i<lengthA; i++) stack[i]=canonizeCharacter(translation_all[readA][blockA][i],true);
+		for (i=0; i<lengthB; i++) stack[lengthA+i]=canonizeCharacter(translation_all[readB][blockB][i],false);
+		if (lengthA>1) Arrays.sort(stack,0,lengthA);
+		if (lengthB>1) Arrays.sort(stack,lengthA,lengthA+lengthB);
+		return Math.nonemptyIntersection(stack,0,lengthA-1,stack,lengthA,lengthA+lengthB-1);
 	}
 
 	
