@@ -220,8 +220,9 @@ public class RepeatAlphabet {
 	 * sequence$.
 	 */
 	public static final void recodeRead(int distanceThreshold) {
+		final int MAX_DENSE_LENGTH = distanceThreshold<<1;  // Arbitrary
 		int i, j, k;
-		int lastPeriodicInterval, currentStart, currentEnd;
+		int lastPeriodicInterval, currentStart, currentEnd, first, firstZero;
 		int firstJForNextI, inPeriodic;
 		int startA, endA, newLength, component, nComponents;
 		final int lengthA = Reads.getReadLength(alignments[0].readA);
@@ -252,35 +253,90 @@ public class RepeatAlphabet {
 			periodicIntervals[++lastPeriodicInterval]=currentEnd;
 		}
 		
-		// Clustering readA endpoints of alignments
-		i=0; j=0; firstJForNextI=-1; inPeriodic=-1; lastPoint=-1;
-		while (i<=lastAlignment) {
-			if (j>lastPeriodicInterval || periodicIntervals[j]>=alignments[i].endA-distanceThreshold) {
-				if (inPeriodic==-1) {
-					points[++lastPoint]=alignments[i].startA;
-					points[++lastPoint]=alignments[i].endA;
-				}
-				else if (isPeriodic[alignments[i].readB]) {
-					if (Math.abs(alignments[i].startA,periodicIntervals[inPeriodic])<=distanceThreshold) points[++lastPoint]=alignments[i].startA;
-					if (Math.abs(alignments[i].endA,periodicIntervals[inPeriodic+1])<=distanceThreshold) points[++lastPoint]=alignments[i].endA;
-				}
-				i++; inPeriodic=-1;
+		// Collecting readA endpoints of all alignments
+		lastPoint=-1;
+		for (i=0; i<=lastAlignment; i++) {
+			points[++lastPoint]=alignments[i].startA;
+			points[++lastPoint]=alignments[i].endA;
+		}
+		if (lastPoint>0) Arrays.sort(points,0,lastPoint+1);
+		initializeGraph(lastPoint+1);
+		
+		// Marking points: (0) outside periodic intervals; (1) inside a periodic interval
+		// and close to its endpoints; (-1) inside a periodic interval and far from its
+		// endpoints. $connectedComponent$ is used as temporary space.
+		Math.set(connectedComponent,lastPoint,0);
+		i=0; j=0; firstJForNextI=-1;
+		while (i<=lastPoint) {
+			if (j>lastPeriodicInterval || periodicIntervals[j]-distanceThreshold>points[i]) {
+				i++;
 				if (firstJForNextI!=-1) j=firstJForNextI;
 				firstJForNextI=-1;
 				continue;
 			}
-			if (periodicIntervals[j+1]<alignments[i].startA-distanceThreshold) {
+			if (periodicIntervals[j+1]+distanceThreshold<points[i]) {
 				j+=2;
 				continue;
 			}
-			if (firstJForNextI==-1 && i<lastAlignment && periodicIntervals[j+1]>=alignments[i+1].startA) firstJForNextI=j;
-			if ( Intervals.isApproximatelyContained(alignments[i].startA,alignments[i].endA,periodicIntervals[j],periodicIntervals[j+1]) ||
-				 Intervals.areApproximatelyIdentical(alignments[i].startA,alignments[i].endA,periodicIntervals[j],periodicIntervals[j+1])
-			   ) inPeriodic=j;
-			j+=2;
+			if (firstJForNextI==-1 && i<lastPoint && periodicIntervals[j+1]+distanceThreshold>=points[i+1]) firstJForNextI=j;
+			if (points[i]>periodicIntervals[j]+distanceThreshold && points[i]<periodicIntervals[j+1]-distanceThreshold) {
+				if (connectedComponent[i]!=1) connectedComponent[i]=-1;
+			}
+			else connectedComponent[i]=1;
+			j++;
 		}
-		if (lastPoint>0) Arrays.sort(points,0,lastPoint+1);
-		initializeGraph(lastPoint+1);
+		j=-1;
+		for (i=0; i<=lastPoint; i++) {
+			if (connectedComponent[i]==-1) continue;
+			j++;
+			points[j]=points[i]; connectedComponent[j]=connectedComponent[i];
+		}
+		lastPoint=j;
+		
+		// Removing points outside periodic intervals if they are in a dense region
+		firstZero=-1;
+		for (i=0; i<=lastPoint; i++) {
+			if (connectedComponent[i]==1) {
+				if (firstZero!=-1) {
+					first=firstZero;
+					for (j=firstZero+1; j<i; j++) {
+						if (points[j]-points[j-1]>distanceThreshold) {
+							if (points[j-1]-points[first]+1>MAX_DENSE_LENGTH) {
+								for (k=first; k<=j-1; k++) connectedComponent[k]=-1;
+							}
+							first=j;
+						}
+					}
+					if (points[i-1]-points[first]+1>MAX_DENSE_LENGTH) {
+						for (k=first; k<=i-1; k++) connectedComponent[k]=-1;
+					}
+					firstZero=-1;
+				}
+			}
+			else if (firstZero==-1) firstZero=i;
+		}
+		if (firstZero!=-1) {
+			first=firstZero;
+			for (j=firstZero+1; j<=lastPoint; j++) {
+				if (points[j]-points[j-1]>distanceThreshold) {
+					if (points[j-1]-points[first]+1>MAX_DENSE_LENGTH) {
+						for (k=first; k<=j-1; k++) connectedComponent[k]=-1;
+					}
+					first=j;
+				}
+			}
+			if (points[lastPoint]-points[first]+1>MAX_DENSE_LENGTH) {
+				for (k=first; k<=lastPoint; k++) connectedComponent[k]=-1;
+			}
+		}
+		j=-1;
+		for (i=0; i<=lastPoint; i++) {
+			if (connectedComponent[i]==-1) continue;
+			points[++j]=points[i];
+		}
+		lastPoint=j;
+		
+		// Clustering all surviving points
 		for (i=0; i<lastPoint; i++) {
 			for (j=i+1; j<=lastPoint; j++) {
 				if (points[j]>points[i]+distanceThreshold) break;
@@ -334,7 +390,7 @@ public class RepeatAlphabet {
 			}
 			if (firstJForNextI==-1 && i<lastPoint && alignments[j].endA>endA) firstJForNextI=j;
 			if ( Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) || 
-				 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
+------->		 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
 			   ) newBlock.addCharacter(alignments[j],distanceThreshold,tmpCharacter);
 			j++;
 		}
@@ -692,7 +748,7 @@ public class RepeatAlphabet {
 	
 		// Computing components
 		idGenerator=-1;
-		for (i=0; i<nNodes; i++) connectedComponent[i]=-1;
+		Math.set(connectedComponent,0,nNodes-1,-1);
 		for (i=0; i<nNodes; i++) {
 			if (connectedComponent[i]!=-1) continue;
 			currentComponent=++idGenerator;
@@ -718,7 +774,7 @@ public class RepeatAlphabet {
 	
 		// Computing component size
 		connectedComponentSize = new int[nComponents];
-		for (i=0; i<nComponents; i++) connectedComponentSize[i]=0;
+		Math.set(connectedComponentSize,0,nComponents-1,0);
 		for (i=0; i<nNodes; i++) connectedComponentSize[connectedComponent[i]]++;
 	
 		return nComponents;
@@ -2698,8 +2754,8 @@ public class RepeatAlphabet {
 	 * Remark: the procedure uses global array $stack$ as temporary space.
 	 *
 	 * @return TRUE iff array $translation_all[readA][blockA]$ has at least one character 
-	 * in common with the reverse-complemented characters of array 
-	 * $translation_all[readB][blockB]$.
+	 * in common with the reverse-complemented characters of array $translation_all[readB]
+	 * [blockB]$; characters are canonized with $canonizeCharacter()$ and then compared.
 	 */
 	private static final boolean nonemptyIntersectionRC(int readA, int blockA, int readB, int blockB) {
 		int i;
