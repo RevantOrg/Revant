@@ -206,12 +206,19 @@ public class RepeatAlphabet {
 	/**
 	 * Stores in global variable $sequence$ a recoding of the read based on repeat 
 	 * alignments. The procedure collects the endpoints of every maximal range of 
-	 * overlapping periodic alignments, and of every non-periodic alignment that is not 
-	 * contained in a periodic range and that does not straddle another non-periodic 
-	 * alignment. Every other alignment is discarded. Points are clustered, and the 
-	 * resulting blocks of the read become elements of $sequence$.
+	 * overlapping periodic alignments, as well as the endpoints of every non-periodic 
+	 * alignment that is not contained in a periodic range (non-periodic alignments might
+	 * straddle one another and periodic ranges). Points are clustered, and the resulting
+	 * blocks of the read become elements of $sequence$.
 	 *
 	 * Remark: the procedure assumes that reads do not contain long low-quality regions.
+	 *
+	 * Remark: it might happen that some alignments are not used for building blocks, and
+	 * that the region of the read they cover might become part of a non-repetitive block.
+	 * One might think of recording how such a non-repetitive block is covered by
+	 * alignments (e.g. fully covered, partially covered, prefix, suffix, substring) since
+	 * it might be a useful feature for discrimination. We don't pursue this for 
+	 * simplicity.
 	 *
 	 * Remark: the characters in blocks of $sequence$ are not objects in $alphabet$, and 
 	 * the procedure does not look them up in $alphabet$: this is left to the caller.
@@ -220,7 +227,8 @@ public class RepeatAlphabet {
 	 * sequence$.
 	 */
 	public static final void recodeRead(int distanceThreshold) {
-		final int MAX_DENSE_LENGTH = distanceThreshold<<1;  // Arbitrary
+		final int CLUSTERING_DISTANCE = distanceThreshold;
+		final int MAX_DENSE_LENGTH = (CLUSTERING_DISTANCE)<<1;  // Arbitrary
 		int i, j, k;
 		int lastPeriodicInterval, currentStart, currentEnd, first, firstZero;
 		int firstJForNextI, inPeriodic;
@@ -300,7 +308,7 @@ public class RepeatAlphabet {
 				if (firstZero!=-1) {
 					first=firstZero;
 					for (j=firstZero+1; j<i; j++) {
-						if (points[j]-points[j-1]>distanceThreshold) {
+						if (points[j]-points[j-1]>CLUSTERING_DISTANCE) {
 							if (points[j-1]-points[first]+1>MAX_DENSE_LENGTH) {
 								for (k=first; k<=j-1; k++) connectedComponent[k]=-1;
 							}
@@ -318,7 +326,7 @@ public class RepeatAlphabet {
 		if (firstZero!=-1) {
 			first=firstZero;
 			for (j=firstZero+1; j<=lastPoint; j++) {
-				if (points[j]-points[j-1]>distanceThreshold) {
+				if (points[j]-points[j-1]>CLUSTERING_DISTANCE) {
 					if (points[j-1]-points[first]+1>MAX_DENSE_LENGTH) {
 						for (k=first; k<=j-1; k++) connectedComponent[k]=-1;
 					}
@@ -339,7 +347,7 @@ public class RepeatAlphabet {
 		// Clustering all surviving points
 		for (i=0; i<lastPoint; i++) {
 			for (j=i+1; j<=lastPoint; j++) {
-				if (points[j]>points[i]+distanceThreshold) break;
+				if (points[j]>points[i]+CLUSTERING_DISTANCE) break;
 				addEdge(i,j); addEdge(j,i);
 			}
 		}
@@ -390,8 +398,9 @@ public class RepeatAlphabet {
 			}
 			if (firstJForNextI==-1 && i<lastPoint && alignments[j].endA>endA) firstJForNextI=j;
 			if ( Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) || 
-------->		 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
-			   ) newBlock.addCharacter(alignments[j],distanceThreshold,tmpCharacter);
+				 (isPeriodic[alignments[j].readB] && Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA))
+			   ) newBlock.addCharacter(alignments[j],distanceThreshold,alignments[j].startA,alignments[j].endA,tmpCharacter);
+			else if (!isPeriodic[alignments[j].readB] && Intervals.isApproximatelyContained(startA,endA,alignments[j].startA,alignments[j].endA)) newBlock.addCharacter(alignments[j],distanceThreshold,startA,endA,tmpCharacter);
 			j++;
 		}
 		// Last non-repetitive block (if any).
@@ -2880,6 +2889,7 @@ public class RepeatAlphabet {
 			for (i=0; i<=lastCharacter; i++) p=characters[i].deserialize(str);
 		}
 		
+		
 		/**
 		 * @return the average length of all characters.
 		 */
@@ -2895,33 +2905,42 @@ public class RepeatAlphabet {
 		/**
 		 * Adds an alignment to the current block. If the block already contains an 
 		 * alignment to the same repeat, the new alignment replaces the old one based
-		 * on a canonical (and arbitrary) order.
+		 * on a canonical (and arbitrary) order. The alignment might contain the block and
+		 * be much larger than it.
 		 *
 		 * Remark: characters might not be sorted after the procedure completes.
 		 *
+		 * @param alignmentStartA,alignmentEndA substring of $[alignment.startA..
+		 * alignment.endA]$ that corresponds to this block of readA (the alignment might
+		 * span multiple blocks);
 		 * @param tmpCharacter temporary space.
 		 */
-		public final void addCharacter(AlignmentRow alignment, int distanceThreshold, Character tmpCharacter) {
+		public final void addCharacter(AlignmentRow alignment, int distanceThreshold, int alignmentStartA, int alignmentEndA, Character tmpCharacter) {
 			int i;
-			int found;
+			int found, alignmentStartB, alignmentEndB;
+			final double ratio = ((double)(alignment.endB-alignment.startB+1))/(alignment.endA-alignment.startA+1);
 			
 			if (alignment.orientation) {
-				tmpCharacter.openStart=alignment.startA<=distanceThreshold;
-				tmpCharacter.openEnd=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				tmpCharacter.openStart=alignmentStartA<=distanceThreshold;
+				tmpCharacter.openEnd=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				alignmentStartB=alignment.startB+(int)((alignmentStartA-alignment.startA)*ratio);
+				alignmentEndB=alignment.endB-(int)((alignment.endA-alignmentEndA)*ratio);			
 			}
 			else {
-				tmpCharacter.openEnd=alignment.startA<=distanceThreshold;
-				tmpCharacter.openStart=alignment.endA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				tmpCharacter.openEnd=alignmentStartA<=distanceThreshold;
+				tmpCharacter.openStart=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				alignmentStartB=alignment.startB+(int)((alignment.endA-alignmentEndA)*ratio);
+				alignmentEndB=alignment.endB-(int)((alignmentStartA-alignment.startA)*ratio);
 			}
 			tmpCharacter.repeat=alignment.readB; tmpCharacter.orientation=alignment.orientation;
 			if (!isPeriodic[alignment.readB]) {
-				tmpCharacter.start=alignment.startB;
-				tmpCharacter.end=alignment.endB;
+				tmpCharacter.start=alignmentStartB;
+				tmpCharacter.end=alignmentEndB;
 				tmpCharacter.length=0;
 			}
 			else {
 				tmpCharacter.start=-1; tmpCharacter.end=-1;
-				tmpCharacter.length=alignment.endA-alignment.startA+1; // A is correct here
+				tmpCharacter.length=alignmentEndA-alignmentStartA+1; // A is correct here
 			}
 			found=-1;
 			for (i=0; i<=lastCharacter; i++) {
@@ -2937,11 +2956,11 @@ public class RepeatAlphabet {
 			}
 			else {
 				if (isPeriodic[alignment.readB]) characters[found].length=Math.max(characters[found].length,tmpCharacter.length);
-				else if ( alignment.startB<characters[found].start || 
-						  (alignment.startB==characters[found].start && alignment.endB<characters[found].end)
+				else if ( alignmentStartB<characters[found].start || 
+						  (alignmentStartB==characters[found].start && alignmentEndB<characters[found].end)
 			        	) {
-					characters[found].start=alignment.startB;
-					characters[found].end=alignment.endB;
+					characters[found].start=alignmentStartB;
+					characters[found].end=alignmentEndB;
 				}
 				if (tmpCharacter.openStart) characters[found].openStart=true;
 				if (tmpCharacter.openEnd) characters[found].openEnd=true;
@@ -3209,6 +3228,12 @@ public class RepeatAlphabet {
 	/**
 	 * Basic filters on repeat alignments.
 	 *
+	 * Remark: non-periodic alignments that straddle other (periodic or non-periodic)
+	 * alignments (possibly with the same readB) are kept, so their endpoints might create
+	 * blocks when the read is recoded downstream. This is allowed, because some repeats 
+	 * are seen to straddle in practice. Keeping all such alignments might create regions
+	 * with many events and unclear signal: these are filtered out by $recodeRead()$.
+	 *
 	 * @param alignments all alignments of a given readA.
 	 */
 	private static final void cleanAlignments(int distanceThreshold) {
@@ -3251,32 +3276,6 @@ public class RepeatAlphabet {
 				if ( !Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA) &&
 					 Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)
 				   ) alignments[j].flag=false;
-			}
-		}
-		j=-1;
-		for (i=0; i<=lastAlignment; i++) {
-			if (!alignments[i].flag) continue;
-			j++;
-			tmpAlignment=alignments[j];
-			alignments[j]=alignments[i];
-			alignments[i]=tmpAlignment;
-		}
-		lastAlignment=j;
-		
-		// Removing non-periodic alignments that straddle other non-periodic alignments
-		// (possibly with the same readB): these do not provide a clear signal.
-// ----> This is not satisfactory, since repeats can straddle one another...
-// Either do like Arne, explicitly modeling this as smaller blocks.
-// Or find maximal ranges of straddling alignments like periodic, and assign them a specific type.
-		for (i=0; i<=lastAlignment; i++) alignments[i].flag=true;
-		for (i=0; i<=lastAlignment; i++) {
-			if (isPeriodic[alignments[i].readB]) continue;
-			startA=alignments[i].startA; endA=alignments[i].endA;
-			for (j=i+1; j<=lastAlignment; j++) {
-				if (alignments[j].startA>=endA-distanceThreshold) break;
-				if (isPeriodic[alignments[j].readB]) continue;
-				if (Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA)) continue;
-				alignments[i].flag=false; alignments[j].flag=false;
 			}
 		}
 		j=-1;
