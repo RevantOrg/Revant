@@ -28,6 +28,7 @@ TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 echo "Splitting the alignments file..."
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
 LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
+rm -f ${TMPFILE_PATH}-1-*
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
 echo "Alignments filtered and split in ${N_THREADS} parts"
 

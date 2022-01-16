@@ -52,6 +52,30 @@ public class RepeatAlphabet {
 	public static int[] sequenceLengths;
 	
 	/**
+	 * Sorted lists of read IDs: with a blue interval; fully non-repetitive; fully 
+	 * contained in a single repeat block; translated into more than one block.
+	 */
+	private static int[] blueIntervals_reads;
+	private static int[] fullyUnique, fullyContained, translated;
+	
+	/**
+	 * For every read in $blueIntervals_reads$: tuples (position,length,nHaplotypes).
+	 *
+	 * Remark: could be an array of bytes, since there are fewer than 128 blocks per read 
+	 * in practice: we keep it as an array of 32-bit integers to be fully generic.
+	 */
+	private static int[][] blueIntervals;
+	private static int blueIntervals_last;
+	
+	/**
+	 * For every read in $translated$: block boundaries; flags marking non-repetitive
+	 * blocks; full translation.
+	 */ 
+	private static int[][] boundaries_all;
+	private static byte[][] isBlockUnique_all;
+	private static int[][][] translation_all;
+	
+	/**
 	 * Temporary space used by procedure $recodeRead()$.
 	 */
 	private static int[] periodicIntervals, points;
@@ -166,7 +190,7 @@ public class RepeatAlphabet {
 					cleanAlignments(distanceThreshold);
 					if (lastAlignment!=-1) {
 						recodeRead(distanceThreshold);
-						if (lastInSequence>0) addCharacterInstances(bw);
+						if (lastInSequence>=0) addCharacterInstances(bw);
 						sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 					}
 					else sequenceLengths[0]++;
@@ -191,7 +215,7 @@ public class RepeatAlphabet {
 			cleanAlignments(distanceThreshold);
 			if (lastAlignment!=-1) {
 				recodeRead(distanceThreshold);
-				if (lastInSequence>0) addCharacterInstances(bw);
+				if (lastInSequence>=0) addCharacterInstances(bw);
 				sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 			}
 			else sequenceLengths[0]++;
@@ -212,6 +236,18 @@ public class RepeatAlphabet {
 	 * blocks of the read become elements of $sequence$.
 	 *
 	 * Remark: the procedure assumes that reads do not contain long low-quality regions.
+	 *
+	 * Remark: endpoints are clustered by connected components based on distance 
+	 * $distanceThreshold$. If two repeats overlap by at most this much, their overlapping 
+	 * endpoints are merged into one, so the procedure creates blocks of length greater
+	 * than $distanceThreshold$.
+	 *
+	 * Remark: assume that two consecutive real boundaries between (possibly overlapping)
+	 * repeats are such that the set of all endpoints between them forms a dense region. 
+	 * The procedure might discard all the points in such a dense region, and collapse the 
+	 * two repeats into a single block. The correct way of solving this problem would be
+	 * to perform density estimation on the distribution of endpoints and to select peaks.
+	 * We don't do this for simplicity.
 	 *
 	 * Remark: it might happen that some alignments are not used for building blocks, and
 	 * that the region of the read they cover might become part of a non-repetitive block.
@@ -414,7 +450,7 @@ public class RepeatAlphabet {
 				sequence=newSequence;
 			}
 			sequence[lastInSequence].setUnique(lengthA-i,i<=distanceThreshold,true);
-		}
+		}		
 	}
 	
 	
@@ -872,12 +908,13 @@ public class RepeatAlphabet {
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
-						if (lastInSequence==-1) { 
+						if (lastInSequence==-1) {
 							bw1.newLine(); bw2.newLine(); histogram[0]++;
 							bw3.write(previousReadA+"\n");
 						}
-						else if (lastInSequence==0) { 
-							bw1.newLine(); bw2.newLine(); histogram[0]++;
+						else if (lastInSequence==0) {
+							translateRead(bw1,bw2,quantum);
+							histogram[1]++;
 							if (sequence[0].isUnique()) bw3.write(previousReadA+"\n");
 							else bw4.write(previousReadA+"\n");
 						}
@@ -921,8 +958,9 @@ public class RepeatAlphabet {
 					bw1.newLine(); bw2.newLine(); histogram[0]++; 
 					bw3.write(previousReadA+"\n");
 				}
-				else if (lastInSequence==0) { 
-					bw1.newLine(); bw2.newLine(); histogram[0]++; 
+				else if (lastInSequence==0) {
+					translateRead(bw1,bw2,quantum);
+					histogram[1]++; 
 					if (sequence[0].isUnique()) bw3.write(previousReadA+"\n");
 					else bw4.write(previousReadA+"\n");
 				}
@@ -1008,7 +1046,7 @@ public class RepeatAlphabet {
 		int i, j, k;
 		int repeat, length, last;
 		final int lastCharacter = block.lastCharacter;
-		Character character;
+		Character character;		
 		
 		// Collecting characters
 		if (stack==null) stack = new int[CAPACITY];
@@ -1039,6 +1077,8 @@ public class RepeatAlphabet {
 					System.err.println("translateRead_periodic> ERROR: closed periodic character not found in the alphabet:");
 					System.err.println("query: "+character);
 					System.err.println("candidate in alphabet: "+alphabet[-1-i]);
+					System.err.println("characters in the block:");
+					for (int x=0; x<=lastCharacter; x++) System.err.println(block.characters[x]+"  isPeriodic="+isPeriodic[block.characters[x].repeat]);
 					System.exit(1);
 				}
 				last=appendToStack(i,last);
@@ -1247,12 +1287,18 @@ public class RepeatAlphabet {
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].start==start && alphabet[j].end==end) characterCount[j]=sum;
+				if (alphabet[j].start==start && alphabet[j].end==end) {
+					characterCount[j]=sum;
+					marked[j]=true;
+				}
 			}
 			for (j=i-1; j>lastPeriodic; j--) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].start==start && alphabet[j].end==end) characterCount[j]=sum;
+				if (alphabet[j].start==start && alphabet[j].end==end) {
+					characterCount[j]=sum;
+					marked[j]=true;
+				}
 			}
 		}
 	}
@@ -1443,7 +1489,8 @@ public class RepeatAlphabet {
 		String[] tokens;
 		
 		if (read2characters.length()==0) return;
-		if (read2boundaries.indexOf(SEPARATOR_MINOR+"")>=0) {
+		if (read2boundaries.length()==0) nBoundaries=0;
+		else if (read2boundaries.indexOf(SEPARATOR_MINOR+"")>=0) {
 			tokens=read2boundaries.split(SEPARATOR_MINOR+"");
 			nBoundaries=tokens.length;
 			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
@@ -1636,7 +1683,8 @@ public class RepeatAlphabet {
 		String[] tokens;
 		
 		if (read2characters_old.length()==0) return 0;
-		if (read2boundaries_old.indexOf(SEPARATOR_MINOR+"")>=0) {
+		if (read2boundaries_old.length()==0) nBoundaries=0;
+		else if (read2boundaries_old.indexOf(SEPARATOR_MINOR+"")>=0) {
 			tokens=read2boundaries_old.split(SEPARATOR_MINOR+"");
 			nBoundaries=tokens.length;
 			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
@@ -2108,30 +2156,6 @@ public class RepeatAlphabet {
 	// ------------------------- UNIQUE INTERVALS PROCEDURES -----------------------------
 	
 	/**
-	 * Tuples (position,length,nHaplotypes). Could be an array of bytes, since there are
-	 * fewer than 128 blocks per read in practice: we keep it as an array of 32-bit 
-	 * integers to be fully generic.
-	 */
-	private static int[][] blueIntervals;
-	private static int blueIntervals_last;
-	
-	/**
-	 * Sorted lists of read IDs: with a blue interval; fully non-repetitive; fully 
-	 * contained in a single repeat block; translated into several blocks.
-	 */
-	private static int[] blueIntervals_reads;
-	private static int[] fullyUnique, fullyContained, translated;
-	
-	/**
-	 * For every read in $translated$: block boundaries; flags marking non-repetitive
-	 * blocks; full translation.
-	 */ 
-	private static int[][] boundaries_all;
-	private static byte[][] isBlockUnique_all;
-	private static int[][][] translation_all;
-	
-	
-	/**
 	 * Initializes global variables $fullyUnique,fullyContained$ to the sorted list of IDs
 	 * of reads that are fully nonrepetitive and fully contained in a single repeat block,
 	 * respectively.
@@ -2152,12 +2176,13 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Loads the entire boundaries file in $boundaries_all$, and stores in 
-	 * $isBlockUnique_all$ a bitmap for every block of every read.
+	 * Loads $translated$ and, for every read in it, the row of the boundaries file in
+	 * $boundaries_all$.
 	 *
-	 * @param loadIsBlockUnique loads the bitvector $isBlockUnique_all$;
+	 * @param loadIsBlockUnique loads the bitvector $isBlockUnique_all$ for every read in 
+	 * $translated$;
 	 * @param loadTranslation loads in $translation_all$ the translation of every read 
-	 * that has one.
+	 * in $translated$.
 	 */
 	public static final void loadAllBoundaries(String translatedFile, boolean loadIsBlockUnique, boolean loadTranslation, String boundariesFile) throws IOException {
 		int i, j, r;
@@ -2166,12 +2191,12 @@ public class RepeatAlphabet {
 		BufferedReader br;
 		String[] tokens;
 		
-		// Computing the set of translated reads
+		// Computing the set of translated reads that are not fully contained in a repeat
 		br = new BufferedReader(new FileReader(translatedFile));
 		str=br.readLine();
 		nReads=0;
 		while (str!=null) {
-			if (str.length()!=0) nReads++;
+			if (str.length()!=0 && str.indexOf(SEPARATOR_MAJOR+"")>=0) nReads++;
 			str=br.readLine();
 		}
 		br.close();
@@ -2179,7 +2204,7 @@ public class RepeatAlphabet {
 		br = new BufferedReader(new FileReader(translatedFile));
 		str=br.readLine(); r=0; i=-1;
 		while (str!=null) {
-			if (str.length()!=0) translated[++i]=r;
+			if (str.length()!=0 && str.indexOf(SEPARATOR_MAJOR+"")>=0) translated[++i]=r;
 			str=br.readLine(); r++;
 		}
 		br.close();
@@ -2214,7 +2239,7 @@ public class RepeatAlphabet {
 			br = new BufferedReader(new FileReader(translatedFile));
 			str=br.readLine(); r=-1;
 			while (str!=null) {
-				if (str.length()==0) {
+				if (str.length()==0 || str.indexOf(SEPARATOR_MAJOR+"")<0) {
 					str=br.readLine();
 					continue;
 				}
@@ -2244,7 +2269,7 @@ public class RepeatAlphabet {
 			br = new BufferedReader(new FileReader(translatedFile));
 			str=br.readLine(); r=-1;
 			while (str!=null) {
-				if (str.length()==0) {
+				if (str.length()==0 || str.indexOf(SEPARATOR_MAJOR+"")<0) {
 					str=br.readLine();
 					continue;
 				}
@@ -2307,11 +2332,20 @@ public class RepeatAlphabet {
 	/**
 	 * Writes to $outputFile$ a zero for every alignment of $alignmentsFile$ that belongs 
 	 * to a \emph{red region} on both readA and readB, i.e. to a region that fully belongs
-	 * to a repeat, or to a sequence of repeats, that is likely to occur multiple times in 
-	 * the genome. The intervals of the alignment in the two reads might cover mismatching 
-	 * sequences of boundaries and different characters, but we can safely discard the 
-	 * alignment anyway, since it just encodes a similarity between substrings of 
-	 * (possibly different) repeats.
+	 * to a repeat character, or to a sequence of repeat characters, that is likely to 
+	 * have more than H occurrences in the genome, where H is the number of haplotypes.
+	 * The intervals of the alignment in the two reads might cover mismatching sequences 
+	 * of boundaries and different characters, but we can safely discard the alignment 
+	 * anyway, since it just encodes a similarity between substrings of (possibly 
+	 * different) repeats.
+	 *
+	 * Remark: every alignment between intervals at frequency <=H should be kept in the
+	 * assembly graph. In heterozygous regions such alignments might create multiple
+	 * alternative paths, and these should be resolved downstream. One might label every
+	 * alignment with the estimated number of haplotypes it involves, as a clue for the
+	 * assembler, but this might require extracting many more shortest unique intervals
+	 * (since an interval that occurs once in X haplotypes might be contained in an 
+	 * interval that occurs once in < X haplotypes). We don't do this for simplicity.
 	 *
 	 * Remark: the procedure does not need $alphabet$, but it needs the following arrays: 
 	 * isBlockUnique_all | fullyUnique, fullyContained, boundaries_all, blueIntervals, 
@@ -2385,8 +2419,8 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Tells whether interval $readID[intervalStart..intervalEnd]$ fully belongs to a 
-	 * single repeat character, or to a sequence of repeat characters, that is likely to 
-	 * occur multiple times in the genome.
+	 * single repeat character, or to a sequence of repeat characters, that is likely to
+	 * have more than H occurrences in the genome, where H is the number of haplotypes.
 	 *
 	 * Remark: the procedure needs the following arrays: 
 	 * isBlockUnique_all, boundaries_all, blueIntervals, blueIntervals_reads.
@@ -2534,20 +2568,21 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Writes to $outputFile$ a one for every alignment of $alignmentsFile$ that contains
-	 * a unique region in both readA and readB. If $mode=TRUE$, the procedure additionally
-	 * requires that the intervals of the alignment in the two reads cover matching 
-	 * sequences of boundaries and matching characters.
+	 * Writes to $outputFile$ a one for every alignment of $alignmentsFile$ that contains,
+	 * in both readA and readB, a region that is likely to have at most H occurrences in
+	 * the genome, where H is the number of haplotypes. If $mode=TRUE$, the procedure 
+	 * additionally requires that the intervals of the alignment in the two reads cover
+	 * matching sequences of boundaries and matching characters.
 	 *
 	 * Remark: the procedure needs the following arrays: 
 	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, 
 	 * blueIntervals, blueIntervals_reads.
 	 */
 	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection) throws IOException {
-		boolean isFullyUniqueA;
-		int p;
+		boolean overlapsUniqueA;
+		int p, q;
 		int row, readA, readB, startA, endA, startB, endB;
-		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval;
+		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval, readAInTranslated;
 		final int nFullyContained = fullyContained.length;
 		final int nFullyUnique = fullyUnique.length;
 		final int nTranslated = translated.length;
@@ -2567,33 +2602,32 @@ public class RepeatAlphabet {
 			readA=Alignments.readA-1; readB=Alignments.readB-1;
 			startA=Alignments.startA; endA=Alignments.endA;
 			startB=Alignments.startB; endB=Alignments.endB;
+			readAInTranslated=-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
-			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
-				isFullyUniqueA=true;
-				if (mode) {
-					if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) bw.write("1\n");
-					else bw.write("0\n");
-					str=br.readLine(); row++;
-					continue;
-				}
-			}
+			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) overlapsUniqueA=true;
 			else {
-				isFullyUniqueA=false;
 				while (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]<readA) lastFullyContained++;
 				if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
 				}
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
+				if (translated[lastTranslated]!=readA) {
+					System.err.println("filterAlignments_tight> ERROR: readA not found in translated: "+readA+" :: "+translated[lastTranslated]);
+					System.exit(1);
+				}
+				readAInTranslated=lastTranslated;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				if (!inBlueRegion(readA,startA,endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) {
+				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection);
+				if (q==-1) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
 				}
+				else overlapsUniqueA=q==0||q==1;
 			}
 			// Processing readB
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
-				if (mode) bw.write(isFullyUniqueA?"1\n":"0\n");
+				if (mode) bw.write(overlapsUniqueA?"1\n":"0\n");
 				else bw.write("1\n");
 				str=br.readLine(); row++;
 				continue;
@@ -2603,14 +2637,22 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			if (inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection)) {
+			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);
+			if (q==0 || q==1) {
+				if (mode) bw.write(overlapsUniqueA?"1\n":"0\n");
+				else bw.write("1\n");
+			}
+			else if (q==2) {
 				if (mode) {
-					if (sameFactorization(readA,startA,endA,readB,startB,endB,Alignments.orientation)) bw.write("1\n");
-					else bw.write("0\n");
+					if (overlapsUniqueA) bw.write("0\n");
+					else {
+						if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,Alignments.orientation)) bw.write("1\n");
+						else bw.write("0\n");
+					}
 				}
 				else bw.write("1\n");
 			}
-			else bw.write("0\n"); 
+			else bw.write("0\n");
 			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
@@ -2618,15 +2660,17 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * The dual of $inRedRegion()$: tells whether interval $readID[intervalStart..
-	 * intervalEnd]$ fully belongs to a non-repetitive region, or straddles a non-
-	 * repetitive region, or contains a sequence of repeat characters that is likely to 
-	 * occur just once in the genome.
-	 *
-	 * Remark: the procedure needs the following arrays: 
+	 * The dual of $inRedRegion()$. The procedure needs the following arrays: 
 	 * boundaries_all, translation_all, blueIntervals, blueIntervals_reads.
+	 *
+	 * @return interval $readID[intervalStart..intervalEnd]$:
+	 * 0: fully belongs to a non-repetitive region;
+	 * 1: straddles a non-repetitive region;
+	 * 2: contains a sequence of repeat characters that is likely to occur <=H times in 
+	 *    the genome, where H is the number of haplotypes;
+	 * -1: none of the above.
 	 */
-	private static final boolean inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
+	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
 		int i, j;
 		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
@@ -2634,36 +2678,36 @@ public class RepeatAlphabet {
 		
 		// Checking the nonrepetitive blocks of the read, if any.
 		blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
-		if ( translation_all[boundariesAllID][0].length==1 && (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1) &&
-			 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-			      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
-			   )
-			 )
-		   ) return true;
+		if (translation_all[boundariesAllID][0].length==1 && (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1)) {
+			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
+			   ) return 0;
+			else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+			   		) return 1;
+		}
 		for (i=1; i<nBlocks-1; i++) {
 			blockStart=boundaries_all[boundariesAllID][i-1];
 			blockEnd=boundaries_all[boundariesAllID][i];
-			if ( translation_all[boundariesAllID][i].length==1 && (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1) &&
-				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
-				   )
-				 )
-			   ) return true;
+			if (translation_all[boundariesAllID][i].length==1 && (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1)) {
+				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
+				   ) return 0;
+				else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+				      	   Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+				   		) return 1;
+			}
 		}
 		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
 		blockEnd=readLength-1;
-		if ( translation_all[boundariesAllID][nBlocks-1].length==1 && (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1) &&
-			 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-			      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
-			   )
-			 )
-		   ) return true;
+		if (translation_all[boundariesAllID][nBlocks-1].length==1 && (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1)) {
+			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
+			   ) return 0;
+			else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
+			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+			        ) return 1;
+		}
 		
 		// Checking the repetitive blocks of the read, if any.
 		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
@@ -2675,18 +2719,18 @@ public class RepeatAlphabet {
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
 				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
-				   ) return true;
+				   ) return 2;
 			}
 		}
 		
-		return false;
+		return -1;
 	}
 	
 	
 	/**
 	 * @param read* index in $translated_all$;
-	 * @return TRUE iff $readA[startA..endA]$ intersects the same number of blocks as
-	 * $read[startB..endB]$, with boundaries at similar positions, and with at least one 
+	 * @return TRUE iff $[startA..endA]$ intersects the same number of blocks as
+	 * $[startB..endB]$, with boundaries at similar positions, and with at least one 
 	 * matching character per block.
 	 */
 	private static final boolean sameFactorization(int readA, int startA, int endA, int readB, int startB, int endB, boolean orientation) {
@@ -2742,18 +2786,18 @@ public class RepeatAlphabet {
 		if (orientation) {
 			for (i=0; i<nBlocks-1; i++) {
 				if ( Math.abs((boundaries_all[readA][firstBlockA+i]-startA)*ratio-(boundaries_all[readB][firstBlockB+i]-startB))>IDENTITY_THRESHOLD ||
-					 !Math.nonemptyIntersection(translation_all[readA][firstBlockA+i],0,translation_all[readA][firstBlockA+i].length-1,translation_all[readB][firstBlockB+i],0,translation_all[readB][firstBlockB+i].length-1)
+					 !nonemptyIntersection(readA,firstBlockA+i,readB,firstBlockB+i,true)
 				   ) return false;
 			}
-			if (!Math.nonemptyIntersection(translation_all[readA][lastBlockA],0,translation_all[readA][lastBlockA].length-1,translation_all[readB][lastBlockB],0,translation_all[readB][lastBlockB].length-1)) return false;
+			if (!nonemptyIntersection(readA,lastBlockA,readB,lastBlockB,true)) return false;
 		}
 		else {
 			for (i=0; i<nBlocks-1; i++) {
 				if ( Math.abs((boundaries_all[readA][firstBlockA+i]-startA)*ratio-(endB-boundaries_all[readB][lastBlockB-i-1]))>IDENTITY_THRESHOLD ||
-					 !nonemptyIntersectionRC(readA,firstBlockA+i,readB,lastBlockB-i)
+					 !nonemptyIntersection(readA,firstBlockA+i,readB,lastBlockB-i,false)
 				   ) return false;
 			}
-			if (!nonemptyIntersectionRC(readA,lastBlockA,readB,firstBlockB)) return false;
+			if (!nonemptyIntersection(readA,lastBlockA,readB,firstBlockB,false)) return false;
 		}
 		return true;
 	}
@@ -2762,18 +2806,20 @@ public class RepeatAlphabet {
 	/**
 	 * Remark: the procedure uses global array $stack$ as temporary space.
 	 *
+	 * @param read* index in $translated_all$;
 	 * @return TRUE iff array $translation_all[readA][blockA]$ has at least one character 
-	 * in common with the reverse-complemented characters of array $translation_all[readB]
-	 * [blockB]$; characters are canonized with $canonizeCharacter()$ and then compared.
+	 * in common with the characters (if $mode=TRUE$) or the reverse-complemented 
+	 * characters (if $mode=FALSE$) of array $translation_all[readB][blockB]$; characters
+	 * are canonized with $canonizeCharacter()$ before being compared.
 	 */
-	private static final boolean nonemptyIntersectionRC(int readA, int blockA, int readB, int blockB) {
+	private static final boolean nonemptyIntersection(int readA, int blockA, int readB, int blockB, boolean mode) {
 		int i;
 		final int lengthA = translation_all[readA][blockA].length;
 		final int lengthB = translation_all[readB][blockB].length;
 		
 		if (stack==null || stack.length<lengthA+lengthB) stack = new int[lengthA+lengthB];
 		for (i=0; i<lengthA; i++) stack[i]=canonizeCharacter(translation_all[readA][blockA][i],true);
-		for (i=0; i<lengthB; i++) stack[lengthA+i]=canonizeCharacter(translation_all[readB][blockB][i],false);
+		for (i=0; i<lengthB; i++) stack[lengthA+i]=canonizeCharacter(translation_all[readB][blockB][i],mode);
 		if (lengthA>1) Arrays.sort(stack,0,lengthA);
 		if (lengthB>1) Arrays.sort(stack,lengthA,lengthA+lengthB);
 		return Math.nonemptyIntersection(stack,0,lengthA-1,stack,lengthA,lengthA+lengthB-1);
@@ -2923,14 +2969,14 @@ public class RepeatAlphabet {
 			if (alignment.orientation) {
 				tmpCharacter.openStart=alignmentStartA<=distanceThreshold;
 				tmpCharacter.openEnd=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
-				alignmentStartB=alignment.startB+(int)((alignmentStartA-alignment.startA)*ratio);
-				alignmentEndB=alignment.endB-(int)((alignment.endA-alignmentEndA)*ratio);			
+				alignmentStartB=alignment.startB+(alignmentStartA>alignment.startA?(int)((alignmentStartA-alignment.startA)*ratio):0);
+				alignmentEndB=alignment.endB-(alignment.endA>alignmentEndA?(int)((alignment.endA-alignmentEndA)*ratio):0);
 			}
 			else {
 				tmpCharacter.openEnd=alignmentStartA<=distanceThreshold;
 				tmpCharacter.openStart=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
-				alignmentStartB=alignment.startB+(int)((alignment.endA-alignmentEndA)*ratio);
-				alignmentEndB=alignment.endB-(int)((alignmentStartA-alignment.startA)*ratio);
+				alignmentStartB=alignment.startB+(alignment.endA>alignmentEndA?(int)((alignment.endA-alignmentEndA)*ratio):0);
+				alignmentEndB=alignment.endB-(alignmentStartA>alignment.startA?(int)((alignmentStartA-alignment.startA)*ratio):0);
 			}
 			tmpCharacter.repeat=alignment.readB; tmpCharacter.orientation=alignment.orientation;
 			if (!isPeriodic[alignment.readB]) {
@@ -2988,11 +3034,7 @@ public class RepeatAlphabet {
 				}
 				else foundNonperiodic=true;
 			}
-			if (!foundPeriodic) {
-				Arrays.sort(characters,0,lastCharacter+1);
-				return;
-			}
-			if (foundNonperiodic) {
+			if (foundPeriodic && foundNonperiodic) {
 				j=-1;
 				for (i=0; i<=lastCharacter; i++) {
 					if (!isPeriodic[characters[i].repeat]) continue;
