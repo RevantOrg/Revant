@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import de.mpi_cbg.revant.util.Math;
 import de.mpi_cbg.revant.util.IO;
@@ -846,8 +847,7 @@ public class RepeatAlphabet {
 	 * @param lastTranslatedRead the index in $Reads.readIDs$ of the last read that has 
 	 * already been translated (-1 if no read has been translated yet);
 	 * @param outputFile_characters translation of every read (one per line); a read has
-	 * an empty line if it contains no repeat, or if it is fully contained in a single
-	 * repeat;
+	 * an empty line if it contains no repeat;
 	 * @param outputFile_boundaries character boundaries (one read per line);
 	 * @param outputFile_fullyUniqueReads list of IDs of reads that contain no repeat
 	 * (zero-based);
@@ -1796,7 +1796,7 @@ public class RepeatAlphabet {
 	
 	/**
 	 * If $newKmers$ is not null, the procedure uses every length-k window that satisfies 
-	 * the conditions in $uniqueMode,openMode,multiMode$ (see procedure $isValidKmer()$ 
+	 * the conditions in $uniqueMode,openMode,multiMode$ (see procedure $isValidWindow()$ 
 	 * for details) to add a k-mer to $newKmers$. If a block contains multiple characters, 
 	 * every character can be used to build a k-mer. K-mers are canonized before being 
 	 * added to $newKmers$ (see $Kmer.canonize()$). Array $avoidedIntervals$ contains 
@@ -1841,7 +1841,7 @@ public class RepeatAlphabet {
 		if (nBlocks<k) return out;
 		loadBlocks(str); loadIntBlocks(nBlocks);
 		sum=0;
-		for (i=0; i<nBlocks; i++) sum+=lastInBlock[i]+1;
+		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		
 		// Loading k-mers
@@ -1949,6 +1949,242 @@ public class RepeatAlphabet {
 			}
 		}
 		return -1;
+	}
+	
+	
+	/**
+	 * For every k-mer in $kmers$, the procedure adds both its canonized prefix and suffix
+	 * to $kMinusOneMers$, setting their ${previous,next}Character$ fields.
+	 *
+	 * @param k length of a k-mer (not of a (k-1)-mer);
+	 * @param kMinusOneMer temporary space;
+	 * @param tmpArray temporary space of size at least 2(k-1).
+	 */
+	public static final void getKMinusOneMers(HashMap<Kmer,Kmer> kmers, HashMap<Kmer,Kmer> kMinusOneMers, int k, Kmer kMinusOneMer, int[] tmpArray) {
+		boolean sameOrientation;
+		int c;
+		Kmer kmer, oldKey, newKey;
+		Iterator<Kmer> iterator;
+		
+		kMinusOneMers.clear();
+		iterator=kmers.keySet().iterator();
+		while (iterator.hasNext()) {
+			kmer=iterator.next();
+			// Prefix
+			System.arraycopy(kmer.sequence,0,kMinusOneMer.sequence,0,kmer.sequence.length-1);
+			sameOrientation=kMinusOneMer.canonize(k-1,tmpArray);
+			oldKey=kMinusOneMers.get(kMinusOneMer);
+			c=canonizeCharacter(kmer.sequence[k-1],sameOrientation);
+			if (sameOrientation) {
+				if (oldKey==null) {
+					newKey = new Kmer(kMinusOneMer,k-1);
+					newKey.previousCharacter=-1; newKey.nextCharacter=c;
+					kMinusOneMers.put(newKey,newKey);
+				}
+				else {
+					if (oldKey.nextCharacter==-1) oldKey.nextCharacter=c;
+					else if (oldKey.nextCharacter>=0 && oldKey.nextCharacter!=c) oldKey.nextCharacter=-2;			
+				}
+			}
+			else {
+				if (oldKey==null) {
+					newKey = new Kmer(kMinusOneMer,k-1);
+					newKey.previousCharacter=c; newKey.nextCharacter=-1;
+					kMinusOneMers.put(newKey,newKey);
+				}
+				else {
+					if (oldKey.previousCharacter==-1) oldKey.previousCharacter=c;
+					else if (oldKey.previousCharacter>=0 && oldKey.previousCharacter!=c) oldKey.previousCharacter=-2;			
+				}
+			}
+			// Suffix
+			System.arraycopy(kmer.sequence,1,kMinusOneMer.sequence,0,kmer.sequence.length-1);
+			sameOrientation=kMinusOneMer.canonize(k-1,tmpArray);
+			oldKey=kMinusOneMers.get(kMinusOneMer);
+			c=canonizeCharacter(kmer.sequence[0],sameOrientation);
+			if (sameOrientation) {
+				if (oldKey==null) {
+					newKey = new Kmer(kMinusOneMer,k-1);
+					newKey.previousCharacter=c; newKey.nextCharacter=-1;
+					kMinusOneMers.put(newKey,newKey);
+				}
+				else {
+					if (oldKey.previousCharacter==-1) oldKey.previousCharacter=c;
+					else if (oldKey.previousCharacter>=0 && oldKey.previousCharacter!=c) oldKey.previousCharacter=-2;			
+				}
+			}
+			else {
+				if (oldKey==null) {
+					newKey = new Kmer(kMinusOneMer,k-1);
+					newKey.previousCharacter=-1; newKey.nextCharacter=c;
+					kMinusOneMers.put(newKey,newKey);
+				}
+				else {
+					if (oldKey.nextCharacter==-1) oldKey.nextCharacter=c;
+					else if (oldKey.nextCharacter>=0 && oldKey.nextCharacter!=c) oldKey.nextCharacter=-2;			
+				}
+			}
+		}
+	}
+	
+	
+	/**
+	 * Tries to disambiguate the first and the last block of $str$ using the sorrounding
+	 * context of length $k$, and appends the updated $str$ to $bw$.
+	 *
+	 * Remark: for simplicity the procedure loads all the blocks of $str$, even though 
+	 * just the first and the last $k+1$ would be required.
+	 *	
+	 * @param kmers a set of k-mers, with their $*Character$ fields correctly set; this
+ 	 * might be just a subset of all k-mers (e.g. only those with large frequency);
+ 	 * @param tightMode TRUE=accept a prediction only if every k-mer of $intBlocks[first..
+ 	 * first+k-1]$ is either adjacent to no character or to a single character, and if
+ 	 * such a character is the same across all k-mers; FALSE=accept a prediction if all
+ 	 * k-mers that predict a single character (possibly just one k-mer) agree, even though
+ 	 * other k-mers might be adjacent to multiple characters;
+ 	 * @param context temporary space;
+ 	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
+ 	 * elements in $intBlocks$;
+ 	 * @param tmpArray2 temporary space, of size at least k;
+ 	 * @param tmpArray3 temporary space, of size at least 2k.
+	 */
+	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw) throws IOException {
+		int i, j, c, d;
+		int nBlocks, sum;
+				
+		// Loading all blocks
+		if (str.length()<((k+1)<<1)-1) {
+			bw.write(str); bw.newLine();
+			return;
+		}
+		i=-1; nBlocks=0;
+		while (true) {
+			i=str.indexOf(SEPARATOR_MAJOR+"",i+1);
+			if (i<0) break;
+			else nBlocks++;
+		}
+		nBlocks++;
+		if (nBlocks<k+1) {
+			bw.write(str); bw.newLine();
+			return;
+		}
+		loadBlocks(str); loadIntBlocks(nBlocks);
+		if (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0) {
+			bw.write(str); bw.newLine();
+			return;
+		}
+		sum=0;
+		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
+		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
+		
+		// Fixing first and last block
+		if (lastInBlock_int[0]>0) c=fixEndBlocks_impl(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
+		else c=intBlocks[0][0];
+		if (lastInBlock_int[nBlocks-1]>0) d=fixEndBlocks_impl(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
+		else d=intBlocks[nBlocks-1][0];
+		bw.write(""+c);
+		i=str.indexOf(SEPARATOR_MAJOR+""); j=str.lastIndexOf(SEPARATOR_MAJOR+"");
+		bw.write(str.substring(i,j+1)); bw.write(""+d); bw.newLine();
+	}
+	
+	
+	/**
+	 * Uses every k-mer that can be built from $intBlocks[first..first+k-1]$ and that 
+	 * occurs in $kmers$, as a context for disambiguating the first (if $first=1$) or the
+	 * last (if $first=nBlocks-k$) block of $intBlocks$.
+	 *
+	 * @return -1: impossible to perform a prediction; -2: a prediction is possible, but
+	 * the only predicted character cannot be found in the block to disambiguate; >=0: the
+	 * character that results from disambiguating the block.
+	 */
+	private static final int fixEndBlocks_impl(int first, int nBlocks, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+		boolean sameOrientation;
+		int i, c;
+		int top1, top2, row, column, lastChild, predictedCharacter, selectedCharacter;
+		Kmer key;
+		
+		// Collecting the single character predicted by every possible context
+		predictedCharacter=-1;  // In the forward orientation
+		top1=-1; top2=-1;
+		tmpArray1[++top1]=-1; tmpArray1[++top1]=-1; tmpArray1[++top1]=first-1;
+		while (top1>=0) {
+			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
+			if (row==first+k-1) {
+				context.set(tmpArray2,0,k); 
+				sameOrientation=context.canonize(k,tmpArray3);
+				key=kmers.get(context);
+				if (key!=null) {
+					if (first==1) {
+						if (sameOrientation) {
+							if (tightMode && key.previousCharacter==-2) return -1;
+							if (key.previousCharacter>=0) {
+								if (predictedCharacter==-1) predictedCharacter=key.previousCharacter;
+								else if (predictedCharacter!=key.previousCharacter) return -1;
+							}
+						}
+						else {
+							if (tightMode && key.nextCharacter==-2) return -1;
+							if (key.nextCharacter>=0) {
+								c=canonizeCharacter(key.nextCharacter,false);
+								if (predictedCharacter==-1) predictedCharacter=c;
+								else if (predictedCharacter!=c) return -1;
+							}
+						}
+					}
+					else {
+						if (sameOrientation) {
+							if (tightMode && key.nextCharacter==-2) return -1;
+							if (key.nextCharacter>=0) {
+								if (predictedCharacter==-1) predictedCharacter=key.nextCharacter;
+								else if (predictedCharacter!=key.nextCharacter) return -1;
+							}
+						}
+						else {
+							if (tightMode && key.previousCharacter==-2) return -1;
+							if (key.previousCharacter>=0) {
+								c=canonizeCharacter(key.previousCharacter,false);
+								if (predictedCharacter==-1) predictedCharacter=c;
+								else if (predictedCharacter!=c) return -1;
+							}
+						}
+					}
+				}
+			}
+			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
+			else {
+				lastChild++;
+				tmpArray1[top1-2]=lastChild;
+				tmpArray1[++top1]=-1; tmpArray1[++top1]=lastChild; tmpArray1[++top1]=row+1;
+				tmpArray2[++top2]=intBlocks[row+1][lastChild];
+			}
+		}
+		if (predictedCharacter==-1) return -1;
+		
+		// Checking the characters of $intBlocks$.
+		selectedCharacter=-1;
+		if (first==1) {
+			for (i=0; i<=lastInBlock_int[0]; i++) {
+				if (canonizeCharacter(intBlocks[0][i],true)==predictedCharacter) {
+					if (selectedCharacter==-1) selectedCharacter=intBlocks[0][i];
+					else if (selectedCharacter!=intBlocks[0][i]) {
+						System.err.println("fixEndBlocks_impl> ERROR: characters "+selectedCharacter+" and "+intBlocks[0][i]+" in the same first block canonize to the same character?!");
+						System.exit(1);
+					}
+				}
+			}
+		}
+		else {
+			for (i=0; i<=lastInBlock_int[nBlocks-1]; i++) {
+				if (canonizeCharacter(intBlocks[nBlocks-1][i],true)==predictedCharacter) {
+					if (selectedCharacter==-1) selectedCharacter=intBlocks[nBlocks-1][i];
+					else if (selectedCharacter!=intBlocks[nBlocks-1][i]) {
+						System.err.println("fixEndBlocks_impl> ERROR: characters "+selectedCharacter+" and "+intBlocks[nBlocks-1][i]+" in the same last block canonize to the same character?!");
+						System.exit(1);
+					}
+				}
+			}
+		}
+		return selectedCharacter==-1?-2:selectedCharacter;
 	}
 	
 	
@@ -2075,12 +2311,18 @@ public class RepeatAlphabet {
 		public int[] sequence;  // Positions in $alphabet$.
 		public long count;
 		
+		/**
+		 * -1: unknown; -2: more than one character. >=0: canonized index in $alphabet$
+		 * of the only character that precedes/follows in the recoded reads.
+		 */
+		public int previousCharacter, nextCharacter;
+		
 		public Kmer() { }
 		
 		public Kmer(Kmer otherKmer, int k) {
 			sequence = new int[k];
 			System.arraycopy(otherKmer.sequence,0,sequence,0,k);
-			count=0;
+			count=0; previousCharacter=-1; nextCharacter=-1;
 		}
 		
 		public Kmer(String str, int k) {
@@ -2088,12 +2330,13 @@ public class RepeatAlphabet {
 			String[] tokens = str.split(",");
 			for (int i=0; i<k; i++) sequence[i]=Integer.parseInt(tokens[i]);
 			count=Long.parseLong(tokens[k]);
+			previousCharacter=-1; nextCharacter=-1;
 		}
 		
 		public void set(int[] fromArray, int first, int k) {
 			sequence = new int[k];
 			System.arraycopy(fromArray,first,sequence,0,k);
-			count=0;
+			count=0; previousCharacter=-1; nextCharacter=-1;
 		}
 		
 		/**
@@ -2101,9 +2344,10 @@ public class RepeatAlphabet {
 		 * every character canonized, and the reverse of $sequence$ with the complement of 
 		 * every character canonized.
 		 * 
-		 * @tmpArray temporary space of size at least 2k.
+		 * @tmpArray temporary space of size at least 2k;
+		 * @return TRUE iff canonization did not change the orientation of $sequence$.
 		 */
-		public void canonize(int k, int[] tmpArray) {
+		public boolean canonize(int k, int[] tmpArray) {
 			boolean smaller;
 			int i;
 			
@@ -2117,6 +2361,7 @@ public class RepeatAlphabet {
 				}
 			}
 			System.arraycopy(tmpArray,smaller?0:k,sequence,0,k);
+			return smaller;
 		}
 		
 		public boolean equals(Object other) {

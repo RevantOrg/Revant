@@ -65,7 +65,7 @@ for K in $(seq 1 ${MAX_K}); do
 		SORT_OPTIONS_KMERS="${SORT_OPTIONS_KMERS} -k ${i},${i}n"
 	done
 	echo "Collecting ${K}-mers..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*" ); do
+	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 		if [ ${K} -le 1 ]; then
 			PREVIOUS_INTERVALS="null"
