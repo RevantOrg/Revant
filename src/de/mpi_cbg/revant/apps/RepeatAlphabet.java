@@ -2047,16 +2047,18 @@ public class RepeatAlphabet {
  	 * elements in $intBlocks$;
  	 * @param tmpArray2 temporary space, of size at least k;
  	 * @param tmpArray3 temporary space, of size at least 2k;
-	 * @return {0,1,2} the number of blocks disambiguated by the procedure.
+	 * @param out adds to cell 0 the number of blocks disambiguated by the procedure 
+	 * (0,1,2) and to cell 1 the max number of blocks that could have been disambiguated
+	 * with a k-mer (0,1,2).
 	 */
-	public static final int fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw) throws IOException {
+	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out) throws IOException {
 		int i, j, c;
-		int nBlocks, sum, out;
+		int nBlocks, sum;
 				
 		// Loading all blocks
 		if (str.length()<((k+1)<<1)-1) {
 			bw.write(str); bw.newLine();
-			return 0;
+			return;
 		}
 		i=-1; nBlocks=0;
 		while (true) {
@@ -2067,32 +2069,33 @@ public class RepeatAlphabet {
 		nBlocks++;
 		if (nBlocks<k+1) {
 			bw.write(str); bw.newLine();
-			return 0;
+			return;
 		}
 		loadBlocks(str); loadIntBlocks(nBlocks);
 		if (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0) {
 			bw.write(str); bw.newLine();
-			return 0;
+			return;
 		}
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		
 		// Fixing first and last block
-		out=0; i=str.indexOf(SEPARATOR_MAJOR+""); j=str.lastIndexOf(SEPARATOR_MAJOR+"");
+		i=str.indexOf(SEPARATOR_MAJOR+""); j=str.lastIndexOf(SEPARATOR_MAJOR+"");
 		if (lastInBlock_int[0]>0) {
+			out[1]++;
 			c=fixEndBlocks_impl(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
-			if (c>=0) { bw.write(c+str.substring(i,j+1)); out++; }
+			if (c>=0) { bw.write(c+str.substring(i,j+1)); out[0]++; }
 			else bw.write(str.substring(0,j+1));
 		}
 		else bw.write(str.substring(0,j+1));
 		if (lastInBlock_int[nBlocks-1]>0) {
+			out[1]++;
 			c=fixEndBlocks_impl(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
-			if (c>=0) { bw.write(c+""); out++; }
+			if (c>=0) { bw.write(c+""); out[0]++; }
 			else bw.write(str.substring(j+1));
 		}
 		bw.newLine();
-		return out;
 	}
 	
 	

@@ -15,10 +15,10 @@ public class CompactKmers {
 		final String INPUT_FILE = args[0];
 		final int K = Integer.parseInt(args[1]);
 		final int MIN_COUNT = Integer.parseInt(args[2]);
-		final int MAX_COUNT = Integer.parseInt(args[3]);
+		final int MAX_COUNT = Integer.parseInt(args[3]);  // -1 to impose no max
 		final String OUTPUT_FILE_KMERS = args[4];
 		final int MAX_HISTOGRAM_COUNT = Integer.parseInt(args[5]);
-		final String OUTPUT_FILE_HISTOGRAM = args[6];
+		final String OUTPUT_FILE_HISTOGRAM = args[6].equalsIgnoreCase("null")?null:args[0];
 		
 		boolean equal;
 		int i;
@@ -37,8 +37,11 @@ public class CompactKmers {
 			System.err.println("ERROR: empty file "+INPUT_FILE);
 			System.exit(1);
 		}
-		histogram = new long[MAX_HISTOGRAM_COUNT+1];
-		Math.set(histogram,MAX_HISTOGRAM_COUNT,0);
+		if (OUTPUT_FILE_HISTOGRAM!=null) {
+			histogram = new long[MAX_HISTOGRAM_COUNT+1];
+			Math.set(histogram,MAX_HISTOGRAM_COUNT,0);
+		}
+		else histogram=null;
 		bw = new BufferedWriter(new FileWriter(OUTPUT_FILE_KMERS));
 		previous = new int[K];
 		tokens=str.split(",");
@@ -56,26 +59,28 @@ public class CompactKmers {
 			count=Long.parseLong(tokens[K]);
 			if (equal) previousCount+=count;
 			else {
-				if (previousCount>=MIN_COUNT && previousCount<=MAX_COUNT) {
+				if (previousCount>=MIN_COUNT && (MAX_COUNT==-1||previousCount<=MAX_COUNT)) {
 					for (i=0; i<K; i++) bw.write(previous[i]+",");
 					bw.write(previousCount+"\n");
 				}
-				histogram[previousCount>MAX_HISTOGRAM_COUNT?MAX_HISTOGRAM_COUNT:(int)previousCount]++;
+				if (OUTPUT_FILE_HISTOGRAM!=null) histogram[previousCount>MAX_HISTOGRAM_COUNT?MAX_HISTOGRAM_COUNT:(int)previousCount]++;
 				tmpArray=previous; previous=current; current=tmpArray;
 				previousCount=count;
 			}
 			str=br.readLine();
 		}
 		br.close();
-		if (previousCount>=MIN_COUNT && previousCount<=MAX_COUNT) {
+		if (previousCount>=MIN_COUNT && (MAX_COUNT==-1||previousCount<=MAX_COUNT)) {
 			for (i=0; i<K; i++) bw.write(previous[i]+",");
 			bw.write(previousCount+"\n");
 		}
 		bw.close();
-		histogram[previousCount>MAX_HISTOGRAM_COUNT?MAX_HISTOGRAM_COUNT:(int)previousCount]++;
-		bw = new BufferedWriter(new FileWriter(OUTPUT_FILE_HISTOGRAM));
-		for (i=0; i<=MAX_HISTOGRAM_COUNT; i++) bw.write(i+","+histogram[i]+"\n");
-		bw.close();
+		if (OUTPUT_FILE_HISTOGRAM!=null) {
+			histogram[previousCount>MAX_HISTOGRAM_COUNT?MAX_HISTOGRAM_COUNT:(int)previousCount]++;
+			bw = new BufferedWriter(new FileWriter(OUTPUT_FILE_HISTOGRAM));
+			for (i=0; i<=MAX_HISTOGRAM_COUNT; i++) bw.write(i+","+histogram[i]+"\n");
+			bw.close();
+		}
 	}
 
 }

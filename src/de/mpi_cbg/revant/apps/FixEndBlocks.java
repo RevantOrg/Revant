@@ -10,8 +10,10 @@ import java.util.HashMap;
 public class FixEndBlocks {
 	
 	/**
-	 * Remark: the program writes to STDOUT the number of read ends that have been
-	 * disambiguated.
+	 * Remark: the program writes $X,Y,Z$ to STDOUT, where X is the number of read ends
+	 * that have been disambiguated, Y is the max number of read ends that could have been
+	 * possibly disambiguated with a context of length K, and Z is the total number of 
+	 * reads.
 	 *
 	 * @param args 
 	 * 1: input file of translated reads with ambiguous starts/ends;
@@ -25,13 +27,13 @@ public class FixEndBlocks {
 		final boolean TIGHT_MODE = Integer.parseInt(args[4])==1;
 		final String NEW_TRANSLATED_FILE = args[5];
 		
-		int nFixed;
+		int nReads, nFixed;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
 		RepeatAlphabet.Kmer newKmer, context;
 		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
-		int[] tmpArray1, tmpArray2, tmpArray3;
+		int[] out, tmpArray1, tmpArray2, tmpArray3;
 		
 		// Loading k-mers and alphabet
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
@@ -48,17 +50,19 @@ public class FixEndBlocks {
 		// Fixing end blocks
 		context = new RepeatAlphabet.Kmer();
 		context.sequence = new int[K];
+		out = new int[] {0,0};
 		tmpArray1 = new int[3000/*Arbitrary*/];
 		tmpArray2 = new int[K]; tmpArray3 = new int[(K)<<1];
 		br = new BufferedReader(new FileReader(OLD_TRANSLATED_FILE));
 		bw = new BufferedWriter(new FileWriter(NEW_TRANSLATED_FILE));
-		str=br.readLine(); nFixed=0;
+		str=br.readLine(); nReads=0;
 		while (str!=null) {
-			nFixed+=RepeatAlphabet.fixEndBlocks(str,K,kmers,TIGHT_MODE,context,tmpArray1,tmpArray2,tmpArray3,bw);
+			nReads++;
+			RepeatAlphabet.fixEndBlocks(str,K,kmers,TIGHT_MODE,context,tmpArray1,tmpArray2,tmpArray3,bw,out);
 			str=br.readLine();
 		}
 		br.close(); bw.close();
-		System.out.println(nFixed+"");
+		System.out.println(out[0]+","+out[1]+","+nReads);
 	}
 
 }
