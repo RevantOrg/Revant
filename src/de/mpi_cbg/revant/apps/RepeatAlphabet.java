@@ -2033,7 +2033,7 @@ public class RepeatAlphabet {
 	 * context of length $k$, and appends the updated $str$ to $bw$.
 	 *
 	 * Remark: for simplicity the procedure loads all the blocks of $str$, even though 
-	 * just the first and the last $k+1$ would be required.
+	 * just the first and the last $k+1$ blocks would be enough.
 	 *	
 	 * @param kmers a set of k-mers, with their $*Character$ fields correctly set; this
  	 * might be just a subset of all k-mers (e.g. only those with large frequency);
@@ -2046,16 +2046,17 @@ public class RepeatAlphabet {
  	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
  	 * elements in $intBlocks$;
  	 * @param tmpArray2 temporary space, of size at least k;
- 	 * @param tmpArray3 temporary space, of size at least 2k.
+ 	 * @param tmpArray3 temporary space, of size at least 2k;
+	 * @return {0,1,2} the number of blocks disambiguated by the procedure.
 	 */
-	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw) throws IOException {
-		int i, j, c, d;
-		int nBlocks, sum;
+	public static final int fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw) throws IOException {
+		int i, j, c;
+		int nBlocks, sum, out;
 				
 		// Loading all blocks
 		if (str.length()<((k+1)<<1)-1) {
 			bw.write(str); bw.newLine();
-			return;
+			return 0;
 		}
 		i=-1; nBlocks=0;
 		while (true) {
@@ -2066,25 +2067,32 @@ public class RepeatAlphabet {
 		nBlocks++;
 		if (nBlocks<k+1) {
 			bw.write(str); bw.newLine();
-			return;
+			return 0;
 		}
 		loadBlocks(str); loadIntBlocks(nBlocks);
 		if (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0) {
 			bw.write(str); bw.newLine();
-			return;
+			return 0;
 		}
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		
 		// Fixing first and last block
-		if (lastInBlock_int[0]>0) c=fixEndBlocks_impl(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
-		else c=intBlocks[0][0];
-		if (lastInBlock_int[nBlocks-1]>0) d=fixEndBlocks_impl(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
-		else d=intBlocks[nBlocks-1][0];
-		bw.write(""+c);
-		i=str.indexOf(SEPARATOR_MAJOR+""); j=str.lastIndexOf(SEPARATOR_MAJOR+"");
-		bw.write(str.substring(i,j+1)); bw.write(""+d); bw.newLine();
+		out=0; i=str.indexOf(SEPARATOR_MAJOR+""); j=str.lastIndexOf(SEPARATOR_MAJOR+"");
+		if (lastInBlock_int[0]>0) {
+			c=fixEndBlocks_impl(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
+			if (c>=0) { bw.write(c+str.substring(i,j+1)); out++; }
+			else bw.write(str.substring(0,j+1));
+		}
+		else bw.write(str.substring(0,j+1));
+		if (lastInBlock_int[nBlocks-1]>0) {
+			c=fixEndBlocks_impl(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
+			if (c>=0) { bw.write(c+""); out++; }
+			else bw.write(str.substring(j+1));
+		}
+		bw.newLine();
+		return out;
 	}
 	
 	
@@ -2330,7 +2338,11 @@ public class RepeatAlphabet {
 			String[] tokens = str.split(",");
 			for (int i=0; i<k; i++) sequence[i]=Integer.parseInt(tokens[i]);
 			count=Long.parseLong(tokens[k]);
-			previousCharacter=-1; nextCharacter=-1;
+			if (tokens.length>k+1) {
+				previousCharacter=Integer.parseInt(tokens[k+1]);
+				nextCharacter=Integer.parseInt(tokens[k+2]);
+			}
+			else { previousCharacter=-1; nextCharacter=-1; }
 		}
 		
 		public void set(int[] fromArray, int first, int k) {
