@@ -463,7 +463,7 @@ public class RepeatAlphabet {
 		
 		for (i=0; i<=lastInSequence; i++) {
 			if (sequence[i].isUnique()) {
-				if (!sequence[i].openStart() && !sequence[i].openEnd()) {
+				if (!sequence[i].characters[0].openStart && !sequence[i].characters[0].openEnd) {
 					bw.write(sequence[i].characters[0].toString());
 					bw.newLine();
 				}
@@ -920,7 +920,7 @@ public class RepeatAlphabet {
 						}
 						else {
 							translateRead(bw1,bw2,quantum);
-							histogram[lastInSequence+1]++;
+							histogram[lastInSequence+1]++;							
 						}
 					}
 					else { 
@@ -1408,7 +1408,6 @@ public class RepeatAlphabet {
 		Math.set(isBlockOpen,nBlocks-1,false);
 		
 		// Building arrays
-		isBlockOpen[0]=true; isBlockOpen[nBlocks-1]=true;
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
 			nElements=0;
@@ -2084,14 +2083,14 @@ public class RepeatAlphabet {
 		i=str.indexOf(SEPARATOR_MAJOR+""); j=str.lastIndexOf(SEPARATOR_MAJOR+"");
 		if (lastInBlock_int[0]>0) {
 			out[1]++;
-			c=fixEndBlocks_impl(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
+			c=fixEndBlocks_impl(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
 			if (c>=0) { bw.write(c+str.substring(i,j+1)); out[0]++; }
 			else bw.write(str.substring(0,j+1));
 		}
 		else bw.write(str.substring(0,j+1));
 		if (lastInBlock_int[nBlocks-1]>0) {
 			out[1]++;
-			c=fixEndBlocks_impl(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3);
+			c=fixEndBlocks_impl(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
 			if (c>=0) { bw.write(c+""); out[0]++; }
 			else bw.write(str.substring(j+1));
 		}
@@ -2108,7 +2107,7 @@ public class RepeatAlphabet {
 	 * the only predicted character cannot be found in the block to disambiguate; >=0: the
 	 * character that results from disambiguating the block.
 	 */
-	private static final int fixEndBlocks_impl(int first, int nBlocks, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+	private static final int fixEndBlocks_impl(int first, int nBlocks, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, String str) {
 		boolean sameOrientation;
 		int i, c;
 		int top1, top2, row, column, lastChild, predictedCharacter, selectedCharacter;
@@ -2179,6 +2178,10 @@ public class RepeatAlphabet {
 					if (selectedCharacter==-1) selectedCharacter=intBlocks[0][i];
 					else if (selectedCharacter!=intBlocks[0][i]) {
 						System.err.println("fixEndBlocks_impl> ERROR: characters "+selectedCharacter+" and "+intBlocks[0][i]+" in the same first block canonize to the same character?!");
+						System.err.println("first character: "+alphabet[selectedCharacter]);
+						System.err.println("second character: "+alphabet[intBlocks[0][i]]);
+						System.err.println("predicted character: "+alphabet[predictedCharacter]);
+						System.err.println("translated read: "+str);
 						System.exit(1);
 					}
 				}
@@ -2190,6 +2193,9 @@ public class RepeatAlphabet {
 					if (selectedCharacter==-1) selectedCharacter=intBlocks[nBlocks-1][i];
 					else if (selectedCharacter!=intBlocks[nBlocks-1][i]) {
 						System.err.println("fixEndBlocks_impl> ERROR: characters "+selectedCharacter+" and "+intBlocks[nBlocks-1][i]+" in the same last block canonize to the same character?!");
+						System.err.println("first character: "+alphabet[selectedCharacter]);
+						System.err.println("second character: "+alphabet[intBlocks[nBlocks-1][i]]);
+						System.err.println("predicted character: "+alphabet[predictedCharacter]);
 						System.exit(1);
 					}
 				}
@@ -3226,28 +3232,37 @@ public class RepeatAlphabet {
 			int found, alignmentStartB, alignmentEndB;
 			final double ratio = ((double)(alignment.endB-alignment.startB+1))/(alignment.endA-alignment.startA+1);
 			
-			if (alignment.orientation) {
-				tmpCharacter.openStart=alignmentStartA<=distanceThreshold;
-				tmpCharacter.openEnd=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
-				alignmentStartB=alignment.startB+(alignmentStartA>alignment.startA?(int)((alignmentStartA-alignment.startA)*ratio):0);
-				alignmentEndB=alignment.endB-(alignment.endA>alignmentEndA?(int)((alignment.endA-alignmentEndA)*ratio):0);
-			}
-			else {
-				tmpCharacter.openEnd=alignmentStartA<=distanceThreshold;
-				tmpCharacter.openStart=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
-				alignmentStartB=alignment.startB+(alignment.endA>alignmentEndA?(int)((alignment.endA-alignmentEndA)*ratio):0);
-				alignmentEndB=alignment.endB-(alignmentStartA>alignment.startA?(int)((alignmentStartA-alignment.startA)*ratio):0);
-			}
+			alignmentStartB=-1; alignmentEndB=-1;
 			tmpCharacter.repeat=alignment.readB; tmpCharacter.orientation=alignment.orientation;
-			if (!isPeriodic[alignment.readB]) {
-				tmpCharacter.start=alignmentStartB;
-				tmpCharacter.end=alignmentEndB;
-				tmpCharacter.length=0;
-			}
-			else {
+			if (isPeriodic[alignment.readB]) {
+				if (alignment.orientation) {
+					tmpCharacter.openStart=alignmentStartA<=distanceThreshold;
+					tmpCharacter.openEnd=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				}
+				else {
+					tmpCharacter.openEnd=alignmentStartA<=distanceThreshold;
+					tmpCharacter.openStart=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold;
+				}
 				tmpCharacter.start=-1; tmpCharacter.end=-1;
 				tmpCharacter.length=alignmentEndA-alignmentStartA+1; // A is correct here
 			}
+			else {
+				if (alignment.orientation) {
+					alignmentStartB=alignment.startB+(alignmentStartA>alignment.startA?(int)((alignmentStartA-alignment.startA)*ratio):0);
+					alignmentEndB=alignment.endB-(alignment.endA>alignmentEndA?(int)((alignment.endA-alignmentEndA)*ratio):0);
+					tmpCharacter.openStart=alignmentStartA<=distanceThreshold && alignmentStartB>distanceThreshold;
+					tmpCharacter.openEnd=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold && alignmentEndB<repeatLengths[alignment.readB]-distanceThreshold;
+				}
+				else {
+					alignmentStartB=alignment.startB+(alignment.endA>alignmentEndA?(int)((alignment.endA-alignmentEndA)*ratio):0);
+					alignmentEndB=alignment.endB-(alignmentStartA>alignment.startA?(int)((alignmentStartA-alignment.startA)*ratio):0);
+					tmpCharacter.openEnd=alignmentStartA<=distanceThreshold && alignmentEndB<repeatLengths[alignment.readB]-distanceThreshold;
+					tmpCharacter.openStart=alignmentEndA>=Reads.getReadLength(alignment.readA)-distanceThreshold && alignmentStartB>distanceThreshold;
+				}
+				tmpCharacter.start=alignmentStartB; tmpCharacter.end=alignmentEndB;
+				tmpCharacter.length=0;
+			}
+			
 			found=-1;
 			for (i=0; i<=lastCharacter; i++) {
 				if (characters[i].repeat==tmpCharacter.repeat && characters[i].orientation==tmpCharacter.orientation) {
@@ -3275,17 +3290,15 @@ public class RepeatAlphabet {
 		
 		
 		/**
-		 * (1) Sorts $characters$. (2) Makes open marks homogeneous across all characters.
-		 * (3) If the block contains a periodic repeat, removes all non-periodic repeats 
-		 * from the block and sets the length of every periodic repeat to
+		 * Sorts $characters$. If the block contains a periodic repeat, removes all non-
+		 * periodic repeats from the block and sets the length of every periodic repeat to
 		 * $periodicLength$.
 		 */
 		public final void cleanCharacters(int periodicLength) {
-			boolean foundPeriodic, foundNonperiodic, openLeft, openRight;
+			boolean foundPeriodic, foundNonperiodic;
 			int i, j;
 			Character tmpCharacter;
 			
-			// Enforcing periodic/nonperiodic criteria
 			foundPeriodic=false; foundNonperiodic=false;
 			for (i=0; i<=lastCharacter; i++) {
 				if (isPeriodic[characters[i].repeat]) {
@@ -3305,26 +3318,8 @@ public class RepeatAlphabet {
 				}
 				lastCharacter=j;
 			}
-			
-			// Enforcing open criteria
-			openLeft=false; openRight=false;
-			for (i=0; i<=lastCharacter; i++) {
-				if ((characters[i].orientation && characters[i].openStart) ||  (!characters[i].orientation && characters[i].openEnd)) openLeft=true;
-				if ((characters[i].orientation && characters[i].openEnd) ||  (!characters[i].orientation && characters[i].openStart)) openRight=true;				
-			}
-			for (i=0; i<=lastCharacter; i++) {
-				if (characters[i].orientation) { characters[i].openStart=openLeft; characters[i].openEnd=openRight; }
-				else { characters[i].openStart=openRight; characters[i].openEnd=openLeft; }
-			}			
-			
 			Arrays.sort(characters,0,lastCharacter+1);
 		}
-		
-		
-		public final boolean openStart() { return characters[0].openStart; }
-		
-		
-		public final boolean openEnd() { return characters[0].openEnd; }
 	}
 	
 	
@@ -3335,7 +3330,7 @@ public class RepeatAlphabet {
 		public int repeat;
 		public boolean orientation;
 		public int start, end;
-		public boolean openStart, openEnd;  // The repeat might continue beyond start/end
+		public boolean openStart, openEnd;  // The repeat might continue after start/end
 		public int length;  // >0: unique or periodic; 0: repetitive non-periodic.
 		
 		public int flag;  // Temporary space

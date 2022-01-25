@@ -14,7 +14,7 @@ INPUT_DIR=$1
 HAPLOTYPE_COVERAGE="5"  # Of one haplotype
 TIGHT_MODE="0"
 MAX_K="11"  # One plus the max length of a context used for disambiguation
-N_THREADS="4"
+N_THREADS="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -22,6 +22,8 @@ JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 
 TMPFILE_NAME="fixEndBlocks-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
+READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
+N_READS=$(wc -l < ${READ_IDS_FILE})
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
@@ -32,7 +34,7 @@ rm -f ${TMPFILE_PATH}*
 function kmersThread() {
 	local LOCAL_K=$1
 	local LOCAL_TRANSLATED_READS_FILE=$2
-	local LOCAL_KMERS_FILE=$4
+	local LOCAL_KMERS_FILE=$3
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${OPEN_MODE} ${MULTI_MODE} null ${LOCAL_KMERS_FILE}
 }
 
@@ -62,8 +64,8 @@ for K in $(seq 2 ${MAX_K}); do
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} -1 ${FREQUENT_KMERS_FILE} 0 null
 	echo "Computing $((${K}-1))-mers..."
 	K_MINUS_ONE_MERS_FILE="${INPUT_DIR}/kMinusOne-k${K}.txt"
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetKMinusOneMers ${FREQUENT_KMERS_FILE} ${K} ${K_MINUS_ONE_MERS_FILE}
-	echo "Disambiguating read ends using $((${K}-1))-mers..."
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetKMinusOneMers ${ALPHABET_FILE} ${FREQUENT_KMERS_FILE} ${K} ${K_MINUS_ONE_MERS_FILE}
+	echo "Disambiguating read ends using contexts of length $((${K}-1))..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-$((${K}-1))-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-$((${K}-1))-}
 		fixThread ${FILE} ${K_MINUS_ONE_MERS_FILE} $((${K}-1)) ${TMPFILE_PATH}-${K}-${THREAD_ID} > ${TMPFILE_PATH}-counts-${K}-${THREAD_ID} &

@@ -13,9 +13,10 @@ import java.util.Iterator;
 public class GetKMinusOneMers {
 	
 	public static void main(String[] args) throws IOException {
-		final String KMERS_FILE = args[0];
-		final int K = Integer.parseInt(args[1]);
-		final String K_MINUS_ONE_MERS_FILE = args[2];
+		final String ALPHABET_FILE = args[0];
+		final String KMERS_FILE = args[1];
+		final int K = Integer.parseInt(args[2]);
+		final String K_MINUS_ONE_MERS_FILE = args[3];
 		
 		String str;
 		RepeatAlphabet.Kmer tmpKmer;
@@ -25,7 +26,8 @@ public class GetKMinusOneMers {
 		BufferedWriter bw;
 		int[] tmpArray;
 		
-		// Loading k-mers
+		// Loading k-mers and alphabet
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		kmers = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
 		br = new BufferedReader(new FileReader(KMERS_FILE));
 		str=br.readLine();
