@@ -101,7 +101,7 @@ public class RepeatAlphabet {
 	private static int[] lastInBlock, lastInBlock_int;
 	private static int[] boundaries;
 	private static int[][] intBlocks;
-	private static boolean[] isBlockUnique, isBlockOpen;
+	private static boolean[] isBlockUnique, isBlockOpen;  // = A character in the block is open (other characters in the same block might be closed).
 	
 	
 	/**
@@ -2075,6 +2075,17 @@ public class RepeatAlphabet {
 			bw.write(str); bw.newLine();
 			return;
 		}
+		if (IO.CONSISTENCY_CHECKS) {
+			for (i=1; i<nBlocks-1; i++) {
+				if (isBlockOpen[i]) {
+					System.err.println("fixEndBlocks> ERROR: interior block "+i+" contains open characters?!");
+					for (j=0; j<=lastInBlock_int[i]; j++) System.err.println(alphabet[intBlocks[i][j]]);
+					System.err.println("Translated read: "+str);
+					System.err.println();
+					System.exit(1);
+				}
+			}
+		}
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
@@ -3290,15 +3301,19 @@ public class RepeatAlphabet {
 		
 		
 		/**
-		 * Sorts $characters$. If the block contains a periodic repeat, removes all non-
-		 * periodic repeats from the block and sets the length of every periodic repeat to
-		 * $periodicLength$.
+		 * (1) Sorts $characters$. (2) If the block contains a periodic repeat, removes 
+		 * all non-periodic repeats from the block and sets the length of every periodic 
+		 * repeat to $periodicLength$. (3) If the block contains open and closed 
+		 * characters from the same periodic repeat, only the closed ones are kept. If the 
+		 * block contains open and closed characters from the same nonperiodic repeat and
+		 * similar substrings, only the closed ones are kept.
 		 */
 		public final void cleanCharacters(int periodicLength) {
 			boolean foundPeriodic, foundNonperiodic;
 			int i, j;
 			Character tmpCharacter;
 			
+			// Constraint 2
 			foundPeriodic=false; foundNonperiodic=false;
 			for (i=0; i<=lastCharacter; i++) {
 				if (isPeriodic[characters[i].repeat]) {
@@ -3318,7 +3333,39 @@ public class RepeatAlphabet {
 				}
 				lastCharacter=j;
 			}
+			
+			// Constraint 3
 			Arrays.sort(characters,0,lastCharacter+1);
+			currentRepeat=-1; currentOrientation=false; currentStart=-1; currentEnd=-1; 
+			currentLength=-1; currentOpenStart=false; currentOpenEnd=false;
+			currentFirst=-1;
+			for (i=0; i<=lastCharacter; i++) {
+				if ( characters[i].repeat!=currentRepeat || characters[i].orientation!=currentOrientation ||
+					 character[i].start==-1 || character[i].start>currentStart+DISTANCE_THRESHOLD || Math.abs(characters[i].end,currentEnd)>DISTANCE_THRESHOLD
+				   ) {
+					if (currentFirst!=-1 && i>currentFirst+1) {
+						for (j=currentFirst; j<i; j++) {
+							
+							
+							
+						}
+						
+						
+					}
+					currentRepeat=characters[i].repeat; currentOrientation=characters[i].orientation;
+					currentStart=characters[i].start; currentEnd=characters[i].end;
+					currentFirst=i;
+				}
+				
+				
+				repeat==otherCharacter.repeat && orientation==otherCharacter.orientation && start==otherCharacter.start && end==otherCharacter.end && length==otherCharacter.length && openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
+				
+				
+				
+			}
+			
+			
+			
 		}
 	}
 	

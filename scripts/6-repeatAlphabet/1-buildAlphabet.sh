@@ -13,7 +13,7 @@
 #
 INPUT_DIR=$1
 MAX_ALIGNMENT_ERROR="0.2"  # Alignments with more error than this are discarded
-N_THREADS="1"
+N_THREADS="4"
 MIN_CHARACTER_FREQUENCY="5"  # Should be the coverage of one haplotype
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
