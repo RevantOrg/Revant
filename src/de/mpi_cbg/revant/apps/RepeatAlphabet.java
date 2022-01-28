@@ -409,13 +409,17 @@ public class RepeatAlphabet {
 			sequence[0].setUnique(i,true,i>=lengthA-distanceThreshold);
 		}
 		// Middle blocks
+		if (stack==null || stack.length<lastAlignment+1) stack = new int[lastAlignment+1];
 		i=1; j=0; firstJForNextI=-1;
 		while (i<=lastPoint) {
 			startA=points[i-1]; endA=points[i];
 			if (j>lastAlignment || alignments[j].startA>=endA) {
-				if (newBlock.lastCharacter==-1) newBlock.setUnique(endA-startA+1,startA<=distanceThreshold,endA>=lengthA-distanceThreshold);
-				else newBlock.cleanCharacters(endA-startA+1);
 				lastInSequence++;
+				if (newBlock.lastCharacter==-1) newBlock.setUnique(endA-startA+1,startA<=distanceThreshold,endA>=lengthA-distanceThreshold);
+				else {
+					if (stack.length<newBlock.lastCharacter+1) stack = new int[newBlock.lastCharacter+1];
+					newBlock.cleanCharacters(endA-startA+1,lastInSequence==0||(i==lastPoint&&lengthA-points[lastPoint]<=distanceThreshold),stack);
+				}
 				if (lastInSequence==sequence.length) {
 					Block[] newSequence = new Block[sequence.length<<1];
 					System.arraycopy(sequence,0,newSequence,0,sequence.length);
@@ -3303,15 +3307,23 @@ public class RepeatAlphabet {
 		/**
 		 * (1) Sorts $characters$. (2) If the block contains a periodic repeat, removes 
 		 * all non-periodic repeats from the block and sets the length of every periodic 
-		 * repeat to $periodicLength$. (3) If the block contains open and closed 
-		 * characters from the same periodic repeat, only the closed ones are kept. If the 
-		 * block contains open and closed characters from the same nonperiodic repeat and
-		 * similar substrings, only the closed ones are kept.
+		 * repeat to $periodicLength$. (3) If the block is not the first or last of its 
+		 * read, all open marks are removed. Then, if the block contains several 
+		 * characters from the same periodic repeat in the same orientation, only a single
+		 * one (closed if possible) is kept. If the block contains characters from the 
+		 * same nonperiodic repeat, in the same orientation, and with similar substrings, 
+		 * only a single one (closed if possible) is kept.
+		 *
+		 * @param stack temporary space, of size at least $lastCharacter+1$.
 		 */
-		public final void cleanCharacters(int periodicLength) {
+		public final void cleanCharacters(int periodicLength, boolean firstOrLast, int[] stack) {
+			final int DISTANCE_THRESHOLD = 100;  // Arbitrary
 			boolean foundPeriodic, foundNonperiodic;
 			int i, j;
+			int top, selected, count, countSelected, currentCharacter;
 			Character tmpCharacter;
+			
+			if (lastCharacter==0) return;
 			
 			// Constraint 2
 			foundPeriodic=false; foundNonperiodic=false;
@@ -3333,41 +3345,75 @@ public class RepeatAlphabet {
 				}
 				lastCharacter=j;
 			}
-			
-			// Constraint 3
+			if (lastCharacter==0) return;
 			Arrays.sort(characters,0,lastCharacter+1);
-			currentRepeat=-1; currentOrientation=false; currentStart=-1; currentEnd=-1; 
-			currentLength=-1; currentOpenStart=false; currentOpenEnd=false;
-			currentFirst=-1;
-			for (i=0; i<=lastCharacter; i++) {
-				if ( characters[i].repeat!=currentRepeat || characters[i].orientation!=currentOrientation ||
-					 character[i].start==-1 || character[i].start>currentStart+DISTANCE_THRESHOLD || Math.abs(characters[i].end,currentEnd)>DISTANCE_THRESHOLD
-				   ) {
-					if (currentFirst!=-1 && i>currentFirst+1) {
-						for (j=currentFirst; j<i; j++) {
-							
-							
-							
-						}
-						
-						
-					}
-					currentRepeat=characters[i].repeat; currentOrientation=characters[i].orientation;
-					currentStart=characters[i].start; currentEnd=characters[i].end;
-					currentFirst=i;
+			
+			// Constraint 3 (using temporary field $Character.flag$).
+			if (!firstOrLast) {
+				for (i=0; i<=lastCharacter; i++) {
+					if (characters[i].openStart) characters[i].openStart=false;
+					if (characters[i].openEnd) characters[i].openEnd=false;
 				}
-				
-				
-				repeat==otherCharacter.repeat && orientation==otherCharacter.orientation && start==otherCharacter.start && end==otherCharacter.end && length==otherCharacter.length && openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
-				
-				
-				
 			}
-			
-			
-			
+			for (i=0; i<=lastCharacter; i++) characters[i].flag=-1;
+			for (i=0; i<=lastCharacter; i++) {
+				if (characters[i].flag!=-1) continue;
+				characters[i].flag=i; top=0; stack[0]=i;
+				if (characters[i].isOpen()) { selected=-1; countSelected=0; }
+				else { 
+					selected=i;
+					countSelected=(characters[i].openStart?0:1)+(characters[i].openEnd?0:1);
+				}
+				while (top>=0) {
+					currentCharacter=stack[top--];
+					for (j=currentCharacter+1; j<=lastCharacter; j++) {
+						if (characters[j].repeat!=characters[currentCharacter].repeat || characters[j].orientation!=characters[currentCharacter].orientation) break;
+						if (characters[j].flag!=-1) continue;
+						if ( characters[j].start==-1 ||
+					   	 	 ( characters[j].start<=characters[currentCharacter].start+DISTANCE_THRESHOLD &&
+					           Math.abs(characters[j].end,characters[currentCharacter].end)<=DISTANCE_THRESHOLD
+					         )
+						   ) {
+							characters[j].flag=i;
+							count=(characters[j].openStart?0:1)+(characters[j].openEnd?0:1);
+							if ( selected==-1 || count>countSelected || 
+								 ( count==selected &&
+								   ( (characters[j].start==-1 && characters[j].length<characters[selected].length) ||
+								     (characters[j].start!=-1 && characters[j].end-characters[j].start<characters[selected].end-characters[selected].start)
+								   )
+								 )
+							   ) {
+								selected=j; countSelected=count;
+								continue;
+							}
+							stack[++top]=j;
+						}
+					}
+				}
+				if (selected==-1 || selected==i) {
+					// If all characters are open, we leave them flagged by $i$.
+				}
+				else {
+					for (j=i; j<=lastCharacter; j++) {
+						if (characters[j].repeat!=characters[i].repeat || characters[j].orientation!=characters[i].orientation) break;
+						if (characters[j].flag==i) characters[j].flag=selected;
+					}
+				}
+			}
+			j=-1;
+			for (i=0; i<=lastCharacter; i++) {
+				if (characters[i].flag!=i) continue;
+				j++;
+				tmpCharacter=characters[j];
+				characters[j]=characters[i];
+				characters[i]=tmpCharacter;
+			}
+			lastCharacter=j;
 		}
+		
 	}
+	
+	
 	
 	
 	/**
