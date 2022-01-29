@@ -13,8 +13,8 @@
 INPUT_DIR=$1
 HAPLOTYPE_COVERAGE="5"  # Of one haplotype
 TIGHT_MODE="0"
-MAX_K="11"  # One plus the max length of a context used for disambiguation
-N_THREADS="1"
+MAX_K="5"  # One plus the max length of a context used for disambiguation
+N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -46,6 +46,7 @@ function fixThread() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixEndBlocks ${ALPHABET_FILE} ${LOCAL_OLD_TRANSLATED_FILE} ${LOCAL_KMERS_FILE} ${LOCAL_K} ${TIGHT_MODE} ${LOCAL_NEW_TRANSLATED_FILE}
 }
 
+rm -f "${TMPFILE_PATH}-1-*"
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-1-"
 for K in $(seq 2 ${MAX_K}); do
 	SORT_OPTIONS_KMERS=""

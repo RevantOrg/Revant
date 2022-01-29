@@ -455,7 +455,7 @@ public class RepeatAlphabet {
 				sequence=newSequence;
 			}
 			sequence[lastInSequence].setUnique(lengthA-i,i<=distanceThreshold,true);
-		}		
+		}
 	}
 	
 	
@@ -1512,10 +1512,9 @@ public class RepeatAlphabet {
 					tmpChar.repeat=UNIQUE;
 					tmpChar.orientation=false;
 					tmpChar.start=-1; tmpChar.end=-1;
-					length=(i==nBlocks-1?readLength:boundaries[i])-(first==0?0:boundaries[first-1]);
+					length=boundaries[i-1]-(first==0?0:boundaries[first-1]);
 					tmpChar.length=length;
-					tmpChar.openStart=first==0;
-					tmpChar.openEnd=i==nBlocks-1;
+					tmpChar.openStart=first==0; tmpChar.openEnd=false;
 					tmpChar.quantize(quantum);
 					j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar);
 					if (tmpChar.isOpen()) {
@@ -1534,8 +1533,7 @@ public class RepeatAlphabet {
 			tmpChar.start=-1; tmpChar.end=-1;
 			length=readLength-(first==0?0:boundaries[first-1]);
 			tmpChar.length=length;
-			tmpChar.openStart=first==0; 
-			tmpChar.openEnd=true;
+			tmpChar.openStart=first==0; tmpChar.openEnd=true;
 			tmpChar.quantize(quantum);
 			j=Arrays.binarySearch(alphabet,0,lastUnique+1,tmpChar);
 			if (tmpChar.isOpen()) {
@@ -1708,10 +1706,9 @@ public class RepeatAlphabet {
 					tmpChar.repeat=UNIQUE;
 					tmpChar.orientation=false;
 					tmpChar.start=-1; tmpChar.end=-1;
-					length=(i==nBlocks-1?readLength:boundaries[i])-(first==0?0:boundaries[first-1]);
+					length=boundaries[i-1]-(first==0?0:boundaries[first-1]);
 					tmpChar.length=length;
-					tmpChar.openStart=first==0;
-					tmpChar.openEnd=i==nBlocks-1;
+					tmpChar.openStart=first==0; tmpChar.openEnd=false;
 					tmpChar.quantize(quantum);
 					if (nAppendedBlocks>0) read2characters_new.write(SEPARATOR_MAJOR+"");
 					translate_unique(tmpChar,read2characters_new);
@@ -1773,8 +1770,7 @@ public class RepeatAlphabet {
 				tmpChar.start=-1; tmpChar.end=-1;
 				length=readLength-(first==0?0:boundaries[first-1]);
 				tmpChar.length=length;
-				tmpChar.openStart=first==0;
-				tmpChar.openEnd=true;
+				tmpChar.openStart=first==0; tmpChar.openEnd=true;
 				tmpChar.quantize(quantum);
 				if (nAppendedBlocks>0) read2characters_new.write(SEPARATOR_MAJOR+"");
 				translate_unique(tmpChar,read2characters_new);
@@ -2035,8 +2031,15 @@ public class RepeatAlphabet {
 	 * Tries to disambiguate the first and the last block of $str$ using the sorrounding
 	 * context of length $k$, and appends the updated $str$ to $bw$.
 	 *
+	 * Remark: multiple characters in the same first/last block might canonize to the same
+	 * character, since we wrote all the characters that imply the block, and the alphabet
+	 * might contain several open/closed versions of the same substring of the same repeat
+	 * in the same orientation. If all the characters in a block canonize to the same
+	 * character, the procedure selects just one of them (which one is irrelevant for 
+	 * computing unique substrings and for filtering alignments downstream).
+	 *
 	 * Remark: for simplicity the procedure loads all the blocks of $str$, even though 
-	 * just the first and the last $k+1$ blocks would be enough.
+	 * just the first and the last $k+1$ blocks would suffice.
 	 *	
 	 * @param kmers a set of k-mers, with their $*Character$ fields correctly set; this
  	 * might be just a subset of all k-mers (e.g. only those with large frequency);
@@ -2050,35 +2053,18 @@ public class RepeatAlphabet {
  	 * elements in $intBlocks$;
  	 * @param tmpArray2 temporary space, of size at least k;
  	 * @param tmpArray3 temporary space, of size at least 2k;
-	 * @param out adds to cell 0 the number of blocks disambiguated by the procedure 
-	 * (0,1,2) and to cell 1 the max number of blocks that could have been disambiguated
-	 * with a k-mer (0,1,2).
+	 * @param out adds to cell 0 the number of blocks disambiguated by the procedure using
+	 * k-mers (0,1,2), and to cell 1 the max number of blocks that could have been 
+	 * disambiguated with a k-mer (0,1,2).
 	 */
 	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out) throws IOException {
-		int i, j, c;
-		int nBlocks, sum;
-				
-		// Loading all blocks
-		if (str.length()<((k+1)<<1)-1) {
-			bw.write(str); bw.newLine();
-			return;
-		}
-		i=-1; nBlocks=0;
-		while (true) {
-			i=str.indexOf(SEPARATOR_MAJOR+"",i+1);
-			if (i<0) break;
-			else nBlocks++;
-		}
-		nBlocks++;
-		if (nBlocks<k+1) {
-			bw.write(str); bw.newLine();
-			return;
-		}
-		loadBlocks(str); loadIntBlocks(nBlocks);
-		if (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0) {
-			bw.write(str); bw.newLine();
-			return;
-		}
+		int i, j, c, d, p, q;
+		int nBlocks, sum, fixedFirst, fixedLast;
+		
+		if (str.length()==0) { bw.newLine(); return; }
+		
+		// Loading blocks
+		nBlocks=loadBlocks(str); loadIntBlocks(nBlocks);
 		if (IO.CONSISTENCY_CHECKS) {
 			for (i=1; i<nBlocks-1; i++) {
 				if (isBlockOpen[i]) {
@@ -2090,27 +2076,79 @@ public class RepeatAlphabet {
 				}
 			}
 		}
+		if (nBlocks<2 || (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0)) {
+			bw.write(str); bw.newLine();
+			return;
+		}
+		
+		// Non-kmer-based fixes
+		p=str.indexOf(SEPARATOR_MAJOR+""); q=str.lastIndexOf(SEPARATOR_MAJOR+"");
+		fixedFirst=-1; fixedLast=-1;
+		if (lastInBlock_int[0]>0) fixedFirst=fixEndBlocks_impl_basic(0);
+		if (lastInBlock_int[nBlocks-1]>0) fixedLast=fixEndBlocks_impl_basic(nBlocks-1);
+		if (fixedFirst>=0 && fixedLast>=0) {
+			bw.write(fixedFirst+str.substring(p,q+1)+fixedLast); bw.newLine();
+			return;
+		}
+		
+		// Kmer-based fixes
+		if (nBlocks<k+1) {
+			if (fixedFirst>=0) bw.write(fixedFirst+str.substring(p)); 
+			else if (fixedLast>=0) bw.write(str.substring(0,q+1)+fixedLast); 
+			else bw.write(str);
+			bw.newLine();
+			return;
+		}
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
-		
-		// Fixing first and last block
-		i=str.indexOf(SEPARATOR_MAJOR+""); j=str.lastIndexOf(SEPARATOR_MAJOR+"");
 		if (lastInBlock_int[0]>0) {
-			out[1]++;
-			c=fixEndBlocks_impl(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
-			if (c>=0) { bw.write(c+str.substring(i,j+1)); out[0]++; }
-			else bw.write(str.substring(0,j+1));
+			if (fixedFirst>=0) bw.write(fixedFirst+str.substring(p,q+1));
+			else {
+				out[1]++;
+				c=fixEndBlocks_impl_kmer(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
+				if (c>=0) { bw.write(c+str.substring(p,q+1)); out[0]++; }
+				else bw.write(str.substring(0,q+1));
+			}
 		}
-		else bw.write(str.substring(0,j+1));
+		else bw.write(str.substring(0,q+1));
 		if (lastInBlock_int[nBlocks-1]>0) {
-			out[1]++;
-			c=fixEndBlocks_impl(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
-			if (c>=0) { bw.write(c+""); out[0]++; }
-			else bw.write(str.substring(j+1));
+			if (fixedLast>=0) bw.write(fixedLast+"");
+			else {
+				out[1]++;
+				c=fixEndBlocks_impl_kmer(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
+				if (c>=0) { bw.write(c+""); out[0]++; }
+				else bw.write(str.substring(q+1));
+			}
 		}
 		bw.newLine();
 	}
+	
+	
+	/**
+	 * If block $blockID$ contains multiple characters, but they are all canonized in the
+	 * same way, the procedure selects just one of the most open out of them.
+	 *
+	 * @return -1 if the block contains distinct characters after canonization; >=0 the 
+	 * selected character if the block contains a single character after canonization.
+	 */
+	private static final int fixEndBlocks_impl_basic(int blockID) {
+		int i, c, cPrime;
+		int count, canonized, canonizedCount, nonCanonized;
+		
+		canonized=-1; canonizedCount=-1; nonCanonized=-1;
+		for (i=0; i<=lastInBlock_int[blockID]; i++) {
+			c=intBlocks[blockID][i]; cPrime=canonizeCharacter(c,true);
+			count=(alphabet[c].openStart?1:0)+(alphabet[c].openEnd?1:0);
+			if (canonized==-1) { canonized=cPrime; canonizedCount=count; nonCanonized=c; }
+			else if (cPrime==canonized) {
+				if (count>canonizedCount) { canonizedCount=count; nonCanonized=c; }
+			}
+			else return -1;
+		}
+		return nonCanonized;
+	}
+	
 	
 	
 	/**
@@ -2122,10 +2160,10 @@ public class RepeatAlphabet {
 	 * the only predicted character cannot be found in the block to disambiguate; >=0: the
 	 * character that results from disambiguating the block.
 	 */
-	private static final int fixEndBlocks_impl(int first, int nBlocks, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, String str) {
+	private static final int fixEndBlocks_impl_kmer(int first, int nBlocks, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, String str) {
 		boolean sameOrientation;
 		int i, c;
-		int top1, top2, row, column, lastChild, predictedCharacter, selectedCharacter;
+		int top1, top2, count, row, column, lastChild, predictedCharacter, selectedCharacter, selectedCount;
 		Kmer key;
 		
 		// Collecting the single character predicted by every possible context
@@ -2185,19 +2223,16 @@ public class RepeatAlphabet {
 		}
 		if (predictedCharacter==-1) return -1;
 		
-		// Checking the characters of $intBlocks$.
-		selectedCharacter=-1;
+		// Choosing the most open among all the characters in the block that canonize to
+		// the character predicted by the context.
+		selectedCharacter=-1; selectedCount=-1;
 		if (first==1) {
 			for (i=0; i<=lastInBlock_int[0]; i++) {
 				if (canonizeCharacter(intBlocks[0][i],true)==predictedCharacter) {
-					if (selectedCharacter==-1) selectedCharacter=intBlocks[0][i];
-					else if (selectedCharacter!=intBlocks[0][i]) {
-						System.err.println("fixEndBlocks_impl> ERROR: characters "+selectedCharacter+" and "+intBlocks[0][i]+" in the same first block canonize to the same character?!");
-						System.err.println("first character: "+alphabet[selectedCharacter]);
-						System.err.println("second character: "+alphabet[intBlocks[0][i]]);
-						System.err.println("predicted character: "+alphabet[predictedCharacter]);
-						System.err.println("translated read: "+str);
-						System.exit(1);
+					count=(alphabet[intBlocks[0][i]].openStart?1:0)+(alphabet[intBlocks[0][i]].openEnd?1:0);
+					if (selectedCharacter==-1 || (intBlocks[0][i]!=selectedCharacter && count>selectedCount)) {
+						selectedCharacter=intBlocks[0][i];
+						selectedCount=count;
 					}
 				}
 			}
@@ -2205,13 +2240,10 @@ public class RepeatAlphabet {
 		else {
 			for (i=0; i<=lastInBlock_int[nBlocks-1]; i++) {
 				if (canonizeCharacter(intBlocks[nBlocks-1][i],true)==predictedCharacter) {
-					if (selectedCharacter==-1) selectedCharacter=intBlocks[nBlocks-1][i];
-					else if (selectedCharacter!=intBlocks[nBlocks-1][i]) {
-						System.err.println("fixEndBlocks_impl> ERROR: characters "+selectedCharacter+" and "+intBlocks[nBlocks-1][i]+" in the same last block canonize to the same character?!");
-						System.err.println("first character: "+alphabet[selectedCharacter]);
-						System.err.println("second character: "+alphabet[intBlocks[nBlocks-1][i]]);
-						System.err.println("predicted character: "+alphabet[predictedCharacter]);
-						System.exit(1);
+					count=(alphabet[intBlocks[nBlocks-1][i]].openStart?1:0)+(alphabet[intBlocks[nBlocks-1][i]].openEnd?1:0);
+					if (selectedCharacter==-1 || (intBlocks[nBlocks-1][i]!=selectedCharacter && count>selectedCount)) {
+						selectedCharacter=intBlocks[nBlocks-1][i];
+						selectedCount=count;
 					}
 				}
 			}
@@ -3323,8 +3355,6 @@ public class RepeatAlphabet {
 			int top, selected, count, countSelected, currentCharacter;
 			Character tmpCharacter;
 			
-			if (lastCharacter==0) return;
-			
 			// Constraint 2
 			foundPeriodic=false; foundNonperiodic=false;
 			for (i=0; i<=lastCharacter; i++) {
@@ -3345,75 +3375,71 @@ public class RepeatAlphabet {
 				}
 				lastCharacter=j;
 			}
-			if (lastCharacter==0) return;
-			Arrays.sort(characters,0,lastCharacter+1);
+			if (lastCharacter>0) Arrays.sort(characters,0,lastCharacter+1);
 			
 			// Constraint 3 (using temporary field $Character.flag$).
 			if (!firstOrLast) {
-				for (i=0; i<=lastCharacter; i++) {
-					if (characters[i].openStart) characters[i].openStart=false;
-					if (characters[i].openEnd) characters[i].openEnd=false;
-				}
+				for (i=0; i<=lastCharacter; i++) { characters[i].openStart=false; characters[i].openEnd=false; }
 			}
-			for (i=0; i<=lastCharacter; i++) characters[i].flag=-1;
-			for (i=0; i<=lastCharacter; i++) {
-				if (characters[i].flag!=-1) continue;
-				characters[i].flag=i; top=0; stack[0]=i;
-				if (characters[i].isOpen()) { selected=-1; countSelected=0; }
-				else { 
-					selected=i;
-					countSelected=(characters[i].openStart?0:1)+(characters[i].openEnd?0:1);
-				}
-				while (top>=0) {
-					currentCharacter=stack[top--];
-					for (j=currentCharacter+1; j<=lastCharacter; j++) {
-						if (characters[j].repeat!=characters[currentCharacter].repeat || characters[j].orientation!=characters[currentCharacter].orientation) break;
-						if (characters[j].flag!=-1) continue;
-						if ( characters[j].start==-1 ||
-					   	 	 ( characters[j].start<=characters[currentCharacter].start+DISTANCE_THRESHOLD &&
-					           Math.abs(characters[j].end,characters[currentCharacter].end)<=DISTANCE_THRESHOLD
-					         )
-						   ) {
-							characters[j].flag=i;
-							count=(characters[j].openStart?0:1)+(characters[j].openEnd?0:1);
-							if ( selected==-1 || count>countSelected || 
-								 ( count==selected &&
-								   ( (characters[j].start==-1 && characters[j].length<characters[selected].length) ||
-								     (characters[j].start!=-1 && characters[j].end-characters[j].start<characters[selected].end-characters[selected].start)
-								   )
-								 )
+			if (lastCharacter>0) {
+				for (i=0; i<=lastCharacter; i++) characters[i].flag=-1;
+				for (i=0; i<=lastCharacter; i++) {
+					if (characters[i].flag!=-1) continue;
+					characters[i].flag=i; top=0; stack[0]=i;
+					if (characters[i].isOpen()) { selected=-1; countSelected=0; }
+					else { 
+						selected=i;
+						countSelected=(characters[i].openStart?0:1)+(characters[i].openEnd?0:1);
+					}
+					while (top>=0) {
+						currentCharacter=stack[top--];
+						for (j=currentCharacter+1; j<=lastCharacter; j++) {
+							if (characters[j].repeat!=characters[currentCharacter].repeat || characters[j].orientation!=characters[currentCharacter].orientation) break;
+							if (characters[j].flag!=-1) continue;
+							if ( characters[j].start==-1 ||
+						   	 	 ( characters[j].start<=characters[currentCharacter].start+DISTANCE_THRESHOLD &&
+						           Math.abs(characters[j].end,characters[currentCharacter].end)<=DISTANCE_THRESHOLD
+						         )
 							   ) {
-								selected=j; countSelected=count;
-								continue;
+								characters[j].flag=i;
+								count=(characters[j].openStart?0:1)+(characters[j].openEnd?0:1);
+								if ( selected==-1 || count>countSelected || 
+									 ( count==selected &&
+									   ( (characters[j].start==-1 && characters[j].length<characters[selected].length) ||
+									     (characters[j].start!=-1 && characters[j].end-characters[j].start<characters[selected].end-characters[selected].start)
+									   )
+									 )
+								   ) {
+									selected=j; countSelected=count;
+									continue;
+								}
+								stack[++top]=j;
 							}
-							stack[++top]=j;
+						}
+					}
+					if (selected==-1 || selected==i) {
+						// If all characters are open, we leave them flagged by $i$.
+					}
+					else {
+						for (j=i; j<=lastCharacter; j++) {
+							if (characters[j].repeat!=characters[i].repeat || characters[j].orientation!=characters[i].orientation) break;
+							if (characters[j].flag==i) characters[j].flag=selected;
 						}
 					}
 				}
-				if (selected==-1 || selected==i) {
-					// If all characters are open, we leave them flagged by $i$.
+				j=-1;
+				for (i=0; i<=lastCharacter; i++) {
+					if (characters[i].flag!=i) continue;
+					j++;
+					tmpCharacter=characters[j];
+					characters[j]=characters[i];
+					characters[i]=tmpCharacter;
 				}
-				else {
-					for (j=i; j<=lastCharacter; j++) {
-						if (characters[j].repeat!=characters[i].repeat || characters[j].orientation!=characters[i].orientation) break;
-						if (characters[j].flag==i) characters[j].flag=selected;
-					}
-				}
+				lastCharacter=j;
 			}
-			j=-1;
-			for (i=0; i<=lastCharacter; i++) {
-				if (characters[i].flag!=i) continue;
-				j++;
-				tmpCharacter=characters[j];
-				characters[j]=characters[i];
-				characters[i]=tmpCharacter;
-			}
-			lastCharacter=j;
-		}
+		}		
 		
 	}
-	
-	
 	
 	
 	/**
