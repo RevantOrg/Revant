@@ -2678,6 +2678,10 @@ public class RepeatAlphabet {
 	 * anyway, since it just encodes a similarity between substrings of (possibly 
 	 * different) repeats.
 	 *
+	 * Remark: the ad hoc handling of suffix-prefix overlaps in $filterAlignments_tight()$
+	 * is not needed here, since we keep an alignment just if it contains a unique 
+	 * interval in either read.
+	 *
 	 * Remark: every alignment between intervals at frequency <=H should be kept in the
 	 * assembly graph. In heterozygous regions such alignments might create multiple
 	 * alternative paths, and these should be resolved downstream. One might label every
@@ -2913,14 +2917,19 @@ public class RepeatAlphabet {
 	 * additionally requires that the intervals of the alignment in the two reads cover
 	 * matching sequences of boundaries and matching characters.
 	 *
+	 * Remark: a suffix-prefix alignment is kept even if it contains a unique interval in
+	 * just one read. This is allowed when the alignment straddles a unique interval on
+	 * the other read, on the side that is opposite to the end of the read.
+	 *
 	 * Remark: the procedure needs the following arrays: 
 	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, 
 	 * blueIntervals, blueIntervals_reads.
 	 */
 	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection) throws IOException {
-		boolean overlapsUniqueA;
+		final int DISTANCE_THRESHOLD = IO.quantum;
+		boolean orientation, overlapsUniqueA, straddlesLeftA, straddlesRightA;
 		int p, q;
-		int row, readA, readB, startA, endA, startB, endB;
+		int row, readA, readB, startA, endA, startB, endB, lengthA, lengthB;
 		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval, readAInTranslated;
 		final int nFullyContained = fullyContained.length;
 		final int nFullyUnique = fullyUnique.length;
@@ -2938,12 +2947,15 @@ public class RepeatAlphabet {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			// Processing readA
-			readA=Alignments.readA-1; readB=Alignments.readB-1;
+			readA=Alignments.readA-1; readB=Alignments.readB-1; orientation=Alignments.orientation;
 			startA=Alignments.startA; endA=Alignments.endA;
 			startB=Alignments.startB; endB=Alignments.endB;
+			lengthA=Reads.getReadLength(readA); lengthB=Reads.getReadLength(readB);
 			readAInTranslated=-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
-			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) overlapsUniqueA=true;
+			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
+				overlapsUniqueA=true; straddlesLeftA=false; straddlesRightA=false;
+			}
 			else {
 				while (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]<readA) lastFullyContained++;
 				if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) {
@@ -2957,12 +2969,16 @@ public class RepeatAlphabet {
 				}
 				readAInTranslated=lastTranslated;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection);
+				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection);
 				if (q==-1) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
 				}
-				else overlapsUniqueA=q==0||q==1;
+				overlapsUniqueA=q==0||q==1; straddlesLeftA=q==3||q==5; straddlesRightA=q==4||q==5;
+				if (!overlapsUniqueA && q!=2 && !(startA<=DISTANCE_THRESHOLD && straddlesRightA) && !(endA>=lengthA-DISTANCE_THRESHOLD && straddlesLeftA)) {
+					bw.write("0\n"); str=br.readLine(); row++;
+					continue;
+				}
 			}
 			// Processing readB
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
@@ -2977,21 +2993,76 @@ public class RepeatAlphabet {
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
 			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);
-			if (q==0 || q==1) {
+			if (q==-1) bw.write("0\n");
+			else if (q==0 || q==1) {
 				if (mode) bw.write(overlapsUniqueA?"1\n":"0\n");
 				else bw.write("1\n");
 			}
 			else if (q==2) {
-				if (mode) {
-					if (overlapsUniqueA) bw.write("0\n");
-					else {
-						if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,Alignments.orientation)) bw.write("1\n");
-						else bw.write("0\n");
+				if (overlapsUniqueA) {
+					if (mode) bw.write("0\n");
+					else bw.write("1\n");
+				}
+				else if (straddlesLeftA) {
+					if ((orientation && startB<=DISTANCE_THRESHOLD) || (!orientation && endB>=lengthB-DISTANCE_THRESHOLD)) {
+						if (mode) {
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							else bw.write("0\n");
+						}
+						else bw.write("1\n");
 					}
 				}
-				else bw.write("1\n");
+				else if (straddlesRightA) {
+					if ((orientation && endB>=lengthB-DISTANCE_THRESHOLD) || (!orientation && startB<=DISTANCE_THRESHOLD)) {
+						if (mode) {
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							else bw.write("0\n");
+						}
+						else bw.write("1\n");
+					}
+				}
+				else {
+					if (mode) {
+						if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+						else bw.write("0\n");
+					}
+					else bw.write("1\n");
+				}
 			}
-			else bw.write("0\n");
+			else if (q==3 || q==5) {
+				if (overlapsUniqueA) {
+					if (mode) bw.write("0\n");
+					else bw.write("1\n");
+				}
+				else if (straddlesLeftA || straddlesRightA) bw.write("0\n");
+				else {
+					if ((orientation && startA<=DISTANCE_THRESHOLD) || (!orientation && endA>=lengthA-DISTANCE_THRESHOLD)) {
+						if (mode) {
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							else bw.write("0\n");
+						}
+						else bw.write("1\n");
+					}
+					else bw.write("0\n");
+				}
+			}
+			else if (q==4 || q==5) {
+				if (overlapsUniqueA) {
+					if (mode) bw.write("0\n");
+					else bw.write("1\n");
+				}
+				else if (straddlesLeftA || straddlesRightA) bw.write("0\n");
+				else {
+					if ((orientation && endA>=lengthA-DISTANCE_THRESHOLD) || (!orientation && startA<=DISTANCE_THRESHOLD)) {
+						if (mode) {
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							else bw.write("0\n");
+						}
+						else bw.write("1\n");
+					}
+					else bw.write("0\n");
+				}
+			}
 			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
@@ -3007,9 +3078,15 @@ public class RepeatAlphabet {
 	 * 1: straddles a non-repetitive region;
 	 * 2: contains a sequence of repeat characters that is likely to occur <=H times in 
 	 *    the genome, where H is the number of haplotypes;
-	 * -1: none of the above.
+	 * 3: straddles, but does not fully contain, a sequence in point (2), on the left side
+	 *    of the interval;
+	 * 4: straddles, but does not fully contain, a sequence in point (2), on the right
+	 *    side of the interval;
+	 * 5: both (3) and (4) are true;
+	 * -1: none of the above is true.
 	 */
 	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
+		boolean straddlesLeft, straddlesRight;
 		int i, j;
 		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
@@ -3051,6 +3128,7 @@ public class RepeatAlphabet {
 		// Checking the repetitive blocks of the read, if any.
 		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
 		if (blueIntervalsID!=-1) {
+			straddlesLeft=false; straddlesRight=false;
 			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
 				firstBlock=blueIntervals[blueIntervalsID][i];
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
@@ -3059,7 +3137,14 @@ public class RepeatAlphabet {
 				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
 				   ) return 2;
+				else if (intervalEnd>=start+minIntersection && intervalEnd<end && intervalStart<start) straddlesRight=true;
+				else if (end>=intervalStart+minIntersection && end<intervalEnd && start<intervalStart) straddlesLeft=true;
 			}
+			if (straddlesLeft) {
+				if (straddlesRight) return 5;
+				else return 3;
+			}
+			else if (straddlesRight) return 4;
 		}
 		
 		return -1;

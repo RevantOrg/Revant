@@ -27,12 +27,12 @@ READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
 TMPFILE_NAME="getUniqueSubstrings-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
-READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
+READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 READS_TRANSLATED_BOUNDARIES="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=${HAPLOTYPE_COVERAGE}
 MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + (${HAPLOTYPE_COVERAGE}-1) ))
-# We use open blocks if they match just one character, since they are the only way to
+# Open blocks are allowed if they match just one character, since they are the only way to
 # detect e.g. a transposon that is longer than every read and that occurs just once in
 # the genome, or an extremely long satellite that occurs just once in the genome.
 UNIQUE_MODE="1"; OPEN_MODE="0"; MULTI_MODE="1"
