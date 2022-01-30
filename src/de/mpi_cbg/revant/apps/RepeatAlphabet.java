@@ -2029,7 +2029,15 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Tries to disambiguate the first and the last block of $str$ using the sorrounding
-	 * context of length $k$, and appends the updated $str$ to $bw$.
+	 * context of length $k$, and appends the updated $str$ to $bw$. This is useful, since
+	 * ambiguous endblocks are not included in the unique intervals that are built 
+	 * downstream, and thus a suffix-prefix alignment is more likely to be filtered out by
+	 * $filterAlignments_*()$ if its endblock is ambiguous.
+	 *
+	 * Remark: this procedure might disambiguate just few endblocks in practice. This is
+	 * expected, since we need a strong signal from a length-k context to proceed. Even
+	 * few disambiguated endblocks might have a large effect on the number of filtered
+	 * alignments.
 	 *
 	 * Remark: multiple characters in the same first/last block might canonize to the same
 	 * character, since we wrote all the characters that imply the block, and the alphabet
@@ -2053,9 +2061,8 @@ public class RepeatAlphabet {
  	 * elements in $intBlocks$;
  	 * @param tmpArray2 temporary space, of size at least k;
  	 * @param tmpArray3 temporary space, of size at least 2k;
-	 * @param out adds to cell 0 the number of blocks disambiguated by the procedure using
-	 * k-mers (0,1,2), and to cell 1 the max number of blocks that could have been 
-	 * disambiguated with a k-mer (0,1,2).
+	 * @param out adds to cell 0 the number of blocks disambiguated by the procedure 
+	 * (0,1,2), and to cell 1 the total number of ambiguous blocks (0,1,2).
 	 */
 	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out) throws IOException {
 		int i, j, c, d, p, q;
@@ -2080,6 +2087,8 @@ public class RepeatAlphabet {
 			bw.write(str); bw.newLine();
 			return;
 		}
+		if (lastInBlock_int[0]>0) out[1]++;
+		if (lastInBlock_int[nBlocks-1]>0) out[1]++;
 		
 		// Non-kmer-based fixes
 		p=str.indexOf(SEPARATOR_MAJOR+""); q=str.lastIndexOf(SEPARATOR_MAJOR+"");
@@ -2087,14 +2096,21 @@ public class RepeatAlphabet {
 		if (lastInBlock_int[0]>0) fixedFirst=fixEndBlocks_impl_basic(0);
 		if (lastInBlock_int[nBlocks-1]>0) fixedLast=fixEndBlocks_impl_basic(nBlocks-1);
 		if (fixedFirst>=0 && fixedLast>=0) {
+			out[0]+=2;
 			bw.write(fixedFirst+str.substring(p,q+1)+fixedLast); bw.newLine();
 			return;
 		}
 		
 		// Kmer-based fixes
 		if (nBlocks<k+1) {
-			if (fixedFirst>=0) bw.write(fixedFirst+str.substring(p)); 
-			else if (fixedLast>=0) bw.write(str.substring(0,q+1)+fixedLast); 
+			if (fixedFirst>=0) {
+				out[0]++;
+				bw.write(fixedFirst+str.substring(p)); 
+			}
+			else if (fixedLast>=0) {
+				out[0]++;
+				bw.write(str.substring(0,q+1)+fixedLast);
+			}
 			else bw.write(str);
 			bw.newLine();
 			return;
@@ -2103,24 +2119,35 @@ public class RepeatAlphabet {
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		if (lastInBlock_int[0]>0) {
-			if (fixedFirst>=0) bw.write(fixedFirst+str.substring(p,q+1));
+			if (fixedFirst>=0) {
+				out[0]++;
+				bw.write(fixedFirst+str.substring(p,q+1));
+			}
 			else {
-				out[1]++;
 				c=fixEndBlocks_impl_kmer(1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
-				if (c>=0) { bw.write(c+str.substring(p,q+1)); out[0]++; }
+				if (c>=0) { 
+					out[0]++;
+					bw.write(c+str.substring(p,q+1)); 
+				}
 				else bw.write(str.substring(0,q+1));
 			}
 		}
 		else bw.write(str.substring(0,q+1));
 		if (lastInBlock_int[nBlocks-1]>0) {
-			if (fixedLast>=0) bw.write(fixedLast+"");
+			if (fixedLast>=0) {
+				out[0]++;
+				bw.write(fixedLast+"");
+			}
 			else {
-				out[1]++;
 				c=fixEndBlocks_impl_kmer(nBlocks-k-1,nBlocks,k,kmers,tightMode,context,tmpArray1,tmpArray2,tmpArray3,str);
-				if (c>=0) { bw.write(c+""); out[0]++; }
+				if (c>=0) { 
+					out[0]++;
+					bw.write(c+"");
+				}
 				else bw.write(str.substring(q+1));
 			}
 		}
+		else bw.write(str.substring(q+1));
 		bw.newLine();
 	}
 	
@@ -2148,7 +2175,6 @@ public class RepeatAlphabet {
 		}
 		return nonCanonized;
 	}
-	
 	
 	
 	/**

@@ -12,8 +12,7 @@ public class FixEndBlocks {
 	/**
 	 * Remark: the program writes $X,Y,Z$ to STDOUT, where X is the number of read ends
 	 * that have been disambiguated, Y is the max number of read ends that could have been
-	 * possibly disambiguated with a context of length K, and Z is the total number of 
-	 * reads.
+	 * possibly disambiguated, and Z is the total number of reads.
 	 *
 	 * @param args 
 	 * 1: input file of translated reads with ambiguous starts/ends;
