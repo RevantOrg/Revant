@@ -71,7 +71,7 @@ public class FixEndBlocks {
 		bw = new BufferedWriter(new FileWriter(STATS_FILE));
 		bw.write(out[0]+","+out[1]+","+nReads+"\n");
 		bw.close();
-		System.err.println("Distribution of endpoints ambiguity: (0=)");
+		System.err.println("Distribution of endpoints ambiguity:");
 		last=-1;
 		for (i=0; i<=MAX_AMBIGUITY_HISTOGRAM; i++) {
 			if (ambiguityHistogram[i]!=0) last=i;

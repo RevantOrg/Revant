@@ -484,8 +484,9 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Quantizes the endpoints of every repeat and removes character instances that can be
-	 * considered substrings of others.
+	 * Quantizes the endpoints of every repeat, and removes character instances that are
+	 * less specific than others (this is done just to reduce the size of the alphabet, to
+	 * speed up the procedures downstream).
 	 *
 	 * Remark: the procedure compacts only characters in the same orientation.
 	 *
@@ -1142,15 +1143,15 @@ public class RepeatAlphabet {
 				if (i<0) i=-1-i;
 				found=false;
 				for (j=i; j<=lastAlphabet; j++) {
-					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation || alphabet[j].implies_tooFarAfter(character)) break;
-					if (alphabet[j].implies(character,quantum) || alphabet[j].isSimilar(character)) {
+					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation) break;
+					if (alphabet[j].implies(character,quantum)) {
 					   found=true;
 					   last=appendToStack(j,last);
 					}
 				}
 				for (j=i-1; j>lastPeriodic; j--) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation) break;
-					if (alphabet[j].implies(character,quantum) || alphabet[j].isSimilar(character)) {
+					if (alphabet[j].implies(character,quantum)) {
 						found=true;
 						last=appendToStack(j,last);
 					}
@@ -1394,7 +1395,7 @@ public class RepeatAlphabet {
 	 * Remark: the procedure follows the logic of $incrementCharacterCounts()$.
 	 */
 	private static final void loadIntBlocks(int nBlocks) {
-		boolean orientation, unique;
+		boolean orientation, unique, found;
 		int i, j, k, c;
 		int to, last, value, nElements, repeat;
 		
@@ -1417,17 +1418,22 @@ public class RepeatAlphabet {
 			nElements=0;
 			for (j=0; j<=last; j++) {
 				value=Integer.parseInt(blocks[i][j]);
-				if (value>=0) nElements++;
+				found=false;
+				if (value>=0) { found=true; nElements++; }
 				else {
 					value=-1-value;
-					if (value<=lastUnique) nElements+=lastUnique+1-value;
+					if (value<=lastUnique) { found=true; nElements+=lastUnique+1-value; }
 					else {
 						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
 						for (k=value; k<=lastPeriodic; k++) {
 							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
-							if (alphabet[k].implies(alphabet[value],-1)) nElements++;
+							if (alphabet[k].implies(alphabet[value],-1)) { found=true; nElements++; }
 						}
 					}
+				}
+				if (!found) {
+					System.err.println("loadIntBlocks> ERROR: character ID "+blocks[i][j]+" in a translated read is not implied by any character in the alphabet.");
+					System.exit(1);
 				}
 			}
 			if (intBlocks[i].length<nElements) intBlocks[i] = new int[nElements];
@@ -3684,30 +3690,31 @@ if (lastInBlock_int[0]==-1 || lastInBlock_int[nBlocks-1]==-1) {
 		
 		
 		/**
-		 * Both characters are assumed to be quantized, and repetitive with the same 
-		 * repeat and in the same orientation. Unique characters are not assumed to imply 
-		 * one another, since fully-open and half-open unique characters are assumed to 
-		 * have been discarded.
+		 * Tells whether this character is more specific than, or as specific as, 
+		 * $otherCharacter$ (a character implies itself). 
 		 *
-		 * ------------------------------>
+		 * Remark: both characters are assumed to be quantized, and repetitive with the 
+		 * same repeat and in the same orientation. Unique characters are not assumed to
+		 * imply  one another, since fully-open and half-open unique characters are 
+		 * assumed to have been discarded.
 		 */
 		public final boolean implies(Character otherCharacter, int quantum) {
 			if (start==-1) {  // Periodic
-				if (length!=otherCharacter.length) return false;
-				else if ( (!otherCharacter.openStart && !otherCharacter.openEnd) ||
-					      (!otherCharacter.openStart && openStart) ||
-				          (!otherCharacter.openEnd && openEnd)
-						) return false;
+				if (length<otherCharacter.length) return false;
+				else if (length==otherCharacter.length) {
+					if ((openStart && !otherCharacter.openStart) || (openEnd && !otherCharacter.openEnd)) return false;
+					else return true;
+				}
+				else {
+					if (!openStart && !openEnd && !otherCharacter.openStart && !otherCharacter.openEnd) return false;
+					else if ((openStart && !otherCharacter.openStart) || (openEnd && !otherCharacter.openEnd)) return false;
+					else return true;
+				}
 			}
 			else {  // Nonperiodic
 				if (otherCharacter.start==start && otherCharacter.end==end) {
-					if (Math.abs(getLength(),repeatLengths[repeat])<=quantum) {
-						if ( (!openStart && !openEnd && (otherCharacter.openStart || otherCharacter.openEnd)) ||
-							 ((!openStart || !openEnd) && otherCharacter.openStart && otherCharacter.openEnd)
-						   ) return true;
-						else return false;
-					}
-					else return false;
+					if ((openStart && !otherCharacter.openStart) || (openEnd && !otherCharacter.openEnd)) return false;
+					else return true;
 				}
 				else if (Intervals.isContained(otherCharacter.start,otherCharacter.end,start,end)) {
 					if ( (start==otherCharacter.start && openStart && !otherCharacter.openStart) ||
@@ -3715,16 +3722,18 @@ if (lastInBlock_int[0]==-1 || lastInBlock_int[nBlocks-1]==-1) {
 						 (end==otherCharacter.end && openEnd && !otherCharacter.openEnd) ||
 						 (otherCharacter.end<end && !otherCharacter.openEnd)
 					   ) return false;
+					else return true;
 				}
 				else return false;
 			}
-			return true;
 		}
 		
 		
 		/**
-		 * Assumes that the characters have the same repeats, and uses the same criteria 
-		 * as $implies()$.
+		 * Tells whether neither this character nor any character that follows in the 
+		 * alphabet can be implied by $otherCharacter$.
+		 * 
+		 * Remark: the procedure assumes that the characters have the same repeats.
 		 */
 		public final boolean implies_tooFarAfter(Character otherCharacter) {
 			if (start==-1) {  // Periodic
@@ -3738,15 +3747,6 @@ if (lastInBlock_int[0]==-1 || lastInBlock_int[nBlocks-1]==-1) {
 		
 		public final boolean sameOpen(Character otherCharacter) {
 			return openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
-		}
-		
-		
-		/**
-		 * Assumes that the characters have the same repeat and are quantized.
-		 */
-		public final boolean isSimilar(Character otherCharacter) {
-			return start==otherCharacter.start && end==otherCharacter.end && length==otherCharacter.length && 
-				   openStart==otherCharacter.openStart && openEnd==otherCharacter.openEnd;
 		}
 		
 		
