@@ -2062,9 +2062,11 @@ public class RepeatAlphabet {
  	 * @param tmpArray2 temporary space, of size at least k;
  	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param out adds to cell 0 the number of blocks disambiguated by the procedure 
-	 * (0,1,2), and to cell 1 the total number of ambiguous blocks (0,1,2).
+	 * (0,1,2), and to cell 1 the total number of ambiguous blocks (0,1,2);
+	 * @param ambiguityHistogram adds to cell $i$ the number of endblocks that contain $i$ 
+	 * characters, for every read with at least two blocks.
 	 */
-	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out) throws IOException {
+	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out, int[] ambiguityHistogram) throws IOException {
 		int i, j, c, d, p, q;
 		int nBlocks, sum, fixedFirst, fixedLast;
 		
@@ -2083,7 +2085,21 @@ public class RepeatAlphabet {
 				}
 			}
 		}
-		if (nBlocks<2 || (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0)) {
+		if (nBlocks<2) {
+			bw.write(str); bw.newLine();
+			return;
+		}
+		
+		
+if (lastInBlock_int[0]==-1 || lastInBlock_int[nBlocks-1]==-1) {
+	System.err.println("VITTU> no character in first or last block?!    "+str);		
+	System.exit(1);
+}
+		
+		
+		ambiguityHistogram[lastInBlock_int[0]+1>=ambiguityHistogram.length?ambiguityHistogram.length-1:lastInBlock_int[0]+1]++;
+		ambiguityHistogram[lastInBlock_int[nBlocks-1]+1>=ambiguityHistogram.length?ambiguityHistogram.length-1:lastInBlock_int[nBlocks-1]+1]++;
+		if (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0) {
 			bw.write(str); bw.newLine();
 			return;
 		}
@@ -3672,6 +3688,8 @@ public class RepeatAlphabet {
 		 * repeat and in the same orientation. Unique characters are not assumed to imply 
 		 * one another, since fully-open and half-open unique characters are assumed to 
 		 * have been discarded.
+		 *
+		 * ------------------------------>
 		 */
 		public final boolean implies(Character otherCharacter, int quantum) {
 			if (start==-1) {  // Periodic

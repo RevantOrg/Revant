@@ -11,6 +11,18 @@ import de.mpi_cbg.revant.util.IO;
  * keeps only alignments such that the sequence of both intervals is likely to occur just 
  * once in the genome. MODE=2 additionally requires the intervals to cover matching 
  * characters of the repeat alphabet.
+ *
+ * Remark: an obvious limitation of character-based alignment filtering is that it cannot 
+ * achieve sub-character resolution. E.g. even if a 3-mer is unique in the genome, the
+ * filtering would discard an alignment that spans both adjacencies of the 3-mer, without 
+ * spanning the whole 3-mer. This is reasonable, since the first/last substrings are 
+ * partial and could match other characters (e.g. longer substrings of the same repeat).
+ *
+ * Remark: if there are no low-quality regions, all local alignments (i.e. not suffix-
+ * prefix) are likely repeat-induced, so one could discard them upstream and feed just
+ * suffix-prefix alignments to this program. Local alignments that are not repeat-induced
+ * are probably due to the heuristics of the aligner failing to continue an alignment, or 
+ * to wrong read corrections at previous stages of the assembly pipeline.
  */
 public class FilterAlignments {
 	

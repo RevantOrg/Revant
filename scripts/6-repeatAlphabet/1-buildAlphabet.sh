@@ -12,7 +12,7 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-MAX_ALIGNMENT_ERROR="0.2"  # Alignments with more error than this are discarded
+MAX_ALIGNMENT_ERROR="0.2"  # Repeat-read alignments with error > this are discarded
 N_THREADS="4"
 MIN_CHARACTER_FREQUENCY="5"  # Should be the coverage of one haplotype
 # REVANT

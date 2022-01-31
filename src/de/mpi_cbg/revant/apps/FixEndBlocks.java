@@ -1,6 +1,7 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.HashMap;
 
 /**
@@ -8,6 +9,7 @@ import java.util.HashMap;
  * sorrounding context of length $k$.
  */
 public class FixEndBlocks {
+	private static final int MAX_AMBIGUITY_HISTOGRAM = 20;  // Arbitrary
 	
 	/**
 	 * Remark: the program writes $X,Y,Z$ to STDOUT, where X is the number of read ends
@@ -25,14 +27,17 @@ public class FixEndBlocks {
 		final int K = Integer.parseInt(args[3]);
 		final boolean TIGHT_MODE = Integer.parseInt(args[4])==1;
 		final String NEW_TRANSLATED_FILE = args[5];
+		final String STATS_FILE = args[6];
 		
-		int nReads, nFixed;
+		int i;
+		int nReads, nFixed, last;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
 		RepeatAlphabet.Kmer newKmer, context;
 		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
 		int[] out, tmpArray1, tmpArray2, tmpArray3;
+		int[] ambiguityHistogram;
 		
 		// Loading k-mers and alphabet
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
@@ -52,16 +57,26 @@ public class FixEndBlocks {
 		out = new int[] {0,0};
 		tmpArray1 = new int[3000/*Arbitrary*/];
 		tmpArray2 = new int[K]; tmpArray3 = new int[(K)<<1];
+		ambiguityHistogram = new int[MAX_AMBIGUITY_HISTOGRAM+1];
+		Arrays.fill(ambiguityHistogram,0);
 		br = new BufferedReader(new FileReader(OLD_TRANSLATED_FILE));
 		bw = new BufferedWriter(new FileWriter(NEW_TRANSLATED_FILE));
 		str=br.readLine(); nReads=0;
 		while (str!=null) {
 			nReads++;
-			RepeatAlphabet.fixEndBlocks(str,K,kmers,TIGHT_MODE,context,tmpArray1,tmpArray2,tmpArray3,bw,out);
+			RepeatAlphabet.fixEndBlocks(str,K,kmers,TIGHT_MODE,context,tmpArray1,tmpArray2,tmpArray3,bw,out,ambiguityHistogram);
 			str=br.readLine();
 		}
 		br.close(); bw.close();
-		System.out.println(out[0]+","+out[1]+","+nReads);
+		bw = new BufferedWriter(new FileWriter(STATS_FILE));
+		bw.write(out[0]+","+out[1]+","+nReads+"\n");
+		bw.close();
+		System.err.println("Distribution of endpoints ambiguity: (0=)");
+		last=-1;
+		for (i=0; i<=MAX_AMBIGUITY_HISTOGRAM; i++) {
+			if (ambiguityHistogram[i]!=0) last=i;
+		}
+		for (i=0; i<=last; i++) System.err.println(i+","+ambiguityHistogram[i]);
 	}
 
 }

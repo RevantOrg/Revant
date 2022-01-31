@@ -15,7 +15,7 @@
 INPUT_DIR=$1
 N_HAPLOTYPES="2"
 HAPLOTYPE_COVERAGE="5"  # Of one haplotype
-MAX_K="10"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
+MAX_K="5"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
 N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"

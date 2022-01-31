@@ -47,7 +47,8 @@ function fixThread() {
 	local LOCAL_KMERS_FILE=$2
 	local LOCAL_K=$3
 	local LOCAL_NEW_TRANSLATED_FILE=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixEndBlocks ${ALPHABET_FILE} ${LOCAL_OLD_TRANSLATED_FILE} ${LOCAL_KMERS_FILE} ${LOCAL_K} ${TIGHT_MODE} ${LOCAL_NEW_TRANSLATED_FILE}
+	local LOCAL_STATS_FILE=$5
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixEndBlocks ${ALPHABET_FILE} ${LOCAL_OLD_TRANSLATED_FILE} ${LOCAL_KMERS_FILE} ${LOCAL_K} ${TIGHT_MODE} ${LOCAL_NEW_TRANSLATED_FILE} ${LOCAL_STATS_FILE}
 }
 
 rm -f "${TMPFILE_PATH}-1-*"
@@ -73,7 +74,7 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 	echo "Disambiguating read ends using contexts of length $((${K}-1))..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-$((${K}-1))-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-$((${K}-1))-}
-		fixThread ${FILE} ${K_MINUS_ONE_MERS_FILE} $((${K}-1)) ${TMPFILE_PATH}-${K}-${THREAD_ID} > ${TMPFILE_PATH}-counts-${K}-${THREAD_ID} &
+		fixThread ${FILE} ${K_MINUS_ONE_MERS_FILE} $((${K}-1)) ${TMPFILE_PATH}-${K}-${THREAD_ID} ${TMPFILE_PATH}-counts-${K}-${THREAD_ID} &
 	done
 	wait
 	N_FIXED="0"; N_FIXABLE="0"; N_ENDS="0";
