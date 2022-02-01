@@ -3,6 +3,7 @@ package de.mpi_cbg.revant.apps;
 import java.io.*;
 import de.mpi_cbg.revant.factorize.Reads;
 import de.mpi_cbg.revant.util.IO;
+import de.mpi_cbg.revant.util.Math;
 
 /**
  * Writes to the output instructions on which alignments to keep or to remove.
@@ -43,6 +44,7 @@ public class FilterAlignments {
 		final String OUTPUT_FILE = args[13];
 		
 		final int MIN_INTERSECTION = IO.quantum<<1;  // Arbitrary
+		long[][] stats;
 		
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
@@ -50,14 +52,20 @@ public class FilterAlignments {
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadBlueIntervals(UNIQUE_INTERVALS_FILE);
+		stats = new long[2][3];
+		Math.set(stats,0);
 		if (MODE==0) {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,false,TRANSLATED_BOUNDARIES_FILE);
-			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,OUTPUT_FILE,MIN_INTERSECTION);
+			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,OUTPUT_FILE,MIN_INTERSECTION,stats);
 		}
 		else {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,false,true,TRANSLATED_BOUNDARIES_FILE);
-			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,OUTPUT_FILE,MODE==1?false:true,MIN_INTERSECTION);
+			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,OUTPUT_FILE,MODE==1?false:true,MIN_INTERSECTION,stats);
 		}
+		System.err.println("All alignments:  (input, output)");
+		System.err.println("Suffix/prefix overlaps: \t"+stats[0][0]+" -> "+stats[1][0]+" ("+(100*((double)(stats[1][0]-stats[0][0]))/stats[0][0])+"%)");
+		System.err.println("Local substring: \t\t"+stats[0][1]+" -> "+stats[1][1]+" ("+(100*((double)(stats[1][1]-stats[0][1]))/stats[0][1])+"%)");
+		System.err.println("Full containment/identity: \t"+stats[0][2]+" -> "+stats[1][2]+" ("+(100*((double)(stats[1][2]-stats[0][2]))/stats[0][2])+"%)");
 	}
 
 }

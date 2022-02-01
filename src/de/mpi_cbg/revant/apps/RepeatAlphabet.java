@@ -2708,12 +2708,16 @@ public class RepeatAlphabet {
 	 *
 	 * @param alignmentsFile output of LAshow, assumed to be sorted by readA;
 	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
-	 * for the alignment not to be considered red.
+	 * for the alignment not to be considered red;
+	 * @param out output array containing the number of alignments for each type (columns)
+	 * specified in $Alignments.readAlignmentFile_getType()$; row 0: alignments in input;
+	 * row 1: alignments kept in output.
 	 */
-	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection) throws IOException {
+	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection, long[][] out) throws IOException {
+		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean isRepetitive;
 		int p;
-		int row, readA, readB;
+		int row, readA, readB, type;
 		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval;
 		final int nFullyContained = fullyContained.length;
 		final int nFullyUnique = fullyUnique.length;
@@ -2730,11 +2734,14 @@ public class RepeatAlphabet {
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
+			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
+			out[0][type]++;
 			// Processing readA
 			readA=Alignments.readA-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
 			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
 				bw.write("1\n"); str=br.readLine(); row++;
+				out[1][type]++;
 				continue;
 			}
 			isRepetitive=false;
@@ -2747,12 +2754,14 @@ public class RepeatAlphabet {
 			}
 			if (!isRepetitive) {
 				bw.write("1\n"); str=br.readLine(); row++;
+				out[1][type]++;
 				continue;
 			}
 			// Processing readB
 			readB=Alignments.readB-1;
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
 				bw.write("1\n"); str=br.readLine(); row++;
+				out[1][type]++;
 				continue;
 			}
 			else if (readInArray(readB,fullyContained,nFullyContained-1,lastFullyContained)>=0) {
@@ -2764,8 +2773,12 @@ public class RepeatAlphabet {
 				System.err.println("filterAlignments_loose> ERROR: read "+readB+" is neither translated, nor fully unique, nor fully contained in a repeat.");
 				System.exit(1);
 			}
-			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);			
-			bw.write(isRepetitive?"0\n":"1\n"); 
+			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);
+			if (isRepetitive) bw.write("0\n"); 
+			else {
+				bw.write("1\n"); 
+				out[1][type]++;
+			}
 			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
@@ -2937,11 +2950,11 @@ public class RepeatAlphabet {
 	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, 
 	 * blueIntervals, blueIntervals_reads.
 	 */
-	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection) throws IOException {
+	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection, long[][] out) throws IOException {
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		boolean orientation, overlapsUniqueA, straddlesLeftA, straddlesRightA;
 		int p, q;
-		int row, readA, readB, startA, endA, startB, endB, lengthA, lengthB;
+		int row, readA, readB, startA, endA, startB, endB, lengthA, lengthB, type;
 		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval, readAInTranslated;
 		final int nFullyContained = fullyContained.length;
 		final int nFullyUnique = fullyUnique.length;
@@ -2958,6 +2971,8 @@ public class RepeatAlphabet {
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
+			type=Alignments.readAlignmentFile_getType(DISTANCE_THRESHOLD);
+			out[0][type]++;
 			// Processing readA
 			readA=Alignments.readA-1; readB=Alignments.readB-1; orientation=Alignments.orientation;
 			startA=Alignments.startA; endA=Alignments.endA;
@@ -2994,8 +3009,17 @@ public class RepeatAlphabet {
 			}
 			// Processing readB
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
-				if (mode) bw.write(overlapsUniqueA?"1\n":"0\n");
-				else bw.write("1\n");
+				if (mode) {
+					if (overlapsUniqueA) {
+						bw.write("1\n");
+						out[1][type]++;
+					}
+					else bw.write("0\n");
+				}
+				else {
+					bw.write("1\n");
+					out[1][type]++;
+				}
 				str=br.readLine(); row++;
 				continue;
 			}
@@ -3007,53 +3031,92 @@ public class RepeatAlphabet {
 			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);
 			if (q==-1) bw.write("0\n");
 			else if (q==0 || q==1) {
-				if (mode) bw.write(overlapsUniqueA?"1\n":"0\n");
-				else bw.write("1\n");
+				if (mode) {
+					if (overlapsUniqueA) {
+						bw.write("1\n");
+						out[1][type]++;
+					}
+					else bw.write("0\n");
+				}
+				else {
+					bw.write("1\n");
+					out[1][type]++;
+				}
 			}
 			else if (q==2) {
 				if (overlapsUniqueA) {
 					if (mode) bw.write("0\n");
-					else bw.write("1\n");
+					else {
+						bw.write("1\n");
+						out[1][type]++;
+					}
 				}
 				else if (straddlesLeftA) {
 					if ((orientation && startB<=DISTANCE_THRESHOLD) || (!orientation && endB>=lengthB-DISTANCE_THRESHOLD)) {
 						if (mode) {
-							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+								bw.write("1\n");
+								out[1][type]++;
+							}
 							else bw.write("0\n");
 						}
-						else bw.write("1\n");
+						else {
+							bw.write("1\n");
+							out[1][type]++;
+						}
 					}
 				}
 				else if (straddlesRightA) {
 					if ((orientation && endB>=lengthB-DISTANCE_THRESHOLD) || (!orientation && startB<=DISTANCE_THRESHOLD)) {
 						if (mode) {
-							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+								bw.write("1\n");
+								out[1][type]++;
+							}
 							else bw.write("0\n");
 						}
-						else bw.write("1\n");
+						else {
+							bw.write("1\n");
+							out[1][type]++;
+						}
 					}
 				}
 				else {
 					if (mode) {
-						if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+						if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+							bw.write("1\n");
+							out[1][type]++;
+						}
 						else bw.write("0\n");
 					}
-					else bw.write("1\n");
+					else {
+						bw.write("1\n");
+						out[1][type]++;
+					}
 				}
 			}
 			else if (q==3 || q==5) {
 				if (overlapsUniqueA) {
 					if (mode) bw.write("0\n");
-					else bw.write("1\n");
+					else {
+						bw.write("1\n");
+						out[1][type]++;
+					}
 				}
 				else if (straddlesLeftA || straddlesRightA) bw.write("0\n");
 				else {
 					if ((orientation && startA<=DISTANCE_THRESHOLD) || (!orientation && endA>=lengthA-DISTANCE_THRESHOLD)) {
 						if (mode) {
-							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+								bw.write("1\n");
+								out[1][type]++;
+							}
 							else bw.write("0\n");
 						}
-						else bw.write("1\n");
+						else {
+							bw.write("1\n");
+							out[1][type]++;
+						}
 					}
 					else bw.write("0\n");
 				}
@@ -3061,16 +3124,25 @@ public class RepeatAlphabet {
 			else if (q==4 || q==5) {
 				if (overlapsUniqueA) {
 					if (mode) bw.write("0\n");
-					else bw.write("1\n");
+					else {
+						bw.write("1\n");
+						out[1][type]++;
+					}
 				}
 				else if (straddlesLeftA || straddlesRightA) bw.write("0\n");
 				else {
 					if ((orientation && endA>=lengthA-DISTANCE_THRESHOLD) || (!orientation && startA<=DISTANCE_THRESHOLD)) {
 						if (mode) {
-							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) bw.write("1\n");
+							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+								bw.write("1\n");
+								out[1][type]++;
+							}
 							else bw.write("0\n");
 						}
-						else bw.write("1\n");
+						else {
+							bw.write("1\n");
+							out[1][type]++;
+						}
 					}
 					else bw.write("0\n");
 				}

@@ -280,6 +280,37 @@ public class Alignments {
 	}
 	
 	
+	/**
+	 * @return the type of the alignment currently in the global variables written by
+	 * $readAlignmentsFile()$: 0=suffix-prefix overlap; 1=local substring; 2=full
+	 * containment or full identity.
+	 */
+	public static final int readAlignmentFile_getType(int identityThreshold) {	
+		if ( (startA<=identityThreshold && endA>=Reads.getReadLength(readA)-identityThreshold) ||
+			 (startB<=identityThreshold && endB>=Reads.getReadLength(readA)-identityThreshold)
+		   ) return 2;
+		if (orientation) {
+			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA)-identityThreshold) &&
+				   (startB>identityThreshold && endB>=Reads.getReadLength(readB)-identityThreshold)
+				 ) ||
+			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA)-identityThreshold) &&
+			   	   (startB<=identityThreshold && endB<Reads.getReadLength(readB)-identityThreshold)
+			   	 )
+			   ) return 0;
+		}
+		else {
+			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA)-identityThreshold) &&
+				   (startB<=identityThreshold && endB<Reads.getReadLength(readB)-identityThreshold)
+				 ) ||
+			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA)-identityThreshold) &&
+				   (startB>identityThreshold && endB>=Reads.getReadLength(readB)-identityThreshold)
+			   	 )
+			   ) return 0;
+		}
+		return 1;
+	}
+	
+	
 	public static final int nextParenthesis(boolean open, int p, String str) {
 		final int k = str.indexOf(open?"[":"]",p);
 		final int kPrime = str.indexOf(open?"<":">",p);
