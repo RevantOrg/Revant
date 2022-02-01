@@ -32,10 +32,10 @@ READS_TRANSLATED_BOUNDARIES="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=${HAPLOTYPE_COVERAGE}
 MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + (${HAPLOTYPE_COVERAGE}-1) ))
-# Open blocks are allowed if they match just one character, since they are the only way to
+# Endblocks are allowed if they match just one character, since they are the only way to
 # detect e.g. a transposon that is longer than every read and that occurs just once in
 # the genome, or an extremely long satellite that occurs just once in the genome.
-UNIQUE_MODE="1"; OPEN_MODE="0"; MULTI_MODE="1"
+UNIQUE_MODE="1"; MULTI_MODE="1"
 MAX_HISTOGRAM_COUNT="10000"  # Arbitrary
 rm -f ${TMPFILE_PATH}*
 rm -f ${INPUT_DIR}/unique-*
@@ -46,7 +46,7 @@ function kmersThread() {
 	local LOCAL_TRANSLATED_READS_FILE=$2
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$3
 	local LOCAL_KMERS_FILE=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${OPEN_MODE} ${MULTI_MODE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_KMERS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_KMERS_FILE}
 }
 
 function intervalsThread() {

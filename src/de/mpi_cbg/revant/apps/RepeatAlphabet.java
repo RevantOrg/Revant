@@ -101,7 +101,7 @@ public class RepeatAlphabet {
 	private static int[] lastInBlock, lastInBlock_int;
 	private static int[] boundaries;
 	private static int[][] intBlocks;
-	private static boolean[] isBlockUnique, isBlockOpen;  // = A character in the block is open (other characters in the same block might be closed).
+	private static boolean[] isBlockUnique;
 	
 	
 	/**
@@ -1409,8 +1409,6 @@ public class RepeatAlphabet {
 		if (lastInBlock_int==null || lastInBlock_int.length<nBlocks) lastInBlock_int = new int[nBlocks];
 		if (isBlockUnique==null || isBlockUnique.length<nBlocks) isBlockUnique = new boolean[nBlocks];
 		Math.set(isBlockUnique,nBlocks-1,false);
-		if (isBlockOpen==null || isBlockOpen.length<nBlocks) isBlockOpen = new boolean[nBlocks];
-		Math.set(isBlockOpen,nBlocks-1,false);
 		
 		// Building arrays
 		for (i=0; i<nBlocks; i++) {
@@ -1442,7 +1440,6 @@ public class RepeatAlphabet {
 				value=Integer.parseInt(blocks[i][j]);
 				if (value>=0) {
 					intBlocks[i][++k]=value;
-					if (value==lastAlphabet+1 || alphabet[value].isOpen()) isBlockOpen[i]=true;
 					if (value==lastAlphabet+1 || value<=lastUnique) unique=true;
 				}
 				else {
@@ -1458,7 +1455,6 @@ public class RepeatAlphabet {
 							if (alphabet[c].implies(alphabet[value],-1)) intBlocks[i][++k]=c;
 						}
 					}
-					isBlockOpen[i]=true;
 				}
 			}
 			lastInBlock_int[i]=k; isBlockUnique[i]=unique;
@@ -1801,8 +1797,8 @@ public class RepeatAlphabet {
 	
 	/**
 	 * If $newKmers$ is not null, the procedure uses every length-k window that satisfies 
-	 * the conditions in $uniqueMode,openMode,multiMode$ (see procedure $isValidWindow()$ 
-	 * for details) to add a k-mer to $newKmers$. If a block contains multiple characters, 
+	 * the conditions in $uniqueMode,multiMode$ (see procedure $isValidWindow()$ for 
+	 * details) to add a k-mer to $newKmers$. If a block contains multiple characters, 
 	 * every character can be used to build a k-mer. K-mers are canonized before being 
 	 * added to $newKmers$ (see $Kmer.canonize()$). Array $avoidedIntervals$ contains 
 	 * tuples (position,length,nHaplotypes) sorted by position: if a window contains one 
@@ -1829,7 +1825,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int openMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
+	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
 		int i, j;
 		int nBlocks, sum, start, end, nHaplotypes, out;
 		
@@ -1854,7 +1850,7 @@ public class RepeatAlphabet {
 		for (i=0; i<=nBlocks-k; i++) {
 			while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 			if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-			if (!isValidWindow(i,k,uniqueMode,openMode,multiMode)) continue;
+			if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
 			nHaplotypes=getKmers_impl(i,k,newKmers,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 			if (newKmers==null && nHaplotypes!=-1) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
 		}
@@ -1869,16 +1865,13 @@ public class RepeatAlphabet {
 	 * 0: are allowed; 
 	 * 1: are allowed everywhere, except in the first and last block of the window;
 	 * 2: are not allowed;
-	 * @param openMode open blocks:
-	 * 0: are allowed; 
-	 * 1: are not allowed;
 	 * @param multiMode blocks with multiple characters:
 	 * 0: are allowed; 
-	 * 1: are not allowed if they are open (open blocks are more likely to match several 
-	 *    characters because they contain just a fraction of a character);
+	 * 1: are not allowed if they are the first/last one (endblocks are more likely to
+	 *    match several characters because they contain just a fraction of a character);
 	 * 2: are not allowed.
 	 */
-	private static final boolean isValidWindow(int first, int k, int uniqueMode, int openMode, int multiMode) {
+	private static final boolean isValidWindow(int first, int k, int nBlocks, int uniqueMode, int multiMode) {
 		int i;
 		
 		if (uniqueMode==1) {
@@ -1889,15 +1882,8 @@ public class RepeatAlphabet {
 				if (isBlockUnique[first+i]) return false;
 			}
 		}
-		if (openMode==1) {
-			for (i=0; i<=k-1; i++) {
-				if (isBlockOpen[first+i]) return false;
-			}
-		}
 		if (multiMode==1) {
-			for (i=0; i<=k-1; i++) {
-				if (lastInBlock_int[first+i]>0 && isBlockOpen[first+i]) return false;
-			}
+			if ((first==0 && lastInBlock_int[first]>0) || (first+k-1==nBlocks-1 && lastInBlock_int[first+k-1]>0)) return false;
 		}
 		else if (multiMode==2) {
 			for (i=0; i<=k-1; i++) {
@@ -2043,7 +2029,12 @@ public class RepeatAlphabet {
 	 * Remark: this procedure might disambiguate just few endblocks in practice. This is
 	 * expected, since we need a strong signal from a length-k context to proceed. Even
 	 * few disambiguated endblocks might have a large effect on the number of filtered
-	 * alignments.
+	 * alignments, in theory.
+	 *
+	 * Remark: we are aware that we are treating blocks that contain several characters
+	 * differently, depending on whether they occur in the middle or at the end of a read.
+	 * One might want to try and disambiguate blocks in the middle of a read, as well. We
+	 * don't do it for simplicity.
 	 *
 	 * Remark: multiple characters in the same first/last block might canonize to the same
 	 * character, since we wrote all the characters that imply the block, and the alphabet
@@ -2069,10 +2060,12 @@ public class RepeatAlphabet {
  	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param out adds to cell 0 the number of blocks disambiguated by the procedure 
 	 * (0,1,2), and to cell 1 the total number of ambiguous blocks (0,1,2);
-	 * @param ambiguityHistogram adds to cell $i$ the number of endblocks that contain $i$ 
-	 * characters, for every read with at least two blocks.
+	 * @param ambiguityHistogram adds to cell $i$ of row 0 the number of endblocks that 
+	 * contain $i>=1$ characters, for every read with at least two blocks; adds to cell 
+	 * $i$ of row 1 the number of internal blocks that contain $i>=2$ characters, for 
+	 * every read with at least 3 blocks.
 	 */
-	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out, int[] ambiguityHistogram) throws IOException {
+	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out, int[][] ambiguityHistogram) throws IOException {
 		int i, j, c, d, p, q;
 		int nBlocks, sum, fixedFirst, fixedLast;
 		
@@ -2082,12 +2075,14 @@ public class RepeatAlphabet {
 		nBlocks=loadBlocks(str); loadIntBlocks(nBlocks);
 		if (IO.CONSISTENCY_CHECKS) {
 			for (i=1; i<nBlocks-1; i++) {
-				if (isBlockOpen[i]) {
-					System.err.println("fixEndBlocks> ERROR: interior block "+i+" contains open characters?!");
-					for (j=0; j<=lastInBlock_int[i]; j++) System.err.println(alphabet[intBlocks[i][j]]);
-					System.err.println("Translated read: "+str);
-					System.err.println();
-					System.exit(1);
+				for (j=0; j<=lastInBlock_int[i]; j++) {
+					if (alphabet[intBlocks[i][j]].isOpen()) {
+						System.err.println("fixEndBlocks> ERROR: interior block "+i+" contains open characters?!");
+						for (j=0; j<=lastInBlock_int[i]; j++) System.err.println(alphabet[intBlocks[i][j]]);
+						System.err.println("Translated read: "+str);
+						System.err.println();
+						System.exit(1);
+					}
 				}
 			}
 		}
@@ -2095,16 +2090,11 @@ public class RepeatAlphabet {
 			bw.write(str); bw.newLine();
 			return;
 		}
-		
-		
-if (lastInBlock_int[0]==-1 || lastInBlock_int[nBlocks-1]==-1) {
-	System.err.println("VITTU> no character in first or last block?!    "+str);		
-	System.exit(1);
-}
-		
-		
-		ambiguityHistogram[lastInBlock_int[0]+1>=ambiguityHistogram.length?ambiguityHistogram.length-1:lastInBlock_int[0]+1]++;
-		ambiguityHistogram[lastInBlock_int[nBlocks-1]+1>=ambiguityHistogram.length?ambiguityHistogram.length-1:lastInBlock_int[nBlocks-1]+1]++;
+		ambiguityHistogram[0][lastInBlock_int[0]+1>=ambiguityHistogram[0].length?ambiguityHistogram[0].length-1:lastInBlock_int[0]+1]++;
+		ambiguityHistogram[0][lastInBlock_int[nBlocks-1]+1>=ambiguityHistogram[0].length?ambiguityHistogram[0].length-1:lastInBlock_int[nBlocks-1]+1]++;
+		for (i=1; i<nBlocks-1; i++) {
+			if (lastInBlock_int[i]>0) ambiguityHistogram[1][lastInBlock_int[i]+1>=ambiguityHistogram[1].length?ambiguityHistogram[1].length-1:lastInBlock_int[i]+1]++;
+		}
 		if (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0) {
 			bw.write(str); bw.newLine();
 			return;
@@ -3693,9 +3683,15 @@ if (lastInBlock_int[0]==-1 || lastInBlock_int[nBlocks-1]==-1) {
 		 * Tells whether this character is more specific than, or as specific as, 
 		 * $otherCharacter$ (a character implies itself). 
 		 *
+		 * Remark: an open character is just a character that might continue on its open
+		 * sides. After $compactInstances()$, only open characters that cannot be implied
+		 * by any other character in the alphabet survive (e.g. long satellites). The open
+		 * status of a character should not affect anything downstream: open characters
+		 * are just characters like any other.
+		 *
 		 * Remark: both characters are assumed to be quantized, and repetitive with the 
 		 * same repeat and in the same orientation. Unique characters are not assumed to
-		 * imply  one another, since fully-open and half-open unique characters are 
+		 * imply one another, since fully-open and half-open unique characters are 
 		 * assumed to have been discarded.
 		 */
 		public final boolean implies(Character otherCharacter, int quantum) {

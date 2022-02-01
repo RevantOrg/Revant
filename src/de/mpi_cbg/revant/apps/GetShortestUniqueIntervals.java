@@ -10,6 +10,10 @@ import java.util.HashMap;
  * h < k; (2) intervals are not contained in one another. The program adds to every such
  * list all the occurrences of unique k-mers that do not contain an interval already in
  * the list.
+ *
+ * Remark: when we mark a unique k-mer in a read, we don't propagate this information to
+ * the reads that align to it, so the aligned region of another read might not be marked
+ * as unique, and it might even have completely different characters and block boundaries.
  */
 public class GetShortestUniqueIntervals {
 	
@@ -18,12 +22,11 @@ public class GetShortestUniqueIntervals {
 		final String TRANSLATED_FILE = args[1];
 		final String ALPHABET_FILE = args[2];
 		final int UNIQUE_MODE = Integer.parseInt(args[3]);  // See $RepeatAlphabet.isValidWindow()$
-		final int OPEN_MODE = Integer.parseInt(args[4]);
-		final int MULTI_MODE = Integer.parseInt(args[5]);
-		final String UNIQUE_KMERS_FILE = args[6];
-		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[7]);
-		final String OLD_INTERVALS_FILE = args[8];  // NULL to discard it
-		final String NEW_INTERVALS_FILE = args[9];  // Output
+		final int MULTI_MODE = Integer.parseInt(args[4]);
+		final String UNIQUE_KMERS_FILE = args[5];
+		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[6]);
+		final String OLD_INTERVALS_FILE = args[7];  // NULL to discard it
+		final String NEW_INTERVALS_FILE = args[8];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -79,7 +82,7 @@ public class GetShortestUniqueIntervals {
 				}
 			}
 			else lastUniqueInterval=-1;
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,OPEN_MODE,MULTI_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,tmpKmer,tmpArray2,tmpArray3);
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,tmpKmer,tmpArray2,tmpArray3);
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {

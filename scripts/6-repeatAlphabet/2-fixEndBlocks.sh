@@ -32,14 +32,14 @@ READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=${HAPLOTYPE_COVERAGE}
-UNIQUE_MODE="1"; OPEN_MODE="1"; MULTI_MODE="0"  # Open blocks are forbidden
+UNIQUE_MODE="1"; MULTI_MODE="0"  # Endblocks are forbidden
 rm -f ${TMPFILE_PATH}*
 
 function kmersThread() {
 	local LOCAL_K=$1
 	local LOCAL_TRANSLATED_READS_FILE=$2
 	local LOCAL_KMERS_FILE=$3
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${OPEN_MODE} ${MULTI_MODE} null ${LOCAL_KMERS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} null ${LOCAL_KMERS_FILE}
 }
 
 function fixThread() {

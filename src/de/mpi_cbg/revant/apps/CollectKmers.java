@@ -16,10 +16,9 @@ public class CollectKmers {
 		final String TRANSLATED_FILE = args[1];
 		final String ALPHABET_FILE = args[2];
 		final int UNIQUE_MODE = Integer.parseInt(args[3]);  // See $RepeatAlphabet.isValidWindow()$
-		final int OPEN_MODE = Integer.parseInt(args[4]);
-		final int MULTI_MODE = Integer.parseInt(args[5]);
-		final String AVOIDED_INTERVALS_FILE = args[6];  // NULL to discard it
-		final String KMERS_FILE = args[7];  // Output file
+		final int MULTI_MODE = Integer.parseInt(args[4]);
+		final String AVOIDED_INTERVALS_FILE = args[5];  // NULL to discard it
+		final String KMERS_FILE = args[6];  // Output file
 		
 		boolean INTERVALS_FILE_EXISTS = !AVOIDED_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -57,12 +56,12 @@ public class CollectKmers {
 				}
 			}
 			else lastAvoidedInterval=-1;
-			RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,OPEN_MODE,MULTI_MODE,kmers,null,avoidedIntervals,lastAvoidedInterval,-1,tmpKmer,tmpArray2,tmpArray3);
+			RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,kmers,null,avoidedIntervals,lastAvoidedInterval,-1,tmpKmer,tmpArray2,tmpArray3);
 			str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; row++;
 		}
 		br1.close(); nKmers=kmers.size();
 		if (INTERVALS_FILE_EXISTS) br2.close();
-		System.err.println(nKmers+" total distinct "+K+"-mers (uniqueMode="+UNIQUE_MODE+", openMode="+OPEN_MODE+", multiMode="+MULTI_MODE+")");
+		System.err.println(nKmers+" total distinct "+K+"-mers (uniqueMode="+UNIQUE_MODE+", multiMode="+MULTI_MODE+")");
 		
 		// Serializing sorted k-mers
 		keys = new RepeatAlphabet.Kmer[nKmers];

@@ -37,7 +37,7 @@ public class FixEndBlocks {
 		RepeatAlphabet.Kmer newKmer, context;
 		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
 		int[] out, tmpArray1, tmpArray2, tmpArray3;
-		int[] ambiguityHistogram;
+		int[][] ambiguityHistogram;
 		
 		// Loading k-mers and alphabet
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
@@ -57,8 +57,8 @@ public class FixEndBlocks {
 		out = new int[] {0,0};
 		tmpArray1 = new int[3000/*Arbitrary*/];
 		tmpArray2 = new int[K]; tmpArray3 = new int[(K)<<1];
-		ambiguityHistogram = new int[MAX_AMBIGUITY_HISTOGRAM+1];
-		Arrays.fill(ambiguityHistogram,0);
+		ambiguityHistogram = new int[2][MAX_AMBIGUITY_HISTOGRAM+1];
+		Arrays.fill(ambiguityHistogram[0],0); Arrays.fill(ambiguityHistogram[1],0);
 		br = new BufferedReader(new FileReader(OLD_TRANSLATED_FILE));
 		bw = new BufferedWriter(new FileWriter(NEW_TRANSLATED_FILE));
 		str=br.readLine(); nReads=0;
@@ -71,12 +71,12 @@ public class FixEndBlocks {
 		bw = new BufferedWriter(new FileWriter(STATS_FILE));
 		bw.write(out[0]+","+out[1]+","+nReads+"\n");
 		bw.close();
-		System.err.println("Distribution of endpoints ambiguity:");
+		System.err.println("Distribution of endpoints ambiguity:  (endblocks, interior blocks)");
 		last=-1;
 		for (i=0; i<=MAX_AMBIGUITY_HISTOGRAM; i++) {
-			if (ambiguityHistogram[i]!=0) last=i;
+			if (ambiguityHistogram[0][i]!=0 || ambiguityHistogram[1][i]!=0) last=i;
 		}
-		for (i=0; i<=last; i++) System.err.println(i+","+ambiguityHistogram[i]);
+		for (i=0; i<=last; i++) System.err.println(i+","+ambiguityHistogram[0][i]+","+ambiguityHistogram[1][i]);
 	}
 
 }
