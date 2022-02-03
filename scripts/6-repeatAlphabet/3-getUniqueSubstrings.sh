@@ -35,6 +35,9 @@ MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + (${HAPLOTYPE_CO
 # Endblocks are allowed if they match just one character, since they are the only way to
 # detect e.g. a transposon that is longer than every read and that occurs just once in
 # the genome, or an extremely long satellite that occurs just once in the genome.
+# We could allow, in a k-mer, just unique characters shorter than the min length needed
+# for them to be a unique address to the genome (the alignment filtering procedures
+# downstream ignore k-mers with long non-repetitive characters).
 UNIQUE_MODE="1"; MULTI_MODE="1"
 MAX_HISTOGRAM_COUNT="10000"  # Arbitrary
 rm -f ${TMPFILE_PATH}*

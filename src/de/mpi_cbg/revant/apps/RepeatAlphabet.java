@@ -1672,6 +1672,15 @@ public class RepeatAlphabet {
 	 * Updates the translation of a read into characters, assuming that $alphabetCount$ 
 	 * refers to the OLD alphabet before $cleanTranslatedRead_updateAlphabet()$.
 	 * 
+	 * Remark: real repeats might be inadvertedly discarded by this process, since the
+	 * frequency threshold is not perfect. Discarded repeat characters are transformed 
+	 * into non-repetitive: this completely discards the information that the substring 
+	 * of the read is similar to a repeat (this information might have been particularly 
+	 * useful if the discarded repeat was periodic), and it might affect alignment 
+	 * filtering downstream (any alignment that contains this new nonrepetitive character
+	 * might be kept, precisely because of this character). We keep things as they are for
+	 * simplicity.
+	 *	
 	 * @param read2characters_old old translation;
 	 * @param read2boundaries_old old block boundaries of the translation;
 	 * @param newAlphabet obtained from the old alphabet by running $cleanTranslatedRead_
@@ -2708,16 +2717,17 @@ public class RepeatAlphabet {
 	 *
 	 * @param alignmentsFile output of LAshow, assumed to be sorted by readA;
 	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
-	 * for the alignment not to be considered red;
+	 * for the alignment not to be considered red; this should not be too small, since
+	 * short non-repetitive regions might not address a unique locus of the genome;
 	 * @param out output array containing the number of alignments for each type (columns)
-	 * specified in $Alignments.readAlignmentFile_getType()$; row 0: alignments in input;
-	 * row 1: alignments kept in output.
+	 * specified in $Alignments.readAlignmentFile_getType()$; row 0: all alignments in 
+	 * input; row 1: all alignments kept in output; row 2: only input alignments that
+	 * intersect a non-repetitive region (these are kept in output).
 	 */
 	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection, long[][] out) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
-		boolean isRepetitive;
 		int p;
-		int row, readA, readB, type;
+		int row, readA, readB, type, value, isRepetitive;
 		int lastFullyContained, lastFullyUnique, lastTranslated, lastBlueInterval;
 		final int nFullyContained = fullyContained.length;
 		final int nFullyUnique = fullyUnique.length;
@@ -2741,27 +2751,28 @@ public class RepeatAlphabet {
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
 			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
 				bw.write("1\n"); str=br.readLine(); row++;
-				out[1][type]++;
+				out[1][type]++; out[2][type]++;
 				continue;
 			}
-			isRepetitive=false;
+			isRepetitive=-3;
 			while (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]<readA) lastFullyContained++;
-			if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) isRepetitive=true;
+			if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) isRepetitive=0;
 			else {
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				if (inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection)) isRepetitive=true;
+				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection);
 			}
-			if (!isRepetitive) {
+			if (isRepetitive!=0) {
 				bw.write("1\n"); str=br.readLine(); row++;
-				out[1][type]++;
+				out[1][type]++; 
+				if (isRepetitive==-1) out[2][type]++;
 				continue;
 			}
 			// Processing readB
 			readB=Alignments.readB-1;
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
 				bw.write("1\n"); str=br.readLine(); row++;
-				out[1][type]++;
+				out[1][type]++; out[2][type]++;
 				continue;
 			}
 			else if (readInArray(readB,fullyContained,nFullyContained-1,lastFullyContained)>=0) {
@@ -2774,10 +2785,11 @@ public class RepeatAlphabet {
 				System.exit(1);
 			}
 			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);
-			if (isRepetitive) bw.write("0\n"); 
+			if (isRepetitive==0) bw.write("0\n"); 
 			else {
-				bw.write("1\n"); 
+				bw.write("1\n");
 				out[1][type]++;
+				if (isRepetitive==-1) out[2][type]++;
 			}
 			str=br.readLine(); row++;
 		}
@@ -2802,9 +2814,14 @@ public class RepeatAlphabet {
 	 * @param blueIntervalsStart a position in $blueIntervals$ from which to start
 	 * the search when $blueIntervalsID=-2$;
 	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
-	 * for the alignment to be considered non-repetitive.
+	 * for the alignment to be considered non-repetitive;
+	 * @return interval $readID[intervalStart..intervalEnd]$:
+	 * -1: belongs to or straddles a non-repetitive region;
+	 * -2: contains a sequence of repeat characters that likely occurs <=H times in the 
+	 *     genome;
+	 *  0: none of the above is true.
 	 */
-	private static final boolean inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
+	private static final int inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
 		int i, j;
 		int mask, cell, start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
@@ -2821,7 +2838,7 @@ public class RepeatAlphabet {
 				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 				   )
 				 )
-			   ) return false;
+			   ) return -1;
 			mask<<=1;
 			for (j=1; j<8; j++) {
 				if (j==nBlocks-1) break;
@@ -2834,7 +2851,7 @@ public class RepeatAlphabet {
 						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 					   )
 					 ) 
-				   ) return false;
+				   ) return -1;
 				mask<<=1;
 			}
 		}
@@ -2853,7 +2870,7 @@ public class RepeatAlphabet {
 						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 					   )
 					 )
-				   ) return false;
+				   ) return -1;
 				mask<<=1;
 			}
 		}
@@ -2869,7 +2886,7 @@ public class RepeatAlphabet {
 					  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 				   )
 				 )
-			   ) return false;
+			   ) return -1;
 		}
 		
 		// Checking the repetitive blocks of the read, if any.
@@ -2882,11 +2899,11 @@ public class RepeatAlphabet {
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
 				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
-				   ) return false;
+				   ) return -2;
 			}
 		}
 		
-		return true;
+		return 0;
 	}
 	
 	
@@ -2949,6 +2966,9 @@ public class RepeatAlphabet {
 	 * Remark: the procedure needs the following arrays: 
 	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, 
 	 * blueIntervals, blueIntervals_reads.
+	 *
+	 * @param stats row 2 stores the number of input alignments that overlap a non-
+	 * repetitive region on both reads (these are kept in output).
 	 */
 	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection, long[][] out) throws IOException {
 		final int DISTANCE_THRESHOLD = IO.quantum;
@@ -3012,13 +3032,14 @@ public class RepeatAlphabet {
 				if (mode) {
 					if (overlapsUniqueA) {
 						bw.write("1\n");
-						out[1][type]++;
+						out[1][type]++; out[2][type]++;
 					}
 					else bw.write("0\n");
 				}
 				else {
 					bw.write("1\n");
 					out[1][type]++;
+					if (overlapsUniqueA) out[2][type]++;
 				}
 				str=br.readLine(); row++;
 				continue;
@@ -3034,13 +3055,14 @@ public class RepeatAlphabet {
 				if (mode) {
 					if (overlapsUniqueA) {
 						bw.write("1\n");
-						out[1][type]++;
+						out[1][type]++; out[2][type]++;
 					}
 					else bw.write("0\n");
 				}
 				else {
 					bw.write("1\n");
 					out[1][type]++;
+					if (overlapsUniqueA) out[2][type]++;
 				}
 			}
 			else if (q==2) {

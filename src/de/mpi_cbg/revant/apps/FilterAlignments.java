@@ -21,9 +21,12 @@ import de.mpi_cbg.revant.util.Math;
  *
  * Remark: if there are no low-quality regions, all local alignments (i.e. not suffix-
  * prefix) are likely repeat-induced, so one could discard them upstream and feed just
- * suffix-prefix alignments to this program. Local alignments that are not repeat-induced
- * are probably due to the heuristics of the aligner failing to continue an alignment, or 
- * to wrong read corrections at previous stages of the assembly pipeline.
+ * suffix-prefix alignments to this program. Local alignments that are not filtered out by
+ * the program might be due to: (1) rare repeat characters wrongly recoded as non-
+ * repetitive characters by our pipeline; (2) repeated k-mers with borderline frequency
+ * considered unique by our pipeline; (3) the heuristics of the aligner failing to 
+ * continue an alignment; (4) wrong read correction/patching at previous stages of the 
+ * assembly pipeline; (5) chimeric reads.
  */
 public class FilterAlignments {
 	
@@ -42,8 +45,9 @@ public class FilterAlignments {
 		final int MODE = Integer.parseInt(args[11]);
 		final String ALPHABET_FILE = args[12];  // Discarded if MODE==0
 		final String OUTPUT_FILE = args[13];
+		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[14]);
 		
-		final int MIN_INTERSECTION = IO.quantum<<1;  // Arbitrary
+		final int MIN_INTERSECTION = MIN_ALIGNMENT_LENGTH_READ_READ>>2;  // Arbitrary
 		long[][] stats;
 		
 		Reads.nReads=N_READS;
@@ -52,7 +56,7 @@ public class FilterAlignments {
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadBlueIntervals(UNIQUE_INTERVALS_FILE);
-		stats = new long[2][3];
+		stats = new long[3][3];
 		Math.set(stats,0);
 		if (MODE==0) {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,false,TRANSLATED_BOUNDARIES_FILE);
@@ -63,9 +67,9 @@ public class FilterAlignments {
 			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,OUTPUT_FILE,MODE==1?false:true,MIN_INTERSECTION,stats);
 		}
 		System.err.println("All alignments:  (input, output)");
-		System.err.println("Suffix/prefix overlaps: \t"+stats[0][0]+" -> "+stats[1][0]+" ("+(100*((double)(stats[1][0]-stats[0][0]))/stats[0][0])+"%)");
-		System.err.println("Local substring: \t\t"+stats[0][1]+" -> "+stats[1][1]+" ("+(100*((double)(stats[1][1]-stats[0][1]))/stats[0][1])+"%)");
-		System.err.println("Full containment/identity: \t"+stats[0][2]+" -> "+stats[1][2]+" ("+(100*((double)(stats[1][2]-stats[0][2]))/stats[0][2])+"%)");
+		System.err.println("Suffix/prefix overlaps: \t"+stats[0][0]+" ("+stats[2][0]+") -> "+stats[1][0]+" ("+(100*((double)(stats[1][0]-stats[0][0]))/stats[0][0])+"%)");
+		System.err.println("Local substring: \t\t"+stats[0][1]+" ("+stats[2][1]+") -> "+stats[1][1]+" ("+(100*((double)(stats[1][1]-stats[0][1]))/stats[0][1])+"%)");
+		System.err.println("Full containment/identity: \t"+stats[0][2]+" ("+stats[2][2]+") -> "+stats[1][2]+" ("+(100*((double)(stats[1][2]-stats[0][2]))/stats[0][2])+"%)");
 	}
 
 }
