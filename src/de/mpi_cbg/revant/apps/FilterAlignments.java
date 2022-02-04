@@ -19,14 +19,18 @@ import de.mpi_cbg.revant.util.Math;
  * spanning the whole 3-mer. This is reasonable, since the first/last substrings are 
  * partial and could match other characters (e.g. longer substrings of the same repeat).
  *
+ * Remark: this program does not filter by error rate. This basic check should have been
+ * already performed upstream.
+ *
  * Remark: if there are no low-quality regions, all local alignments (i.e. not suffix-
  * prefix) are likely repeat-induced, so one could discard them upstream and feed just
  * suffix-prefix alignments to this program. Local alignments that are not filtered out by
- * the program might be due to: (1) rare repeat characters wrongly recoded as non-
- * repetitive characters by our pipeline; (2) repeated k-mers with borderline frequency
- * considered unique by our pipeline; (3) the heuristics of the aligner failing to 
- * continue an alignment; (4) wrong read correction/patching at previous stages of the 
- * assembly pipeline; (5) chimeric reads.
+ * the program might be due to: (1) the repeat database not containing some repeats in the
+ * dataset (their occurrences might get tagged as non-repetitive); (2) rare repeat 
+ * characters wrongly recoded as non-repetitive characters by our pipeline; (3) repeated 
+ * k-mers with borderline frequency considered unique by our pipeline; (4) the heuristics 
+ * of the aligner failing to continue an alignment; (4) wrong read correction/patching at 
+ * previous stages of the assembly pipeline; (5) chimeric reads.
  */
 public class FilterAlignments {
 	
