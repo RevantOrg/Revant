@@ -14,7 +14,7 @@
 INPUT_DIR=$1
 MAX_ALIGNMENT_ERROR="0.2"  # Repeat-read alignments with error > this are discarded
 N_THREADS="4"
-MIN_CHARACTER_FREQUENCY="5"  # Should be the coverage of one haplotype
+MIN_CHARACTER_FREQUENCY="14"  # Should be the coverage of one haplotype
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------

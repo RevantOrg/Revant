@@ -328,7 +328,7 @@ public class RepeatAlphabet {
 				if (connectedComponent[i]!=1) connectedComponent[i]=-1;
 			}
 			else connectedComponent[i]=1;
-			j++;
+			j+=2;
 		}
 		j=-1;
 		for (i=0; i<=lastPoint; i++) {
@@ -379,7 +379,7 @@ public class RepeatAlphabet {
 			if (connectedComponent[i]==-1) continue;
 			points[++j]=points[i];
 		}
-		lastPoint=j;
+		lastPoint=j;		
 		
 		// Clustering all surviving points
 		for (i=0; i<lastPoint; i++) {
@@ -444,6 +444,7 @@ public class RepeatAlphabet {
 			else if (!isPeriodic[alignments[j].readB] && Intervals.isApproximatelyContained(startA,endA,alignments[j].startA,alignments[j].endA)) newBlock.addCharacter(alignments[j],distanceThreshold,startA,endA,tmpCharacter);
 			j++;
 		}
+		
 		// Last non-repetitive block (if any).
 		i=points[lastPoint];
 		if (lengthA-i>distanceThreshold) {
@@ -912,7 +913,7 @@ public class RepeatAlphabet {
 					}
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
-						recodeRead(quantum);
+						recodeRead(quantum);						
 						if (lastInSequence==-1) {
 							bw1.newLine(); bw2.newLine(); histogram[0]++;
 							bw3.write(previousReadA+"\n");
@@ -1817,6 +1818,10 @@ public class RepeatAlphabet {
 	 * $oldKmers$, and if so it appends a (position,length,nHaplotypes) tuple to 
 	 * $avoidedIntervals$ ($nHaplotypes$ is decided according to $haplotypeCoverage$).
 	 * The new value of $lastAvoidedInterval$ is returned in output.
+	 *
+	 * Remark: in the latter case above, 1-mers in $oldKmers$ are not used if they occur
+	 * in an endblock of the read, or in a block with multiple characters (for $k>1$ we do
+	 * not do this, since we assume that longer contexts are enough to disambiguate).
      *
 	 * Remark: 1-mers collected by this procedure might have a different (and even 
 	 * smaller) count than the one produced by the $getCharacterHistogram()$ pipeline, 
@@ -1861,7 +1866,7 @@ public class RepeatAlphabet {
 			if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
 			if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
 			nHaplotypes=getKmers_impl(i,k,newKmers,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-			if (newKmers==null && nHaplotypes!=-1) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
+			if (newKmers==null && nHaplotypes!=-1 && (k>1?true:i>0&&i<nBlocks-1&&lastInBlock_int[i]==1)) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
 		}
 		return out;
 	}
@@ -2746,12 +2751,17 @@ public class RepeatAlphabet {
 			Alignments.readAlignmentFile(str);
 			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
 			out[0][type]++;
+
+boolean fabio= (Alignments.readA==171613 && Alignments.readB==38298) || (Alignments.readB==171613 && Alignments.readA==38298);
+if (fabio) System.err.println("filterAlignments_loose> considering alignment "+str+" // Alignments.readA="+Alignments.readA+" Alignments.readB="+Alignments.readB);
+	
 			// Processing readA
 			readA=Alignments.readA-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
 			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
 				bw.write("1\n"); str=br.readLine(); row++;
 				out[1][type]++; out[2][type]++;
+if (fabio) System.err.println("filterAlignments_loose> 1  kept alignment "+str);
 				continue;
 			}
 			isRepetitive=-3;
@@ -2763,6 +2773,7 @@ public class RepeatAlphabet {
 				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection);
 			}
 			if (isRepetitive!=0) {
+if (fabio) System.err.println("filterAlignments_loose> 2  kept alignment because isRepetitive("+readA+")="+isRepetitive+": "+str);
 				bw.write("1\n"); str=br.readLine(); row++;
 				out[1][type]++; 
 				if (isRepetitive==-1) out[2][type]++;
@@ -2771,6 +2782,7 @@ public class RepeatAlphabet {
 			// Processing readB
 			readB=Alignments.readB-1;
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
+if (fabio) System.err.println("filterAlignments_loose> 3  kept alignment "+str);
 				bw.write("1\n"); str=br.readLine(); row++;
 				out[1][type]++; out[2][type]++;
 				continue;
@@ -2790,6 +2802,7 @@ public class RepeatAlphabet {
 				bw.write("1\n");
 				out[1][type]++;
 				if (isRepetitive==-1) out[2][type]++;
+if (fabio) System.err.println("filterAlignments_loose> 4  kept alignment because isRepetitive("+readB+")="+isRepetitive+": "+str);				
 			}
 			str=br.readLine(); row++;
 		}
@@ -2838,7 +2851,16 @@ public class RepeatAlphabet {
 				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 				   )
 				 )
-			   ) return -1;
+			   ) {
+if (readID==38297) {
+	System.err.println("inRedRegion> 0");
+	System.err.println("condition 1: "+Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd));
+	System.err.println("condition 2: "+Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd));
+	System.err.println("condition 3: "+Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd));
+	System.err.println("condition 4: "+Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)+" :: minIntersection="+minIntersection);
+}
+				   return -1;
+			   }
 			mask<<=1;
 			for (j=1; j<8; j++) {
 				if (j==nBlocks-1) break;
@@ -2851,7 +2873,10 @@ public class RepeatAlphabet {
 						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 					   )
 					 ) 
-				   ) return -1;
+				   ) {
+if (readID==38297) System.err.println("inRedRegion> 1");
+					   return -1;
+				   }
 				mask<<=1;
 			}
 		}
@@ -2870,7 +2895,10 @@ public class RepeatAlphabet {
 						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 					   )
 					 )
-				   ) return -1;
+				   ) {
+if (readID==38297) System.err.println("inRedRegion> 2");
+					   return -1;
+				   }
 				mask<<=1;
 			}
 		}
@@ -2886,7 +2914,10 @@ public class RepeatAlphabet {
 					  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 				   )
 				 )
-			   ) return -1;
+			   ) {
+if (readID==38297) System.err.println("inRedRegion> 3");
+				   return -1;
+			   }
 		}
 		
 		// Checking the repetitive blocks of the read, if any.

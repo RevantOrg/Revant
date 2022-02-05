@@ -281,29 +281,32 @@ public class Alignments {
 	
 	
 	/**
+	 * Remark: the procedure uses $-1+read*$ instead of global variables $read*$ as a read
+	 * ID.
+	 *
 	 * @return the type of the alignment currently in the global variables written by
 	 * $readAlignmentsFile()$: 0=suffix-prefix overlap; 1=local substring; 2=full
 	 * containment or full identity.
 	 */
 	public static final int readAlignmentFile_getType(int identityThreshold) {	
-		if ( (startA<=identityThreshold && endA>=Reads.getReadLength(readA)-identityThreshold) ||
-			 (startB<=identityThreshold && endB>=Reads.getReadLength(readA)-identityThreshold)
+		if ( (startA<=identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) ||
+			 (startB<=identityThreshold && endB>=Reads.getReadLength(readA-1)-identityThreshold)
 		   ) return 2;
 		if (orientation) {
-			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA)-identityThreshold) &&
-				   (startB>identityThreshold && endB>=Reads.getReadLength(readB)-identityThreshold)
+			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA-1)-identityThreshold) &&
+				   (startB>identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)
 				 ) ||
-			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA)-identityThreshold) &&
-			   	   (startB<=identityThreshold && endB<Reads.getReadLength(readB)-identityThreshold)
+			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) &&
+			   	   (startB<=identityThreshold && endB<Reads.getReadLength(readB-1)-identityThreshold)
 			   	 )
 			   ) return 0;
 		}
 		else {
-			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA)-identityThreshold) &&
-				   (startB<=identityThreshold && endB<Reads.getReadLength(readB)-identityThreshold)
+			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA-1)-identityThreshold) &&
+				   (startB<=identityThreshold && endB<Reads.getReadLength(readB-1)-identityThreshold)
 				 ) ||
-			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA)-identityThreshold) &&
-				   (startB>identityThreshold && endB>=Reads.getReadLength(readB)-identityThreshold)
+			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) &&
+				   (startB>identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)
 			   	 )
 			   ) return 0;
 		}

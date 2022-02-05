@@ -8,9 +8,9 @@ import de.mpi_cbg.revant.util.IO;
 import de.mpi_cbg.revant.util.Math;
 
 /**
- * Prints a simplified assembly graph from the alignments before and after filtering. This
- * should help checking whether the filtering induces a visible decrease in complexity
- * while at the same time preserving linearity.
+ * Prints a simplified assembly graph from the alignments before and after filtering.
+ * This should help checking whether the filtering induces a visible decrease in
+ * complexity while at the same time preserving linearity.
  */
 public class BuildAssemblyGraph {	
 	/**

@@ -51,7 +51,7 @@ public class FilterAlignments {
 		final String OUTPUT_FILE = args[13];
 		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[14]);
 		
-		final int MIN_INTERSECTION = MIN_ALIGNMENT_LENGTH_READ_READ>>2;  // Arbitrary
+		final int MIN_INTERSECTION = Math.max(MIN_ALIGNMENT_LENGTH_READ_READ>>2,IO.quantum*3);  // Arbitrary, should be defined in a more principled way.
 		long[][] stats;
 		
 		Reads.nReads=N_READS;

@@ -11,9 +11,9 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-ALIGNMENTS_FILE="${INPUT_DIR}/m54238_firstTen.1.m54238_firstTen.2.txt"
-MIN_ALIGNMENT_LENGTH="1000"  # In read-read alignments
-MAX_K_UNIQUE_INTERVALS="5"  # Same as in $2-getUniqueSubstrings.sh$
+ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-chrX-reads-reads.txt"
+MIN_ALIGNMENT_LENGTH="500"  # In read-read alignments
+MAX_K_UNIQUE_INTERVALS="5"  # Same as in $3-getUniqueSubstrings.sh$
 FILTERING_MODE="0"  # 0-loose, 1=tight, 2=tight with matching characters.
 N_THREADS="4"
 # REVANT
