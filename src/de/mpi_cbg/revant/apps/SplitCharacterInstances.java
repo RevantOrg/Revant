@@ -55,6 +55,15 @@ public class SplitCharacterInstances {
 		br.close(); outputFile.close();
 		headerFile.write(lastUnique+(RepeatAlphabet.SEPARATOR_MINOR+"")+lastPeriodic+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nInstancesInFile-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+"-1");
 		headerFile.newLine(); headerFile.close();
+		fileID++;
+		while (fileID<N_INSTANCES) {
+			outputFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+".txt"));
+			outputFile.close();
+			headerFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+"-header.txt"));
+			headerFile.write("-1"+RepeatAlphabet.SEPARATOR_MINOR+"-1"+RepeatAlphabet.SEPARATOR_MINOR+"-1"+RepeatAlphabet.SEPARATOR_MINOR+"-1");
+			headerFile.close();
+			fileID++;
+		}
 		System.out.println(nInstancesInFile+" instances");
 	}
 

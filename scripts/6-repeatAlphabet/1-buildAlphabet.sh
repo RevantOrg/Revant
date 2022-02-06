@@ -12,9 +12,9 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-MAX_ALIGNMENT_ERROR="0.2"  # Repeat-read alignments with error > this are discarded
+MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 N_THREADS="4"
-MIN_CHARACTER_FREQUENCY="14"  # Should be the coverage of one haplotype
+MIN_CHARACTER_FREQUENCY="5"  # Should be the coverage of one haplotype
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -100,7 +100,8 @@ function translationThread() {
 	local PREFIX_4=$6
 	local PREFIX_5=$7
 	local PREFIX_6=$8
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_4}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_5}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_6}${ALIGNMENTS_FILE_ID}.txt
+	local LAST_READ_IN_CHUNK=$9
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_4}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_5}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_6}${ALIGNMENTS_FILE_ID}.txt ${LAST_READ_IN_CHUNK}
 }
 if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 	TO=${N_THREADS}
@@ -160,6 +161,14 @@ function cleaningThread1() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
 }
+
+
+echo "split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} ${TMPFILE_PATH}-12-"
+echo "split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} ${TMPFILE_PATH}-13-"
+echo "N_READS=${N_READS}  N_THREADS=${N_THREADS}"
+
+
+
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-12-"
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${TMPFILE_PATH}-13-"
 for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do

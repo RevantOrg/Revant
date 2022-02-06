@@ -15,8 +15,10 @@ public class CompactCharacterInstances {
 		
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		RepeatAlphabet.deserializeAlphabet(INSTANCES_FILE,2);
-		RepeatAlphabet.compactInstances(IO.quantum,IO.quantum<<1);
-		RepeatAlphabet.closeAlphabetByRC();
+		if (RepeatAlphabet.lastAlphabet>=0) { 
+			RepeatAlphabet.compactInstances(IO.quantum,IO.quantum<<1);
+			RepeatAlphabet.closeAlphabetByRC();
+		}
 		RepeatAlphabet.serializeAlphabet(OUTPUT_FILE);
 	}
 

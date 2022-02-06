@@ -14,10 +14,10 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-HAPLOTYPE_COVERAGE="14"  # Of one haplotype
+HAPLOTYPE_COVERAGE="5"  # Of one haplotype
 TIGHT_MODE="0"
 MIN_K="2"  # One plus the min length of a context used for disambiguation
-MAX_K="5"  # One plus the max length of a context used for disambiguation
+MAX_K="4"  # One plus the max length of a context used for disambiguation
 N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
