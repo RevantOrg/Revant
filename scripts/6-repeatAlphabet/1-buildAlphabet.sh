@@ -100,21 +100,28 @@ function translationThread() {
 	local PREFIX_4=$6
 	local PREFIX_5=$7
 	local PREFIX_6=$8
-	local LAST_READ_IN_CHUNK=$9
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_4}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_5}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_6}${ALIGNMENTS_FILE_ID}.txt ${LAST_READ_IN_CHUNK}
+	local IS_LAST_CHUNK=$9
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.TranslateReads ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${ALPHABET_FILE} ${LAST_TRANSLATED_READ} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_4}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_5}${ALIGNMENTS_FILE_ID}.txt ${PREFIX_6}${ALIGNMENTS_FILE_ID}.txt ${IS_LAST_CHUNK}
 }
 if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 	TO=${N_THREADS}
 else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
-translationThread 0 -1 "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" &
 if [ ${TO} -ge 1 ]; then
-	for THREAD in $(seq 1 ${TO}); do
-		LAST_TRANSLATED_READ=$(tail -n 1 ${TMPFILE_PATH}-1-$(( ${THREAD} - 1 )).txt | awk '{ print $1 }' | tr -d , )
-		LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} - 1 ))
-		translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" &
-	done
+	translationThread 0 -1 "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" 0 &
+	if [ ${TO} -ge 2 ]; then
+		for THREAD in $(seq 1 $((${TO} - 1))); do
+			LAST_TRANSLATED_READ=$(tail -n 1 ${TMPFILE_PATH}-1-$(( ${THREAD} - 1 )).txt | awk '{ print $1 }' | tr -d , )
+			LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} - 1 ))
+			translationThread ${THREAD} ${LAST_TRANSLATED_READ} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" 0 &
+		done
+	fi
+	LAST_TRANSLATED_READ=$(tail -n 1 ${TMPFILE_PATH}-1-$((${TO} - 1)).txt | awk '{ print $1 }' | tr -d , )
+	LAST_TRANSLATED_READ=$(( ${LAST_TRANSLATED_READ} - 1 ))
+	translationThread ${TO} ${LAST_TRANSLATED_READ} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" 1 &
+else
+	translationThread 0 -1 "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-8-" "${TMPFILE_PATH}-9-" "${TMPFILE_PATH}-9-hist-" "${TMPFILE_PATH}-10-" "${TMPFILE_PATH}-11-" 1 &
 fi
 wait
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated.txt"
@@ -161,14 +168,6 @@ function cleaningThread1() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
 	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
 }
-
-
-echo "split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} ${TMPFILE_PATH}-12-"
-echo "split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} ${TMPFILE_PATH}-13-"
-echo "N_READS=${N_READS}  N_THREADS=${N_THREADS}"
-
-
-
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-12-"
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${TMPFILE_PATH}-13-"
 for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do

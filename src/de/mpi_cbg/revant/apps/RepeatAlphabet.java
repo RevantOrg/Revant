@@ -857,7 +857,7 @@ public class RepeatAlphabet {
 	 *
 	 * @param lastTranslatedRead the index in $Reads.readIDs$ of the last read that has 
 	 * already been translated (-1 if no read has been translated yet);
-	 * @param lastReadInChunk last read to be processed by the procedure;
+	 * @param isLastChunk TRUE iff this is the last chunk of alignments to be processed;
 	 * @param outputFile_characters translation of every read (one per line); a read has
 	 * an empty line if it contains no repeat;
 	 * @param outputFile_boundaries character boundaries (one read per line);
@@ -866,7 +866,7 @@ public class RepeatAlphabet {
 	 * @param outputFile_oneRepeatReads list of IDs of reads that are fully contained in a
 	 * single repeat (zero-based).
 	 */
-	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, int lastReadInChunk, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram, String outputFile_fullyUniqueReads, String outputFile_oneRepeatReads) throws IOException {
+	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, boolean isLastChunk, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram, String outputFile_fullyUniqueReads, String outputFile_oneRepeatReads) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
@@ -987,10 +987,13 @@ public class RepeatAlphabet {
 			}
 			j++;
 		}
-		previousReadA++;
-		while (previousReadA<=lastReadInChunk) {
-			bw1.newLine(); bw3.write(previousReadA);
+		if (isLastChunk) {
 			previousReadA++;
+			while (previousReadA<=Reads.lastRead) {
+				bw1.newLine(); bw2.newLine(); histogram[0]++;
+				bw3.write(previousReadA+"\n");
+				previousReadA++;
+			}
 		}
 		bw1.close(); bw2.close(); bw3.close(); bw4.close();
 		bw1 = new BufferedWriter(new FileWriter(outputFile_histogram));
@@ -2047,7 +2050,7 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Tries to disambiguate the first and the last block of $str$ using the sorrounding
+	 * Tries to disambiguate the first and the last block of $str$ using the surrounding
 	 * context of length $k$, and appends the updated $str$ to $bw$. This is useful, since
 	 * ambiguous endblocks are not included in the unique intervals that are built 
 	 * downstream, and thus a suffix-prefix alignment is more likely to be filtered out by
@@ -3398,13 +3401,26 @@ if (readID==38297) System.err.println("inRedRegion> 3");
 		if (lengthB>1) Arrays.sort(stack,lengthA,lengthA+lengthB);
 		return Math.nonemptyIntersection(stack,0,lengthA-1,stack,lengthA,lengthA+lengthB-1);
 	}
-
+	
+	
+	/**
+	 * @return TRUE iff the translated read in $str$ contains a non-repetitive character.
+	 */
+	public static final boolean containsUnique(String str) {
+		final int nBlocks = loadBlocks(str); 
+		loadIntBlocks(nBlocks);
+		for (int i=0; i<nBlocks; i++) {
+			if (isBlockUnique[i]) return true;
+		}
+		return false;
+	}
 	
 	
 	
 
 
 
+	
 	
 	// ------------------------------ DATA STRUCTURES ------------------------------------
 	

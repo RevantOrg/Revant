@@ -24,29 +24,37 @@ public class BuildAssemblyGraph {
 	 * Remark: the program prints only components of a minimum size.
 	 *
 	 * @param args
-	 * 6: 2=use only suffix-prefix alignments; 1=use every alignment, except containment/
+	 * 2: 0=loose, 1=tight;
+	 * 3: 2=use only suffix-prefix alignments; 1=use every alignment, except containment/
 	 * identity; 0=use every alignment.
 	 */
 	public static void main(String[] args) throws IOException {
-		final String ALIGNMENTS_FILE = args[0];
-		final String BITVECTOR_FILE = args[1];
-		final String READ_IDS_FILE = args[2];
-		final String READ_LENGTHS_FILE = args[3];
-		final int N_READS = Integer.parseInt(args[4]);
-		final double MAX_ERROR_RATE = Double.parseDouble(args[5]);
-		final int ALIGNMENT_TYPE = Integer.parseInt(args[6]);
-		final String OUTPUT_DIR = args[7];
+		final String INPUT_DIR = args[0];
+		final int N_READS = Integer.parseInt(args[1]);
+		final String FILTERING_MODE = args[2];
+		final int ALIGNMENT_TYPE = Integer.parseInt(args[3]);
+		final double MAX_ERROR_RATE = Double.parseDouble(args[4]);
+		final String OUTPUT_DIR = args[5];
 		
+		final String ALIGNMENTS_FILE = INPUT_DIR+"/LAshow-reads-reads.txt";
+		final String BITVECTOR_FILE = INPUT_DIR+"/LAshow-reads-reads.txt.mode"+FILTERING_MODE+".bitvector";
+		final String FULLY_UNIQUE_FILE = INPUT_DIR+"/reads-fullyUnique-new.txt";
+		final String READS_TRANSLATED_FILE = INPUT_DIR+"/reads-translated-disambiguated.txt";
+		final String ALPHABET_FILE = INPUT_DIR+"/alphabet-cleaned.txt";
+		final String READ_IDS_FILE = INPUT_DIR+"/reads-ids.txt";
+		final String READ_LENGTHS_FILE = INPUT_DIR+"/reads-lengths.txt";
+			
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int MIN_COMPONENT_SIZE = 10;  // Arbitrary
 		
 		boolean keep;
 		int i, j, k;
-		int type, nAlignments, idGenerator, top, node, neighbor, nComponents, size;
+		int type, nAlignments, idGenerator, top, node, neighbor, nComponents, size, nextFullyUnique;
 		double errorRate;
 		String str1, str2;
 		BufferedReader br1, br2;
 		BufferedWriter bw;
+		boolean[] containsUnique;
 		int[] component, componentSize, stack;
 		BufferedWriter[] bws;
 		
@@ -93,6 +101,18 @@ public class BuildAssemblyGraph {
 			lastNeighbor[i]=k;
 		}
 		
+		// Building $contaisUnique$.
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
+		containsUnique = new boolean[N_READS];
+		Arrays.fill(containsUnique,false);
+		br1 = new BufferedReader(new FileReader(READS_TRANSLATED_FILE));
+		str1=br1.readLine(); j=0;
+		while (str1!=null) {
+			if (str1.length()!=0) containsUnique[j]=RepeatAlphabet.containsUnique(str1);
+			j++; str1=br1.readLine();
+		}
+		br1.close();
+		
 		// Outputting input connected components
 		System.err.println("Computing input connected components...");
 		component = new int[N_READS];
@@ -131,16 +151,30 @@ public class BuildAssemblyGraph {
 			bws[i] = new BufferedWriter(new FileWriter(OUTPUT_DIR+"/all-component-"+componentSize[i]+".dot"));
 			bws[i].write("graph G {\n");
 		}
+		br1 = new BufferedReader(new FileReader(FULLY_UNIQUE_FILE));
+		str1=br1.readLine();
+		nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
 		for (i=0; i<N_READS; i++) {
 			k=Arrays.binarySearch(componentSize,0,nComponents,component[i]);
 			if (k>=0) {
-				for (j=0; j<=lastNeighbor[i]; j++) bws[k].write(i+" -- "+(neighbors[i][j]>=0?neighbors[i][j]:-1-neighbors[i][j])+";\n");
+				while (nextFullyUnique<i) {
+					str1=br1.readLine();
+					nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
+				}
+				if (i==nextFullyUnique) {
+					bws[k].write(i+" [uniqueStatus=\"2\"];\n");
+					str1=br1.readLine();
+					nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
+				}
+				else bws[k].write(i+" [uniqueStatus=\""+(containsUnique[i]?1:0)+"\"];\n");
+				for (j=0; j<=lastNeighbor[i]; j++) {
+					neighbor=neighbors[i][j]>=0?neighbors[i][j]:-1-neighbors[i][j];
+					if (i<neighbor) bws[k].write(i+" -- "+neighbor+";\n");
+				}
 			}
 		}
-		for (i=0; i<nComponents; i++) {
-			bws[i].write("}");
-			bws[i].close();
-		}
+		for (i=0; i<nComponents; i++) { bws[i].write("}"); bws[i].close(); }
+		br1.close();
 		
 		// Outputting filtered connected components
 		System.err.println("Computing filtered connected components...");
@@ -178,18 +212,29 @@ public class BuildAssemblyGraph {
 			bws[i] = new BufferedWriter(new FileWriter(OUTPUT_DIR+"/filtered-component-"+componentSize[i]+".dot"));
 			bws[i].write("graph G {\n");
 		}
+		br1 = new BufferedReader(new FileReader(FULLY_UNIQUE_FILE));
+		str1=br1.readLine();
+		nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
 		for (i=0; i<N_READS; i++) {
 			k=Arrays.binarySearch(componentSize,0,nComponents,component[i]);
 			if (k>=0) {
+				while (nextFullyUnique<i) {
+					str1=br1.readLine();
+					nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
+				}
+				if (i==nextFullyUnique) {
+					bws[k].write(i+" [uniqueStatus=\"2\"];\n");
+					str1=br1.readLine();
+					nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
+				}
+				else bws[k].write(i+" [uniqueStatus=\""+(containsUnique[i]?1:0)+"\"];\n");
 				for (j=0; j<=lastNeighbor[i]; j++) {
-					if (neighbors[i][j]>=0) bws[k].write(i+" -- "+neighbors[i][j]+";\n");
+					if (neighbors[i][j]>=0 && i<neighbors[i][j]) bws[k].write(i+" -- "+neighbors[i][j]+";\n");
 				}
 			}
 		}
-		for (i=0; i<nComponents; i++) {
-			bws[i].write("}");
-			bws[i].close();
-		}
+		for (i=0; i<nComponents; i++) { bws[i].write("}"); bws[i].close(); }
+		br1.close();
 	}
 	
 	
