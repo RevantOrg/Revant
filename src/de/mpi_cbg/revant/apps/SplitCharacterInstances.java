@@ -35,12 +35,10 @@ public class SplitCharacterInstances {
 		while (str!=null) {
 			character.deserialize(str);
 			if (character.repeat!=previousCharacter.repeat && nInstancesInFile>=quantum) {
-				if (outputFile!=null) {
-					outputFile.close();
-					headerFile.write(lastUnique+(RepeatAlphabet.SEPARATOR_MINOR+"")+lastPeriodic+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nInstancesInFile-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+"-1");
-					headerFile.newLine(); headerFile.close();
-					System.out.println(nInstancesInFile+" instances");
-				}
+				outputFile.close();
+				headerFile.write(lastUnique+(RepeatAlphabet.SEPARATOR_MINOR+"")+lastPeriodic+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nInstancesInFile-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+"-1");
+				headerFile.newLine(); headerFile.close();
+				System.out.println(nInstancesInFile+" instances");
 				fileID++;
 				outputFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+".txt"));
 				headerFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+"-header.txt"));
@@ -56,7 +54,7 @@ public class SplitCharacterInstances {
 		headerFile.write(lastUnique+(RepeatAlphabet.SEPARATOR_MINOR+"")+lastPeriodic+(RepeatAlphabet.SEPARATOR_MINOR+"")+(nInstancesInFile-1)+(RepeatAlphabet.SEPARATOR_MINOR+"")+"-1");
 		headerFile.newLine(); headerFile.close();
 		fileID++;
-		while (fileID<N_INSTANCES) {
+		while (fileID<N_PIECES) {
 			outputFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+".txt"));
 			outputFile.close();
 			headerFile = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+fileID+"-header.txt"));

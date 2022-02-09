@@ -7,6 +7,10 @@ import de.mpi_cbg.revant.util.Math;
 /**
  * Converts the reads-reads PAF file produced by minimap2, into the output of LAshow.
  *
+ * Remark: reads with no alignment are not listed in the read lengths file printed in 
+ * output and are never mentioned in the alignments file. Any downstream step should use 
+ * the number of reads with an alignment as the effective number of reads.
+ *
  * Remark: this is just a simple first attempt and it has not been optimized. 
  */
 public class PAF2LAshowReadRead {

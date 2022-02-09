@@ -13,8 +13,8 @@
 INPUT_DIR=$1
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 MIN_ALIGNMENT_LENGTH="500"  # In read-read alignments
-MAX_K_UNIQUE_INTERVALS="3"  # Same as in $3-getUniqueSubstrings.sh$
-FILTERING_MODE="2"  # 0-loose, 1=tight, 2=tight with matching characters.
+MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
+FILTERING_MODE="0"  # 0-loose, 1=tight, 2=tight with matching characters.
 N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
@@ -25,6 +25,7 @@ READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
 TMPFILE_NAME="filterAlignments-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
+rm -rf ${TMPFILE_PATH}*
 
 echo "Splitting the alignments file..."
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))

@@ -14,16 +14,17 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-HAPLOTYPE_COVERAGE="5"  # Of one haplotype
+HAPLOTYPE_COVERAGE="14"  # Of one haplotype
 TIGHT_MODE="0"
 MIN_K="2"  # One plus the min length of a context used for disambiguation
-MAX_K="3"  # One plus the max length of a context used for disambiguation
+MAX_K="9"  # One plus the max length of a context used for disambiguation
 N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
 
+export LC_ALL=C  # To speed up sort
 TMPFILE_NAME="fixEndBlocks-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
@@ -64,7 +65,11 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 		kmersThread ${K} ${FILE} ${TMPFILE_PATH}-kmers-${K}-${THREAD_ID} &
 	done
 	wait
-	sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-kmers-${K}-* > ${TMPFILE_PATH}-${K}.txt
+	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-kmers-${K}-* > ${TMPFILE_PATH}-${K}.txt
+	if [ ! -s ${TMPFILE_PATH}-${K}.txt ]; then
+		MAX_K=$((${K}-1))
+		break
+	fi
 	FREQUENT_KMERS_FILE="${INPUT_DIR}/frequent-k${K}.txt"
 	echo "Finding frequent ${K}-mers..."
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} -1 ${FREQUENT_KMERS_FILE} 0 null

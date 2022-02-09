@@ -12,14 +12,15 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
+MAX_ALIGNMENT_ERROR="1.0"  # Repeat-read alignments with error > this are discarded
 N_THREADS="4"
-MIN_CHARACTER_FREQUENCY="5"  # Should be the coverage of one haplotype
+MIN_CHARACTER_FREQUENCY="14"  # Should be the coverage of one haplotype
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
 
+export LC_ALL=C  # To speed up sort
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
@@ -32,7 +33,7 @@ SORT_OPTIONS=""
 for i in $(seq 1 9); do  # Should be in sync with the serialization of $Character$.
 	SORT_OPTIONS="${SORT_OPTIONS} -k ${i},${i}n"
 done
-rm -rf ${TMPFILE_PATH}*
+rm -f ${TMPFILE_PATH}*
 
 echo "Splitting the alignments file..."
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
@@ -48,7 +49,7 @@ function collectionThread() {
 	local PREFIX_2=$3
 	local PREFIX_3=$4
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterInstances ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${N_REPEATS} ${REPEAT_LENGTHS_FILE} ${REPEAT_ISPERIODIC_FILE} ${PREFIX_1}${ALIGNMENTS_FILE_ID}.txt ${MAX_ALIGNMENT_ERROR} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt "${PREFIX_2}unique-${ALIGNMENTS_FILE_ID}.txt"
-	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt | uniq - ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
+	sort --parallel=1 -t , ${SORT_OPTIONS} ${PREFIX_2}${ALIGNMENTS_FILE_ID}.txt | uniq - ${PREFIX_3}${ALIGNMENTS_FILE_ID}.txt
 }
 if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 	TO=${N_THREADS}
@@ -59,7 +60,7 @@ for THREAD in $(seq 0 ${TO}); do
 	collectionThread ${THREAD} "${TMPFILE_PATH}-1-" "${TMPFILE_PATH}-2-" "${TMPFILE_PATH}-3-" &
 done
 wait
-sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-3-*.txt | uniq - ${TMPFILE_PATH}-4.txt
+sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-3-*.txt | uniq - ${TMPFILE_PATH}-4.txt
 N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-4.txt)
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-4.txt ${TMPFILE_PATH}-5-
 
@@ -166,7 +167,7 @@ function cleaningThread1() {
 	local PREFIX_2=$4
 	local ID=$5
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
-	sort --parallel 1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
+	sort --parallel=1 -t , ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt | uniq - ${PREFIX_2}${ID}.txt
 }
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-12-"
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${TMPFILE_PATH}-13-"
@@ -175,8 +176,8 @@ for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do
 	cleaningThread1 "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${TMPFILE_PATH}-14-" "${TMPFILE_PATH}-15-" ${THREAD_ID} &
 done
 wait
-sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-15-*.txt | uniq - ${TMPFILE_PATH}-15.txt
-cat ${TMPFILE_PATH}-14-unique-*.txt | sort -n -r > ${TMPFILE_PATH}-14-unique.txt
+sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-15-*.txt | uniq - ${TMPFILE_PATH}-15.txt
+cat ${TMPFILE_PATH}-14-unique-*.txt | sort --parallel=${N_THREADS} -n -r > ${TMPFILE_PATH}-14-unique.txt
 ALPHABET_FILE_CLEANED="${INPUT_DIR}/alphabet-cleaned.txt"
 rm -f ${ALPHABET_FILE_CLEANED}
 OLD2NEW_FILE="${INPUT_DIR}/alphabet-old2new.txt"

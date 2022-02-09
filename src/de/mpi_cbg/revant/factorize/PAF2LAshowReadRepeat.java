@@ -6,7 +6,8 @@ import de.mpi_cbg.revant.util.Math;
 
 /**
  * Converts the reads-repeats PAF file produced by minimap2, into the output of LAshow.
- * The program assumes that $PAF2LAshowReadRead$ has already been executed.
+ * The program assumes that $PAF2LAshowReadRead$ has already been executed, and it 
+ * discards any read that is not listed in the conversion file produced by that program.
  *
  * Remark: this is just a simple first attempt and it has not been optimized. 
  */

@@ -13,15 +13,16 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-N_HAPLOTYPES="2"
-HAPLOTYPE_COVERAGE="5"  # Of one haplotype
-MAX_K="3"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
+N_HAPLOTYPES="1"
+HAPLOTYPE_COVERAGE="14"  # Of one haplotype
+MAX_K="8"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
 N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
 
+export LC_ALL=C  # To speed up sort
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
@@ -61,6 +62,7 @@ function intervalsThread() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${OPEN_MODE} ${MULTI_MODE} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
 }
 
+FINAL_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-0-"
 for K in $(seq 1 ${MAX_K}); do
 	SORT_OPTIONS_KMERS=""
@@ -78,7 +80,11 @@ for K in $(seq 1 ${MAX_K}); do
 		kmersThread ${K} ${FILE} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID} &
 	done
 	wait
-	sort --parallel ${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}.txt
+	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}.txt
+	if [ ! -s ${TMPFILE_PATH}-${K}.txt ]; then
+		MAX_K=$((${K}-1))
+		break
+	fi
 	UNIQUE_KMERS_FILE="${INPUT_DIR}/unique-k${K}.txt"
 	OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding unique ${K}-mers..."
@@ -95,7 +101,6 @@ for K in $(seq 1 ${MAX_K}); do
 	done
 	wait
 done
-FINAL_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
 rm -f ${FINAL_INTERVALS_FILE}
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-intervals-*" ); do
 	cat ${FILE} >> ${FINAL_INTERVALS_FILE}
