@@ -49,6 +49,7 @@ public class PAF2LAshowReadRepeat {
 		str=br.readLine();
 		while (str!=null)  {
 			tokens=str.split(PAF_SEPARATOR);
+System.err.println(str+"  ::  "+tokens[0]+"  ::  "+tokens[1]);			
 			readNames.put(tokens[0],Integer.valueOf(Integer.parseInt(tokens[1])));
 			str=br.readLine();
 		}

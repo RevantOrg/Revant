@@ -1624,6 +1624,7 @@ public class RepeatAlphabet {
 	 */
 	public static final int[] cleanTranslatedRead_updateAlphabet(int nNewCharacters, String newCharactersFile, int minCount) throws IOException {
 		int i, j;
+		int lastPeriodicPrime;
 		String str;
 		Character tmpChar;
 		BufferedReader br;
@@ -1633,17 +1634,18 @@ public class RepeatAlphabet {
 		// Removing rare characters
 		old2new = new int[lastAlphabet-lastUnique];
 		Math.set(old2new,old2new.length-1,-1);
-		j=lastUnique;
+		j=lastUnique; lastPeriodicPrime=-1;
 		for (i=lastUnique+1; i<=lastAlphabet; i++) {
 			if (alphabetCount[i]<minCount) continue;
 			j++;
 			tmpChar=alphabet[j];
 			alphabet[j]=alphabet[i];
 			alphabet[i]=tmpChar;
-			if (alphabet[j].start==-1) lastPeriodic=j;
+			if (alphabet[j].start==-1) lastPeriodicPrime=j;
 			old2new[i-lastUnique-1]=j-lastUnique-1;
 		}
 		lastAlphabet=j;
+		lastPeriodic=lastPeriodicPrime!=-1?lastPeriodicPrime:lastUnique;
 		
 		// Adding new unique characters
 		if (nNewCharacters>0) {

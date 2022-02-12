@@ -101,7 +101,7 @@ public class BuildAssemblyGraph {
 			lastNeighbor[i]=k;
 		}
 		
-		// Building $contaisUnique$.
+		// Building $containsUnique$.
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		containsUnique = new boolean[N_READS];
 		Arrays.fill(containsUnique,false);
