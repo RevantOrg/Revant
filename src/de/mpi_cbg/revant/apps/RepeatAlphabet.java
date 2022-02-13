@@ -2768,18 +2768,13 @@ public class RepeatAlphabet {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
-			out[0][type]++;
-
-boolean fabio= (Alignments.readA==171613 && Alignments.readB==38298) || (Alignments.readB==171613 && Alignments.readA==38298);
-if (fabio) System.err.println("filterAlignments_loose> considering alignment "+str+" // Alignments.readA="+Alignments.readA+" Alignments.readB="+Alignments.readB);
-	
+			out[0][type]++;	
 			// Processing readA
 			readA=Alignments.readA-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
 			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
 				bw.write("1\n"); str=br.readLine(); row++;
 				out[1][type]++; out[2][type]++;
-if (fabio) System.err.println("filterAlignments_loose> 1  kept alignment "+str);
 				continue;
 			}
 			isRepetitive=-3;
@@ -2791,7 +2786,6 @@ if (fabio) System.err.println("filterAlignments_loose> 1  kept alignment "+str);
 				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection);
 			}
 			if (isRepetitive!=0) {
-if (fabio) System.err.println("filterAlignments_loose> 2  kept alignment because isRepetitive("+readA+")="+isRepetitive+": "+str);
 				bw.write("1\n"); str=br.readLine(); row++;
 				out[1][type]++; 
 				if (isRepetitive==-1) out[2][type]++;
@@ -2800,7 +2794,6 @@ if (fabio) System.err.println("filterAlignments_loose> 2  kept alignment because
 			// Processing readB
 			readB=Alignments.readB-1;
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
-if (fabio) System.err.println("filterAlignments_loose> 3  kept alignment "+str);
 				bw.write("1\n"); str=br.readLine(); row++;
 				out[1][type]++; out[2][type]++;
 				continue;
@@ -2820,7 +2813,6 @@ if (fabio) System.err.println("filterAlignments_loose> 3  kept alignment "+str);
 				bw.write("1\n");
 				out[1][type]++;
 				if (isRepetitive==-1) out[2][type]++;
-if (fabio) System.err.println("filterAlignments_loose> 4  kept alignment because isRepetitive("+readB+")="+isRepetitive+": "+str);				
 			}
 			str=br.readLine(); row++;
 		}
@@ -2869,16 +2861,7 @@ if (fabio) System.err.println("filterAlignments_loose> 4  kept alignment because
 				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 				   )
 				 )
-			   ) {
-if (readID==38297) {
-	System.err.println("inRedRegion> 0");
-	System.err.println("condition 1: "+Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd));
-	System.err.println("condition 2: "+Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd));
-	System.err.println("condition 3: "+Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd));
-	System.err.println("condition 4: "+Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)+" :: minIntersection="+minIntersection);
-}
-				   return -1;
-			   }
+			   ) return -1;
 			mask<<=1;
 			for (j=1; j<8; j++) {
 				if (j==nBlocks-1) break;
@@ -2891,10 +2874,7 @@ if (readID==38297) {
 						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 					   )
 					 ) 
-				   ) {
-if (readID==38297) System.err.println("inRedRegion> 1");
-					   return -1;
-				   }
+				   ) return -1;
 				mask<<=1;
 			}
 		}
@@ -2913,10 +2893,7 @@ if (readID==38297) System.err.println("inRedRegion> 1");
 						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 					   )
 					 )
-				   ) {
-if (readID==38297) System.err.println("inRedRegion> 2");
-					   return -1;
-				   }
+				   ) return -1;
 				mask<<=1;
 			}
 		}
@@ -2932,10 +2909,7 @@ if (readID==38297) System.err.println("inRedRegion> 2");
 					  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
 				   )
 				 )
-			   ) {
-if (readID==38297) System.err.println("inRedRegion> 3");
-				   return -1;
-			   }
+			   ) return -1;
 		}
 		
 		// Checking the repetitive blocks of the read, if any.
@@ -3136,6 +3110,7 @@ if (readID==38297) System.err.println("inRedRegion> 3");
 							out[1][type]++;
 						}
 					}
+					else bw.write("0\n");
 				}
 				else if (straddlesRightA) {
 					if ((orientation && endB>=lengthB-DISTANCE_THRESHOLD) || (!orientation && startB<=DISTANCE_THRESHOLD)) {
@@ -3151,6 +3126,7 @@ if (readID==38297) System.err.println("inRedRegion> 3");
 							out[1][type]++;
 						}
 					}
+					else bw.write("0\n");
 				}
 				else {
 					if (mode) {

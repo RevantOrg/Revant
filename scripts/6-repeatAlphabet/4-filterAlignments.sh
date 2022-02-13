@@ -12,9 +12,9 @@
 #
 INPUT_DIR=$1
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-MIN_ALIGNMENT_LENGTH="500"  # In read-read alignments
+MIN_ALIGNMENT_LENGTH="1000"  # In read-read alignments
 MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
-FILTERING_MODE="1"  # 0-loose, 1=tight, 2=tight with matching characters.
+FILTERING_MODE="2"  # 0-loose, 1=tight, 2=tight with matching characters.
 N_THREADS="4"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
@@ -25,14 +25,15 @@ READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
 TMPFILE_NAME="filterAlignments-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
-rm -rf ${TMPFILE_PATH}*
 
-echo "Splitting the alignments file..."
-N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
-LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
-rm -f ${TMPFILE_PATH}-1-*
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
-echo "Alignments filtered and split in ${N_THREADS} parts"
+if [ ! -e ${TMPFILE_PATH}-1-0.txt ]; then
+	echo "Splitting the alignments file..."
+	N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
+	LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
+	echo "Alignments filtered and split in ${N_THREADS} parts"
+fi
+rm -f ${TMPFILE_PATH}-[2-9]-*
 
 echo "Filtering alignments..."
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"

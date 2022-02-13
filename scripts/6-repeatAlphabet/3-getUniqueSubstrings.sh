@@ -13,8 +13,8 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-N_HAPLOTYPES="1"
-HAPLOTYPE_COVERAGE="12"  # Of one haplotype
+N_HAPLOTYPES="2"
+HAPLOTYPE_COVERAGE="9"  # Of one haplotype
 MAX_K="8"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
 N_THREADS="4"
 # REVANT
