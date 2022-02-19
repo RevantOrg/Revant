@@ -13,6 +13,10 @@ import de.mpi_cbg.revant.util.Math;
  * once in the genome. MODE=2 additionally requires the intervals to cover matching 
  * characters of the repeat alphabet.
  *
+ * Remark: the program removes all alignments between reads that are fully contained in a
+ * single repeat (e.g. a long satellite). One should try to assemble such reads with ad
+ * hoc methods.
+ *
  * Remark: an obvious limitation of character-based alignment filtering is that it cannot 
  * achieve sub-character resolution. E.g. even if a 3-mer is unique in the genome, the
  * filtering would discard an alignment that spans both adjacencies of the 3-mer, without 

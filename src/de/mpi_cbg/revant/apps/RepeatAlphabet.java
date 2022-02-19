@@ -141,11 +141,23 @@ public class RepeatAlphabet {
 	 * Recodes every read, and collects in $outputFile$ every character (not necessarily 
 	 * distinct) with discriminative power.
 	 *
+	 * Remark: the error rate in read-repeat alignments should not be too high compared to
+	 * the one used in read-read alignments, otherwise the following could happen. Assume
+	 * that there are many variants of the same repeat, such that each variant occurs in
+	 * a single locus of the genome, and the variants can be discriminated by read-read 
+	 * alignments. Every such variant would get tagged with the same repeat ID, and any 
+	 * alignment strictly contained inside such variants would be filtered out downstream 
+	 * because assumed to be repeat-induced -- even though such alignments come from the 
+	 * same locus of the genome. In practice this might not be a problem, because of the 
+	 * context around the variants in the genome.
+	 *
 	 * @param alignmentsFile alignments between reads (readA) and repeats (readB);
 	 * @param maxError alignments with error rate greater than this are discarded;
+	 * @param minAlignmentLength alignments shorter than this on either side are 
+	 * discarded;
 	 * @param uniqueFile the procedure writes just $maxOpenLength_unique$ there.
 	 */
-	public static final void collectCharacterInstances(String alignmentsFile, double maxError, int distanceThreshold, int lengthThreshold, String outputFile, String uniqueFile) throws IOException {
+	public static final void collectCharacterInstances(String alignmentsFile, double maxError, int minAlignmentLength, int distanceThreshold, int lengthThreshold, String outputFile, String uniqueFile) throws IOException {
 		final int ALPHABET_CAPACITY = 100000;  // Arbitrary
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
@@ -181,7 +193,9 @@ public class RepeatAlphabet {
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
-			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError) {
+			if ( (2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError ||
+				 Math.min(Alignments.endA-Alignments.startA,Alignments.endB-Alignments.startB)+1<minAlignmentLength
+			   ) {
 				str=br.readLine(); row++;
 				continue;
 			}
@@ -866,7 +880,7 @@ public class RepeatAlphabet {
 	 * @param outputFile_oneRepeatReads list of IDs of reads that are fully contained in a
 	 * single repeat (zero-based).
 	 */
-	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int quantum, boolean isLastChunk, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram, String outputFile_fullyUniqueReads, String outputFile_oneRepeatReads) throws IOException {
+	public static final void translateReads(String alignmentsFile, int lastTranslatedRead, double maxError, int minAlignmentLength, int quantum, boolean isLastChunk, String outputFile_characters, String outputFile_boundaries, String outputFile_histogram, String outputFile_fullyUniqueReads, String outputFile_oneRepeatReads) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
@@ -905,7 +919,9 @@ public class RepeatAlphabet {
 		while (str!=null)  {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
-			if ((2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError) {
+			if ( (2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError ||
+				 Math.min(Alignments.endA-Alignments.startA,Alignments.endB-Alignments.startB)+1<minAlignmentLength
+			   ) {
 				str=br.readLine(); row++;
 				continue;
 			}
@@ -919,7 +935,7 @@ public class RepeatAlphabet {
 					}
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
-						recodeRead(quantum);						
+						recodeRead(quantum);
 						if (lastInSequence==-1) {
 							bw1.newLine(); bw2.newLine(); histogram[0]++;
 							bw3.write(previousReadA+"\n");
@@ -933,7 +949,7 @@ public class RepeatAlphabet {
 						else {
 							translateRead(bw1,bw2,quantum);
 							histogram[lastInSequence+1]++;							
-						}
+						}						
 					}
 					else { 
 						bw1.newLine(); bw2.newLine(); histogram[0]++; 
@@ -1046,7 +1062,7 @@ public class RepeatAlphabet {
 		}
 		else {
 			if (i<0) {
-				System.err.println("translateRead_unique> ERROR: closed unique character not found in the alphabet");
+				System.err.println("translate_unique> ERROR: closed unique character not found in the alphabet");
 				System.err.println("query: "+character);
 				System.err.println("candidate in alphabet: "+alphabet[-1-i]);
 				System.exit(1);
@@ -1085,7 +1101,7 @@ public class RepeatAlphabet {
 				while (k<=lastPeriodic && alphabet[k].repeat==repeat && alphabet[k].orientation==orientation && !alphabet[k].implies(character,-1)) k++;
 				i=k;
 				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation || !alphabet[i].implies(character,-1)) {
-					System.err.println("translateRead_periodic> ERROR: open periodic repeat not found in the alphabet");
+					System.err.println("translate_periodic> ERROR: open periodic repeat not found in the alphabet");
 					System.err.println("query: "+character);
 					System.err.println("first candidate in alphabet: "+alphabet[i]);
 					System.exit(1);
@@ -1094,7 +1110,7 @@ public class RepeatAlphabet {
 			}
 			else {
 				if (i<0) {
-					System.err.println("translateRead_periodic> ERROR: closed periodic character not found in the alphabet:");
+					System.err.println("translate_periodic> ERROR: closed periodic character not found in the alphabet:");
 					System.err.println("query: "+character);
 					System.err.println("candidate in alphabet: "+alphabet[-1-i]);
 					System.err.println("characters in the block:");
@@ -1172,7 +1188,7 @@ public class RepeatAlphabet {
 					}
 				}
 				if (!found) {
-					System.err.println("translateRead> ERROR: open nonperiodic character not found in the alphabet:");
+					System.err.println("translate> ERROR: open nonperiodic character not found in the alphabet:");
 					System.err.println("query: "+character);
 					System.err.println("candidate in alphabet: "+alphabet[Math.min(i,lastAlphabet)]);
 					System.exit(1);
@@ -1180,7 +1196,7 @@ public class RepeatAlphabet {
 			}
 			else {
 				if (i<0) {
-					System.err.println("translateRead> ERROR: closed nonperiodic character not found in the alphabet:");
+					System.err.println("translate> ERROR: closed nonperiodic character not found in the alphabet:");
 					System.err.println("query: "+character);
 					System.err.println("candidate in alphabet: "+alphabet[-1-i]);
 					System.exit(1);
@@ -1504,6 +1520,7 @@ public class RepeatAlphabet {
 	 * @param tmpChar temporary space.
 	 */
 	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, int minCount, int quantum, BufferedWriter bw, Character tmpChar) throws IOException {
+		boolean isUnique;
 		int i, j, k;
 		int c, length, first, nBlocks, nBoundaries;
 		String[] tokens;
@@ -1525,7 +1542,14 @@ public class RepeatAlphabet {
 		removeRareCharacters(nBlocks,minCount,lastUnique,lastPeriodic,lastAlphabet);
 		first=-1;
 		for (i=0; i<nBlocks; i++) {
-			if (lastInBlock[i]!=-1) {
+			if (lastInBlock[i]==-1) isUnique=true;
+			else if (lastInBlock[i]>0) isUnique=false;
+			else {
+				j=Integer.parseInt(blocks[i][0]);
+				if (j<0) j=-1-j;
+				isUnique=j<=lastUnique;
+			}
+			if (!isUnique) {
 				if (first!=-1) {
 					tmpChar.repeat=UNIQUE;
 					tmpChar.orientation=false;
@@ -1564,7 +1588,7 @@ public class RepeatAlphabet {
 
 	
 	/**
-	 * Removes from $blocks$ all characters with count smaller than $minCount$.
+	 * Removes from $blocks$ all non-unique characters with count smaller than $minCount$.
 	 *
 	 * Remark: the procedure assumes that global variable $alphabetCount$ has already been
 	 * initialized.
@@ -1603,7 +1627,7 @@ public class RepeatAlphabet {
 						// repeats cannot be negative.
 					}
 				}
-				else if (alphabetCount[c]<minCount) deleted=true;
+				else if (c>lastUnique && alphabetCount[c]<minCount) deleted=true;
 				if (!deleted) blocks[i][++k]=blocks[i][j];
 			}
 			lastInBlock[i]=k;
@@ -1708,6 +1732,7 @@ public class RepeatAlphabet {
 	 * @return the number of blocks in the new translation.
 	 */
 	public static final int cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, int minCount, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
+		boolean isUnique;
 		int i, j;
 		int c, length, first, last, nBlocks, nBoundaries, nAppendedBlocks;
 		String[] tokens;
@@ -1731,7 +1756,14 @@ public class RepeatAlphabet {
 		alphabet=newAlphabet; lastUnique=lastUnique_new; lastPeriodic=lastPeriodic_new; lastAlphabet=lastAlphabet_new;
 		first=-1; nAppendedBlocks=0;
 		for (i=0; i<nBlocks; i++) {
-			if (lastInBlock[i]!=-1) {
+			if (lastInBlock[i]==-1) isUnique=true;
+			else if (lastInBlock[i]>0) isUnique=false;
+			else {
+				j=Integer.parseInt(blocks[i][0]);
+				if (j<0) j=-1-j;
+				isUnique=j<=lastUnique;
+			}
+			if (!isUnique) {
 				if (first!=-1) {
 					tmpChar.repeat=UNIQUE;
 					tmpChar.orientation=false;
@@ -1740,7 +1772,7 @@ public class RepeatAlphabet {
 					tmpChar.length=length;
 					tmpChar.openStart=first==0; tmpChar.openEnd=false;
 					tmpChar.quantize(quantum);
-					if (nAppendedBlocks>0) read2characters_new.write(SEPARATOR_MAJOR+"");
+					if (nAppendedBlocks>0) read2characters_new.write(SEPARATOR_MAJOR+"");				
 					translate_unique(tmpChar,read2characters_new);
 					if (first>0) {
 						if (nAppendedBlocks>1) read2boundaries_new.write(SEPARATOR_MINOR+"");

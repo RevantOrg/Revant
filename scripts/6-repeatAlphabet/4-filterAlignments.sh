@@ -12,7 +12,7 @@
 #
 INPUT_DIR=$1
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-MIN_ALIGNMENT_LENGTH="1000"  # In read-read alignments
+MIN_ALIGNMENT_LENGTH="500"  # In read-read alignments
 MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
 FILTERING_MODE="2"  # 0-loose, 1=tight, 2=tight with matching characters.
 N_THREADS="4"

@@ -21,15 +21,16 @@ public class GetCharacterInstances {
 		final String ISPERIODIC_FILE = args[5];
 		final String ALIGNMENTS_FILE = args[6];
 		final double MAX_ERROR = Double.parseDouble(args[7]);
-		final String INSTANCES_FILE = args[8];
-		final String UNIQUE_FILE = args[9];
+		final int MIN_ALIGNMENT_LENGTH = Integer.parseInt(args[8]);
+		final String INSTANCES_FILE = args[9];
+		final String UNIQUE_FILE = args[10];
 		
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
 		Reads.loadReadIDs(READ_IDS_FILE,Reads.nReads);
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		RepeatAlphabet.loadIsPeriodic(ISPERIODIC_FILE,N_REPEATS);
-		RepeatAlphabet.collectCharacterInstances(ALIGNMENTS_FILE,MAX_ERROR,IO.quantum,IO.quantum<<1,INSTANCES_FILE,UNIQUE_FILE);
+		RepeatAlphabet.collectCharacterInstances(ALIGNMENTS_FILE,MAX_ERROR,MIN_ALIGNMENT_LENGTH,IO.quantum,IO.quantum<<1,INSTANCES_FILE,UNIQUE_FILE);
 		System.err.println("Histogram of recoded sequence lengths:");
 		RepeatAlphabet.printSequenceLengths();
 	}
