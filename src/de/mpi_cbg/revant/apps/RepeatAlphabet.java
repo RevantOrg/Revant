@@ -1,6 +1,7 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -3427,7 +3428,156 @@ public class RepeatAlphabet {
 	
 	
 	
-
+	
+	
+	
+	
+	
+	// ------------------------ LOW-QUALITY REGIONS PROCEDURES ---------------------------
+	
+	/**
+	 * For every read $R$ (rows), a sequence of tuples $(i_0,j_0,r_0),...,(i_n,j_n,r_n)$
+	 * that says that substring $R[i_x..j_x]$ becomes the new read $r_x$.
+	 */
+	private static int[][] breakIntervals;
+	private static int[] lastBreakInterval;
+	
+	
+	/**
+	 * @param nReads the procedure assumes that read IDs are a compact interval $[0..
+	 * nReads-1]$;
+	 * @param minIntervalLength low-quality intervals shorter than this are not used for
+	 * breaking reads;
+	 * @return the number of reads after breaking.
+	 */
+	public static final int breakIntervals_load(String qualitiesFile, int nReads, String qualityThresholdsFile, int minIntervalLength) throws IOException {
+		final int CAPACITY = 1000;  // Arbitrary
+		final int CAPACITY_INTERVALS = 9;  // Arbitrary, multiple of 3.
+		byte mode;
+		int i;
+		int idGenerator, read, last, lastPosition, lastInterval;
+		String str;
+		BufferedReader br;
+		byte[] tmpBytes;
+		int[] tmpIntervals;
+		double[] tmpQualities;
+		
+		breakIntervals = new int[nReads][0];
+		lastBreakInterval = new int[nReads];
+		Math.set(lastBreakInterval,nReads-1,-1);
+		Reads.loadQualities_thresholds(qualityThresholdsFile);
+		mode=Reads.filename2qualityMode(qualitiesFile);
+		tmpQualities = new double[CAPACITY];
+		tmpIntervals = new int[(CAPACITY)<<1];  // Arbitrary, fixed.
+		br = new BufferedReader(new FileReader(qualitiesFile));
+		str=br.readLine(); idGenerator=nReads-1; read=0;
+		while (str!=null) {
+			tmpBytes=str.getBytes(Charset.forName("US-ASCII"));
+			if (tmpQualities.length<tmpBytes.length) tmpQualities = new double[tmpBytes.length];
+			for (i=0; i<tmpBytes.length; i++) tmpQualities[i]=Reads.ascii2quality(tmpBytes[i],mode);
+			lastInterval=Reads.getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Math.POSITIVE_INFINITY,tmpIntervals);
+			if (lastInterval==-1) {
+				str=br.readLine(); read++;
+				continue;
+			}
+			lastPosition=-1;
+			for (i=0; i<lastInterval; i+=2) {
+				if (tmpIntervals[i+1]-tmpIntervals[i]+1>=minIntervalLength) {
+					last=lastBreakInterval[read];
+					if (last+3>=breakIntervals[read].length) {
+						int[] newArray = new int[breakIntervals[read].length+CAPACITY_INTERVALS];
+						System.arraycopy(breakIntervals[read],0,newArray,0,breakIntervals[read].length);
+						breakIntervals[read]=newArray;
+					}
+					breakIntervals[read][++last]=lastPosition+1;
+					breakIntervals[read][++last]=tmpIntervals[i]-1;
+					breakIntervals[read][++last]=lastPosition==-1?read:++idGenerator;
+					lastBreakInterval[read]=last;
+					lastPosition=tmpIntervals[i+1];
+				}
+			}
+			if (lastPosition!=-1) {
+				last=lastBreakInterval[read];
+				if (last+3>=breakIntervals[read].length) {
+					int[] newArray = new int[breakIntervals[read].length+CAPACITY_INTERVALS];
+					System.arraycopy(breakIntervals[read],0,newArray,0,breakIntervals[read].length);
+					breakIntervals[read]=newArray;
+				}
+				breakIntervals[read][++last]=lastPosition+1;
+				breakIntervals[read][++last]=Math.POSITIVE_INFINITY;
+				breakIntervals[read][++last]=++idGenerator;
+				lastBreakInterval[read]=last;
+			}
+			str=br.readLine(); read++;
+		}
+		br.close();
+		return idGenerator+1;
+	}
+	
+	
+	/**
+	 *
+	 */
+	public static final void breakIntervals_printTranslationMaps(String forward, String reverse) throws IOException {
+		
+		
+	}
+	
+	
+	
+	/**
+	 *
+	 */
+	public static final void breakIntervals_printReadLengths(String out) throws IOException {
+		
+		
+	}
+	
+	
+	/**
+	 * 
+	 */
+	public static final void breakIntervals_translateAlignments_readRead(String inputFile, String outputFile) throws IOException {
+		
+		
+		
+		
+	}
+	
+	
+	/**
+	 * 
+	 */
+	public static final void breakIntervals_translateAlignments_readRepeat(String inputFile, String outputFile) throws IOException {
+		
+		
+		
+		
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 
 
 	

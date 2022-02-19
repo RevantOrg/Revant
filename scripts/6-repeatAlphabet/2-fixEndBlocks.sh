@@ -24,7 +24,7 @@ JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
 
-export LC_ALL=C  # To speed up sort
+export LC_ALL=C  # To speed up the $sort$ command.
 TMPFILE_NAME="fixEndBlocks-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"

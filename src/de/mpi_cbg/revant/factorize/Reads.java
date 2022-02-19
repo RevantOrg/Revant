@@ -335,7 +335,7 @@ public class Reads {
 	 * DAmar;
 	 * @return -1 if the character is not the valid encoding of a quality value.
 	 */																	 
-	private static final byte ascii2quality(byte c, byte mode) {
+	public static final byte ascii2quality(byte c, byte mode) {
 		if (mode==0) {
 			if (c>=ASCII_FROM1 && c<=ASCII_TO1) return (byte)(c-ASCII_FROM1+1);
 			else if (c>=ASCII_FROM2 && c<=ASCII_TO2) return (byte)((ASCII_TO1-ASCII_FROM1+1)+(c-ASCII_FROM2)+1);
@@ -367,7 +367,7 @@ public class Reads {
 	 * Infers whether a quality file is in the DBDUMP or DAMAR format, from its 
 	 * extension.
 	 */
-	private static final byte filename2qualityMode(String filename) {
+	public static final byte filename2qualityMode(String filename) {
 		final int p = filename.lastIndexOf('.');
 		if (p<0) return 0;
 		if (filename.substring(p).equalsIgnoreCase(IO.DBDUMP_QUALITY_EXTENSION)) return 0;
@@ -545,9 +545,13 @@ public class Reads {
 	 * @param out assumed to be large enough.
 	 */
 	public static final int getLowQualityIntervals(int readID, byte minLowQuality, int from, int to, int[] out) {
+		return getLowQualityIntervals_impl(getQualityArray(readID),minLowQuality,from,to,out);
+	}
+	
+	
+	public static final int getLowQualityIntervals_impl(double[] qualityArray, byte minLowQuality, int from, int to, int[] out) {
 		int i;
 		int start, end, last;
-		final double[] qualityArray = getQualityArray(readID);
 		
 		start=-1; end=-1; last=-1;
 		for (i=0; i<qualityArray.length; i++) {
