@@ -3585,12 +3585,81 @@ public class RepeatAlphabet {
 	
 	/**
 	 * 
+	 * Remark: the procedure discards any alignment that contains a long low-quality 
+	 * region, and it trims any alignment whose suffix/prefix overlaps a long low-quality
+	 * region.
+	 *
 	 */
 	public static final void breakIntervals_translateAlignments_readRead(String inputFile, String outputFile) throws IOException {
 		
 		
 		
 		
+		br = new BufferedReader(new FileReader(inputFile));
+		str=br.readLine(); str=br.readLine();  // Skipping header
+		str=br.readLine();
+		while (str!=null) {
+			Alignments.readAlignmentFile(str);
+			readA=Alignments.readA-1; readB=Alignments.readB-1;
+			// Discarding alignments that span a low-quality region
+			if (lastBreakInterval[readA]!=-1) {
+				found=false; last=-1;
+				for (i=0; i<lastBreakInterval[readA]; i+=3) {
+					if ( breakIntervals[readA][i]>0 &&
+						 ( Intervals.isApproximatelyContained(last+1,breakIntervals[readA][i]-1,Alignments.startA,Alignments.endA) ||
+						   Intervals.areApproximatelyIdentical(last+1,breakIntervals[readA][i]-1,Alignments.startA,Alignments.endA)
+						 )
+					   ) {
+					   found=true;
+					   break;
+				   	}
+					last=breakIntervals[readA][i+1];
+				}
+				end=Reads.readLengths[readA]-1;
+				if ( last+1<end && 
+					 ( Intervals.isApproximatelyContained(last+1,end,Alignments.startA,Alignments.endA) ||
+					   Intervals.areApproximatelyIdentical(last+1,end,Alignments.startA,Alignments.endA)
+					 )
+				   ) found=true;
+				if (found) {
+					str=br.readLine();
+					continue;
+				}
+			}
+			if (lastBreakInterval[readB]!=-1) {
+				found=false; last=-1;
+				for (i=0; i<lastBreakInterval[readB]; i+=3) {
+					if ( breakIntervals[readB][i]>0 &&
+						 ( Intervals.isApproximatelyContained(last+1,breakIntervals[readB][i]-1,Alignments.startB,Alignments.endB) ||
+						   Intervals.areApproximatelyIdentical(last+1,breakIntervals[readB][i]-1,Alignments.startB,Alignments.endB)
+						 )
+					   ) {
+					   found=true;
+					   break;
+				   	}
+					last=breakIntervals[readB][i+1];
+				}
+				end=Reads.readLengths[readB]-1;
+				if ( last+1<end && 
+					 ( Intervals.isApproximatelyContained(last+1,end,Alignments.startB,Alignments.endB) ||
+					   Intervals.areApproximatelyIdentical(last+1,end,Alignments.startB,Alignments.endB)
+					 )
+				   ) found=true;
+				if (found) {
+					str=br.readLine();
+					continue;
+				}
+			}
+			// Translating the alignment
+			---------->
+			
+			
+			
+			
+			
+			str=br.readLine();
+		}
+		br.close();
 	}
 	
 	
