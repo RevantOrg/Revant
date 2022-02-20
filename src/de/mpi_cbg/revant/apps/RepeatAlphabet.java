@@ -3450,7 +3450,7 @@ public class RepeatAlphabet {
 	 * breaking reads;
 	 * @return the number of reads after breaking.
 	 */
-	public static final int breakIntervals_load(String qualitiesFile, int nReads, String qualityThresholdsFile, int minIntervalLength) throws IOException {
+	public static final int breakIntervals_load(int nReads, String readLengthsFile, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength) throws IOException {
 		final int CAPACITY = 1000;  // Arbitrary
 		final int CAPACITY_INTERVALS = 9;  // Arbitrary, multiple of 3.
 		byte mode;
@@ -3462,11 +3462,13 @@ public class RepeatAlphabet {
 		int[] tmpIntervals;
 		double[] tmpQualities;
 		
+		Reads.nReads=nReads;
+		Reads.loadReadLengths(readLengthsFile);
+		Reads.loadQualities_thresholds(qualityThresholdsFile);
+		mode=Reads.filename2qualityMode(qualitiesFile);
 		breakIntervals = new int[nReads][0];
 		lastBreakInterval = new int[nReads];
 		Math.set(lastBreakInterval,nReads-1,-1);
-		Reads.loadQualities_thresholds(qualityThresholdsFile);
-		mode=Reads.filename2qualityMode(qualitiesFile);
 		tmpQualities = new double[CAPACITY];
 		tmpIntervals = new int[(CAPACITY)<<1];  // Arbitrary, fixed.
 		br = new BufferedReader(new FileReader(qualitiesFile));
@@ -3475,7 +3477,7 @@ public class RepeatAlphabet {
 			tmpBytes=str.getBytes(Charset.forName("US-ASCII"));
 			if (tmpQualities.length<tmpBytes.length) tmpQualities = new double[tmpBytes.length];
 			for (i=0; i<tmpBytes.length; i++) tmpQualities[i]=Reads.ascii2quality(tmpBytes[i],mode);
-			lastInterval=Reads.getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Math.POSITIVE_INFINITY,tmpIntervals);
+			lastInterval=Reads.getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Reads.readLengths[read]-1,tmpIntervals);
 			if (lastInterval==-1) {
 				str=br.readLine(); read++;
 				continue;
@@ -3504,7 +3506,7 @@ public class RepeatAlphabet {
 					breakIntervals[read]=newArray;
 				}
 				breakIntervals[read][++last]=lastPosition+1;
-				breakIntervals[read][++last]=Math.POSITIVE_INFINITY;
+				breakIntervals[read][++last]=Reads.readLengths[read]-1;
 				breakIntervals[read][++last]=++idGenerator;
 				lastBreakInterval[read]=last;
 			}
@@ -3516,22 +3518,69 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 *
+	 * @param forward (discarded if NULL) output file: just a dump of $breakIntervals$;
+	 * @param reverse (discarded if NULL) output file: new read ID -> old read interval;
+	 * @param readLengths_new (discarded if NULL) output file: new read lengths.
 	 */
-	public static final void breakIntervals_printTranslationMaps(String forward, String reverse) throws IOException {
+	public static final void breakIntervals_printTranslation(int nReads_old, int nReads_new, String forward, String reverse, String readLengths_new) throws IOException {
+		int i, j;
+		int last;
+		BufferedWriter bw;
+		Translation[] tuples;
 		
-		
+		if (forward!=null) {
+			bw = new BufferedWriter(new FileWriter(forward));
+			for (i=0; i<nReads_new; i++) {
+				for (j=0; j<lastBreakInterval[i]; j++) bw.write(breakIntervals[i][j]+",");
+				bw.newLine();
+			}
+			bw.close();
+		}	
+		if (reverse!=null || readLengths_new!=null) {
+			tuples = new Translation[nReads_new];
+			last=-1;
+			for (i=0; i<nReads_old; i++) {
+				if (lastBreakInterval[i]==-1) tuples[++last] = new Translation(i,i,0,Reads.readLengths[i]-1);
+				else {
+					for (j=0; j<lastBreakInterval[i]; j+=3) tuples[++last] = new Translation(breakIntervals[i][j+2],i,breakIntervals[i][j],breakIntervals[i][j+1]);
+				}
+			}
+			if (last>0) Arrays.sort(tuples,0,last+1);
+			if (reverse!=null) {
+				bw = new BufferedWriter(new FileWriter(reverse));
+				for (i=0; i<=last; i++) { tuples[i].serialize(bw); bw.newLine(); }
+				bw.close();
+			}
+			if (readLengths_new!=null) {
+				bw = new BufferedWriter(new FileWriter(readLengths_new));	
+				for (i=0; i<nReads_new; i++) bw.write((tuples[i].oldLast-tuples[i].oldFirst+1)+"\n");
+				bw.close();
+			}
+		}
 	}
 	
 	
-	
-	/**
-	 *
-	 */
-	public static final void breakIntervals_printReadLengths(String out) throws IOException {
+	private static class Translation implements Comparable {
+		public int newRead, oldRead, oldFirst, oldLast;
 		
+		public Translation(int nr, int or, int of, int ol) {
+			this.newRead=nr; this.oldRead=or; this.oldFirst=of; this.oldLast=ol;
+		}
 		
+		public int compareTo(Object other) {
+			Translation otherTranslation = (Translation)other;
+			if (newRead<otherTranslation.newRead) return -1;
+			else if (newRead>otherTranslation.newRead) return 1;
+			if (oldFirst<otherTranslation.oldFirst) return -1;
+			else if (oldFirst>otherTranslation.oldFirst) return 1;
+			return 0;
+		}
+		
+		public void serialize(BufferedWriter bw) throws IOException {
+			bw.write(newRead+","+oldRead+","+oldFirst+","+oldLast);
+		}
 	}
+
 	
 	
 	/**
