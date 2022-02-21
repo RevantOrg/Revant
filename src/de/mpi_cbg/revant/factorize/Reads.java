@@ -978,5 +978,284 @@ public class Reads {
 		System.err.println("addTracksToPhred> Low-quality values that are also dust: "+nLowQualityInDust+" ("+IO.getPercent(nLowQualityInDust,nLowQuality)+"%)");
 		System.err.println("addTracksToPhred> Low-quality values that are also tandem: "+nLowQualityInTandem+" ("+IO.getPercent(nLowQualityInTandem,nLowQuality)+"%)");
 	}
+	
+	
+	
+	
+	
+	
+	
+	
+	// ------------------------- READ BREAKING AT LOW-QUALITY ----------------------------
+	
+	/**
+	 * For every old read $R$ (rows), a sequence of tuples $(i_0,j_0,r_0),...,(i_n,j_n,
+	 * r_n)$ that says that substring $R[i_x..j_x]$ becomes the new read $r_x$ (it can be 
+	 * $R=r_x$). Every old read has at least one record in its row. Old read IDs are
+	 * assumed to form a compact interval.
+	 */
+	public static int[][] breakReads_old2new;
+	public static int[] last_old2new;
+	
+	/**
+	 * For every new read $r$, a tuple $(R,i,j)$ that says that $r$ equals substring 
+	 * $[i..j]$ of the old read $R$ (it can be $r=R$). New read IDs are assumed to form a
+	 * compact interval.
+	 */
+	public static int[][] breakReads_new2old;
+	
+	
+	/**
+	 * Breaks reads into several pieces, by removing every long low-quality substring. 
+	 * Builds global data structures $breakReads_old2new,last_old2new$.
+	 *
+	 * Remark: the IDs of the new reads are assigned in order of appearance, so all the 
+	 * new reads created from the same old read have consecutive IDs. Even an old read
+	 * with no low-quality intervals might be assigned a new ID.
+	 *
+	 * Remark: the new reads that result from the breaking can have any length (even very
+	 * short).
+	 *
+	 * Remark: the procedure calls $Reads.loadReadLengths()$ on the old reads.
+	 *
+	 * @param nReads_old the procedure assumes that read IDs are a compact interval $[0..
+	 * nReads_old-1]$;
+	 * @param minIntervalLength low-quality intervals shorter than this are not used for
+	 * breaking old reads;
+	 * @return the number of new reads.
+	 */
+	public static final int breakReads(int nReads_old, String readLengthsFile, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength) throws IOException {
+		final int CAPACITY = 1000;  // Arbitrary
+		final int CAPACITY_INTERVALS = 9;  // Arbitrary, multiple of 3.
+		byte mode;
+		int i;
+		int oldRead, newRead, last, lastPosition, lastInterval;
+		String str;
+		BufferedReader br;
+		byte[] tmpBytes;
+		int[] tmpIntervals;
+		double[] tmpQualities;
+		
+		Reads.nReads=nReads_old;
+		Reads.loadReadLengths(readLengthsFile);
+		Reads.loadQualities_thresholds(qualityThresholdsFile);
+		mode=Reads.filename2qualityMode(qualitiesFile);
+		breakReads_old2new = new int[nReads_old][0];
+		last_old2new = new int[nReads_old];
+		Math.set(last_old2new,nReads_old-1,-1);
+		tmpQualities = new double[CAPACITY];
+		tmpIntervals = new int[(CAPACITY)<<1];  // Arbitrary, fixed.
+		br = new BufferedReader(new FileReader(qualitiesFile));
+		str=br.readLine(); oldRead=0; newRead=-1;
+		while (str!=null) {
+			tmpBytes=str.getBytes(Charset.forName("US-ASCII"));
+			if (tmpQualities.length<tmpBytes.length) tmpQualities = new double[tmpBytes.length];
+			for (i=0; i<tmpBytes.length; i++) tmpQualities[i]=Reads.ascii2quality(tmpBytes[i],mode);
+			lastInterval=Reads.getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Reads.readLengths[oldRead]-1,tmpIntervals);
+			if (lastInterval==-1) {
+				if (breakReads_old2new[oldRead].length<3) breakReads_old2new[oldRead] = new int[CAPACITY_INTERVALS];
+				breakReads_old2new[oldRead][0]=0;
+				breakReads_old2new[oldRead][1]=Reads.readLengths[oldRead]-1;
+				breakReads_old2new[oldRead][2]=++newRead;
+				str=br.readLine(); oldRead++;
+				continue;
+			}
+			lastPosition=-1;
+			for (i=0; i<lastInterval; i+=2) {
+				if (tmpIntervals[i+1]-tmpIntervals[i]+1>=minIntervalLength) {
+					last=last_old2new[oldRead];
+					if (last+3>=breakReads_old2new[oldRead].length) {
+						int[] newArray = new int[breakReads_old2new[oldRead].length+CAPACITY_INTERVALS];
+						System.arraycopy(breakReads_old2new[oldRead],0,newArray,0,breakReads_old2new[oldRead].length);
+						breakReads_old2new[oldRead]=newArray;
+					}
+					breakReads_old2new[oldRead][++last]=lastPosition+1;
+					breakReads_old2new[oldRead][++last]=tmpIntervals[i]-1;
+					breakReads_old2new[oldRead][++last]=++newRead;
+					last_old2new[oldRead]=last;
+					lastPosition=tmpIntervals[i+1];
+				}
+			}
+			if (lastPosition!=-1) {
+				last=last_old2new[oldRead];
+				if (last+3>=breakReads_old2new[oldRead].length) {
+					int[] newArray = new int[breakReads_old2new[oldRead].length+CAPACITY_INTERVALS];
+					System.arraycopy(breakReads_old2new[oldRead],0,newArray,0,breakReads_old2new[oldRead].length);
+					breakReads_old2new[oldRead]=newArray;
+				}
+				breakReads_old2new[oldRead][++last]=lastPosition+1;
+				breakReads_old2new[oldRead][++last]=Reads.readLengths[oldRead]-1;
+				breakReads_old2new[oldRead][++last]=++newRead;
+				last_old2new[oldRead]=last;
+			}
+			else {
+				if (breakReads_old2new[oldRead].length<3) breakReads_old2new[oldRead] = new int[CAPACITY_INTERVALS];
+				breakReads_old2new[oldRead][0]=0;
+				breakReads_old2new[oldRead][1]=Reads.readLengths[oldRead]-1;
+				breakReads_old2new[oldRead][2]=++newRead;
+			}
+			str=br.readLine(); oldRead++;
+		}
+		br.close();
+		return newRead+1;
+	}
+	
+	
+	/**
+	 * @param old2new (discarded if NULL) output file: just a dump of $breakReads_
+	 * old2new$;
+	 * @param new2old (discarded if NULL) output file: a dump of $breakReads_new2old$ 
+	 * (which does not need to have been initialized);
+	 * @param readLengths_new (discarded if NULL) output file: new read lengths.
+	 */
+	public static final void breakReads_serialize(int nReads_old, int nReads_new, String old2new, String new2old, String readLengths_new) throws IOException {
+		int i, j;
+		int last;
+		BufferedWriter bw;
+		Translation[] tuples;
+		
+		if (old2new!=null) {
+			bw = new BufferedWriter(new FileWriter(old2new));
+			for (i=0; i<nReads_new; i++) {
+				bw.write(last_old2new[i]+"");
+				for (j=0; j<=last_old2new[i]; j++) bw.write(","+breakReads_old2new[i][j]);
+				bw.newLine();
+			}
+			bw.close();
+		}	
+		if (new2old!=null || readLengths_new!=null) {
+			tuples = new Translation[nReads_new];
+			last=-1;
+			for (i=0; i<nReads_old; i++) {
+				if (last_old2new[i]==-1) tuples[++last] = new Translation(i,i,0,Reads.readLengths[i]-1);
+				else {
+					for (j=0; j<last_old2new[i]; j+=3) tuples[++last] = new Translation(breakReads_old2new[i][j+2],i,breakReads_old2new[i][j],breakReads_old2new[i][j+1]);
+				}
+			}
+			if (last>0) Arrays.sort(tuples,0,last+1);
+			if (new2old!=null) {
+				bw = new BufferedWriter(new FileWriter(new2old));
+				for (i=0; i<=last; i++) { tuples[i].serialize(bw); bw.newLine(); }
+				bw.close();
+			}
+			if (readLengths_new!=null) {
+				bw = new BufferedWriter(new FileWriter(readLengths_new));	
+				for (i=0; i<nReads_new; i++) bw.write((tuples[i].oldLast-tuples[i].oldFirst+1)+"\n");
+				bw.close();
+			}
+		}
+	}
+	
+	
+	private static class Translation implements Comparable {
+		public int newRead, oldRead, oldFirst, oldLast;
+		
+		public Translation(int nr, int or, int of, int ol) {
+			this.newRead=nr; this.oldRead=or; this.oldFirst=of; this.oldLast=ol;
+		}
+		
+		public int compareTo(Object other) {
+			Translation otherTranslation = (Translation)other;
+			if (newRead<otherTranslation.newRead) return -1;
+			else if (newRead>otherTranslation.newRead) return 1;
+			if (oldFirst<otherTranslation.oldFirst) return -1;
+			else if (oldFirst>otherTranslation.oldFirst) return 1;
+			return 0;
+		}
+		
+		public void serialize(BufferedWriter bw) throws IOException {
+			bw.write(newRead+","+oldRead+","+oldFirst+","+oldLast);
+		}
+	}
+	
+	
+	public static final void breakReads_old2new_deserialize(int nReads_old, String inputFile) throws IOException {
+		int i, j;
+		int last;
+		String str;
+		BufferedReader br;
+		String[] tokens;
 
+		breakReads_old2new = new int[nReads_old][0];
+		last_old2new = new int[nReads_old];
+		br = new BufferedReader(new FileReader(inputFile));
+		str=br.readLine(); i=0;
+		while (str!=null) {
+			tokens=str.split(",");
+			last=Integer.parseInt(tokens[0]);
+			last_old2new[i]=last;
+			breakReads_old2new[i] = new int[last+1];
+			for (j=0; j<=last; j++) breakReads_old2new[i][j]=Integer.parseInt(tokens[1+i]);
+			str=br.readLine(); i++;
+		}
+		br.close();
+	}
+	
+	
+	public static final void breakReads_new2old_deserialize(int nReads_new, String inputFile) throws IOException {
+		int i, j;
+		int newRead, oldRead, oldFirst, oldLast;
+		String str;
+		BufferedReader br;
+		String[] tokens;
+
+		breakReads_new2old = new int[nReads_new][3];
+		Math.set(breakReads_new2old,-1);
+		br = new BufferedReader(new FileReader(inputFile));
+		str=br.readLine();
+		while (str!=null) {
+			tokens=str.split(",");
+			newRead=Integer.parseInt(tokens[0]);
+			oldRead=Integer.parseInt(tokens[1]);
+			oldFirst=Integer.parseInt(tokens[2]);
+			oldLast=Integer.parseInt(tokens[3]);
+			breakReads_new2old[newRead][0]=oldRead; 
+			breakReads_new2old[newRead][1]=oldFirst;
+			breakReads_new2old[newRead][2]=oldLast;
+			str=br.readLine();
+		}
+		br.close();
+		if (IO.CONSISTENCY_CHECKS) {
+			for (i=0; i<nReads_new; i++) {
+				for (j=0; j<breakReads_new2old[i].length; j++) {
+					if (breakReads_new2old[i][j]==-1) {
+						System.err.println("breakReads_new2old_deserialize> ERROR: new read "+i+" has an incomplete entry:");
+						for (j=0; j<breakReads_new2old[i].length; j++) System.err.print(breakReads_new2old[i][j]+",");
+						System.err.println();
+						System.exit(1);
+					}
+				}
+			}
+		}
+	}
+	
+	
+	/**
+	 * Remark: the procedure needs global variable $breakReads_old2new$.
+	 *
+	 * @return TRUE iff $read[start..end]$ contains a low-quality interval.
+	 */
+	public static final boolean breakReads_containsLowQuality(int read, int start, int end) {
+		int i;
+		int last, endPrime;
+		
+		if (last_old2new[read]==2 && breakReads_old2new[read][0]==0 && breakReads_old2new[read][1]==Reads.readLengths[read]-1) return false;
+		last=-1;
+		for (i=0; i<last_old2new[read]; i+=3) {
+			if ( breakReads_old2new[read][i]>0 &&
+				 ( Intervals.isApproximatelyContained(last+1,breakReads_old2new[read][i]-1,start,end) ||
+				   Intervals.areApproximatelyIdentical(last+1,breakReads_old2new[read][i]-1,start,end)
+				 )
+			   ) return true;
+			last=breakReads_old2new[read][i+1];
+		}
+		endPrime=Reads.readLengths[read]-1;
+		if ( last+1<endPrime && 
+			 ( Intervals.isApproximatelyContained(last+1,endPrime,start,end) ||
+			   Intervals.areApproximatelyIdentical(last+1,endPrime,start,end)
+			 )
+		   ) return true;
+		return false;
+	}
+	
 }

@@ -3433,188 +3433,23 @@ public class RepeatAlphabet {
 	
 	
 	
-	// ------------------------ LOW-QUALITY REGIONS PROCEDURES ---------------------------
+	// ------------------------- READ BREAKING AT LOW-QUALITY ----------------------------
 	
 	/**
-	 * For every read $R$ (rows), a sequence of tuples $(i_0,j_0,r_0),...,(i_n,j_n,r_n)$
-	 * that says that substring $R[i_x..j_x]$ becomes the new read $r_x$.
-	 */
-	private static int[][] breakIntervals;
-	private static int[] lastBreakInterval;
-	
-	
-	/**
-	 * Remark: the IDs of the new reads are assigned in order of appearance, so all 
-	 * the artifical reads created from the same real read have consecutive IDs. Even a
-	 * read with no low-quality intervals might be assigned a new ID. Every read has at 
-	 * least one record in its row of $breakIntervals$.
+	 * Remark: the procedure discards any alignment that contains a low-quality region on
+	 * either side, and it trims each side of an alignment whose suffix/prefix overlaps a
+	 * low-quality region (each side is trimmed independently).
 	 *
-	 * Remark: the artificial reads that result from the breaking can have any length.
-	 *
-	 * Remark: the procedure calls $Reads.loadReadLengths()$ on the old reads.
-	 *
-	 * @param nReads the procedure assumes that read IDs are a compact interval $[0..
-	 * nReads-1]$;
-	 * @param minIntervalLength low-quality intervals shorter than this are not used for
-	 * breaking reads;
-	 * @return the number of reads after breaking.
-	 */
-	public static final int breakIntervals_load(int nReads, String readLengthsFile, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength) throws IOException {
-		final int CAPACITY = 1000;  // Arbitrary
-		final int CAPACITY_INTERVALS = 9;  // Arbitrary, multiple of 3.
-		byte mode;
-		int i;
-		int oldRead, newRead, last, lastPosition, lastInterval;
-		String str;
-		BufferedReader br;
-		byte[] tmpBytes;
-		int[] tmpIntervals;
-		double[] tmpQualities;
-		
-		Reads.nReads=nReads;
-		Reads.loadReadLengths(readLengthsFile);
-		Reads.loadQualities_thresholds(qualityThresholdsFile);
-		mode=Reads.filename2qualityMode(qualitiesFile);
-		breakIntervals = new int[nReads][0];
-		lastBreakInterval = new int[nReads];
-		Math.set(lastBreakInterval,nReads-1,-1);
-		tmpQualities = new double[CAPACITY];
-		tmpIntervals = new int[(CAPACITY)<<1];  // Arbitrary, fixed.
-		br = new BufferedReader(new FileReader(qualitiesFile));
-		str=br.readLine(); oldRead=0; newRead=-1;
-		while (str!=null) {
-			tmpBytes=str.getBytes(Charset.forName("US-ASCII"));
-			if (tmpQualities.length<tmpBytes.length) tmpQualities = new double[tmpBytes.length];
-			for (i=0; i<tmpBytes.length; i++) tmpQualities[i]=Reads.ascii2quality(tmpBytes[i],mode);
-			lastInterval=Reads.getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Reads.readLengths[oldRead]-1,tmpIntervals);
-			if (lastInterval==-1) {
-				if (breakIntervals[oldRead].length<3) breakIntervals[oldRead] = new int[CAPACITY_INTERVALS];
-				breakIntervals[oldRead][0]=0;
-				breakIntervals[oldRead][1]=Reads.readLengths[oldRead]-1;
-				breakIntervals[oldRead][2]=++newRead;
-				str=br.readLine(); oldRead++;
-				continue;
-			}
-			lastPosition=-1;
-			for (i=0; i<lastInterval; i+=2) {
-				if (tmpIntervals[i+1]-tmpIntervals[i]+1>=minIntervalLength) {
-					last=lastBreakInterval[oldRead];
-					if (last+3>=breakIntervals[oldRead].length) {
-						int[] newArray = new int[breakIntervals[oldRead].length+CAPACITY_INTERVALS];
-						System.arraycopy(breakIntervals[oldRead],0,newArray,0,breakIntervals[oldRead].length);
-						breakIntervals[oldRead]=newArray;
-					}
-					breakIntervals[oldRead][++last]=lastPosition+1;
-					breakIntervals[oldRead][++last]=tmpIntervals[i]-1;
-					breakIntervals[oldRead][++last]=++newRead;
-					lastBreakInterval[oldRead]=last;
-					lastPosition=tmpIntervals[i+1];
-				}
-			}
-			if (lastPosition!=-1) {
-				last=lastBreakInterval[oldRead];
-				if (last+3>=breakIntervals[oldRead].length) {
-					int[] newArray = new int[breakIntervals[oldRead].length+CAPACITY_INTERVALS];
-					System.arraycopy(breakIntervals[oldRead],0,newArray,0,breakIntervals[oldRead].length);
-					breakIntervals[oldRead]=newArray;
-				}
-				breakIntervals[oldRead][++last]=lastPosition+1;
-				breakIntervals[oldRead][++last]=Reads.readLengths[oldRead]-1;
-				breakIntervals[oldRead][++last]=++newRead;
-				lastBreakInterval[oldRead]=last;
-			}
-			else {
-				if (breakIntervals[oldRead].length<3) breakIntervals[oldRead] = new int[CAPACITY_INTERVALS];
-				breakIntervals[oldRead][0]=0;
-				breakIntervals[oldRead][1]=Reads.readLengths[oldRead]-1;
-				breakIntervals[oldRead][2]=++newRead;
-			}
-			str=br.readLine(); oldRead++;
-		}
-		br.close();
-		return newRead+1;
-	}
-	
-	
-	/**
-	 * @param forward (discarded if NULL) output file: just a dump of $breakIntervals$;
-	 * @param reverse (discarded if NULL) output file: new read ID -> old read interval;
-	 * @param readLengths_new (discarded if NULL) output file: new read lengths.
-	 */
-	public static final void breakIntervals_printTranslation(int nReads_old, int nReads_new, String forward, String reverse, String readLengths_new) throws IOException {
-		int i, j;
-		int last;
-		BufferedWriter bw;
-		Translation[] tuples;
-		
-		if (forward!=null) {
-			bw = new BufferedWriter(new FileWriter(forward));
-			for (i=0; i<nReads_new; i++) {
-				for (j=0; j<lastBreakInterval[i]; j++) bw.write(breakIntervals[i][j]+",");
-				bw.newLine();
-			}
-			bw.close();
-		}	
-		if (reverse!=null || readLengths_new!=null) {
-			tuples = new Translation[nReads_new];
-			last=-1;
-			for (i=0; i<nReads_old; i++) {
-				if (lastBreakInterval[i]==-1) tuples[++last] = new Translation(i,i,0,Reads.readLengths[i]-1);
-				else {
-					for (j=0; j<lastBreakInterval[i]; j+=3) tuples[++last] = new Translation(breakIntervals[i][j+2],i,breakIntervals[i][j],breakIntervals[i][j+1]);
-				}
-			}
-			if (last>0) Arrays.sort(tuples,0,last+1);
-			if (reverse!=null) {
-				bw = new BufferedWriter(new FileWriter(reverse));
-				for (i=0; i<=last; i++) { tuples[i].serialize(bw); bw.newLine(); }
-				bw.close();
-			}
-			if (readLengths_new!=null) {
-				bw = new BufferedWriter(new FileWriter(readLengths_new));	
-				for (i=0; i<nReads_new; i++) bw.write((tuples[i].oldLast-tuples[i].oldFirst+1)+"\n");
-				bw.close();
-			}
-		}
-	}
-	
-	
-	private static class Translation implements Comparable {
-		public int newRead, oldRead, oldFirst, oldLast;
-		
-		public Translation(int nr, int or, int of, int ol) {
-			this.newRead=nr; this.oldRead=or; this.oldFirst=of; this.oldLast=ol;
-		}
-		
-		public int compareTo(Object other) {
-			Translation otherTranslation = (Translation)other;
-			if (newRead<otherTranslation.newRead) return -1;
-			else if (newRead>otherTranslation.newRead) return 1;
-			if (oldFirst<otherTranslation.oldFirst) return -1;
-			else if (oldFirst>otherTranslation.oldFirst) return 1;
-			return 0;
-		}
-		
-		public void serialize(BufferedWriter bw) throws IOException {
-			bw.write(newRead+","+oldRead+","+oldFirst+","+oldLast);
-		}
-	}
-	
-	
-	/**
-	 * Remark: the procedure discards any alignment that contains a low-quality region, 
-	 * and it just trims each side of an alignment whose suffix/prefix overlaps a low-
-	 * quality region (each side is trimmed independently).
-	 *
-	 * Remark: the procedure assumes that $Reads.readLengths$ has been already initialized
-	 * with the lengths of the old reads.
+	 * Remark: the procedure assumes that $Reads.breakReads_old2new$ has already been 
+	 * loaded, and that $Reads.readLengths$ has been already initialized with the lengths
+	 * of the old reads.
 	 *
 	 * @param inputFile assumed to be sorted by $readA,readB,orientation,startA,startB$;
 	 * @param translateB if FALSE, the readB side of every alignment is kept intact (this
 	 * is useful if $inputFile$ contains read-repeat alignments);
 	 * @param outputFile sorted in the same order as $inputFile$.
 	 */
-	public static final void breakIntervals_translateAlignments(String inputFile, boolean translateB, String outputFile) throws IOException {
+	public static final void breakReads_translateAlignments(String inputFile, boolean translateB, String outputFile) throws IOException {
 		boolean found;
 		int i;
 		int last, end, intersection, maxIntersection, readA, readB;
@@ -3631,81 +3466,35 @@ public class RepeatAlphabet {
 		while (str!=null) {
 			Alignments.readAlignmentFile(str);
 			readA=Alignments.readA-1; readB=Alignments.readB-1;
-			// Checking if the alignment contains a low-quality region
-			if (lastBreakInterval[readA]!=2 || !(breakIntervals[readA][0]==0 && breakIntervals[readA][1]==Reads.readLengths[readA]-1)) {
-				found=false; last=-1;
-				for (i=0; i<lastBreakInterval[readA]; i+=3) {
-					if ( breakIntervals[readA][i]>0 &&
-						 ( Intervals.isApproximatelyContained(last+1,breakIntervals[readA][i]-1,Alignments.startA,Alignments.endA) ||
-						   Intervals.areApproximatelyIdentical(last+1,breakIntervals[readA][i]-1,Alignments.startA,Alignments.endA)
-						 )
-					   ) {
-					   found=true;
-					   break;
-				   	}
-					last=breakIntervals[readA][i+1];
-				}
-				end=Reads.readLengths[readA]-1;
-				if ( last+1<end && 
-					 ( Intervals.isApproximatelyContained(last+1,end,Alignments.startA,Alignments.endA) ||
-					   Intervals.areApproximatelyIdentical(last+1,end,Alignments.startA,Alignments.endA)
-					 )
-				   ) found=true;
-				if (found) {
-					str=br.readLine();
-					continue;
-				}
+			if (Reads.breakReads_containsLowQuality(readA,Alignments.startA,Alignments.endA) || (translateB && Reads.breakReads_containsLowQuality(readB,Alignments.startB,Alignments.endB))) {
+				str=br.readLine();
+				continue;
 			}
-			if (translateB && (lastBreakInterval[readB]!=2 || !(breakIntervals[readB][0]==0 && breakIntervals[readB][1]==Reads.readLengths[readB]-1))) {
-				found=false; last=-1;
-				for (i=0; i<lastBreakInterval[readB]; i+=3) {
-					if ( breakIntervals[readB][i]>0 &&
-						 ( Intervals.isApproximatelyContained(last+1,breakIntervals[readB][i]-1,Alignments.startB,Alignments.endB) ||
-						   Intervals.areApproximatelyIdentical(last+1,breakIntervals[readB][i]-1,Alignments.startB,Alignments.endB)
-						 )
-					   ) {
-					   found=true;
-					   break;
-				   	}
-					last=breakIntervals[readB][i+1];
-				}
-				end=Reads.readLengths[readB]-1;
-				if ( last+1<end && 
-					 ( Intervals.isApproximatelyContained(last+1,end,Alignments.startB,Alignments.endB) ||
-					   Intervals.areApproximatelyIdentical(last+1,end,Alignments.startB,Alignments.endB)
-					 )
-				   ) found=true;
-				if (found) {
-					str=br.readLine();
-					continue;
-				}
-			}
-			// Translating the alignment
 			maxIntersection=0; startA_new=-1; endA_new=-1; readA_new=-1;
-			for (i=0; i<lastBreakInterval[readA]; i+=3) {
-				if (breakIntervals[readA][i]>Alignments.endA) break;
-				if (breakIntervals[readA][i+1]<Alignments.startA) continue;
-				intersection=Intervals.intersectionLength(Alignments.startA,Alignments.endA,breakIntervals[readA][i],breakIntervals[readA][i+1]);
+			for (i=0; i<Reads.last_old2new[readA]; i+=3) {
+				if (Reads.breakReads_old2new[readA][i]>Alignments.endA) break;
+				if (Reads.breakReads_old2new[readA][i+1]<Alignments.startA) continue;
+				intersection=Intervals.intersectionLength(Alignments.startA,Alignments.endA,Reads.breakReads_old2new[readA][i],Reads.breakReads_old2new[readA][i+1]);
 				if (intersection>maxIntersection) {
 					maxIntersection=intersection;
-					startA_new=breakIntervals[readA][i];
-					endA_new=breakIntervals[readA][i+1];
-					readA_new=breakIntervals[readA][i+2];
+					startA_new=Reads.breakReads_old2new[readA][i];
+					endA_new=Reads.breakReads_old2new[readA][i+1];
+					readA_new=Reads.breakReads_old2new[readA][i+2];
 				}
 			}
 			startA_new=Math.max(startA_new,Alignments.startA)-startA_new;
 			endA_new=Math.min(endA_new,Alignments.endA)-startA_new;
 			if (translateB) {
 				maxIntersection=0; startB_new=-1; endB_new=-1; readB_new=-1;
-				for (i=0; i<lastBreakInterval[readB]; i+=3) {
-					if (breakIntervals[readB][i]>Alignments.endB) break;
-					if (breakIntervals[readB][i+1]<Alignments.startB) continue;
-					intersection=Intervals.intersectionLength(Alignments.startB,Alignments.endB,breakIntervals[readB][i],breakIntervals[readB][i+1]);
+				for (i=0; i<Reads.last_old2new[readB]; i+=3) {
+					if (Reads.breakReads_old2new[readB][i]>Alignments.endB) break;
+					if (Reads.breakReads_old2new[readB][i+1]<Alignments.startB) continue;
+					intersection=Intervals.intersectionLength(Alignments.startB,Alignments.endB,Reads.breakReads_old2new[readB][i],Reads.breakReads_old2new[readB][i+1]);
 					if (intersection>maxIntersection) {
 						maxIntersection=intersection;
-						startB_new=breakIntervals[readB][i];
-						endB_new=breakIntervals[readB][i+1];
-						readB_new=breakIntervals[readB][i+2];
+						startB_new=Reads.breakReads_old2new[readB][i];
+						endB_new=Reads.breakReads_old2new[readB][i+1];
+						readB_new=Reads.breakReads_old2new[readB][i+2];
 					}
 				}
 				startB_new=Math.max(startB_new,Alignments.startB)-startB_new;
@@ -3721,77 +3510,52 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * Given a bitvector that filters the new alignments created by $breakIntervals_
+	 * translateAlignments()$, the procedure builds a corresponding bitvector that filters
+	 * the old alignments.
 	 * 
-	 * @param alignmentsFile the translated alignments;
-	 * @param inputFile bitvector with a row for each alignment in $alignmentsFile$;
-	 * @param outputFile bitvector with a row for every original alignment.
+	 * Remark: the procedure uses global array $alignments$.
 	 *
+	 * @param bitvectorFile_old output file.
 	 */
-	public static final void breakIntervals_translateFilter(int nReads_new, String mapFile, String alignments_new, String filterFile_new, String filterFile_old) throws IOException {
+	public static final void breakReads_translateBitvector(String bitvectorFile_new, String alignmentsFile_new, String new2oldFile, int nReads_new, String old2newFile, int nReads_old, String bitvectorFile_old, String alignmentsFile_old) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100;  // Arbitrary
-		int i, j;
-		int newRead, oldRead, oldFirst, oldLast;
-		String str;
-		BufferedReader br;
+		int i;
+		int currentReadA, oldReadA, oldFirstA, oldReadB, oldFirstB;
+		String str1, str2, str3;
+		BufferedReader br1, br2, br3;
+		BufferedWriter bw;
 		AlignmentRow tmpAlignment = new AlignmentRow();
-		String[] tokens;
-		int[][] map;
 		
-		
-		// Loading the new->old map
-		map = new int[nReads_new][3];
-		Math.set(map,-1);
-		br = new BufferedReader(new FileReader(mapFile));
-		str=br.readLine();
-		while (str!=null) {
-			tokens=str.split(",");
-			newRead=Integer.parseInt(tokens[0]);
-			oldRead=Integer.parseInt(tokens[1]);
-			oldFirst=Integer.parseInt(tokens[2]);
-			oldLast=Integer.parseInt(tokens[3]);
-			map[newRead][0]=oldRead; map[newRead][1]=oldFirst; map[newRead][2]=oldLast;
-			str=br.readLine();
-		}
-		br.close();
-		if (IO.CONSISTENCY_CHECKS) {
-			for (i=0; i<nReads_new; i++) {
-				for (j=0; j<map[i].length; j++) {
-					if (map[i][j]==-1) {
-						System.err.println("breakIntervals_translateFilter> ERROR: new read "+i+" has an incomplete map entry:");
-						for (j=0; j<map[i].length; j++) System.err.print(map[i][j]+",");
-						System.err.println();
-						System.exit(1);
-					}
-				}
-			}
-		}
-		
-		// Translating filters
+		Reads.breakReads_old2new_deserialize(nReads_old,old2newFile);
+		Reads.breakReads_new2old_deserialize(nReads_new,new2oldFile);
 		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
 		for (i=0; i<alignments.length; i++) alignments[i] = new AlignmentRow();
 		AlignmentRow.order=AlignmentRow.ORDER_READA_READB_ORIENTATION_STARTA_STARTB_ENDA_ENDB;
-		bw = new BufferedWriter(new FileWriter(filterFile_old));
-		br1 = new BufferedReader(new FileReader(alignments_new));
+		bw = new BufferedWriter(new FileWriter(bitvectorFile_old));
+		br1 = new BufferedReader(new FileReader(alignmentsFile_new));
 		str1=br1.readLine(); str1=br1.readLine();  // Skipping header
 		str1=br1.readLine();
-		br2 = new BufferedReader(new FileReader(alignments_old));
-		str2=br2.readLine(); str2=br2.readLine();  // Skipping header
+		br2 = new BufferedReader(new FileReader(bitvectorFile_new));
 		str2=br2.readLine();
-		br3 = new BufferedReader(new FileReader(filterFile_new));
+		br3 = new BufferedReader(new FileReader(alignmentsFile_old));
+		str3=br3.readLine(); str3=br3.readLine();  // Skipping header
 		str3=br3.readLine();
 		currentReadA=-1; lastAlignment=-1;
 		while (str1!=null) {
-			Alignments.readAlignmentsFile(str1);
-			oldReadA=map[Alignments.readA-1][0]; oldFirstA=map[Alignments.readA-1][1];
-			oldReadB=map[Alignments.readB-1][0]; oldFirstB=map[Alignments.readB-1][1];
+			Alignments.readAlignmentFile(str1);
+			oldReadA=Reads.breakReads_new2old[Alignments.readA-1][0]; 
+			oldFirstA=Reads.breakReads_new2old[Alignments.readA-1][1];
+			oldReadB=Reads.breakReads_new2old[Alignments.readB-1][0]; 
+			oldFirstB=Reads.breakReads_new2old[Alignments.readB-1][1];
 			if (oldReadA!=currentReadA) {
 				if (currentReadA!=-1) {
 					if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
-					str2=breakIntervals_translateFilter_impl(currentReadA,br2,str2,bw,tmpAlignment);
+					str3=breakReads_translateBitvector_impl(currentReadA,br3,str3,bw,tmpAlignment);
 				}
 				currentReadA=oldReadA; lastAlignment=0; 
 				alignments[lastAlignment].set(oldReadA,oldFirstA+Alignments.startA,oldFirstA+Alignments.endA,oldReadB,oldFirstB+Alignments.startB,oldFirstB+Alignments.endB,Alignments.orientation,Alignments.diffs);				
-				alignments[lastAlignment].flag=Integer.parseInt(str3.trim())!=0;
+				alignments[lastAlignment].flag=Integer.parseInt(str2.trim())!=0;
 			}
 			else {
 				lastAlignment++;
@@ -3802,45 +3566,38 @@ public class RepeatAlphabet {
 					alignments=newAlignments;
 				}
 				alignments[lastAlignment].set(oldReadA,oldFirstA+Alignments.startA,oldFirstA+Alignments.endA,oldReadB,oldFirstB+Alignments.startB,oldFirstB+Alignments.endB,Alignments.orientation,Alignments.diffs);
-				alignments[lastAlignment].flag=Integer.parseInt(str3.trim())!=0;
+				alignments[lastAlignment].flag=Integer.parseInt(str2.trim())!=0;
 			}
-			str1=br.readLine(); str3=br3.readLine();
+			str1=br1.readLine(); str2=br2.readLine();
 		}
 		if (currentReadA!=-1) {
 			if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
-			breakIntervals_translateFilter_impl(currentReadA,br2,str2,bw,tmpAlignment);
+			breakReads_translateBitvector_impl(currentReadA,br3,str3,bw,tmpAlignment);
 		}
 		br1.close(); br2.close(); br3.close(); bw.close();
-		
-		
 	}
 	
 	
 	/**
 	 * Remark: an old alignment might not be identical to the translation of its 
 	 * corresponding new alignment, because of trimming. Thus, the procedure has to do a
-	 * binary search in $alignments$ and to return an element that maximizes the 
+	 * binary search inside $alignments$ and to return an element that maximizes the 
 	 * intersection with the old alignment.
 	 *
 	 * @param br old alignments file;
 	 * @param firstString the first string from $br$ to be processed;
-	 * @param bw old bitvector file (to be computed);
+	 * @param bw output file: old bitvector;
 	 * @param tmpAlignment temporary space;
 	 * @return the new value of $firstString$ after the procedure completes.
 	 */
-	private static final String breakIntervals_translateFilter_impl(int currentReadA, BufferedReader br, String firstString, BufferedWriter bw, AlignmentRow tmpAlignment) throws IOException {
-		final int DISTANCE_THRESHOLD = 1000;  // Arbitrary
+	private static final String breakReads_translateBitvector_impl(int currentReadA, BufferedReader br, String firstString, BufferedWriter bw, AlignmentRow tmpAlignment) throws IOException {
 		int i, p;
-		int readA, maxIntersection, maxAlignment;
+		int readA, readB, intersection, maxIntersection, maxAlignment;
 		String str;
-		
-		
------------------> check if old alignment contains a low-quality region by having the forward map loaded as well.
------------------> create separate procedure for loading the reverse map.
 		
 		str=firstString;
 		while (str!=null) {
-			Alignments.readAlignmentsFile(str);
+			Alignments.readAlignmentFile(str);
 			readA=Alignments.readA-1;
 			if (readA>currentReadA) return str;
 			if (readA<currentReadA) {
@@ -3848,7 +3605,13 @@ public class RepeatAlphabet {
 				str=br.readLine();
 				continue;
 			}
-			tmpAlignment.set(readA,Alignments.startA,Alignments.endA,Alignments.readB-1,Alignments.startB,Alignments.endB,Alignments.orientation,Alignments.diffs);
+			readB=Alignments.readB-1;
+			if (Reads.breakReads_containsLowQuality(readA,Alignments.startA,Alignments.endA) || Reads.breakReads_containsLowQuality(readB,Alignments.startB,Alignments.endB)) {
+				bw.write("0\n");
+				str=br.readLine();
+				continue;
+			}
+			tmpAlignment.set(readA,Alignments.startA,Alignments.endA,readB,Alignments.startB,Alignments.endB,Alignments.orientation,Alignments.diffs);
 			p=Arrays.binarySearch(alignments,0,lastAlignment+1,tmpAlignment);
 			if (p>=0) {
 				bw.write(alignments[p].flag?"1\n":"0\n");
@@ -3856,50 +3619,31 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=-1-p; maxIntersection=0; maxAlignment=-1;
-			for (i=p-1; i>=0; i--) {
-				if (alignments[i].readB!=tmpAlignment.readB || alignments[i].orientation!=tmpAlignment.orientation || alignments[i].startA<tmpAlignment.startA-DISTANCE_THRESHOLD) break;
-				intersection=Intervals.intersectionLength(alignments[i].startA,alignments[i].endA,tmpAlignment.startA,tmpAlignment.endA)+Intervals.intersectionLength(alignments[i].startB,alignments[i].endB,tmpAlignment.startB,tmpAlignment.endB);
-				if (intersection>maxIntersection) {
-					maxIntersection=intersection;
-					maxAlignment=i;
-				}
-			}
+			// Because of trimming, the new alignment can only start at or after the
+			// beginning of its corresponding old alignment.
 			for (i=p; i<=lastAlignment; i++) {
-				if (alignments[i].readB!=tmpAlignment.readB || alignments[i].orientation!=tmpAlignment.orientation || alignments[i].startA>tmpAlignment.startA+DISTANCE_THRESHOLD) break;
-				intersection=Intervals.intersectionLength(alignments[i].startA,alignments[i].endA,tmpAlignment.startA,tmpAlignment.endA)+Intervals.intersectionLength(alignments[i].startB,alignments[i].endB,tmpAlignment.startB,tmpAlignment.endB);
+				if (alignments[i].readB!=tmpAlignment.readB || alignments[i].orientation!=tmpAlignment.orientation || alignments[i].startA>=tmpAlignment.endA) break;
+				intersection=Intervals.intersectionLength(alignments[i].startA,alignments[i].endA,Alignments.startA,Alignments.endA)+Intervals.intersectionLength(alignments[i].startB,alignments[i].endB,Alignments.startB,Alignments.endB);
 				if (intersection>maxIntersection) {
 					maxIntersection=intersection;
 					maxAlignment=i;
 				}
 			}
-			if (maxAlignment==-1) bw.write("0\n");
-			else bw.write(alignments[maxAlignment].flag?"1\n":"0\n");
+			if (maxAlignment==-1) {
+				System.err.println("breakIntervals_translateFilter_impl> ERROR: no new alignment intersects the old alignment "+str);
+				System.exit(1);
+			}
+			bw.write(alignments[maxAlignment].flag?"1\n":"0\n");
 			str=br.readLine();
 		}
 		return null;
 	}
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 
 
+	
+	
+	
 	
 	
 	// ------------------------------ DATA STRUCTURES ------------------------------------
