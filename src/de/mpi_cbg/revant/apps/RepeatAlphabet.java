@@ -3514,11 +3514,12 @@ public class RepeatAlphabet {
 	 * translateAlignments()$, the procedure builds a corresponding bitvector that filters
 	 * the old alignments.
 	 * 
-	 * Remark: the procedure uses global array $alignments$.
+	 * Remark: the procedure assumes that the $Reads.breakReads_*$ arrays have already 
+	 * been loaded, and it uses global array $alignments$.
 	 *
 	 * @param bitvectorFile_old output file.
 	 */
-	public static final void breakReads_translateBitvector(String bitvectorFile_new, String alignmentsFile_new, String new2oldFile, int nReads_new, String old2newFile, int nReads_old, String bitvectorFile_old, String alignmentsFile_old) throws IOException {
+	public static final void breakReads_translateBitvector(String bitvectorFile_new, String alignmentsFile_new, String bitvectorFile_old, String alignmentsFile_old) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100;  // Arbitrary
 		int i;
 		int currentReadA, oldReadA, oldFirstA, oldReadB, oldFirstB;
@@ -3527,8 +3528,6 @@ public class RepeatAlphabet {
 		BufferedWriter bw;
 		AlignmentRow tmpAlignment = new AlignmentRow();
 		
-		Reads.breakReads_old2new_deserialize(nReads_old,old2newFile);
-		Reads.breakReads_new2old_deserialize(nReads_new,new2oldFile);
 		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
 		for (i=0; i<alignments.length; i++) alignments[i] = new AlignmentRow();
 		AlignmentRow.order=AlignmentRow.ORDER_READA_READB_ORIENTATION_STARTA_STARTB_ENDA_ENDB;
