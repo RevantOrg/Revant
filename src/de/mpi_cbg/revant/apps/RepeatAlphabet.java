@@ -1422,7 +1422,7 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Transforms string matrix $blocks$ into integer matrix $intBlocks$, expanding every 
-	 * negative ID into a list of positive IDs, and builds arrays $isBlock{Unique,Open}$.
+	 * negative ID into a list of positive IDs, and builds array $isBlockUnique$.
 	 *
 	 * Remark: the procedure follows the logic of $incrementCharacterCounts()$.
 	 */
@@ -3433,12 +3433,13 @@ public class RepeatAlphabet {
 	
 	
 	
-	// ------------------------- READ BREAKING AT LOW-QUALITY ----------------------------
+	// ------------------------- READ BREAKING AT LOW QUALITY ----------------------------
 	
 	/**
-	 * Remark: the procedure discards any alignment that contains a low-quality region on
-	 * either side, and it trims each side of an alignment whose suffix/prefix overlaps a
-	 * low-quality region (each side is trimmed independently).
+	 * Remark: the procedure discards any alignment that contains a low-quality region in
+	 * readA or readB, and it trims the readA and the readB side of an alignment whose 
+	 * suffix/prefix overlaps a low-quality region (the readA side and the readB side are
+	 * trimmed independently).
 	 *
 	 * Remark: the procedure assumes that $Reads.breakReads_old2new$ has already been 
 	 * loaded, and that $Reads.readLengths$ has been already initialized with the lengths
@@ -3636,6 +3637,141 @@ public class RepeatAlphabet {
 			str=br.readLine();
 		}
 		return null;
+	}
+	
+	
+	/**
+	 * Enforces that the result of $fixEndBlocks()$, executed on the broken reads, is
+	 * consistent on the two sides of every long low-quality region.
+	 *
+	 * @param mode every long low-quality region: TRUE=replaces a substring with a random 
+	 * substring of approx. the same length; FALSE=is an insertion; If it replaces without
+	 * preserving length, nothing can be decided;
+	 * @param translatedFile the translated reads before disambiguation;
+	 * @param translatedFile_disambiguated_new (output file) updated version of 
+	 * $translatedFile_disambiguated$.
+	 */
+	public static final void breakReads_checkDisambiguation(boolean mode, int lengthThreshold, String translatedFile, String translatedFile_disambiguated, String translatedFile_disambiguated_new) throws IOException {
+		final int CAPACITY = 10;  // Arbitrary
+		boolean previousEnd2_isUnique, currentEnd2_isUnique;
+		int r;
+		int oldRead, currentOldRead, nBlocks;
+		int last1, last2, previousEnd1_last, previousEnd2_last, currentEnd1_last, currentEnd2_last;
+		String str1, str2;
+		StringBuilder previousEnd1_str, previousEnd2_str;
+		BufferedReader br1, br2;
+		BufferedWriter bw;
+		int[] previousEnd1, previousEnd2, currentEnd1, currentEnd2;
+		int[] tmpArray, tmpArray1, tmpArray2;
+		
+		previousEnd1 = new int[CAPACITY]; previousEnd2 = new int[CAPACITY];
+		currentEnd1 = new int[CAPACITY]; currentEnd2 = new int[CAPACITY];
+		tmpArray1 = new int[CAPACITY]; tmpArray2 = new int[CAPACITY];
+		previousEnd1_str = new StringBuilder();
+		previousEnd2_str = new StringBuilder();
+		bw = new BufferedWriter(new FileWriter(translatedFile_disambiguated_new));
+		br1 = new BufferedReader(new FileReader(translatedFile));
+		br2 = new BufferedReader(new FileReader(translatedFile_disambiguated));
+		str1=br1.readLine(); str2=br2.readLine(); r=-1; 
+		currentOldRead=-1; previousEnd1_last=-1; previousEnd2_last=-1; currentEnd1_last=-1; currentEnd2_last=-1;
+		previousEnd2_isUnique=false; currentEnd2_isUnique=false;
+		while (str1!=null) {
+			r++;
+			oldRead=Reads.breakReads_new2old[r][0]; 
+			if (oldRead!=currentOldRead) {
+				if (previousEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+previousEnd2_str.toString()+"\n");
+				currentOldRead=oldRead;
+				nBlocks=loadBlocks(str1);
+				if (nBlocks<2) {
+					bw.write(str2); bw.newLine();
+					previousEnd1_str.delete(0,previousEnd1_str.length());
+					previousEnd2_str.delete(0,previousEnd2_str.length());
+				}
+				else {
+					bw.write(str2.substring(0,str2.lastIndexOf(SEPARATOR_MAJOR+"")));
+					loadIntBlocks(nBlocks);
+					if (lastInBlock_int[nBlocks-1]>=previousEnd1.length) previousEnd1 = new int[lastInBlock_int[nBlocks-1]+1];
+					System.arraycopy(intBlocks[nBlocks-1],0,previousEnd1,0,lastInBlock_int[nBlocks-1]+1);
+					previousEnd1_last=lastInBlock_int[nBlocks-1];
+					previousEnd1_str.delete(0,previousEnd1_str.length());
+					previousEnd1_str.append(str1.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+					nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks);
+					if (lastInBlock_int[nBlocks-1]>=previousEnd2.length) previousEnd2 = new int[lastInBlock_int[nBlocks-1]+1];
+					System.arraycopy(intBlocks[nBlocks-1],0,previousEnd2,0,lastInBlock_int[nBlocks-1]+1);
+					previousEnd2_last=lastInBlock_int[nBlocks-1];
+					previousEnd2_str.delete(0,previousEnd2_str.length());
+					previousEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+					previousEnd2_isUnique=isBlockUnique[nBlocks-1];
+				}
+				str1=br1.readLine(); str2=br2.readLine();
+				continue;
+			}
+			nBlocks=loadBlocks(str1); loadIntBlocks(nBlocks);
+			if (lastInBlock_int[0]>=currentEnd1.length) currentEnd1 = new int[lastInBlock_int[0]+1];
+			System.arraycopy(intBlocks[0],0,currentEnd1,0,lastInBlock_int[0]+1);
+			currentEnd1_last=lastInBlock_int[0];
+			if (lastInBlock_int[nBlocks-1]>=tmpArray1.length) tmpArray1 = new int[lastInBlock_int[nBlocks-1]+1];
+			System.arraycopy(intBlocks[nBlocks-1],0,tmpArray1,0,lastInBlock_int[nBlocks-1]+1);
+			last1=lastInBlock_int[nBlocks-1];
+			nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks);
+			if (lastInBlock_int[0]>=currentEnd2.length) currentEnd2 = new int[lastInBlock_int[0]+1];
+			System.arraycopy(intBlocks[0],0,currentEnd2,0,lastInBlock_int[0]+1);
+			currentEnd2_last=lastInBlock_int[0];
+			if (lastInBlock_int[nBlocks-1]>=tmpArray2.length) tmpArray2 = new int[lastInBlock_int[nBlocks-1]+1];
+			System.arraycopy(intBlocks[0],0,tmpArray2,0,lastInBlock_int[nBlocks-1]+1);
+			last2=lastInBlock_int[nBlocks-1];
+			currentEnd2_isUnique=isBlockUnique[0];
+			breakReads_checkDisambiguation_impl(previousEnd1,previousEnd1_last,previousEnd1_str,str1,previousEnd2,previousEnd2_last,previousEnd2_isUnique,currentEnd1,currentEnd1_last,currentEnd2,currentEnd2_last,currentEnd2_isUnique,bw);			
+			tmpArray=previousEnd1; previousEnd1=tmpArray1; tmpArray1=tmpArray;
+			previousEnd1_last=last1;
+			previousEnd1_str.delete(0,previousEnd1_str.length());
+			previousEnd1_str.append(str1.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+			tmpArray=previousEnd2; previousEnd2=tmpArray2; tmpArray2=tmpArray;
+			previousEnd2_last=last2;
+			previousEnd2_str.delete(0,previousEnd2_str.length());
+			previousEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+			str1=br1.readLine(); str2=br2.readLine();
+		}
+		if (previousEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+previousEnd2_str.toString()+"\n");
+		br1.close(); br2.close(); bw.close();
+	}
+	
+	
+	/**
+	 *
+	 */
+	private static final void breakReads_checkDisambiguation_impl(int[] previousEnd1, int previousEnd1_last, StringBuilder previousEnd1_str, String str1, int[] previousEnd2, int previousEnd2_last, boolean previousEnd2_isUnique, int[] currentEnd1, int currentEnd1_last, int[] currentEnd2, int currentEnd2_last, boolean currentEnd2_isUnique, BufferedWriter bw) throws IOException {
+		
+		
+		if (previousEnd2_last==0) {
+			if (currentEnd2_last==0) {
+				
+				
+				
+				if (previousEnd2[previousEnd2_last]==currentEnd2[0]) {
+					bw.write(previousEnd2[previousEnd2_last]+"\n");
+					bw.write(currentEnd2[0]+"");
+				}
+				else {
+					bw.write(previousEnd1_str.toString()); bw.newLine();
+					bw.write(str1.substring(0,str1.indexOf(SEPARATOR_MAJOR+"")));
+				}
+			}
+			else if (currentEnd1_last>0) {
+				
+			}
+			
+			
+			
+		}
+		else {
+			
+			
+			
+		}
+		
+		
+		
 	}
 	
 

@@ -986,7 +986,7 @@ public class Reads {
 	
 	
 	
-	// ------------------------- READ BREAKING AT LOW-QUALITY ----------------------------
+	// ------------------------- READ BREAKING AT LOW QUALITY ----------------------------
 	
 	/**
 	 * For every old read $R$ (rows), a sequence of tuples $(i_0,j_0,r_0),...,(i_n,j_n,
@@ -1010,11 +1010,14 @@ public class Reads {
 	 * Builds global data structures $breakReads_old2new,last_old2new$.
 	 *
 	 * Remark: the IDs of the new reads are assigned in order of appearance, so all the 
-	 * new reads created from the same old read have consecutive IDs. Even an old read
-	 * with no low-quality intervals might be assigned a new ID.
+	 * new reads created from the same old read have consecutive IDs. An old read with no 
+	 * low-quality interval is assigned an ID (possibly different from its old ID).
 	 *
 	 * Remark: the new reads that result from the breaking can have any length (even very
 	 * short).
+	 *
+	 * Remark: the procedure is designed to be sequential. This is because new read IDs
+	 * are assigned in order of appearance and must form a compact interval.
 	 *
 	 * Remark: the procedure calls $Reads.loadReadLengths()$ on the old reads.
 	 *
@@ -1105,7 +1108,7 @@ public class Reads {
 	 * @param old2new (discarded if NULL) output file: just a dump of $breakReads_
 	 * old2new$;
 	 * @param new2old (discarded if NULL) output file: a dump of $breakReads_new2old$ 
-	 * (which does not need to have been initialized);
+	 * built just from $breakReads_old2new$ ($breakReads_new2old$ might be NULL);
 	 * @param readLengths_new (discarded if NULL) output file: new read lengths.
 	 */
 	public static final void breakReads_serialize(int nReads_old, int nReads_new, String old2new, String new2old, String readLengths_new) throws IOException {
