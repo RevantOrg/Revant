@@ -3643,135 +3643,302 @@ public class RepeatAlphabet {
 	/**
 	 * Enforces that the result of $fixEndBlocks()$, executed on the broken reads, is
 	 * consistent on the two sides of every long low-quality region.
+	 * 
+	 * Remark: if a long low-quality region replaces a substring without preserving the
+	 * substring's length, no constraint can be enforced.
+	 *
+	 * Remark: the procedure assumes that $Reads.readLengths$ contains the length of every
+	 * new read, and that $Reads.breakReads_new2old$ has already been loaded.
 	 *
 	 * @param mode every long low-quality region: TRUE=replaces a substring with a random 
-	 * substring of approx. the same length; FALSE=is an insertion; If it replaces without
-	 * preserving length, nothing can be decided;
+	 * substring of approx. the same length; FALSE=is an insertion;
 	 * @param translatedFile the translated reads before disambiguation;
 	 * @param translatedFile_disambiguated_new (output file) updated version of 
 	 * $translatedFile_disambiguated$.
 	 */
-	public static final void breakReads_checkDisambiguation(boolean mode, int lengthThreshold, String translatedFile, String translatedFile_disambiguated, String translatedFile_disambiguated_new) throws IOException {
+	public static final void breakReads_checkDisambiguation(boolean mode, int lengthThreshold, String translatedFile, String translatedFile_disambiguated, String boundariesFile, String translatedFile_disambiguated_new) throws IOException {
+		final int LENGTH_THRESHOLD = (IO.quantum)<<1;  // Arbitrary
 		final int CAPACITY = 10;  // Arbitrary
-		boolean previousEnd2_isUnique, currentEnd2_isUnique;
 		int r;
-		int oldRead, currentOldRead, nBlocks;
-		int last1, last2, previousEnd1_last, previousEnd2_last, currentEnd1_last, currentEnd2_last;
-		String str1, str2;
-		StringBuilder previousEnd1_str, previousEnd2_str;
-		BufferedReader br1, br2;
+		int oldRead, currentOldRead, nBlocks, leftLength;
+		int last1, last2, leftEnd1_last, leftEnd2_last, rightEnd1_last, rightEnd2_last;
+		String str1, str2, str3;
+		StringBuilder leftEnd1_str, leftEnd2_str;
+		BufferedReader br1, br2, br3;
 		BufferedWriter bw;
-		int[] previousEnd1, previousEnd2, currentEnd1, currentEnd2;
+		int[] leftEnd1, leftEnd2, rightEnd1, rightEnd2;
 		int[] tmpArray, tmpArray1, tmpArray2;
+		String[] tokens;
 		
-		previousEnd1 = new int[CAPACITY]; previousEnd2 = new int[CAPACITY];
-		currentEnd1 = new int[CAPACITY]; currentEnd2 = new int[CAPACITY];
+		leftEnd1 = new int[CAPACITY]; leftEnd2 = new int[CAPACITY];
+		rightEnd1 = new int[CAPACITY]; rightEnd2 = new int[CAPACITY];
 		tmpArray1 = new int[CAPACITY]; tmpArray2 = new int[CAPACITY];
-		previousEnd1_str = new StringBuilder();
-		previousEnd2_str = new StringBuilder();
+		leftEnd1_str = new StringBuilder(); leftEnd2_str = new StringBuilder();
 		bw = new BufferedWriter(new FileWriter(translatedFile_disambiguated_new));
 		br1 = new BufferedReader(new FileReader(translatedFile));
 		br2 = new BufferedReader(new FileReader(translatedFile_disambiguated));
-		str1=br1.readLine(); str2=br2.readLine(); r=-1; 
-		currentOldRead=-1; previousEnd1_last=-1; previousEnd2_last=-1; currentEnd1_last=-1; currentEnd2_last=-1;
-		previousEnd2_isUnique=false; currentEnd2_isUnique=false;
+		br3 = new BufferedReader(new FileReader(boundariesFile));
+		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); r=-1; 
+		currentOldRead=-1; leftEnd1_last=-1; leftEnd2_last=-1; rightEnd1_last=-1; rightEnd2_last=-1; leftLength=0;
 		while (str1!=null) {
 			r++;
 			oldRead=Reads.breakReads_new2old[r][0]; 
 			if (oldRead!=currentOldRead) {
-				if (previousEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+previousEnd2_str.toString()+"\n");
+				if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");
 				currentOldRead=oldRead;
 				nBlocks=loadBlocks(str1);
 				if (nBlocks<2) {
 					bw.write(str2); bw.newLine();
-					previousEnd1_str.delete(0,previousEnd1_str.length());
-					previousEnd2_str.delete(0,previousEnd2_str.length());
+					leftEnd1_str.delete(0,leftEnd1_str.length());
+					leftEnd2_str.delete(0,leftEnd2_str.length());
+					leftLength=0;
 				}
 				else {
 					bw.write(str2.substring(0,str2.lastIndexOf(SEPARATOR_MAJOR+"")));
 					loadIntBlocks(nBlocks);
-					if (lastInBlock_int[nBlocks-1]>=previousEnd1.length) previousEnd1 = new int[lastInBlock_int[nBlocks-1]+1];
-					System.arraycopy(intBlocks[nBlocks-1],0,previousEnd1,0,lastInBlock_int[nBlocks-1]+1);
-					previousEnd1_last=lastInBlock_int[nBlocks-1];
-					previousEnd1_str.delete(0,previousEnd1_str.length());
-					previousEnd1_str.append(str1.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+					if (lastInBlock_int[nBlocks-1]>=leftEnd1.length) leftEnd1 = new int[lastInBlock_int[nBlocks-1]+1];
+					System.arraycopy(intBlocks[nBlocks-1],0,leftEnd1,0,lastInBlock_int[nBlocks-1]+1);
+					leftEnd1_last=lastInBlock_int[nBlocks-1];
+					leftEnd1_str.delete(0,leftEnd1_str.length());
+					leftEnd1_str.append(str1.lastIndexOf(SEPARATOR_MAJOR+"")+1);
 					nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks);
-					if (lastInBlock_int[nBlocks-1]>=previousEnd2.length) previousEnd2 = new int[lastInBlock_int[nBlocks-1]+1];
-					System.arraycopy(intBlocks[nBlocks-1],0,previousEnd2,0,lastInBlock_int[nBlocks-1]+1);
-					previousEnd2_last=lastInBlock_int[nBlocks-1];
-					previousEnd2_str.delete(0,previousEnd2_str.length());
-					previousEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
-					previousEnd2_isUnique=isBlockUnique[nBlocks-1];
+					if (lastInBlock_int[nBlocks-1]>=leftEnd2.length) leftEnd2 = new int[lastInBlock_int[nBlocks-1]+1];
+					System.arraycopy(intBlocks[nBlocks-1],0,leftEnd2,0,lastInBlock_int[nBlocks-1]+1);
+					leftEnd2_last=lastInBlock_int[nBlocks-1];
+					leftEnd2_str.delete(0,leftEnd2_str.length());
+					leftEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+					leftLength=Reads.readLengths[r]-Integer.parseInt(str3.substring(str3.lastIndexOf(",")+1).trim())-1;
 				}
-				str1=br1.readLine(); str2=br2.readLine();
+				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
 			nBlocks=loadBlocks(str1); loadIntBlocks(nBlocks);
-			if (lastInBlock_int[0]>=currentEnd1.length) currentEnd1 = new int[lastInBlock_int[0]+1];
-			System.arraycopy(intBlocks[0],0,currentEnd1,0,lastInBlock_int[0]+1);
-			currentEnd1_last=lastInBlock_int[0];
+			if (lastInBlock_int[0]>=rightEnd1.length) rightEnd1 = new int[lastInBlock_int[0]+1];
+			System.arraycopy(intBlocks[0],0,rightEnd1,0,lastInBlock_int[0]+1);
+			rightEnd1_last=lastInBlock_int[0];
 			if (lastInBlock_int[nBlocks-1]>=tmpArray1.length) tmpArray1 = new int[lastInBlock_int[nBlocks-1]+1];
 			System.arraycopy(intBlocks[nBlocks-1],0,tmpArray1,0,lastInBlock_int[nBlocks-1]+1);
 			last1=lastInBlock_int[nBlocks-1];
 			nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks);
-			if (lastInBlock_int[0]>=currentEnd2.length) currentEnd2 = new int[lastInBlock_int[0]+1];
-			System.arraycopy(intBlocks[0],0,currentEnd2,0,lastInBlock_int[0]+1);
-			currentEnd2_last=lastInBlock_int[0];
+			if (lastInBlock_int[0]>=rightEnd2.length) rightEnd2 = new int[lastInBlock_int[0]+1];
+			System.arraycopy(intBlocks[0],0,rightEnd2,0,lastInBlock_int[0]+1);
+			rightEnd2_last=lastInBlock_int[0];
 			if (lastInBlock_int[nBlocks-1]>=tmpArray2.length) tmpArray2 = new int[lastInBlock_int[nBlocks-1]+1];
 			System.arraycopy(intBlocks[0],0,tmpArray2,0,lastInBlock_int[nBlocks-1]+1);
-			last2=lastInBlock_int[nBlocks-1];
-			currentEnd2_isUnique=isBlockUnique[0];
-			breakReads_checkDisambiguation_impl(previousEnd1,previousEnd1_last,previousEnd1_str,str1,previousEnd2,previousEnd2_last,previousEnd2_isUnique,currentEnd1,currentEnd1_last,currentEnd2,currentEnd2_last,currentEnd2_isUnique,bw);			
-			tmpArray=previousEnd1; previousEnd1=tmpArray1; tmpArray1=tmpArray;
-			previousEnd1_last=last1;
-			previousEnd1_str.delete(0,previousEnd1_str.length());
-			previousEnd1_str.append(str1.lastIndexOf(SEPARATOR_MAJOR+"")+1);
-			tmpArray=previousEnd2; previousEnd2=tmpArray2; tmpArray2=tmpArray;
-			previousEnd2_last=last2;
-			previousEnd2_str.delete(0,previousEnd2_str.length());
-			previousEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
-			str1=br1.readLine(); str2=br2.readLine();
+			last2=lastInBlock_int[nBlocks-1];					
+			breakReads_checkDisambiguation_impl(mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftLength,Integer.parseInt(str3.substring(0,str3.indexOf(","))),LENGTH_THRESHOLD,leftEnd1,leftEnd1_last,leftEnd1_str,rightEnd1,rightEnd1_last,str1,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
+			tmpArray=leftEnd1; leftEnd1=tmpArray1; tmpArray1=tmpArray;
+			leftEnd1_last=last1;
+			leftEnd1_str.delete(0,leftEnd1_str.length());
+			leftEnd1_str.append(str1.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+			tmpArray=leftEnd2; leftEnd2=tmpArray2; tmpArray2=tmpArray;
+			leftEnd2_last=last2;
+			leftEnd2_str.delete(0,leftEnd2_str.length());
+			leftEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
+			leftLength=Reads.readLengths[r]-Integer.parseInt(str3.substring(str3.lastIndexOf(",")+1).trim());	
+			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 		}
-		if (previousEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+previousEnd2_str.toString()+"\n");
-		br1.close(); br2.close(); bw.close();
+		if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");
+		br1.close(); br2.close(); br3.close(); bw.close();
 	}
 	
 	
 	/**
+	 * The disambiguation of the left and right side of a low-quality region is rolled 
+	 * back if it uses open characters, or if it uses characters whose length is 
+	 * incompatible with the old read. If just one side was disambiguated, the procedure
+	 * tries to set the other side to the same character.
 	 *
+	 * Remark: if a low-quality regions is a replacement, the procedure assumes that only
+	 * the character on the left/right side of it can occur inside the replaced interval.
+	 * This is done for simplicity.
+	 *
+	 * Remark: unique and periodic characters are treated the same way as nonperiodic.
+	 *
+	 * @param lowQualityLength length of the low-quality interval between the new reads
+	 * (must be zero if low-quality intervals are assumed to be insertions);
+	 * @param lengthThreshold tolerance in length comparisons;
+	 * @param leftLength,rightEnd length of the left and right blocks of the new reads.
 	 */
-	private static final void breakReads_checkDisambiguation_impl(int[] previousEnd1, int previousEnd1_last, StringBuilder previousEnd1_str, String str1, int[] previousEnd2, int previousEnd2_last, boolean previousEnd2_isUnique, int[] currentEnd1, int currentEnd1_last, int[] currentEnd2, int currentEnd2_last, boolean currentEnd2_isUnique, BufferedWriter bw) throws IOException {
-		
-		
-		if (previousEnd2_last==0) {
-			if (currentEnd2_last==0) {
-				
-				
-				
-				if (previousEnd2[previousEnd2_last]==currentEnd2[0]) {
-					bw.write(previousEnd2[previousEnd2_last]+"\n");
-					bw.write(currentEnd2[0]+"");
+	private static final void breakReads_checkDisambiguation_impl(int lowQualityLength, int leftLength, int rightLength, int lengthThreshold, int[] leftEnd1, int leftEnd1_last, StringBuilder leftEnd1_str, int[] rightEnd1, int rightEnd1_last, String str1, int[] leftEnd2, int leftEnd2_last, int[] rightEnd2, int rightEnd2_last, BufferedWriter bw) throws IOException {
+		boolean found;
+		int i, j;
+		int leftCharacter, leftCharacterLength, rightCharacter, rightCharacterLength;
+		final int availableLength = leftLength+lowQualityLength+rightLength;
+
+		if (leftEnd2_last==0) {
+			leftCharacter=leftEnd2[0];
+			if (alphabet[leftCharacter].openEnd) {
+				// Disambiguation rejected
+				bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
+				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+				return;
+			}
+			leftCharacterLength=alphabet[leftCharacter].getLength();
+			if (rightEnd2_last==0) rightCharacter=rightEnd2[0];
+			else {
+				rightCharacter=-1;
+				for (i=0; i<=rightEnd1_last; i++) {
+					if (rightEnd1[i]==leftCharacter) {
+						rightCharacter=leftCharacter;
+						break;
+					}
+				}
+			}
+			if (rightCharacter==leftCharacter) {
+				// Identical characters must be compatible with the available length
+				i=1; found=false;
+				while (leftCharacterLength*i<=availableLength+lengthThreshold) {
+					if (Math.abs(leftCharacterLength*i,availableLength)<=lengthThreshold) {
+						found=true;
+						break;
+					}
+					i++;
+				}
+				if (found) {
+					// Disambiguation accepted
+					bw.write(SEPARATOR_MAJOR+""+rightCharacter); bw.newLine();
+					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
 				}
 				else {
-					bw.write(previousEnd1_str.toString()); bw.newLine();
-					bw.write(str1.substring(0,str1.indexOf(SEPARATOR_MAJOR+"")));
+					// Disambiguation rejected, if any.
+					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
+					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
 				}
 			}
-			else if (currentEnd1_last>0) {
-				
+			else if (rightCharacter!=-1) {
+				if (alphabet[rightCharacter].openStart) {
+					// Disambiguation rejected
+					bw.write(SEPARATOR_MAJOR+""+leftCharacter); bw.newLine();
+					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
+				// Different characters must be compatible with the available length
+				rightCharacterLength=alphabet[rightCharacter].getLength();
+				found=false; i=1; j=1;
+				while (!found) {
+					if (leftCharacterLength*i>availableLength+lengthThreshold) break;
+					while (!found) {
+						if (leftCharacterLength*i+rightCharacterLength*j>availableLength+lengthThreshold) break;
+						if (Math.abs(leftCharacterLength*i+rightCharacterLength*j,availableLength)<=lengthThreshold) {
+							found=true;
+							break;
+						}
+						j++;
+					}
+					i++;
+				}
+				if (found) {
+					// Disambiguation accepted
+					bw.write(SEPARATOR_MAJOR+""+leftCharacter); bw.newLine();
+					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
+				else {
+					// Disambiguation rejected
+					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
+					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
 			}
-			
-			
-			
+			else {
+				// Cannot disambiguate the right end
+				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
+				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+				return;
+			}
+		}
+		else if (rightEnd2_last==0) {
+			rightCharacter=rightEnd2[0];
+			if (alphabet[rightCharacter].openStart) {
+				// Disambiguation rejected
+				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
+				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+				return;
+			}
+			rightCharacterLength=alphabet[rightCharacter].getLength();
+			if (leftEnd2_last==0) leftCharacter=leftEnd2[0];
+			else {
+				leftCharacter=-1;
+				for (i=0; i<=leftEnd1_last; i++) {
+					if (leftEnd1[i]==rightCharacter) {
+						leftCharacter=rightCharacter;
+						break;
+					}
+				}
+			}
+			if (leftCharacter==rightCharacter) {
+				// Identical characters must be compatible with the available length
+				i=1; found=false;
+				while (rightCharacterLength*i<=availableLength+lengthThreshold) {
+					if (Math.abs(rightCharacterLength*i,availableLength)<=lengthThreshold) {
+						found=true;
+						break;
+					}
+					i++;
+				}
+				if (found) {
+					// Disambiguation accepted
+					bw.write(SEPARATOR_MAJOR+""+rightCharacter); bw.newLine();
+					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
+				else {
+					// Disambiguation rejected, if any.
+					bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
+					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
+			}
+			else if (leftCharacter!=-1) {
+				if (alphabet[leftCharacter].openEnd) {
+					// Disambiguation rejected
+					bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
+					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
+				// Different characters must be compatible with the available length
+				leftCharacterLength=alphabet[leftCharacter].getLength();
+				found=false; i=1; j=1;
+				while (!found) {
+					if (leftCharacterLength*i>availableLength+lengthThreshold) break;
+					while (!found) {
+						if (leftCharacterLength*i+rightCharacterLength*j>availableLength+lengthThreshold) break;
+						if (Math.abs(leftCharacterLength*i+rightCharacterLength*j,availableLength)<=lengthThreshold) {
+							found=true;
+							break;
+						}
+						j++;
+					}
+					i++;
+				}
+				if (found) {
+					// Disambiguation accepted
+					bw.write(SEPARATOR_MAJOR+""+leftCharacter); bw.newLine();
+					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
+				else {
+					// Disambiguation rejected
+					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
+					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+					return;
+				}
+			}
+			else {
+				// Cannot disambiguate the left end
+				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
+				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
+				return;
+			}
 		}
 		else {
-			
-			
-			
+			// No end was disambiguated
+			bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
+			bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
 		}
-		
-		
-		
 	}
 	
 
