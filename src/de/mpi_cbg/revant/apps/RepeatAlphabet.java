@@ -3691,7 +3691,7 @@ public class RepeatAlphabet {
 					bw.write(str2); bw.newLine();
 					leftEnd1_str.delete(0,leftEnd1_str.length());
 					leftEnd2_str.delete(0,leftEnd2_str.length());
-					leftLength=0;
+					leftEnd1_last=-1; leftEnd2_last=-1; leftLength=0;
 				}
 				else {
 					bw.write(str2.substring(0,str2.lastIndexOf(SEPARATOR_MAJOR+"")));
@@ -3712,7 +3712,17 @@ public class RepeatAlphabet {
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
-			nBlocks=loadBlocks(str1); loadIntBlocks(nBlocks);
+			nBlocks=loadBlocks(str1); 
+			if (nBlocks<2) {
+				if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");
+				bw.write(str2); bw.newLine();
+				leftEnd1_str.delete(0,leftEnd1_str.length());
+				leftEnd2_str.delete(0,leftEnd2_str.length());
+				leftEnd1_last=-1; leftEnd2_last=-1; leftLength=0;
+				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
+				continue;
+			}
+			loadIntBlocks(nBlocks);
 			if (lastInBlock_int[0]>=rightEnd1.length) rightEnd1 = new int[lastInBlock_int[0]+1];
 			System.arraycopy(intBlocks[0],0,rightEnd1,0,lastInBlock_int[0]+1);
 			rightEnd1_last=lastInBlock_int[0];
@@ -3725,8 +3735,12 @@ public class RepeatAlphabet {
 			rightEnd2_last=lastInBlock_int[0];
 			if (lastInBlock_int[nBlocks-1]>=tmpArray2.length) tmpArray2 = new int[lastInBlock_int[nBlocks-1]+1];
 			System.arraycopy(intBlocks[0],0,tmpArray2,0,lastInBlock_int[nBlocks-1]+1);
-			last2=lastInBlock_int[nBlocks-1];					
-			breakReads_checkDisambiguation_impl(mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftLength,Integer.parseInt(str3.substring(0,str3.indexOf(","))),LENGTH_THRESHOLD,leftEnd1,leftEnd1_last,leftEnd1_str,rightEnd1,rightEnd1_last,str1,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
+			last2=lastInBlock_int[nBlocks-1];
+			if ((leftEnd1_last>0 && leftEnd2_last==0) || (rightEnd1_last>0 && rightEnd2_last==0 && leftEnd2_last>=0)) breakReads_checkDisambiguation_impl(mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftLength,Integer.parseInt(str3.substring(0,str3.indexOf(","))),LENGTH_THRESHOLD,leftEnd1,leftEnd1_last,leftEnd1_str,rightEnd1,rightEnd1_last,str1,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
+			else {
+				if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");
+				bw.write(str2.substring(0,str2.lastIndexOf(SEPARATOR_MAJOR+"")));
+			}
 			tmpArray=leftEnd1; leftEnd1=tmpArray1; tmpArray1=tmpArray;
 			leftEnd1_last=last1;
 			leftEnd1_str.delete(0,leftEnd1_str.length());
@@ -3735,7 +3749,7 @@ public class RepeatAlphabet {
 			leftEnd2_last=last2;
 			leftEnd2_str.delete(0,leftEnd2_str.length());
 			leftEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
-			leftLength=Reads.readLengths[r]-Integer.parseInt(str3.substring(str3.lastIndexOf(",")+1).trim());	
+			leftLength=Reads.readLengths[r]-Integer.parseInt(str3.substring(str3.lastIndexOf(",")+1).trim());
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 		}
 		if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");
@@ -3748,6 +3762,10 @@ public class RepeatAlphabet {
 	 * back if it uses open characters, or if it uses characters whose length is 
 	 * incompatible with the old read. If just one side was disambiguated, the procedure
 	 * tries to set the other side to the same character.
+	 *
+	 * Remark: the procedure assumes that either the left or the right side were
+	 * disambiguated, and that the side that was not disambiguated contains at least one
+	 * character.
 	 *
 	 * Remark: if a low-quality regions is a replacement, the procedure assumes that only
 	 * the character on the left/right side of it can occur inside the replaced interval.
@@ -3934,11 +3952,7 @@ public class RepeatAlphabet {
 				return;
 			}
 		}
-		else {
-			// No end was disambiguated
-			bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
-			bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-		}
+		else { /* Never happens */ }
 	}
 	
 
