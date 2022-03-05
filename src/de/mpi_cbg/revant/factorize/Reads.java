@@ -1007,25 +1007,26 @@ public class Reads {
 	
 	
 	/**
-	 * Breaks reads into several pieces, by removing every long low-quality substring. 
-	 * Builds global data structures $breakReads_old2new,last_old2new$.
+	 * Assume that the input reads are CLR and that they contain long low-quality regions.
+	 * The procedure breaks each read at every one of its long low-quality regions.
 	 *
 	 * Remark: the IDs of the new reads are assigned in order of appearance, so all the 
 	 * new reads created from the same old read have consecutive IDs. An old read with no 
 	 * low-quality interval is assigned an ID (possibly different from its old ID).
 	 *
-	 * Remark: the new reads that result from the breaking can have any length (even very
-	 * short length). This is not a problem in practice, since we are not computing 
-	 * alignments on the broken reads de novo, we are just projecting the old alignments. 
-	 * But if an aligner is used downstream, this might create problems. The procedure can
-	 * enforce every broken read to have length $>=minBrokenReadLength$ by padding.
+	 * Remark: the new reads that result from the breaking can have any positive length
+	 * (even very short length). This is not a problem in practice, since we are not 
+	 * computing alignments on the broken reads de novo, we are just projecting the old 
+	 * alignments. But if an aligner is used downstream, this might create problems. The 
+	 * procedure can enforce every broken read to have length $>=minBrokenReadLength$ by
+	 * padding.
 	 *
 	 * Remark: the procedure is designed to be sequential. This is because new read IDs
 	 * are assigned in order of appearance and must form a compact interval.
 	 *
 	 * Remark: the procedure calls $Reads.loadReadLengths()$ on the old reads.
 	 *
-	 * @param inputFastaFile,outputFastFile if not NULL, the procedure breaks the actual 
+	 * @param inputFasta,outputFasta if not NULL, the procedure breaks the actual 
 	 * FASTA files;
 	 * @param nReads_old the procedure assumes that read IDs are a compact interval $[0..
 	 * nReads_old-1]$;
@@ -1033,7 +1034,7 @@ public class Reads {
 	 * breaking old reads;
 	 * @return the number of new reads.
 	 */
-	public static final int breakReads(String inputFastaFile, int nReads_old, String readLengthsFile, int minBrokenReadLength, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength, String outputFastaFile) throws IOException {
+	public static final int breakReads(String inputFasta, int nReads_old, String readLengthsFile, int minBrokenReadLength, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength, String outputOld2New, String outputFasta) throws IOException {
 		final int CAPACITY = 1000;  // Arbitrary
 		final int CAPACITY_INTERVALS = 9;  // Arbitrary, multiple of 3.
 		final char PADDING_CHAR = 'A';  // Arbitrary
@@ -1043,7 +1044,7 @@ public class Reads {
 		String str1, str2;
 		StringBuilder sb;
 		BufferedReader br1, br2;
-		BufferedWriter bw;
+		BufferedWriter bw1, bw2;
 		byte[] tmpBytes;
 		int[] tmpIntervals;
 		double[] tmpQualities;
@@ -1052,16 +1053,14 @@ public class Reads {
 		Reads.loadReadLengths(readLengthsFile);
 		Reads.loadQualities_thresholds(qualityThresholdsFile);
 		mode=Reads.filename2qualityMode(qualitiesFile);
-		breakReads_old2new = new int[nReads_old][0];
-		last_old2new = new int[nReads_old];
-		Math.set(last_old2new,nReads_old-1,-1);
 		tmpQualities = new double[CAPACITY];
 		tmpIntervals = new int[(CAPACITY)<<1];  // Arbitrary, fixed.
 		br1 = new BufferedReader(new FileReader(qualitiesFile));
-		br2=null; bw=null; sb=null;
-		if (inputFastaFile!=null) {
-			br2 = new BufferedReader(new FileReader(inputFastaFile));
-			bw = new BufferedWriter(new FileWriter(outputFastaFile));
+		bw1 = new BufferedWriter(new FileWriter(outputOld2New));
+		br2=null; bw2=null; sb=null;
+		if (inputFasta!=null) {
+			br2 = new BufferedReader(new FileReader(inputFasta));
+			bw2 = new BufferedWriter(new FileWriter(outputFasta));
 			sb = new StringBuilder();
 		}
 		str1=br1.readLine();
@@ -1071,18 +1070,15 @@ public class Reads {
 			tmpBytes=str1.getBytes(Charset.forName("US-ASCII"));
 			if (tmpQualities.length<tmpBytes.length) tmpQualities = new double[tmpBytes.length];
 			for (i=0; i<tmpBytes.length; i++) tmpQualities[i]=Reads.ascii2quality(tmpBytes[i],mode);
-			lastInterval=Reads.getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Reads.readLengths[oldRead]-1,tmpIntervals);
+			lastInterval=getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Reads.readLengths[oldRead]-1,tmpIntervals);
 			if (lastInterval==-1) {
-				if (breakReads_old2new[oldRead].length<3) breakReads_old2new[oldRead] = new int[CAPACITY_INTERVALS];
 				newRead++;
-				breakReads_old2new[oldRead][0]=0;
-				breakReads_old2new[oldRead][1]=Reads.readLengths[oldRead]-1;
-				breakReads_old2new[oldRead][2]=newRead;
+				bw1.write("0,"+(readLengths[oldRead]-1)+","+newRead+"\n");
 				if (br2!=null) {
-					IO.writeFakeHeader(newRead,Reads.readLengths[oldRead],null,bw);
+					IO.writeFakeHeader(newRead,readLengths[oldRead],null,bw2);
 					str2=br2.readLine();
-					while (str2.charAt(0)!='>') { bw.write(str2); str2=br2.readLine(); }
-					bw.newLine();
+					while (str2.charAt(0)!='>') { bw2.write(str2); str2=br2.readLine(); }
+					bw2.newLine();
 				}
 				str1=br1.readLine(); oldRead++;
 				continue;
@@ -1095,63 +1091,46 @@ public class Reads {
 			lastPosition=-1;
 			for (i=0; i<lastInterval; i+=2) {
 				if (tmpIntervals[i+1]-tmpIntervals[i]+1>=minIntervalLength) {
-					last=last_old2new[oldRead];
-					if (last+3>=breakReads_old2new[oldRead].length) {
-						int[] newArray = new int[breakReads_old2new[oldRead].length+CAPACITY_INTERVALS];
-						System.arraycopy(breakReads_old2new[oldRead],0,newArray,0,breakReads_old2new[oldRead].length);
-						breakReads_old2new[oldRead]=newArray;
+					if (lastPosition+1<=tmpIntervals[i]-1) {
+						newRead++;
+						bw1.write((lastPosition+1)+","+(tmpIntervals[i]-1)+","+newRead+",");
+						if (br2!=null) {
+							length=tmpIntervals[i]-1-lastPosition;
+							IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw2);
+							bw2.write(sb.substring(lastPosition+1,tmpIntervals[i]));
+							while (length<minBrokenReadLength) { bw2.write(PADDING_CHAR); length++; }
+							bw2.newLine();
+						}
 					}
-					newRead++;
-					breakReads_old2new[oldRead][++last]=lastPosition+1;
-					breakReads_old2new[oldRead][++last]=tmpIntervals[i]-1;
-					breakReads_old2new[oldRead][++last]=newRead;
-					if (br2!=null) {
-						length=tmpIntervals[i]-1-lastPosition;
-						IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw);
-						bw.write(sb.substring(lastPosition+1,tmpIntervals[i]));
-						while (length<minBrokenReadLength) { bw.write(PADDING_CHAR); length++; }
-						bw.newLine();
-					}
-					last_old2new[oldRead]=last;
 					lastPosition=tmpIntervals[i+1];
 				}
 			}
 			if (lastPosition!=-1) {
-				last=last_old2new[oldRead];
-				if (last+3>=breakReads_old2new[oldRead].length) {
-					int[] newArray = new int[breakReads_old2new[oldRead].length+CAPACITY_INTERVALS];
-					System.arraycopy(breakReads_old2new[oldRead],0,newArray,0,breakReads_old2new[oldRead].length);
-					breakReads_old2new[oldRead]=newArray;
+				if (lastPosition+1<=readLengths[oldRead]-1) {
+					newRead++;
+					bw1.write((lastPosition+1)+","+(readLengths[oldRead]-1)+","+newRead+"\n");
+					if (br2!=null) {
+						length=readLengths[oldRead]-1-lastPosition;
+						IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw2);
+						bw2.write(sb.substring(lastPosition+1,readLengths[oldRead])); 
+						while (length<minBrokenReadLength) { bw2.write(PADDING_CHAR); length++; }
+						bw2.newLine();
+					}
 				}
-				newRead++;
-				breakReads_old2new[oldRead][++last]=lastPosition+1;
-				breakReads_old2new[oldRead][++last]=Reads.readLengths[oldRead]-1;
-				breakReads_old2new[oldRead][++last]=newRead;
-				if (br2!=null) {
-					length=Reads.readLengths[oldRead]-1-lastPosition;
-					IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw);
-					bw.write(sb.substring(lastPosition+1,Reads.readLengths[oldRead])); 
-					while (length<minBrokenReadLength) { bw.write(PADDING_CHAR); length++; }
-					bw.newLine();
-				}
-				last_old2new[oldRead]=last;
 			}
 			else {
-				if (breakReads_old2new[oldRead].length<3) breakReads_old2new[oldRead] = new int[CAPACITY_INTERVALS];
 				newRead++;
-				breakReads_old2new[oldRead][0]=0;
-				breakReads_old2new[oldRead][1]=Reads.readLengths[oldRead]-1;
-				breakReads_old2new[oldRead][2]=newRead;
+				bw1.write("0,"+(readLengths[oldRead]-1)+","+newRead+"\n");
 				if (br2!=null) {
-					IO.writeFakeHeader(newRead,Reads.readLengths[oldRead],null,bw);
-					bw.write(sb.toString()); bw.newLine();
+					IO.writeFakeHeader(newRead,readLengths[oldRead],null,bw2);
+					bw2.write(sb.toString()); bw2.newLine();
 				}
 			}
 			str1=br1.readLine(); oldRead++;
 		}
-		br1.close();
+		br1.close(); bw1.close();
 		if (br2!=null) br2.close(); 
-		if (bw!=null) bw.close();
+		if (bw2!=null) bw2.close();
 		return newRead+1;
 	}
 	
@@ -1341,7 +1320,7 @@ public class Reads {
 			i=0;
 			while (i<length) {
 				if (random.nextDouble()<=probability) {
-					last=Math.min(i+intervalLength-1,length-1);
+					last=Math.min(i+intervalLengthPrime-1,length-1);
 					while (i<=last) {
 						bw.write(LOW_QUALITY_CHAR);
 						i++;

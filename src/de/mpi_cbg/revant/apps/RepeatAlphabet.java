@@ -3436,6 +3436,46 @@ public class RepeatAlphabet {
 	// ------------------------- READ BREAKING AT LOW QUALITY ----------------------------
 	
 	/**
+	 * Assume that the input reads are CLR and that they contain long low-quality regions.
+	 * The procedure translates read-read and read-repeat alignments based on the output 
+	 * of $Reads.breakReads()$. This transformation allows handling low-quality regions 
+	 * correctly while translating the reads in the alphabet of repeats: specifically, the
+	 * whole translation pipeline can be run as a black box on the alignments on broken
+	 * reads.
+	 *
+	 * Remark: assume that we just run the repeat translation pipeline as-is on reads with 
+	 * long low-quality regions. If a low-quality region $L$ falls inside a repetitive 
+	 * region $RLS$, the repetitive substrings $R$ and $S$ would be modeled as closed 
+	 * characters and, since low-quality regions are randomly distributed, such characters
+	 * would likely have low frequency in the dataset and they would likely be filtered 
+	 * out of the alphabet. $R$ and $S$ would thus be converted into non-repetitive 
+	 * substrings, and some repeat-induced alignments that contain them might be preserved
+	 * because of this.
+	 * 
+	 * Remark: one might think of modeling $R,S$ above as open characters. Open characters 
+	 * might be compressed away during alphabet construction, so $R,S$ might get replaced 
+	 * with closed characters of much bigger length. The translated read might then become
+	 * $UVW$, where $U,V$ are closed characters (possibly the same closed character) with 
+	 * $|U|>|R|$, $|W|>|S|$, and where $V$ is non-repetitive. Any k-mer built on such a 
+	 * translation would not reflect the real structure of the read. One might assume that
+	 * such a k-mer would likely be globally infrequent and would thus be removed, but it 
+	 * might be kept if it happens to be frequent.
+	 *
+	 * Remark: breaking the read at $L$ above would still allow to model $R,S$ as half-
+	 * open, while at the same time taking advantage of the existing determinization 
+	 * procedures if $R,S$ happen to match several repeats, and forbidding any k-mer to 
+	 * contain $L$. 
+	 *
+	 * Remark: breaking reads is acceptable in this context, since we don't need their
+	 * contiguity information (as we do in assembly): we just need to translate reads in 
+	 * the alphabet of repeats and to mark unique substrings in the recoded alphabet, and
+	 * such unique substrings cannot contain a low-quality region anyway.
+	 *
+	 * Remark: "short" low-quality intervals pose the same problems as "long" low-quality 
+	 * intervals, since the quality track means low coverage, and possibly alignments 
+	 * breaks, in both cases. It makes sense to break reads even at short low-quality 
+	 * intervals.
+	 *
 	 * Remark: the procedure discards any alignment that contains a low-quality region in
 	 * readA or readB, and it trims the readA and the readB side of an alignment whose 
 	 * suffix/prefix overlaps a low-quality region (the readA side and the readB side are
