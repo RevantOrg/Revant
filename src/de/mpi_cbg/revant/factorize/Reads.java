@@ -1,6 +1,7 @@
 package de.mpi_cbg.revant.factorize;
 
 import java.util.Arrays;
+import java.util.Random;
 import java.io.*;
 import java.nio.charset.Charset;
 import de.mpi_cbg.revant.util.Math;
@@ -1014,27 +1015,35 @@ public class Reads {
 	 * low-quality interval is assigned an ID (possibly different from its old ID).
 	 *
 	 * Remark: the new reads that result from the breaking can have any length (even very
-	 * short).
+	 * short length). This is not a problem in practice, since we are not computing 
+	 * alignments on the broken reads de novo, we are just projecting the old alignments. 
+	 * But if an aligner is used downstream, this might create problems. The procedure can
+	 * enforce every broken read to have length $>=minBrokenReadLength$ by padding.
 	 *
 	 * Remark: the procedure is designed to be sequential. This is because new read IDs
 	 * are assigned in order of appearance and must form a compact interval.
 	 *
 	 * Remark: the procedure calls $Reads.loadReadLengths()$ on the old reads.
 	 *
+	 * @param inputFastaFile,outputFastFile if not NULL, the procedure breaks the actual 
+	 * FASTA files;
 	 * @param nReads_old the procedure assumes that read IDs are a compact interval $[0..
 	 * nReads_old-1]$;
 	 * @param minIntervalLength low-quality intervals shorter than this are not used for
 	 * breaking old reads;
 	 * @return the number of new reads.
 	 */
-	public static final int breakReads(int nReads_old, String readLengthsFile, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength) throws IOException {
+	public static final int breakReads(String inputFastaFile, int nReads_old, String readLengthsFile, int minBrokenReadLength, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength, String outputFastaFile) throws IOException {
 		final int CAPACITY = 1000;  // Arbitrary
 		final int CAPACITY_INTERVALS = 9;  // Arbitrary, multiple of 3.
+		final char PADDING_CHAR = 'A';  // Arbitrary
 		byte mode;
 		int i;
-		int oldRead, newRead, last, lastPosition, lastInterval;
-		String str;
-		BufferedReader br;
+		int oldRead, newRead, last, lastPosition, lastInterval, length;
+		String str1, str2;
+		StringBuilder sb;
+		BufferedReader br1, br2;
+		BufferedWriter bw;
 		byte[] tmpBytes;
 		int[] tmpIntervals;
 		double[] tmpQualities;
@@ -1048,20 +1057,40 @@ public class Reads {
 		Math.set(last_old2new,nReads_old-1,-1);
 		tmpQualities = new double[CAPACITY];
 		tmpIntervals = new int[(CAPACITY)<<1];  // Arbitrary, fixed.
-		br = new BufferedReader(new FileReader(qualitiesFile));
-		str=br.readLine(); oldRead=0; newRead=-1;
-		while (str!=null) {
-			tmpBytes=str.getBytes(Charset.forName("US-ASCII"));
+		br1 = new BufferedReader(new FileReader(qualitiesFile));
+		br2=null; bw=null; sb=null;
+		if (inputFastaFile!=null) {
+			br2 = new BufferedReader(new FileReader(inputFastaFile));
+			bw = new BufferedWriter(new FileWriter(outputFastaFile));
+			sb = new StringBuilder();
+		}
+		str1=br1.readLine();
+		if (br2!=null) str2=br2.readLine(); 
+		oldRead=0; newRead=-1;
+		while (str1!=null) {
+			tmpBytes=str1.getBytes(Charset.forName("US-ASCII"));
 			if (tmpQualities.length<tmpBytes.length) tmpQualities = new double[tmpBytes.length];
 			for (i=0; i<tmpBytes.length; i++) tmpQualities[i]=Reads.ascii2quality(tmpBytes[i],mode);
 			lastInterval=Reads.getLowQualityIntervals_impl(tmpQualities,Reads.MIN_RANDOM_QUALITY_SCORE,0,Reads.readLengths[oldRead]-1,tmpIntervals);
 			if (lastInterval==-1) {
 				if (breakReads_old2new[oldRead].length<3) breakReads_old2new[oldRead] = new int[CAPACITY_INTERVALS];
+				newRead++;
 				breakReads_old2new[oldRead][0]=0;
 				breakReads_old2new[oldRead][1]=Reads.readLengths[oldRead]-1;
-				breakReads_old2new[oldRead][2]=++newRead;
-				str=br.readLine(); oldRead++;
+				breakReads_old2new[oldRead][2]=newRead;
+				if (br2!=null) {
+					IO.writeFakeHeader(newRead,Reads.readLengths[oldRead],null,bw);
+					str2=br2.readLine();
+					while (str2.charAt(0)!='>') { bw.write(str2); str2=br2.readLine(); }
+					bw.newLine();
+				}
+				str1=br1.readLine(); oldRead++;
 				continue;
+			}
+			if (br2!=null) {
+				sb.delete(0,sb.length());
+				str2=br2.readLine();
+				while (str2.charAt(0)!='>') { sb.append(str2); str2=br2.readLine(); }
 			}
 			lastPosition=-1;
 			for (i=0; i<lastInterval; i+=2) {
@@ -1072,9 +1101,17 @@ public class Reads {
 						System.arraycopy(breakReads_old2new[oldRead],0,newArray,0,breakReads_old2new[oldRead].length);
 						breakReads_old2new[oldRead]=newArray;
 					}
+					newRead++;
 					breakReads_old2new[oldRead][++last]=lastPosition+1;
 					breakReads_old2new[oldRead][++last]=tmpIntervals[i]-1;
-					breakReads_old2new[oldRead][++last]=++newRead;
+					breakReads_old2new[oldRead][++last]=newRead;
+					if (br2!=null) {
+						length=tmpIntervals[i]-1-lastPosition;
+						IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw);
+						bw.write(sb.substring(lastPosition+1,tmpIntervals[i]));
+						while (length<minBrokenReadLength) { bw.write(PADDING_CHAR); length++; }
+						bw.newLine();
+					}
 					last_old2new[oldRead]=last;
 					lastPosition=tmpIntervals[i+1];
 				}
@@ -1086,20 +1123,35 @@ public class Reads {
 					System.arraycopy(breakReads_old2new[oldRead],0,newArray,0,breakReads_old2new[oldRead].length);
 					breakReads_old2new[oldRead]=newArray;
 				}
+				newRead++;
 				breakReads_old2new[oldRead][++last]=lastPosition+1;
 				breakReads_old2new[oldRead][++last]=Reads.readLengths[oldRead]-1;
-				breakReads_old2new[oldRead][++last]=++newRead;
+				breakReads_old2new[oldRead][++last]=newRead;
+				if (br2!=null) {
+					length=Reads.readLengths[oldRead]-1-lastPosition;
+					IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw);
+					bw.write(sb.substring(lastPosition+1,Reads.readLengths[oldRead])); 
+					while (length<minBrokenReadLength) { bw.write(PADDING_CHAR); length++; }
+					bw.newLine();
+				}
 				last_old2new[oldRead]=last;
 			}
 			else {
 				if (breakReads_old2new[oldRead].length<3) breakReads_old2new[oldRead] = new int[CAPACITY_INTERVALS];
+				newRead++;
 				breakReads_old2new[oldRead][0]=0;
 				breakReads_old2new[oldRead][1]=Reads.readLengths[oldRead]-1;
-				breakReads_old2new[oldRead][2]=++newRead;
+				breakReads_old2new[oldRead][2]=newRead;
+				if (br2!=null) {
+					IO.writeFakeHeader(newRead,Reads.readLengths[oldRead],null,bw);
+					bw.write(sb.toString()); bw.newLine();
+				}
 			}
-			str=br.readLine(); oldRead++;
+			str1=br1.readLine(); oldRead++;
 		}
-		br.close();
+		br1.close();
+		if (br2!=null) br2.close(); 
+		if (bw!=null) bw.close();
 		return newRead+1;
 	}
 	
@@ -1259,6 +1311,51 @@ public class Reads {
 			 )
 		   ) return true;
 		return false;
+	}
+	
+	
+	/**
+	 * (Used for debugging)
+	 * Creates a random qualities file that contains low-quality intervals of fixed length
+	 * $intervalLength$ (or shorter if they occur close to the end of a read) that occur
+	 * with probability $probability$.
+	 *
+	 * @param mode 0=uses the convention of DASqv and DBdump; 1=uses the convention of
+     * DAmar.
+	 */
+	public static final void breakReads_buildRandomQualities(String readLengthsFile, String outputFile, int intervalLength, double probability, byte mode, Random random) throws IOException {
+		final byte LOW_QUALITY_CHAR = quality2ascii(MAX_QUALITY_SCORE,mode);
+		final byte HIGH_QUALITY_CHAR = quality2ascii(MIN_QUALITY_SCORE,mode);
+		int i;
+		int last, length;
+		final int intervalLengthPrime = Math.ceil(intervalLength,QUALITY_SPACING);
+		String str;
+		BufferedReader br;
+		BufferedWriter bw;
+
+		br = new BufferedReader(new FileReader(readLengthsFile));
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		str=br.readLine();
+		while (str!=null) {
+			length=Math.ceil(Integer.parseInt(str),QUALITY_SPACING);
+			i=0;
+			while (i<length) {
+				if (random.nextDouble()<=probability) {
+					last=Math.min(i+intervalLength-1,length-1);
+					while (i<=last) {
+						bw.write(LOW_QUALITY_CHAR);
+						i++;
+					}
+				}
+				else {
+					bw.write(HIGH_QUALITY_CHAR);
+					i++;
+				}
+			}
+			bw.newLine();
+			str=br.readLine();
+		}
+		br.close(); bw.close();
 	}
 	
 }

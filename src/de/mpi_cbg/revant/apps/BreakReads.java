@@ -56,7 +56,7 @@ public class BreakReads {
 		final String READ_READ_ALIGNMENTS_NEW = args[10];
 		final String READ_REPEAT_ALIGNMENTS_NEW = args[11];
 		
-		final int nReads_new = Reads.breakReads(N_READS,READ_LENGTHS_FILE,QUALITIES_FILE,QUALITY_THRESHOLDS_FILE,MIN_LOW_QUALITY_LENGTH);
+		final int nReads_new = Reads.breakReads(null,N_READS,READ_LENGTHS_FILE,0,QUALITIES_FILE,QUALITY_THRESHOLDS_FILE,MIN_LOW_QUALITY_LENGTH,null);		
 		Reads.breakReads_serialize(N_READS,nReads_new,OLD2NEW_FILE,NEW2OLD_FILE,READ_LENGTHS_FILE_NEW);
 		RepeatAlphabet.breakReads_translateAlignments(READ_READ_ALIGNMENTS,true,READ_READ_ALIGNMENTS_NEW);
 		RepeatAlphabet.breakReads_translateAlignments(READ_REPEAT_ALIGNMENTS,false,READ_REPEAT_ALIGNMENTS_NEW);
