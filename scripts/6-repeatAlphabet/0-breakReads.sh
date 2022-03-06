@@ -31,7 +31,8 @@ OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"
 NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
 READ_LENGTHS_FILE_NEW="${INPUT_DIR}/reads-lengths-broken.txt"
 rm -f ${OLD2NEW_FILE} ${NEW2OLD_FILE} ${READ_LENGTHS_FILE_NEW}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads1 ${N_READS} ${READ_LENGTHS_FILE} ${QUALITY_TRACK_FILE} ${QUALITY_THRESHOLDS_FILE} ${LOW_QUALITY_LENGTH} ${OLD2NEW_FILE} ${NEW2OLD_FILE} ${READ_LENGTHS_FILE_NEW}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads1 ${N_READS} ${READ_LENGTHS_FILE} ${QUALITY_TRACK_FILE} ${QUALITY_THRESHOLDS_FILE} ${LOW_QUALITY_LENGTH} ${OLD2NEW_FILE} ${NEW2OLD_FILE} ${READ_LENGTHS_FILE_NEW} > ${TMPFILE_PATH}-nReads
+N_READS_BROKEN=$(cat ${TMPFILE_PATH}-nReads)
 
 echo "Translating read-read alignments..."
 function alignmentsThread1() {
@@ -96,3 +97,5 @@ mv "${INPUT_DIR}/LAshow-reads-repeats.txt" "${INPUT_DIR}/LAshow-reads-repeats-un
 mv "${INPUT_DIR}/LAshow-reads-repeats-broken.txt" "${INPUT_DIR}/LAshow-reads-repeats.txt"
 mv "${INPUT_DIR}/reads-lengths.txt" "${INPUT_DIR}/reads-lengths-unbroken.txt"
 mv "${INPUT_DIR}/reads-lengths-broken.txt" "${INPUT_DIR}/reads-lengths.txt"
+mv "${INPUT_DIR}/reads-ids.txt" "${INPUT_DIR}/reads-ids-unbroken.txt"
+seq 0 $(( ${N_READS_BROKEN} - 1 )) > "${INPUT_DIR}/reads-ids.txt"

@@ -14,8 +14,11 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
+BROKEN_READS=$2  # 1=TRUE
 HAPLOTYPE_COVERAGE="12"  # Of one haplotype
 TIGHT_MODE="0"
+LOW_QUALITY_TYPE="1"  # 1=replacement, 0=insertion.
+LOW_QUALITY_LENGTH_TOLERANCE="200"  # bps
 MIN_K="2"  # One plus the min length of a context used for disambiguation
 MAX_K="8"  # One plus the max length of a context used for disambiguation
 N_THREADS="4"
@@ -29,6 +32,7 @@ TMPFILE_NAME="fixEndBlocks-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
+READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
@@ -95,3 +99,11 @@ rm -f ${READS_DISAMBIGUATED_FILE}
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-*" ); do
 	cat ${FILE} >> ${READS_DISAMBIGUATED_FILE}
 done
+if [ ${BROKEN_READS} -eq 1 ]; then
+	NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
+	READS_TRANSLATED_BOUNDARIES_NEW="${INPUT_DIR}/reads-translated-boundaries-new.txt"
+	READS_DISAMBIGUATED_FILE_NEW="${INPUT_DIR}/reads-translated-disambiguated-new.txt"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads3 ${LOW_QUALITY_TYPE} ${LOW_QUALITY_LENGTH_TOLERANCE} ${NEW2OLD_FILE} ${N_READS} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_DISAMBIGUATED_FILE} ${READS_TRANSLATED_BOUNDARIES_NEW} ${READS_DISAMBIGUATED_FILE_NEW}
+	mv ${READS_DISAMBIGUATED_FILE} "${INPUT_DIR}/reads-translated-disambiguated-pre.txt"
+	mv ${READS_DISAMBIGUATED_FILE_NEW} ${READS_DISAMBIGUATED_FILE}
+fi

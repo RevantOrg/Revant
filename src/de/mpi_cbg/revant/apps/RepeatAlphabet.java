@@ -1553,7 +1553,7 @@ public class RepeatAlphabet {
 			if (!isUnique) {
 				if (first!=-1) {
 					tmpChar.repeat=UNIQUE;
-					tmpChar.orientation=false;
+					tmpChar.orientation=true;
 					tmpChar.start=-1; tmpChar.end=-1;
 					length=boundaries[i-1]-(first==0?0:boundaries[first-1]);
 					tmpChar.length=length;
@@ -1572,7 +1572,7 @@ public class RepeatAlphabet {
 		}
 		if (first!=-1) {
 			tmpChar.repeat=UNIQUE;
-			tmpChar.orientation=false;
+			tmpChar.orientation=true;
 			tmpChar.start=-1; tmpChar.end=-1;
 			length=readLength-(first==0?0:boundaries[first-1]);
 			tmpChar.length=length;
@@ -1767,7 +1767,7 @@ public class RepeatAlphabet {
 			if (!isUnique) {
 				if (first!=-1) {
 					tmpChar.repeat=UNIQUE;
-					tmpChar.orientation=false;
+					tmpChar.orientation=true;
 					tmpChar.start=-1; tmpChar.end=-1;
 					length=boundaries[i-1]-(first==0?0:boundaries[first-1]);
 					tmpChar.length=length;
@@ -1799,7 +1799,7 @@ public class RepeatAlphabet {
 					}
 					else if (c==lastAlphabet_old+1) {
 						tmpChar.repeat=UNIQUE;
-						tmpChar.orientation=false;
+						tmpChar.orientation=true;
 						tmpChar.start=-1; tmpChar.end=-1;
 						length=(i==nBlocks-1?readLength:boundaries[i])-(i==0?0:boundaries[i-1]);
 						tmpChar.length=length;
@@ -1829,7 +1829,7 @@ public class RepeatAlphabet {
 		if (first!=-1) {
 			if (nAppendedBlocks>0) {
 				tmpChar.repeat=UNIQUE;
-				tmpChar.orientation=false;
+				tmpChar.orientation=true;
 				tmpChar.start=-1; tmpChar.end=-1;
 				length=readLength-(first==0?0:boundaries[first-1]);
 				tmpChar.length=length;
@@ -3481,6 +3481,9 @@ public class RepeatAlphabet {
 	 * suffix/prefix overlaps a low-quality region (the readA side and the readB side are
 	 * trimmed independently).
 	 *
+	 * Remark: the translated alignments can have any length. It is left to procedures
+	 * downstream to keep only long-enough alignments.
+	 *
 	 * Remark: the procedure assumes that $Reads.breakReads_old2new$ has already been 
 	 * loaded, and that $Reads.readLengths$ has been already initialized with the lengths
 	 * of the old reads.
@@ -3724,10 +3727,10 @@ public class RepeatAlphabet {
 	 * $translatedFile_disambiguated$.
 	 */
 	public static final void breakReads_checkDisambiguation(boolean mode, int lengthThreshold, String translatedFile, String translatedFile_disambiguated, String boundariesFile, String translatedFile_disambiguated_new) throws IOException {
-		final int LENGTH_THRESHOLD = (IO.quantum)<<1;  // Arbitrary
 		final int CAPACITY = 10;  // Arbitrary
+		boolean success;
 		int r;
-		int oldRead, currentOldRead, nBlocks, leftLength;
+		int oldRead, currentOldRead, nBlocks, leftLength, nAttempted, nRolledBack;
 		int last1, last2, leftEnd1_last, leftEnd2_last, rightEnd1_last, rightEnd2_last;
 		String str1, str2, str3;
 		StringBuilder leftEnd1_str, leftEnd2_str;
@@ -3745,7 +3748,8 @@ public class RepeatAlphabet {
 		br1 = new BufferedReader(new FileReader(translatedFile));
 		br2 = new BufferedReader(new FileReader(translatedFile_disambiguated));
 		br3 = new BufferedReader(new FileReader(boundariesFile));
-		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); r=-1; 
+		nAttempted=0; nRolledBack=0;
+		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); r=-1;
 		currentOldRead=-1; leftEnd1_last=-1; leftEnd2_last=-1; rightEnd1_last=-1; rightEnd2_last=-1; leftLength=0;
 		while (str1!=null) {
 			r++;
@@ -3801,9 +3805,16 @@ public class RepeatAlphabet {
 			System.arraycopy(intBlocks[0],0,rightEnd2,0,lastInBlock_int[0]+1);
 			rightEnd2_last=lastInBlock_int[0];
 			if (lastInBlock_int[nBlocks-1]>=tmpArray2.length) tmpArray2 = new int[lastInBlock_int[nBlocks-1]+1];
-			System.arraycopy(intBlocks[0],0,tmpArray2,0,lastInBlock_int[nBlocks-1]+1);
+			System.arraycopy(intBlocks[nBlocks-1],0,tmpArray2,0,lastInBlock_int[nBlocks-1]+1);
 			last2=lastInBlock_int[nBlocks-1];
-			if ((leftEnd1_last>0 && leftEnd2_last==0) || (rightEnd1_last>0 && rightEnd2_last==0 && leftEnd2_last>=0)) breakReads_checkDisambiguation_impl(mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftLength,Integer.parseInt(str3.substring(0,str3.indexOf(","))),LENGTH_THRESHOLD,leftEnd1,leftEnd1_last,leftEnd1_str,rightEnd1,rightEnd1_last,str1,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
+			if ((leftEnd1_last>0 && leftEnd2_last==0) || (rightEnd1_last>0 && rightEnd2_last==0 && leftEnd2_last>=0)) {
+				nAttempted++;
+				success=breakReads_checkDisambiguation_impl(mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftLength,Integer.parseInt(str3.substring(0,str3.indexOf(","))),lengthThreshold,leftEnd1,leftEnd1_last,leftEnd1_str,rightEnd1,rightEnd1_last,str1,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
+				if (!success) {
+					nRolledBack++;
+System.err.println("breakReads_checkDisambiguation> rolled back: "+str1+" -> "+str2);
+				}
+			}
 			else {
 				if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");
 				bw.write(str2.substring(0,str2.lastIndexOf(SEPARATOR_MAJOR+"")));
@@ -3821,6 +3832,7 @@ public class RepeatAlphabet {
 		}
 		if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");
 		br1.close(); br2.close(); br3.close(); bw.close();
+		System.err.println("Rolled back "+nRolledBack+" pairs out of "+nAttempted+" attempted ("+(((double)(nRolledBack*100))/nAttempted)+"%)");
 	}
 	
 	
@@ -3843,9 +3855,10 @@ public class RepeatAlphabet {
 	 * @param lowQualityLength length of the low-quality interval between the new reads
 	 * (must be zero if low-quality intervals are assumed to be insertions);
 	 * @param lengthThreshold tolerance in length comparisons;
-	 * @param leftLength,rightEnd length of the left and right blocks of the new reads.
+	 * @param leftLength,rightEnd length of the left and right blocks of the new reads;
+	 * @return FALSE iff the disambiguation is rejected.
 	 */
-	private static final void breakReads_checkDisambiguation_impl(int lowQualityLength, int leftLength, int rightLength, int lengthThreshold, int[] leftEnd1, int leftEnd1_last, StringBuilder leftEnd1_str, int[] rightEnd1, int rightEnd1_last, String str1, int[] leftEnd2, int leftEnd2_last, int[] rightEnd2, int rightEnd2_last, BufferedWriter bw) throws IOException {
+	private static final boolean breakReads_checkDisambiguation_impl(int lowQualityLength, int leftLength, int rightLength, int lengthThreshold, int[] leftEnd1, int leftEnd1_last, StringBuilder leftEnd1_str, int[] rightEnd1, int rightEnd1_last, String str1, int[] leftEnd2, int leftEnd2_last, int[] rightEnd2, int rightEnd2_last, BufferedWriter bw) throws IOException {
 		boolean found;
 		int i, j;
 		int leftCharacter, leftCharacterLength, rightCharacter, rightCharacterLength;
@@ -3857,7 +3870,8 @@ public class RepeatAlphabet {
 				// Disambiguation rejected
 				bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-				return;
+System.err.println("breakReads_checkDisambiguation_impl> 1");
+				return false;
 			}
 			leftCharacterLength=alphabet[leftCharacter].getLength();
 			if (rightEnd2_last==0) rightCharacter=rightEnd2[0];
@@ -3884,13 +3898,14 @@ public class RepeatAlphabet {
 					// Disambiguation accepted
 					bw.write(SEPARATOR_MAJOR+""+rightCharacter); bw.newLine();
 					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+					return true;
 				}
 				else {
-					// Disambiguation rejected, if any.
+					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+System.err.println("breakReads_checkDisambiguation_impl> 2");
+					return false;
 				}
 			}
 			else if (rightCharacter!=-1) {
@@ -3898,7 +3913,8 @@ public class RepeatAlphabet {
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+""+leftCharacter); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+System.err.println("breakReads_checkDisambiguation_impl> 3");
+					return false;
 				}
 				// Different characters must be compatible with the available length
 				rightCharacterLength=alphabet[rightCharacter].getLength();
@@ -3919,20 +3935,22 @@ public class RepeatAlphabet {
 					// Disambiguation accepted
 					bw.write(SEPARATOR_MAJOR+""+leftCharacter); bw.newLine();
 					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+					return true;
 				}
 				else {
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+System.err.println("breakReads_checkDisambiguation_impl> 4");
+					return false;
 				}
 			}
 			else {
 				// Cannot disambiguate the right end
 				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-				return;
+System.err.println("breakReads_checkDisambiguation_impl> 5");
+				return false;
 			}
 		}
 		else if (rightEnd2_last==0) {
@@ -3941,7 +3959,8 @@ public class RepeatAlphabet {
 				// Disambiguation rejected
 				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-				return;
+System.err.println("breakReads_checkDisambiguation_impl> 6");
+				return false;
 			}
 			rightCharacterLength=alphabet[rightCharacter].getLength();
 			if (leftEnd2_last==0) leftCharacter=leftEnd2[0];
@@ -3968,13 +3987,14 @@ public class RepeatAlphabet {
 					// Disambiguation accepted
 					bw.write(SEPARATOR_MAJOR+""+rightCharacter); bw.newLine();
 					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+					return true;
 				}
 				else {
-					// Disambiguation rejected, if any.
+					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+System.err.println("breakReads_checkDisambiguation_impl> 7");
+					return false;
 				}
 			}
 			else if (leftCharacter!=-1) {
@@ -3982,7 +4002,8 @@ public class RepeatAlphabet {
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+System.err.println("breakReads_checkDisambiguation_impl> 8");
+					return false;
 				}
 				// Different characters must be compatible with the available length
 				leftCharacterLength=alphabet[leftCharacter].getLength();
@@ -4003,23 +4024,25 @@ public class RepeatAlphabet {
 					// Disambiguation accepted
 					bw.write(SEPARATOR_MAJOR+""+leftCharacter); bw.newLine();
 					bw.write(rightCharacter+str1.substring(str1.indexOf(SEPARATOR_MAJOR+""),str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+					return true;
 				}
 				else {
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-					return;
+System.err.println("breakReads_checkDisambiguation_impl> 9");
+					return false;
 				}
 			}
 			else {
 				// Cannot disambiguate the left end
 				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-				return;
+System.err.println("breakReads_checkDisambiguation_impl> 10");
+				return false;
 			}
 		}
-		else { /* Never happens */ }
+		else return false;  // Never happens
 	}
 	
 
