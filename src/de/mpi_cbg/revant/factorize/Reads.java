@@ -1034,7 +1034,7 @@ public class Reads {
 	 * breaking old reads;
 	 * @return the number of new reads.
 	 */
-	public static final int breakReads(String inputFasta, int nReads_old, String readLengthsFile, int minBrokenReadLength, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength, String outputOld2New, String outputFasta) throws IOException {
+	public static final int breakReads(String inputFasta, int nReads_old, String readLengthsFile, int minBrokenReadLength, String qualitiesFile, String qualityThresholdsFile, int minIntervalLength, String outputOld2new, String outputNew2old, String outputReadLengths, String outputFasta) throws IOException {
 		final int CAPACITY = 1000;  // Arbitrary
 		final int CAPACITY_INTERVALS = 9;  // Arbitrary, multiple of 3.
 		final char PADDING_CHAR = 'A';  // Arbitrary
@@ -1044,7 +1044,7 @@ public class Reads {
 		String str1, str2;
 		StringBuilder sb;
 		BufferedReader br1, br2;
-		BufferedWriter bw1, bw2;
+		BufferedWriter bw1, bw2, bw3, bw4;
 		byte[] tmpBytes;
 		int[] tmpIntervals;
 		double[] tmpQualities;
@@ -1056,11 +1056,13 @@ public class Reads {
 		tmpQualities = new double[CAPACITY];
 		tmpIntervals = new int[(CAPACITY)<<1];  // Arbitrary, fixed.
 		br1 = new BufferedReader(new FileReader(qualitiesFile));
-		bw1 = new BufferedWriter(new FileWriter(outputOld2New));
-		br2=null; bw2=null; sb=null;
+		bw1 = new BufferedWriter(new FileWriter(outputOld2new));
+		bw2 = new BufferedWriter(new FileWriter(outputNew2old));
+		bw3 = new BufferedWriter(new FileWriter(outputReadLengths));
+		br2=null; bw4=null; sb=null;
 		if (inputFasta!=null) {
 			br2 = new BufferedReader(new FileReader(inputFasta));
-			bw2 = new BufferedWriter(new FileWriter(outputFasta));
+			bw4 = new BufferedWriter(new FileWriter(outputFasta));
 			sb = new StringBuilder();
 		}
 		str1=br1.readLine();
@@ -1074,11 +1076,13 @@ public class Reads {
 			if (lastInterval==-1) {
 				newRead++;
 				bw1.write("0,"+(readLengths[oldRead]-1)+","+newRead+"\n");
+				bw2.write(newRead+","+oldRead+",0,"+(readLengths[oldRead]-1)+"\n");
+				bw3.write(readLengths[oldRead]+"\n");
 				if (br2!=null) {
 					IO.writeFakeHeader(newRead,readLengths[oldRead],null,bw2);
 					str2=br2.readLine();
-					while (str2.charAt(0)!='>') { bw2.write(str2); str2=br2.readLine(); }
-					bw2.newLine();
+					while (str2.charAt(0)!='>') { bw4.write(str2); str2=br2.readLine(); }
+					bw4.newLine();
 				}
 				str1=br1.readLine(); oldRead++;
 				continue;
@@ -1094,12 +1098,14 @@ public class Reads {
 					if (lastPosition+1<=tmpIntervals[i]-1) {
 						newRead++;
 						bw1.write((lastPosition+1)+","+(tmpIntervals[i]-1)+","+newRead+",");
+						bw2.write(newRead+","+oldRead+","+(lastPosition+1)+","+(tmpIntervals[i]-1)+"\n");
+						bw3.write((tmpIntervals[i]-1-lastPosition)+"\n");
 						if (br2!=null) {
 							length=tmpIntervals[i]-1-lastPosition;
-							IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw2);
-							bw2.write(sb.substring(lastPosition+1,tmpIntervals[i]));
-							while (length<minBrokenReadLength) { bw2.write(PADDING_CHAR); length++; }
-							bw2.newLine();
+							IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw4);
+							bw4.write(sb.substring(lastPosition+1,tmpIntervals[i]));
+							while (length<minBrokenReadLength) { bw4.write(PADDING_CHAR); length++; }
+							bw4.newLine();
 						}
 					}
 					lastPosition=tmpIntervals[i+1];
@@ -1109,97 +1115,33 @@ public class Reads {
 				if (lastPosition+1<=readLengths[oldRead]-1) {
 					newRead++;
 					bw1.write((lastPosition+1)+","+(readLengths[oldRead]-1)+","+newRead+"\n");
+					bw2.write(newRead+","+oldRead+","+(lastPosition+1)+","+(readLengths[oldRead]-1)+"\n");
+					bw3.write((readLengths[oldRead]-1-lastPosition)+"\n");
 					if (br2!=null) {
 						length=readLengths[oldRead]-1-lastPosition;
-						IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw2);
-						bw2.write(sb.substring(lastPosition+1,readLengths[oldRead])); 
-						while (length<minBrokenReadLength) { bw2.write(PADDING_CHAR); length++; }
-						bw2.newLine();
+						IO.writeFakeHeader(newRead,Math.max(length,minBrokenReadLength),null,bw4);
+						bw4.write(sb.substring(lastPosition+1,readLengths[oldRead])); 
+						while (length<minBrokenReadLength) { bw4.write(PADDING_CHAR); length++; }
+						bw4.newLine();
 					}
 				}
 			}
 			else {
 				newRead++;
 				bw1.write("0,"+(readLengths[oldRead]-1)+","+newRead+"\n");
+				bw2.write(newRead+","+oldRead+",0,"+(readLengths[oldRead]-1)+"\n");
+				bw3.write(readLengths[oldRead]+"\n");
 				if (br2!=null) {
-					IO.writeFakeHeader(newRead,readLengths[oldRead],null,bw2);
-					bw2.write(sb.toString()); bw2.newLine();
+					IO.writeFakeHeader(newRead,readLengths[oldRead],null,bw4);
+					bw4.write(sb.toString()); bw4.newLine();
 				}
 			}
 			str1=br1.readLine(); oldRead++;
 		}
-		br1.close(); bw1.close();
+		br1.close(); bw1.close(); bw2.close(); bw3.close();
 		if (br2!=null) br2.close(); 
-		if (bw2!=null) bw2.close();
+		if (bw4!=null) bw4.close();
 		return newRead+1;
-	}
-	
-	
-	/**
-	 * @param old2new (discarded if NULL) output file: just a dump of $breakReads_
-	 * old2new$;
-	 * @param new2old (discarded if NULL) output file: a dump of $breakReads_new2old$ 
-	 * built just from $breakReads_old2new$ ($breakReads_new2old$ might be NULL);
-	 * @param readLengths_new (discarded if NULL) output file: new read lengths.
-	 */
-	public static final void breakReads_serialize(int nReads_old, int nReads_new, String old2new, String new2old, String readLengths_new) throws IOException {
-		int i, j;
-		int last;
-		BufferedWriter bw;
-		Translation[] tuples;
-		
-		if (old2new!=null) {
-			bw = new BufferedWriter(new FileWriter(old2new));
-			for (i=0; i<nReads_new; i++) {
-				bw.write(last_old2new[i]+"");
-				for (j=0; j<=last_old2new[i]; j++) bw.write(","+breakReads_old2new[i][j]);
-				bw.newLine();
-			}
-			bw.close();
-		}	
-		if (new2old!=null || readLengths_new!=null) {
-			tuples = new Translation[nReads_new];
-			last=-1;
-			for (i=0; i<nReads_old; i++) {
-				if (last_old2new[i]==-1) tuples[++last] = new Translation(i,i,0,Reads.readLengths[i]-1);
-				else {
-					for (j=0; j<last_old2new[i]; j+=3) tuples[++last] = new Translation(breakReads_old2new[i][j+2],i,breakReads_old2new[i][j],breakReads_old2new[i][j+1]);
-				}
-			}
-			if (last>0) Arrays.sort(tuples,0,last+1);
-			if (new2old!=null) {
-				bw = new BufferedWriter(new FileWriter(new2old));
-				for (i=0; i<=last; i++) { tuples[i].serialize(bw); bw.newLine(); }
-				bw.close();
-			}
-			if (readLengths_new!=null) {
-				bw = new BufferedWriter(new FileWriter(readLengths_new));	
-				for (i=0; i<nReads_new; i++) bw.write((tuples[i].oldLast-tuples[i].oldFirst+1)+"\n");
-				bw.close();
-			}
-		}
-	}
-	
-	
-	private static class Translation implements Comparable {
-		public int newRead, oldRead, oldFirst, oldLast;
-		
-		public Translation(int nr, int or, int of, int ol) {
-			this.newRead=nr; this.oldRead=or; this.oldFirst=of; this.oldLast=ol;
-		}
-		
-		public int compareTo(Object other) {
-			Translation otherTranslation = (Translation)other;
-			if (newRead<otherTranslation.newRead) return -1;
-			else if (newRead>otherTranslation.newRead) return 1;
-			if (oldFirst<otherTranslation.oldFirst) return -1;
-			else if (oldFirst>otherTranslation.oldFirst) return 1;
-			return 0;
-		}
-		
-		public void serialize(BufferedWriter bw) throws IOException {
-			bw.write(newRead+","+oldRead+","+oldFirst+","+oldLast);
-		}
 	}
 	
 	
@@ -1216,10 +1158,10 @@ public class Reads {
 		str=br.readLine(); i=0;
 		while (str!=null) {
 			tokens=str.split(",");
-			last=Integer.parseInt(tokens[0]);
+			last=tokens.length-1;
 			last_old2new[i]=last;
 			breakReads_old2new[i] = new int[last+1];
-			for (j=0; j<=last; j++) breakReads_old2new[i][j]=Integer.parseInt(tokens[1+i]);
+			for (j=0; j<=last; j++) breakReads_old2new[i][j]=Integer.parseInt(tokens[j]);
 			str=br.readLine(); i++;
 		}
 		br.close();

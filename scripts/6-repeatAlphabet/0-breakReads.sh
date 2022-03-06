@@ -34,7 +34,7 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.app
 echo "Translating read-read alignments..."
 function alignmentsThread1() {
 	local ALIGNMENTS_FILE_ID=$1	
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 1 "${INPUT_DIR}/${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}" "${INPUT_DIR}/${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 1 ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}.txt
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
@@ -54,13 +54,13 @@ echo "Read-read alignments translated successfully"
 ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-reads-broken.txt"
 rm -f ${ALIGNMENTS_FILE_BROKEN}
 for THREAD in $(seq 0 ${TO}); do
-	cat "${INPUT_DIR}/${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}" >> ${ALIGNMENTS_FILE_BROKEN}
+	cat ${TMPFILE_PATH}-2-${THREAD}.txt >> ${ALIGNMENTS_FILE_BROKEN}
 done
 
 echo "Translating read-repeat alignments..."
 function alignmentsThread2() {
 	local ALIGNMENTS_FILE_ID=$1	
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 0 "${INPUT_DIR}/${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID}" "${INPUT_DIR}/${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID}"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 0 ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID}.txt
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
@@ -80,7 +80,7 @@ echo "Read-repeat alignments translated successfully"
 ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-repeats-broken.txt"
 rm -f ${ALIGNMENTS_FILE_BROKEN}
 for THREAD in $(seq 0 ${TO}); do
-	cat "${INPUT_DIR}/${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID}" >> ${ALIGNMENTS_FILE_BROKEN}
+	cat ${TMPFILE_PATH}-4-${THREAD}.txt >> ${ALIGNMENTS_FILE_BROKEN}
 done
 
 # Renaming files for the following steps of the pipeline
