@@ -3440,7 +3440,7 @@ public class RepeatAlphabet {
 	 * The procedure translates read-read and read-repeat alignments based on the output 
 	 * of $Reads.breakReads()$. This transformation allows handling low-quality regions 
 	 * correctly while translating the reads in the alphabet of repeats: specifically, the
-	 * whole translation pipeline can be run as a black box on the alignments on broken
+	 * whole translation pipeline can be run as a black box on the alignments of broken
 	 * reads.
 	 *
 	 * Remark: assume that we just run the repeat translation pipeline as-is on reads with 
@@ -3467,14 +3467,14 @@ public class RepeatAlphabet {
 	 * contain $L$. 
 	 *
 	 * Remark: breaking reads is acceptable in this context, since we don't need their
-	 * contiguity information (as we do in assembly): we just need to translate reads in 
+	 * long-range information (as we do in assembly): we just need to translate reads in 
 	 * the alphabet of repeats and to mark unique substrings in the recoded alphabet, and
 	 * such unique substrings cannot contain a low-quality region anyway.
 	 *
 	 * Remark: "short" low-quality intervals pose the same problems as "long" low-quality 
-	 * intervals, since the quality track means low coverage, and possibly alignments 
-	 * breaks, in both cases. It makes sense to break reads even at short low-quality 
-	 * intervals.
+	 * intervals, since the quality track comes from observing low coverage, and possibly
+	 * alignments breaks, in both cases. It makes sense to break reads even at short low-
+	 * quality intervals.
 	 *
 	 * Remark: the procedure discards any alignment that contains a low-quality region in
 	 * readA or readB, and it trims the readA and the readB side of an alignment whose 
@@ -3488,25 +3488,40 @@ public class RepeatAlphabet {
 	 * @param inputFile assumed to be sorted by $readA,readB,orientation,startA,startB$;
 	 * @param translateB if FALSE, the readB side of every alignment is kept intact (this
 	 * is useful if $inputFile$ contains read-repeat alignments);
+	 * @param addHeader adds the two header lines to the output;
 	 * @param outputFile sorted in the same order as $inputFile$.
 	 */
-	public static final void breakReads_translateAlignments(String inputFile, boolean translateB, String outputFile) throws IOException {
+	public static final void breakReads_translateAlignments(String inputFile, boolean translateB, boolean addHeader, String outputFile) throws IOException {
+		final int ALIGNMENTS_CAPACITY = 100;  // Arbitrary
 		boolean found;
 		int i;
-		int last, end, intersection, maxIntersection, readA, readB;
+		int last, end, intersection, maxIntersection, readA, readB, currentReadA;
 		int readA_new, startA_new, endA_new, readB_new, startB_new, endB_new, diffs_new;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
 		
+		AlignmentRow.order=AlignmentRow.ORDER_READA_READB_ORIENTATION_STARTA_STARTB_ENDA_ENDB;
+		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
+		for (i=0; i<alignments.length; i++) {	
+			if (alignments[i]==null) alignments[i] = new AlignmentRow();
+		}
 		bw = new BufferedWriter(new FileWriter(outputFile));
-		bw.newLine(); bw.newLine();
+		if (addHeader) { bw.newLine(); bw.newLine(); }
 		br = new BufferedReader(new FileReader(inputFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
-		str=br.readLine();
+		str=br.readLine(); currentReadA=-1;
 		while (str!=null) {
 			Alignments.readAlignmentFile(str);
-			readA=Alignments.readA-1; readB=Alignments.readB-1;
+			readA=Alignments.readA-1;
+			if (readA!=currentReadA) {
+				if (currentReadA!=-1) {
+					if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+					for (i=0; i<=lastAlignment; i++) bw.write((alignments[i].readA+1)+"  "+(alignments[i].readB+1)+"  "+(alignments[i].orientation?'n':'c')+"  ["+alignments[i].startA+".. "+alignments[i].endA+"] x ["+(alignments[i].orientation?alignments[i].startB+".. "+alignments[i].endB:alignments[i].endB+".. "+alignments[i].startB)+"] ( "+alignments[i].diffs+" diffs)\n");
+				}
+				currentReadA=readA; lastAlignment=-1;
+			}
+			readB=Alignments.readB-1;
 			if (Reads.breakReads_containsLowQuality(readA,Alignments.startA,Alignments.endA) || (translateB && Reads.breakReads_containsLowQuality(readB,Alignments.startB,Alignments.endB))) {
 				str=br.readLine();
 				continue;
@@ -3523,8 +3538,8 @@ public class RepeatAlphabet {
 					readA_new=Reads.breakReads_old2new[readA][i+2];
 				}
 			}
-			startA_new=Math.max(startA_new,Alignments.startA)-startA_new;
 			endA_new=Math.min(endA_new,Alignments.endA)-startA_new;
+			startA_new=Math.max(startA_new,Alignments.startA)-startA_new;
 			if (translateB) {
 				maxIntersection=0; startB_new=-1; endB_new=-1; readB_new=-1;
 				for (i=0; i<Reads.last_old2new[readB]; i+=3) {
@@ -3538,15 +3553,27 @@ public class RepeatAlphabet {
 						readB_new=Reads.breakReads_old2new[readB][i+2];
 					}
 				}
-				startB_new=Math.max(startB_new,Alignments.startB)-startB_new;
 				endB_new=Math.min(endB_new,Alignments.endB)-startB_new;
+				startB_new=Math.max(startB_new,Alignments.startB)-startB_new;
 			}
 			else { startB_new=Alignments.startB; endB_new=Alignments.endB; readB_new=readB; }
-			diffs_new=(int)((endA_new-startA_new+1+endB_new-startB_new+1)*((double)Alignments.diffs)/(Alignments.endA-Alignments.startA+1+Alignments.endB-Alignments.startB+1));			
-			bw.write((readA_new+1)+"  "+(readB_new+1)+"  "+(Alignments.orientation?'n':'c')+"  ["+startA_new+".. "+endA_new+"] x ["+(Alignments.orientation?startB_new+".. "+endB_new:endB_new+".. "+startB_new)+"] ( "+diffs_new+" diffs)\n");
+			diffs_new=(int)((endA_new-startA_new+1+endB_new-startB_new+1)*((double)Alignments.diffs)/(Alignments.endA-Alignments.startA+1+Alignments.endB-Alignments.startB+1));
+			lastAlignment++;
+			if (lastAlignment==alignments.length) {
+				AlignmentRow[] newAlignments = new AlignmentRow[alignments.length<<1];
+				System.arraycopy(alignments,0,newAlignments,0,alignments.length);
+				for (i=alignments.length; i<newAlignments.length; i++) newAlignments[i] = new AlignmentRow();
+				alignments=newAlignments;
+			}
+			alignments[lastAlignment].set(readA_new,startA_new,endA_new,readB_new,startB_new,endB_new,Alignments.orientation,diffs_new);
 			str=br.readLine();
 		}
-		bw.close(); br.close();
+		br.close();
+		if (currentReadA!=-1) {
+			if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+			for (i=0; i<=lastAlignment; i++) bw.write((alignments[i].readA+1)+"  "+(alignments[i].readB+1)+"  "+(alignments[i].orientation?'n':'c')+"  ["+alignments[i].startA+".. "+alignments[i].endA+"] x ["+(alignments[i].orientation?alignments[i].startB+".. "+alignments[i].endB:alignments[i].endB+".. "+alignments[i].startB)+"] ( "+alignments[i].diffs+" diffs)\n");
+		}
+		bw.close();
 	}
 	
 	

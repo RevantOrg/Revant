@@ -15,13 +15,14 @@ public class BreakReads2 {
 		final String READ_LENGTHS_FILE = args[1];
 		final String OLD2NEW_FILE = args[2];
 		final boolean TRANSLATE_B = Integer.parseInt(args[3])==1;
-		final String READ_READ_ALIGNMENTS = args[4];
-		final String READ_READ_ALIGNMENTS_NEW = args[5];
+		final boolean WRITE_HEADER = Integer.parseInt(args[4])==1;
+		final String READ_READ_ALIGNMENTS = args[5];
+		final String READ_READ_ALIGNMENTS_NEW = args[6];
 			
 		Reads.nReads=N_READS_OLD;
 		Reads.loadReadLengths(READ_LENGTHS_FILE);
 		Reads.breakReads_old2new_deserialize(N_READS_OLD,OLD2NEW_FILE);
-		RepeatAlphabet.breakReads_translateAlignments(READ_READ_ALIGNMENTS,TRANSLATE_B,READ_READ_ALIGNMENTS_NEW);
+		RepeatAlphabet.breakReads_translateAlignments(READ_READ_ALIGNMENTS,TRANSLATE_B,WRITE_HEADER,READ_READ_ALIGNMENTS_NEW);
 	}
 
 }

@@ -992,8 +992,8 @@ public class Reads {
 	/**
 	 * For every old read $R$ (rows), a sequence of tuples $(i_0,j_0,r_0),...,(i_n,j_n,
 	 * r_n)$ that says that substring $R[i_x..j_x]$ becomes the new read $r_x$ (it can be 
-	 * $R=r_x$). Every old read has at least one record in its row. Old read IDs are
-	 * assumed to form a compact interval.
+	 * $R=r_x$). Every old read that is not fully low-quality has at least one record in 
+	 * its row. Old read IDs are assumed to form a compact interval.
 	 */
 	public static int[][] breakReads_old2new;
 	public static int[] last_old2new;
@@ -1008,7 +1008,8 @@ public class Reads {
 	
 	/**
 	 * Assume that the input reads are CLR and that they contain long low-quality regions.
-	 * The procedure breaks each read at every one of its long low-quality regions.
+	 * The procedure breaks each read at every one of its long low-quality regions. If a
+	 * read is fully low-quality, it is discarded.
 	 *
 	 * Remark: the IDs of the new reads are assigned in order of appearance, so all the 
 	 * new reads created from the same old read have consecutive IDs. An old read with no 
@@ -1125,6 +1126,7 @@ public class Reads {
 						bw4.newLine();
 					}
 				}
+				else bw1.write("\n");
 			}
 			else {
 				newRead++;
@@ -1157,11 +1159,14 @@ public class Reads {
 		br = new BufferedReader(new FileReader(inputFile));
 		str=br.readLine(); i=0;
 		while (str!=null) {
-			tokens=str.split(",");
-			last=tokens.length-1;
-			last_old2new[i]=last;
-			breakReads_old2new[i] = new int[last+1];
-			for (j=0; j<=last; j++) breakReads_old2new[i][j]=Integer.parseInt(tokens[j]);
+			if (str.length()==0) last_old2new[i]=-1;
+			else {
+				tokens=str.split(",");
+				last=tokens.length-1;
+				last_old2new[i]=last;
+				breakReads_old2new[i] = new int[last+1];
+				for (j=0; j<=last; j++) breakReads_old2new[i][j]=Integer.parseInt(tokens[j]);
+			}
 			str=br.readLine(); i++;
 		}
 		br.close();
@@ -1209,18 +1214,21 @@ public class Reads {
 	/**
 	 * Remark: the procedure needs global variable $breakReads_old2new$.
 	 *
-	 * @return TRUE iff $read[start..end]$ contains a low-quality interval.
+	 * @return TRUE iff $read[start..end]$ contains a, is similar to, or is contained in a
+	 * low-quality interval.
 	 */
 	public static final boolean breakReads_containsLowQuality(int read, int start, int end) {
 		int i;
 		int last, endPrime;
 		
+		if (last_old2new[read]==-1) return true;
 		if (last_old2new[read]==2 && breakReads_old2new[read][0]==0 && breakReads_old2new[read][1]==Reads.readLengths[read]-1) return false;
 		last=-1;
 		for (i=0; i<last_old2new[read]; i+=3) {
 			if ( breakReads_old2new[read][i]>0 &&
 				 ( Intervals.isApproximatelyContained(last+1,breakReads_old2new[read][i]-1,start,end) ||
-				   Intervals.areApproximatelyIdentical(last+1,breakReads_old2new[read][i]-1,start,end)
+				   Intervals.areApproximatelyIdentical(last+1,breakReads_old2new[read][i]-1,start,end) ||
+				   Intervals.isApproximatelyContained(start,end,last+1,breakReads_old2new[read][i]-1)
 				 )
 			   ) return true;
 			last=breakReads_old2new[read][i+1];
@@ -1228,7 +1236,8 @@ public class Reads {
 		endPrime=Reads.readLengths[read]-1;
 		if ( last+1<endPrime && 
 			 ( Intervals.isApproximatelyContained(last+1,endPrime,start,end) ||
-			   Intervals.areApproximatelyIdentical(last+1,endPrime,start,end)
+			   Intervals.areApproximatelyIdentical(last+1,endPrime,start,end) ||
+			   Intervals.isApproximatelyContained(start,end,last+1,endPrime)
 			 )
 		   ) return true;
 		return false;

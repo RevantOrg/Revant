@@ -24,17 +24,20 @@ READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 N_READS=$(wc -l < ${READ_LENGTHS_FILE})
 TMPFILE_NAME="breakReads-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
+rm -f ${TMPFILE_PATH}*
 
 echo "Breaking reads..."
 OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"
 NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
 READ_LENGTHS_FILE_NEW="${INPUT_DIR}/reads-lengths-broken.txt"
+rm -f ${OLD2NEW_FILE} ${NEW2OLD_FILE} ${READ_LENGTHS_FILE_NEW}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads1 ${N_READS} ${READ_LENGTHS_FILE} ${QUALITY_TRACK_FILE} ${QUALITY_THRESHOLDS_FILE} ${LOW_QUALITY_LENGTH} ${OLD2NEW_FILE} ${NEW2OLD_FILE} ${READ_LENGTHS_FILE_NEW}
 
 echo "Translating read-read alignments..."
 function alignmentsThread1() {
-	local ALIGNMENTS_FILE_ID=$1	
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 1 ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}.txt
+	local ALIGNMENTS_FILE_ID=$1
+	local WRITE_HEADER=$2
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 1 ${WRITE_HEADER} ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}.txt
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
@@ -46,8 +49,9 @@ if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
-for THREAD in $(seq 0 ${TO}); do
-	alignmentsThread1 ${THREAD} &
+alignmentsThread1 0 1 &
+for THREAD in $(seq 1 ${TO}); do
+	alignmentsThread1 ${THREAD} 0 &
 done
 wait
 echo "Read-read alignments translated successfully"
@@ -59,8 +63,9 @@ done
 
 echo "Translating read-repeat alignments..."
 function alignmentsThread2() {
-	local ALIGNMENTS_FILE_ID=$1	
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 0 ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID}.txt
+	local ALIGNMENTS_FILE_ID=$1
+	local WRITE_HEADER=$2
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 0 ${WRITE_HEADER} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID}.txt
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
@@ -72,8 +77,9 @@ if [ -e ${TMPFILE_PATH}-3-${N_THREADS}.txt ]; then
 else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
-for THREAD in $(seq 0 ${TO}); do
-	alignmentsThread2 ${THREAD} &
+alignmentsThread2 0 1 &
+for THREAD in $(seq 1 ${TO}); do
+	alignmentsThread2 ${THREAD} 0 &
 done
 wait
 echo "Read-repeat alignments translated successfully"
