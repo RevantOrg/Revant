@@ -682,7 +682,6 @@ public class FilterAlignments  {
 		bw.close();
 	}
 	
-	
 }
 
 

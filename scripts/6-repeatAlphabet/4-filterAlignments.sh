@@ -11,6 +11,7 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
+BROKEN_READS=$2  # 1=TRUE
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 MIN_ALIGNMENT_LENGTH="500"  # In read-read alignments
 MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
@@ -50,6 +51,11 @@ function filterThread() {
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${INPUT_DIR}/unique-intervals-k1-${MAX_K_UNIQUE_INTERVALS}.txt ${FILTERING_MODE} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH}
 }
 
+function breakThread() {
+	local ALIGNMENTS_FILE_ID=$1
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads4 ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ----->
+}
+
 if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 	TO=${N_THREADS}
 else
@@ -60,6 +66,20 @@ for THREAD in $(seq 0 ${TO}); do
 done
 wait
 echo "Alignments filtered successfully"
+
+if [ ${BROKEN_READS} -eq 1 ]; then
+	echo "Translating bitvector from broken reads to unbroken reads..."
+	for THREAD in $(seq 0 ${TO}); do
+		breakThread ${THREAD} &
+	done
+	wait
+	
+	
+fi
+
+
+
+
 OUTPUT_BITVECTOR="${ALIGNMENTS_FILE}.mode${FILTERING_MODE}.bitvector"
 rm -f ${OUTPUT_BITVECTOR}
 for THREAD in $(seq 0 ${TO}); do

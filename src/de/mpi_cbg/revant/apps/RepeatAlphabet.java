@@ -3585,8 +3585,8 @@ public class RepeatAlphabet {
 	 * translateAlignments()$, the procedure builds a corresponding bitvector that filters
 	 * the old alignments.
 	 * 
-	 * Remark: the procedure assumes that the $Reads.breakReads_*$ arrays have already 
-	 * been loaded, and it uses global array $alignments$.
+	 * Remark: the procedure assumes that $Reads.breakReads_new2old$ has already been
+	 * loaded, and it uses global array $alignments$.
 	 *
 	 * @param bitvectorFile_old output file.
 	 */
@@ -3815,7 +3815,7 @@ public class RepeatAlphabet {
 				success=breakReads_checkDisambiguation_impl(mode,mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftUnique,leftLength,rightUnique,Integer.parseInt(str3.substring(0,str3.indexOf(","))),lengthThreshold,leftEnd1,leftEnd1_last,leftEnd1_str,rightEnd1,rightEnd1_last,str1,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
 				if (!success) {
 					nRolledBack++;
-System.err.println("breakReads_checkDisambiguation> rolled back: "+str1+" -> "+str2);
+					System.err.println("breakReads_checkDisambiguation> rolled back: "+str1+" <- "+str2);
 				}
 			}
 			else {
@@ -3875,7 +3875,6 @@ System.err.println("breakReads_checkDisambiguation> rolled back: "+str1+" -> "+s
 				// Disambiguation rejected
 				bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 1");
 				return false;
 			}
 			leftCharacterLength=alphabet[leftCharacter].getLength();
@@ -3902,7 +3901,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 1");
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 2");
 					return false;
 				}
 			}
@@ -3911,7 +3909,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 2");
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+""+leftCharacter); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 3");
 					return false;
 				}
 				rightCharacterLength=alphabet[rightCharacter].getLength();
@@ -3927,7 +3924,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 3");
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 4");
 					return false;
 				}
 			}
@@ -3935,7 +3931,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 4");
 				// Cannot disambiguate the right end
 				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 5");
 				return false;
 			}
 		}
@@ -3945,7 +3940,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 5");
 				// Disambiguation rejected
 				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 6");
 				return false;
 			}
 			rightCharacterLength=alphabet[rightCharacter].getLength();
@@ -3972,7 +3966,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 6");
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 7");
 					return false;
 				}
 			}
@@ -3981,7 +3974,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 7");
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 8");
 					return false;
 				}
 				leftCharacterLength=alphabet[leftCharacter].getLength();
@@ -3997,7 +3989,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 8");
 					// Disambiguation rejected
 					bw.write(SEPARATOR_MAJOR+leftEnd1_str.toString()); bw.newLine();
 					bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 9");
 					return false;
 				}
 			}
@@ -4005,7 +3996,6 @@ System.err.println("breakReads_checkDisambiguation_impl> 9");
 				// Cannot disambiguate the left end
 				bw.write(SEPARATOR_MAJOR+""+leftEnd1_str.toString()); bw.newLine();
 				bw.write(str1.substring(0,str1.lastIndexOf(SEPARATOR_MAJOR+"")));
-System.err.println("breakReads_checkDisambiguation_impl> 10");
 				return false;
 			}
 		}

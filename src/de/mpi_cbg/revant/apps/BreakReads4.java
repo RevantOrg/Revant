@@ -9,7 +9,7 @@ import de.mpi_cbg.revant.factorize.Reads;
  * on the broken reads produced by $BreakReads$), to a bitvector that marks the original 
  * alignments on the original reads with low-quality regions.
  */
-public class FilterAlignmentsTranslate {
+public class BreakReads4 {
 	
 	public static void main(String[] args) throws IOException {
 		final String BITVECTOR_FILE_NEW = args[0];
