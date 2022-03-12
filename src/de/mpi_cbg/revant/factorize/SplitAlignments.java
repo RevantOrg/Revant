@@ -52,8 +52,8 @@ public class SplitAlignments {
 			previousReadA=readA;
 			str=br.readLine();
 		}
+		if (previousReadA!=-1) lastReadsFile.write(previousReadA+"");
 		System.out.println(nAlignmentsInFile+" alignments");
-		// We don't need to write the last read to $lastReadsFile$.
 		outputFile.close(); lastReadsFile.close();
 		br.close();
 	}

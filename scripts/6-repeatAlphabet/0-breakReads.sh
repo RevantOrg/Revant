@@ -98,4 +98,6 @@ mv "${INPUT_DIR}/LAshow-reads-repeats-broken.txt" "${INPUT_DIR}/LAshow-reads-rep
 mv "${INPUT_DIR}/reads-lengths.txt" "${INPUT_DIR}/reads-lengths-unbroken.txt"
 mv "${INPUT_DIR}/reads-lengths-broken.txt" "${INPUT_DIR}/reads-lengths.txt"
 mv "${INPUT_DIR}/reads-ids.txt" "${INPUT_DIR}/reads-ids-unbroken.txt"
+mv "${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt" "${INPUT_DIR}/LAshow-reads-reads-lastReadA-unbroken.txt"
+mv "${INPUT_DIR}/LAshow-reads-repeats-lastReadA.txt" "${INPUT_DIR}/LAshow-reads-repeats-lastReadA-unbroken.txt"
 seq 0 $(( ${N_READS_BROKEN} - 1 )) > "${INPUT_DIR}/reads-ids.txt"

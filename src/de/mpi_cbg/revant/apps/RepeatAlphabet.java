@@ -3581,6 +3581,52 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * Splits $alignmentsFile_new,bitvectorFile_new$, which are the full alignments file
+	 * and the full bitvector of the broken reads, into chunks that correspond to those of
+	 * the alignments file of the unbroken reads.
+	 *
+	 * Remark: the procedure assumes that $Reads.breakReads_old2new$ is already loaded.
+	 *
+	 * @param lastReadA_old one-based, like in LAshow;
+	 * @param bitvectorFile_new ignored if NULL.
+	 */
+	public static final void breakReads_splitAlignments(int[] lastReadA_old, int nChunks_old, String alignmentsFile_new, String bitvectorFile_new, String alignmentsPrefix_new, String bitvectorPrefix_new) throws IOException {
+		int i;
+		int readA_new, lastReadA_new;
+		String str1, str2;
+		BufferedReader br1, br2;
+		BufferedWriter bw1, bw2;		
+		
+		br1 = new BufferedReader(new FileReader(alignmentsFile_new));
+		if (bitvectorFile_new!=null) br2 = new BufferedReader(new FileReader(bitvectorFile_new));
+		else br2=null;
+		str1=br1.readLine(); str1=br1.readLine();  // Skipping header
+		str1=br1.readLine(); 
+		if (bitvectorFile_new!=null) str2=br2.readLine();
+		else str2=null;
+		for (i=0; i<nChunks_old; i++) {
+			lastReadA_new=Reads.breakReads_old2new[lastReadA_old[i]-1][Reads.last_old2new[lastReadA_old[i]-1]];
+			bw1 = new BufferedWriter(new FileWriter(alignmentsPrefix_new+i+".txt"));
+			bw1.newLine(); bw1.newLine();
+			if (bitvectorFile_new!=null) bw2 = new BufferedWriter(new FileWriter(bitvectorPrefix_new+i+".txt"));
+			else bw2=null;
+			readA_new=Alignments.readAlignmentFile_readA(str1)-1;
+			while (readA_new<=lastReadA_new) {
+				bw1.write(str1); bw1.newLine(); 
+				if (bitvectorFile_new!=null) { bw2.write(str2); bw2.newLine(); str2=br2.readLine(); }
+				else str2=null;
+				str1=br1.readLine(); 
+				readA_new=Alignments.readAlignmentFile_readA(str1)-1;
+			}
+			bw1.close();
+			if (bitvectorFile_new!=null) bw2.close();
+		}
+		br1.close(); 
+		if (bitvectorFile_new!=null) br2.close();
+	}
+	
+	
+	/**
 	 * Given a bitvector that filters the new alignments created by $breakIntervals_
 	 * translateAlignments()$, the procedure builds a corresponding bitvector that filters
 	 * the old alignments.

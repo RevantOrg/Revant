@@ -31,7 +31,15 @@ if [ ! -e ${TMPFILE_PATH}-1-0.txt ]; then
 	echo "Splitting the alignments file..."
 	N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
 	LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
+	if [ ${BROKEN_READS} -eq 1 ]; then
+		N_READS_OLD=$(wc -l < ${INPUT_DIR}/reads-lengths-unbroken.txt )
+		OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"
+		LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA-unbroken.txt"
+		N_CHUNKS=$(wc -l < ${LASTREADA_FILE})
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads4 ${ALIGNMENTS_FILE} null ${N_READS_OLD} ${OLD2NEW_FILE} ${TMPFILE_PATH}-1- null ${N_CHUNKS} ${LAST_READA_FILE}
+	else
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
+	fi
 	echo "Alignments filtered and split in ${N_THREADS} parts"
 fi
 rm -f ${TMPFILE_PATH}-[2-9]-*
@@ -49,13 +57,14 @@ ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 function filterThread() {
 	local ALIGNMENTS_FILE_ID=$1
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${INPUT_DIR}/unique-intervals-k1-${MAX_K_UNIQUE_INTERVALS}.txt ${FILTERING_MODE} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH}
+	if [ ${BROKEN_READS} -eq 1 ]; then
+		NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
+		OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"
+		NREADS_OLD=$(wc -l < "${INPUT_DIR}/reads-ids-unbroken.txt")
+		ALIGNMENTS_FILE_OLD="${INPUT_DIR}/breakReads-tmp-1-"
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads5 ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${NEW2OLD_FILE} ${N_READS} ${OLD2NEW_FILE} ${NREADS_OLD} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID} ${ALIGNMENTS_FILE_OLD}
+	fi
 }
-
-function breakThread() {
-	local ALIGNMENTS_FILE_ID=$1
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads4 ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ----->
-}
-
 if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 	TO=${N_THREADS}
 else
@@ -66,22 +75,8 @@ for THREAD in $(seq 0 ${TO}); do
 done
 wait
 echo "Alignments filtered successfully"
-
-if [ ${BROKEN_READS} -eq 1 ]; then
-	echo "Translating bitvector from broken reads to unbroken reads..."
-	for THREAD in $(seq 0 ${TO}); do
-		breakThread ${THREAD} &
-	done
-	wait
-	
-	
-fi
-
-
-
-
 OUTPUT_BITVECTOR="${ALIGNMENTS_FILE}.mode${FILTERING_MODE}.bitvector"
 rm -f ${OUTPUT_BITVECTOR}
 for THREAD in $(seq 0 ${TO}); do
-	cat ${TMPFILE_PATH}-2-${THREAD} >> ${OUTPUT_BITVECTOR}
+	cat ${TMPFILE_PATH}-3-${THREAD} >> ${OUTPUT_BITVECTOR}
 done
