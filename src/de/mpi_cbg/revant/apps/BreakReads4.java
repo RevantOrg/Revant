@@ -6,8 +6,8 @@ import de.mpi_cbg.revant.factorize.Reads;
 
 /**
  * Splits the bitvector built by $FilterAlignments$ (which is assumed to mark alignments
- * on the broken reads), and the alignments on the broken reads themselves, into chunks
- * that correspond to those of the alignments file of the unbroken reads.
+ * on the broken reads), and the read-read alignments on the broken reads themselves, into
+ * chunks that correspond to those of the alignments file of the unbroken reads.
  */
 public class BreakReads4 {
 	/**

@@ -12,6 +12,7 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
+BROKEN_READS=$2  # 1=TRUE
 MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
 N_THREADS="4"
@@ -37,10 +38,20 @@ done
 rm -f ${TMPFILE_PATH}*
 
 echo "Splitting the alignments file..."
-ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
-N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
-LAST_READA_FILE="${INPUT_DIR}/LAshow-lastReadA.txt"
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
+if [ ${BROKEN_READS} -eq 1 ]; then
+	# Reusing the chunks of the read-repeat alignments file that are already there (we
+	# assume that they all have the header).
+	for FILE in $(ls ${INPUT_DIR}/breakReads-tmp-4-*.txt ); do
+		ID=$(basename ${FILE} .txt)
+		ID=${ID#breakReads-tmp-4-}
+		mv ${INPUT_DIR}/breakReads-tmp-4-${ID}.txt ${TMPFILE_PATH}-1-${ID}.txt
+	done
+else
+	ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
+	N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
+	LAST_READA_FILE="${INPUT_DIR}/LAshow-lastReadA.txt"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
+fi
 echo "Alignments filtered and split in ${N_THREADS} parts"
 
 echo "Collecting character instances..."

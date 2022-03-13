@@ -1,7 +1,8 @@
 #!/bin/bash
 # 
-# This step is needed only for CLR. Breaks reads at long low-quality intervals before
-# feeding them to the following steps of the pipeline.
+# This step is needed only for CLR: if the data is not CLR, start from Step 1 instead.
+# Breaks reads at long low-quality intervals before feeding them to the following steps
+# of the pipeline.
 #
 # Remark: the script assumes that environment variable $REVANT_BINARIES$ is already set
 # to the directory that contains REVANT's binaries, i.e. to the directory that contains
@@ -52,15 +53,17 @@ else
 fi
 alignmentsThread1 0 1 &
 for THREAD in $(seq 1 ${TO}); do
-	alignmentsThread1 ${THREAD} 0 &
+	alignmentsThread1 ${THREAD} 1 &  # We always write the header for future scripts.
 done
 wait
 echo "Read-read alignments translated successfully"
-ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-reads-broken.txt"
-rm -f ${ALIGNMENTS_FILE_BROKEN}
-for THREAD in $(seq 0 ${TO}); do
-	cat ${TMPFILE_PATH}-2-${THREAD}.txt >> ${ALIGNMENTS_FILE_BROKEN}
-done
+# We do not need to concatenate the chunks in a single file, since they will be used
+# directly as chunks by the following scripts.
+#ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-reads-broken.txt"
+#rm -f ${ALIGNMENTS_FILE_BROKEN}
+#for THREAD in $(seq 0 ${TO}); do
+#	cat ${TMPFILE_PATH}-2-${THREAD}.txt >> ${ALIGNMENTS_FILE_BROKEN}
+#done
 
 echo "Translating read-repeat alignments..."
 function alignmentsThread2() {
@@ -80,21 +83,23 @@ else
 fi
 alignmentsThread2 0 1 &
 for THREAD in $(seq 1 ${TO}); do
-	alignmentsThread2 ${THREAD} 0 &
+	alignmentsThread2 ${THREAD} 1 &  # We always write the header for future scripts.
 done
 wait
 echo "Read-repeat alignments translated successfully"
-ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-repeats-broken.txt"
-rm -f ${ALIGNMENTS_FILE_BROKEN}
-for THREAD in $(seq 0 ${TO}); do
-	cat ${TMPFILE_PATH}-4-${THREAD}.txt >> ${ALIGNMENTS_FILE_BROKEN}
-done
+# We do not need to concatenate the chunks in a single file, since they will be used
+# directly as chunks by the following scripts.
+#ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-repeats-broken.txt"
+#rm -f ${ALIGNMENTS_FILE_BROKEN}
+#for THREAD in $(seq 0 ${TO}); do
+#	cat ${TMPFILE_PATH}-4-${THREAD}.txt >> ${ALIGNMENTS_FILE_BROKEN}
+#done
 
 # Renaming files for the following steps of the pipeline
 mv "${INPUT_DIR}/LAshow-reads-reads.txt" "${INPUT_DIR}/LAshow-reads-reads-unbroken.txt"
-mv "${INPUT_DIR}/LAshow-reads-reads-broken.txt" "${INPUT_DIR}/LAshow-reads-reads.txt"
+#mv "${INPUT_DIR}/LAshow-reads-reads-broken.txt" "${INPUT_DIR}/LAshow-reads-reads.txt"
 mv "${INPUT_DIR}/LAshow-reads-repeats.txt" "${INPUT_DIR}/LAshow-reads-repeats-unbroken.txt"
-mv "${INPUT_DIR}/LAshow-reads-repeats-broken.txt" "${INPUT_DIR}/LAshow-reads-repeats.txt"
+#mv "${INPUT_DIR}/LAshow-reads-repeats-broken.txt" "${INPUT_DIR}/LAshow-reads-repeats.txt"
 mv "${INPUT_DIR}/reads-lengths.txt" "${INPUT_DIR}/reads-lengths-unbroken.txt"
 mv "${INPUT_DIR}/reads-lengths-broken.txt" "${INPUT_DIR}/reads-lengths.txt"
 mv "${INPUT_DIR}/reads-ids.txt" "${INPUT_DIR}/reads-ids-unbroken.txt"

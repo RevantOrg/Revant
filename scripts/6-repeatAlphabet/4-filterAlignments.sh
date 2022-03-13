@@ -29,14 +29,16 @@ TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 
 echo "Splitting the alignments file..."
 rm -f ${TMPFILE_PATH}-1-*
-N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
 if [ ${BROKEN_READS} -eq 1 ]; then
-	N_READS_OLD=$(wc -l < ${INPUT_DIR}/reads-lengths-unbroken.txt )
-	OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"
-	LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA-unbroken.txt"
-	N_CHUNKS=$(wc -l < ${LAST_READA_FILE})
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads4 ${ALIGNMENTS_FILE} null ${N_READS_OLD} ${OLD2NEW_FILE} ${TMPFILE_PATH}-1- null ${N_CHUNKS} ${LAST_READA_FILE}
+	# Reusing the chunks of the read-read alignments file that are already there (we
+	# assume that they all have the header).
+	for FILE in $(ls ${INPUT_DIR}/breakReads-tmp-2-*.txt ); do
+		ID=$(basename ${FILE} .txt)
+		ID=${ID#breakReads-tmp-2-}
+		mv ${INPUT_DIR}/breakReads-tmp-2-${ID}.txt ${TMPFILE_PATH}-1-${ID}.txt
+	done
 else
+	N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
 	LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
 fi
