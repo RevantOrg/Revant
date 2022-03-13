@@ -1252,13 +1252,15 @@ public class Reads {
 	 * $intervalLength$ (or shorter if they occur close to the end of a read) that occur
 	 * with probability $probability$.
 	 *
-	 * @param mode 0=uses the convention of DASqv and DBdump; 1=uses the convention of
-     * DAmar.
+	 * @param lowQualityMode every long low-quality region: TRUE=replaces a substring with
+	 * a random substring of approx. the same length; FALSE=is an insertion;
+	 * @param qualityMode 0=uses the convention of DASqv and DBdump; 1=uses the convention
+	 * of DAmar.
 	 */
-	public static final void breakReads_buildRandomQualities(String readLengthsFile, String outputFile, int intervalLength, double probability, byte mode, Random random) throws IOException {
-		final byte LOW_QUALITY_CHAR = quality2ascii(MAX_QUALITY_SCORE,mode);
-		final byte HIGH_QUALITY_CHAR = quality2ascii(MIN_QUALITY_SCORE,mode);
-		int i;
+	public static final void breakReads_buildRandomQualities(boolean lowQualityMode, String readLengthsFile, String outputFile, int intervalLength, double probability, byte qualityMode, Random random) throws IOException {
+		final byte LOW_QUALITY_CHAR = quality2ascii(MAX_QUALITY_SCORE,qualityMode);
+		final byte HIGH_QUALITY_CHAR = quality2ascii(MIN_QUALITY_SCORE,qualityMode);
+		int i, j;
 		int last, length;
 		final int intervalLengthPrime = Math.ceil(intervalLength,QUALITY_SPACING);
 		String str;
@@ -1273,9 +1275,16 @@ public class Reads {
 			i=0;
 			while (i<length) {
 				if (random.nextDouble()<=probability) {
-					last=Math.min(i+intervalLengthPrime-1,length-1);
-					while (i<=last) {
-						bw.write(LOW_QUALITY_CHAR);
+					if (lowQualityMode) {
+						last=Math.min(i+intervalLengthPrime-1,length-1);
+						while (i<=last) {
+							bw.write(LOW_QUALITY_CHAR);
+							i++;
+						}
+					}
+					else {
+						for (j=0; j<intervalLengthPrime; j++) bw.write(LOW_QUALITY_CHAR);
+						bw.write(HIGH_QUALITY_CHAR);
 						i++;
 					}
 				}

@@ -3614,7 +3614,7 @@ public class RepeatAlphabet {
 			while (readA_new<=lastReadA_new) {
 				bw1.write(str1); bw1.newLine(); 
 				j++;
-				if (j%1000000==0) System.err.println("Processed "+j+" alignments");
+				if (j%10000000==0) System.err.println("Processed "+j+" alignments");
 				if (bitvectorFile_new!=null) { bw2.write(str2); bw2.newLine(); str2=br2.readLine(); }
 				else str2=null;
 				str1=br1.readLine();
