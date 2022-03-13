@@ -19,7 +19,7 @@ N_THREADS="4"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
-
+set -o pipefail; set -e; set -u
 QUALITY_THRESHOLDS_FILE="${INPUT_DIR}/qualityThresholds.txt"
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 N_READS=$(wc -l < ${READ_LENGTHS_FILE})
@@ -59,6 +59,8 @@ wait
 echo "Read-read alignments translated successfully"
 # We do not need to concatenate the chunks in a single file, since they will be used
 # directly as chunks by the following scripts.
+# Remark: if we really want to concatenate, we should remove headers from all chunks,
+# except the first one, in the call above.
 #ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-reads-broken.txt"
 #rm -f ${ALIGNMENTS_FILE_BROKEN}
 #for THREAD in $(seq 0 ${TO}); do
@@ -89,6 +91,8 @@ wait
 echo "Read-repeat alignments translated successfully"
 # We do not need to concatenate the chunks in a single file, since they will be used
 # directly as chunks by the following scripts.
+# Remark: if we really want to concatenate, we should remove headers from all chunks,
+# except the first one, in the call above.
 #ALIGNMENTS_FILE_BROKEN="${INPUT_DIR}/LAshow-reads-repeats-broken.txt"
 #rm -f ${ALIGNMENTS_FILE_BROKEN}
 #for THREAD in $(seq 0 ${TO}); do
@@ -106,3 +110,6 @@ mv "${INPUT_DIR}/reads-ids.txt" "${INPUT_DIR}/reads-ids-unbroken.txt"
 mv "${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt" "${INPUT_DIR}/LAshow-reads-reads-lastReadA-unbroken.txt"
 mv "${INPUT_DIR}/LAshow-reads-repeats-lastReadA.txt" "${INPUT_DIR}/LAshow-reads-repeats-lastReadA-unbroken.txt"
 seq 0 $(( ${N_READS_BROKEN} - 1 )) > "${INPUT_DIR}/reads-ids.txt"
+
+# Removing all temp files that are not used downstream
+rm -f ${TMPFILE_PATH}-3-*

@@ -21,7 +21,7 @@ MIN_CHARACTER_FREQUENCY="12"  # Should be the coverage of one haplotype
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
-
+set -o pipefail; set -e; set -u
 export LC_ALL=C  # To speed up the $sort$ command.
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
@@ -233,3 +233,6 @@ fi
 PASTE_OPTIONS="${PASTE_OPTIONS}}'"
 paste ${INPUT_DIR}/${TMPFILE_NAME}-18-* | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Setminus ${FULLY_CONTAINED_FILE} ${FULLY_UNIQUE_FILE_NEW} > ${FULLY_CONTAINED_FILE_NEW}
+
+# Removing all temp files that are not used downstream
+rm -f ${TMPFILE_PATH}*

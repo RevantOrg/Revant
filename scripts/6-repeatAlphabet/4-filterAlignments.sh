@@ -21,14 +21,15 @@ N_THREADS="4"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
+set -o pipefail; set -e; set -u
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
 TMPFILE_NAME="filterAlignments-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
+rm -f ${TMPFILE_PATH}*
 
 echo "Splitting the alignments file..."
-rm -f ${TMPFILE_PATH}-1-*
 if [ ${BROKEN_READS} -eq 1 ]; then
 	# Reusing the chunks of the read-read alignments file that are already there (we
 	# assume that they all have the header).
@@ -51,10 +52,8 @@ FULLY_UNIQUE_FILE="${INPUT_DIR}/reads-fullyUnique-new.txt"
 N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
 FULLY_CONTAINED_FILE="${INPUT_DIR}/reads-fullyContained-new.txt"
 N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
-UNIQUE_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
+UNIQUE_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K_UNIQUE_INTERVALS}.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
-rm -f ${TMPFILE_PATH}-2-*
-rm -f ${TMPFILE_PATH}-3-*
 
 function filterThread() {
 	local ALIGNMENTS_FILE_ID=$1
@@ -88,3 +87,6 @@ for THREAD in $(seq 0 ${TO}); do
 		cat ${TMPFILE_PATH}-2-${THREAD} >> ${OUTPUT_BITVECTOR}
 	fi
 done
+
+# Removing all temp files that are not used downstream
+rm -f ${TMPFILE_PATH}*

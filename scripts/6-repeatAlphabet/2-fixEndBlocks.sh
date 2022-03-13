@@ -26,7 +26,7 @@ N_THREADS="4"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
-
+set -o pipefail; set -e; set -u
 export LC_ALL=C  # To speed up the $sort$ command.
 TMPFILE_NAME="fixEndBlocks-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
@@ -109,3 +109,6 @@ if [ ${BROKEN_READS} -eq 1 ]; then
 	mv ${READS_DISAMBIGUATED_FILE} ${READS_DISAMBIGUATED_FILE_PRE}
 	mv ${READS_DISAMBIGUATED_FILE_NEW} ${READS_DISAMBIGUATED_FILE}
 fi
+
+# Removing all temp files that are not used downstream
+rm -f ${TMPFILE_PATH}*

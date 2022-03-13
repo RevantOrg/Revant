@@ -21,7 +21,7 @@ N_THREADS="4"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
-
+set -o pipefail; set -e; set -u
 export LC_ALL=C  # To speed up the $sort$ command.
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
@@ -59,7 +59,7 @@ function intervalsThread() {
 	local LOCAL_UNIQUE_KMERS_FILE=$3
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$4
 	local LOCAL_INTERVALS_FILE=$5
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${OPEN_MODE} ${MULTI_MODE} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
 }
 
 FINAL_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
@@ -105,3 +105,6 @@ rm -f ${FINAL_INTERVALS_FILE}
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-intervals-*" ); do
 	cat ${FILE} >> ${FINAL_INTERVALS_FILE}
 done
+
+# Removing all temp files that are not used downstream
+rm -f ${TMPFILE_PATH}*
