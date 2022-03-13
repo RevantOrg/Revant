@@ -52,7 +52,7 @@ public class SplitAlignments {
 			previousReadA=readA;
 			str=br.readLine();
 		}
-		if (previousReadA!=-1) lastReadsFile.write(previousReadA+"");
+		if (previousReadA!=-1) lastReadsFile.write(previousReadA+"\n");
 		System.out.println(nAlignmentsInFile+" alignments");
 		outputFile.close(); lastReadsFile.close();
 		br.close();

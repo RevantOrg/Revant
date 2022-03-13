@@ -2798,7 +2798,7 @@ public class RepeatAlphabet {
 		str=br.readLine(); row=0; 
 		lastFullyContained=0; lastFullyUnique=0; lastTranslated=0; lastBlueInterval=0;
 		while (str!=null)  {
-			if (row%100000==0) System.err.println("Processed "+row+" alignments");
+			if (row%1000000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
 			out[0][type]++;	
@@ -3045,7 +3045,7 @@ public class RepeatAlphabet {
 		str=br.readLine(); row=0; 
 		lastFullyContained=0; lastFullyUnique=0; lastTranslated=0; lastBlueInterval=0;
 		while (str!=null)  {
-			if (row%100000==0) System.err.println("Processed "+row+" alignments");
+			if (row%1000000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			type=Alignments.readAlignmentFile_getType(DISTANCE_THRESHOLD);
 			out[0][type]++;
@@ -3591,17 +3591,17 @@ public class RepeatAlphabet {
 	 * @param bitvectorFile_new ignored if NULL.
 	 */
 	public static final void breakReads_splitAlignments(int[] lastReadA_old, int nChunks_old, String alignmentsFile_new, String bitvectorFile_new, String alignmentsPrefix_new, String bitvectorPrefix_new) throws IOException {
-		int i;
+		int i, j;
 		int readA_new, lastReadA_new;
 		String str1, str2;
 		BufferedReader br1, br2;
-		BufferedWriter bw1, bw2;		
+		BufferedWriter bw1, bw2;
 		
 		br1 = new BufferedReader(new FileReader(alignmentsFile_new));
 		if (bitvectorFile_new!=null) br2 = new BufferedReader(new FileReader(bitvectorFile_new));
 		else br2=null;
 		str1=br1.readLine(); str1=br1.readLine();  // Skipping header
-		str1=br1.readLine(); 
+		str1=br1.readLine(); j=0;
 		if (bitvectorFile_new!=null) str2=br2.readLine();
 		else str2=null;
 		for (i=0; i<nChunks_old; i++) {
@@ -3613,10 +3613,14 @@ public class RepeatAlphabet {
 			readA_new=Alignments.readAlignmentFile_readA(str1)-1;
 			while (readA_new<=lastReadA_new) {
 				bw1.write(str1); bw1.newLine(); 
+				j++;
+				if (j%1000000==0) System.err.println("Processed "+j+" alignments");
 				if (bitvectorFile_new!=null) { bw2.write(str2); bw2.newLine(); str2=br2.readLine(); }
 				else str2=null;
-				str1=br1.readLine(); 
-				readA_new=Alignments.readAlignmentFile_readA(str1)-1;
+				str1=br1.readLine();
+				if (str1==null) break;
+				Alignments.readAlignmentFile_readA(str1);
+				readA_new=Alignments.readA-1;
 			}
 			bw1.close();
 			if (bitvectorFile_new!=null) bw2.close();
@@ -3659,18 +3663,21 @@ public class RepeatAlphabet {
 		str3=br3.readLine();
 		currentReadA=-1; lastAlignment=-1;
 		while (str1!=null) {
-			Alignments.readAlignmentFile(str1);
+			Alignments.readAlignmentFile_readA(str1);
 			oldReadA=Reads.breakReads_new2old[Alignments.readA-1][0]; 
-			oldFirstA=Reads.breakReads_new2old[Alignments.readA-1][1];
-			oldReadB=Reads.breakReads_new2old[Alignments.readB-1][0]; 
-			oldFirstB=Reads.breakReads_new2old[Alignments.readB-1][1];
 			if (oldReadA!=currentReadA) {
 				if (currentReadA!=-1) {
 					if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+					// This procedure calls $Alignments.readAlignmentFile()$, so we should
+					// call it again afterwards.
 					str3=breakReads_translateBitvector_impl(currentReadA,br3,str3,bw,tmpAlignment);
 				}
+				Alignments.readAlignmentFile(str1);
+				oldFirstA=Reads.breakReads_new2old[Alignments.readA-1][1];
+				oldReadB=Reads.breakReads_new2old[Alignments.readB-1][0]; 
+				oldFirstB=Reads.breakReads_new2old[Alignments.readB-1][1];
 				currentReadA=oldReadA; lastAlignment=0; 
-				alignments[lastAlignment].set(oldReadA,oldFirstA+Alignments.startA,oldFirstA+Alignments.endA,oldReadB,oldFirstB+Alignments.startB,oldFirstB+Alignments.endB,Alignments.orientation,Alignments.diffs);				
+				alignments[lastAlignment].set(oldReadA,oldFirstA+Alignments.startA,oldFirstA+Alignments.endA,oldReadB,oldFirstB+Alignments.startB,oldFirstB+Alignments.endB,Alignments.orientation,Alignments.diffs);
 				alignments[lastAlignment].flag=Integer.parseInt(str2.trim())!=0;
 			}
 			else {
@@ -3681,6 +3688,10 @@ public class RepeatAlphabet {
 					for (i=alignments.length; i<newAlignments.length; i++) newAlignments[i] = new AlignmentRow();
 					alignments=newAlignments;
 				}
+				Alignments.readAlignmentFile(str1);
+				oldFirstA=Reads.breakReads_new2old[Alignments.readA-1][1];
+				oldReadB=Reads.breakReads_new2old[Alignments.readB-1][0]; 
+				oldFirstB=Reads.breakReads_new2old[Alignments.readB-1][1];
 				alignments[lastAlignment].set(oldReadA,oldFirstA+Alignments.startA,oldFirstA+Alignments.endA,oldReadB,oldFirstB+Alignments.startB,oldFirstB+Alignments.endB,Alignments.orientation,Alignments.diffs);
 				alignments[lastAlignment].flag=Integer.parseInt(str2.trim())!=0;
 			}
@@ -3735,8 +3746,14 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=-1-p; maxIntersection=0; maxAlignment=-1;
-			// Because of trimming, the new alignment can only start at or after the
-			// beginning of its corresponding old alignment.
+			for (i=p-1; i>=0; i--) {
+				if (alignments[i].readB!=tmpAlignment.readB || alignments[i].orientation!=tmpAlignment.orientation) break;
+				intersection=Intervals.intersectionLength(alignments[i].startA,alignments[i].endA,Alignments.startA,Alignments.endA)+Intervals.intersectionLength(alignments[i].startB,alignments[i].endB,Alignments.startB,Alignments.endB);
+				if (intersection>maxIntersection) {
+					maxIntersection=intersection;
+					maxAlignment=i;
+				}
+			}
 			for (i=p; i<=lastAlignment; i++) {
 				if (alignments[i].readB!=tmpAlignment.readB || alignments[i].orientation!=tmpAlignment.orientation || alignments[i].startA>=tmpAlignment.endA) break;
 				intersection=Intervals.intersectionLength(alignments[i].startA,alignments[i].endA,Alignments.startA,Alignments.endA)+Intervals.intersectionLength(alignments[i].startB,alignments[i].endB,Alignments.startB,Alignments.endB);
@@ -3858,7 +3875,7 @@ public class RepeatAlphabet {
 			last2=lastInBlock_int[nBlocks-1];
 			if ((leftEnd1_last>0 && leftEnd2_last==0) || (rightEnd1_last>0 && rightEnd2_last==0 && leftEnd2_last>=0)) {
 				nAttempted++;
-				success=breakReads_checkDisambiguation_impl(mode,mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftUnique,leftLength,rightUnique,Integer.parseInt(str3.substring(0,str3.indexOf(","))),lengthThreshold,leftEnd1,leftEnd1_last,leftEnd1_str,rightEnd1,rightEnd1_last,str1,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
+				success=breakReads_checkDisambiguation_impl(mode,mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftUnique,leftLength,rightUnique,Integer.parseInt(str3.substring(0,str3.indexOf(","))),lengthThreshold,leftEnd1,leftEnd1_last,leftEnd1_str,leftEnd2_str,rightEnd1,rightEnd1_last,str1,str2,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
 				if (!success) {
 					nRolledBack++;
 					System.err.println("breakReads_checkDisambiguation> rolled back: "+str1+" <- "+str2);
@@ -3909,12 +3926,17 @@ public class RepeatAlphabet {
 	 * repetitive;
 	 * @return FALSE iff the disambiguation is rejected.
 	 */
-	private static final boolean breakReads_checkDisambiguation_impl(boolean mode, int lowQualityLength, boolean leftUnique, int leftLength, boolean rightUnique, int rightLength, int lengthThreshold, int[] leftEnd1, int leftEnd1_last, StringBuilder leftEnd1_str, int[] rightEnd1, int rightEnd1_last, String str1, int[] leftEnd2, int leftEnd2_last, int[] rightEnd2, int rightEnd2_last, BufferedWriter bw) throws IOException {
+	private static final boolean breakReads_checkDisambiguation_impl(boolean mode, int lowQualityLength, boolean leftUnique, int leftLength, boolean rightUnique, int rightLength, int lengthThreshold, int[] leftEnd1, int leftEnd1_last, StringBuilder leftEnd1_str, StringBuilder leftEnd2_str, int[] rightEnd1, int rightEnd1_last, String str1, String str2, int[] leftEnd2, int leftEnd2_last, int[] rightEnd2, int rightEnd2_last, BufferedWriter bw) throws IOException {
 		int i;
 		int leftCharacter, leftCharacterLength, rightCharacter, rightCharacterLength;
 		final int availableLength = leftLength+(mode?lowQualityLength:0)+rightLength;
 
-		if (leftUnique || rightUnique) return true;
+		if (leftUnique || rightUnique) {
+			// Disambiguation accepted
+			bw.write(SEPARATOR_MAJOR+""+leftEnd2_str.toString()); bw.newLine();
+			bw.write(str2.substring(0,str2.lastIndexOf(SEPARATOR_MAJOR+"")));
+			return true;
+		}
 		if (leftEnd2_last==0) {
 			leftCharacter=leftEnd2[0];
 			if (alphabet[leftCharacter].openEnd) {

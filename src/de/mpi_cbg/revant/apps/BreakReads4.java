@@ -32,7 +32,7 @@ public class BreakReads4 {
 		lastReadA_old = new int[N_CHUNKS];
 		br = new BufferedReader(new FileReader(LAST_READA_FILE));
 		str=br.readLine(); i=-1;
-		while (str!=null) {
+		while (str!=null && str.length()!=0) {
 			lastReadA_old[++i]=Integer.parseInt(str)+1;  // The file is zero-based
 			str=br.readLine();
 		}

@@ -18,9 +18,12 @@ public class BreakReads5 {
 		final int NREADS_NEW = Integer.parseInt(args[3]);
 		final String OLD2NEW_FILE = args[4];
 		final int NREADS_OLD = Integer.parseInt(args[5]);
-		final String BITVECTOR_FILE_OLD = args[6];
-		final String ALIGNMENTS_FILE_OLD = args[7];
+		final String ALIGNMENTS_FILE_OLD = args[6];
+		final String READ_LENGTHS_FILE_OLD = args[7];
+		final String BITVECTOR_FILE_OLD = args[8];
 		
+		Reads.nReads=NREADS_OLD;
+		Reads.loadReadLengths(READ_LENGTHS_FILE_OLD);
 		Reads.breakReads_old2new_deserialize(NREADS_OLD,OLD2NEW_FILE);
 		Reads.breakReads_new2old_deserialize(NREADS_NEW,NEW2OLD_FILE);
 		RepeatAlphabet.breakReads_translateBitvector(BITVECTOR_FILE_NEW,ALIGNMENTS_FILE_NEW,BITVECTOR_FILE_OLD,ALIGNMENTS_FILE_OLD);

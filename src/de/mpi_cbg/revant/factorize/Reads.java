@@ -993,7 +993,8 @@ public class Reads {
 	 * For every old read $R$ (rows), a sequence of tuples $(i_0,j_0,r_0),...,(i_n,j_n,
 	 * r_n)$ that says that substring $R[i_x..j_x]$ becomes the new read $r_x$ (it can be 
 	 * $R=r_x$). Every old read that is not fully low-quality has at least one record in 
-	 * its row. Old read IDs are assumed to form a compact interval.
+	 * its row. Old read IDs are assumed to form a compact interval. Old and new read IDs
+	 * are zero-based.
 	 */
 	public static int[][] breakReads_old2new;
 	public static int[] last_old2new;
@@ -1001,7 +1002,7 @@ public class Reads {
 	/**
 	 * For every new read $r$, a tuple $(R,i,j)$ that says that $r$ equals substring 
 	 * $[i..j]$ of the old read $R$ (it can be $r=R$). New read IDs are assumed to form a
-	 * compact interval.
+	 * compact interval. Old and new read IDs are zero-based.
 	 */
 	public static int[][] breakReads_new2old;
 	
@@ -1212,7 +1213,8 @@ public class Reads {
 	
 	
 	/**
-	 * Remark: the procedure needs global variable $breakReads_old2new$.
+	 * Remark: the procedure needs global variables $breakReads_old2new,readLengths$ (the
+	 * latter refers to old, unbroken reads).
 	 *
 	 * @return TRUE iff $read[start..end]$ contains a, is similar to, or is contained in a
 	 * low-quality interval.
@@ -1222,7 +1224,7 @@ public class Reads {
 		int last, endPrime;
 		
 		if (last_old2new[read]==-1) return true;
-		if (last_old2new[read]==2 && breakReads_old2new[read][0]==0 && breakReads_old2new[read][1]==Reads.readLengths[read]-1) return false;
+		if (last_old2new[read]==2 && breakReads_old2new[read][0]==0 && breakReads_old2new[read][1]==readLengths[read]-1) return false;
 		last=-1;
 		for (i=0; i<last_old2new[read]; i+=3) {
 			if ( breakReads_old2new[read][i]>0 &&
