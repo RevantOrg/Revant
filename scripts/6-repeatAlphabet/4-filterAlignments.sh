@@ -13,10 +13,11 @@
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-MIN_ALIGNMENT_LENGTH="500"  # In read-read alignments
+MIN_ALIGNMENT_LENGTH="1000"  # In read-read alignments
 MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
-FILTERING_MODE="0"  # 0-loose, 1=tight, 2=tight with matching characters.
+FILTERING_MODE="2"  # 0-loose, 1=tight, 2=tight with matching characters.
 N_THREADS="4"
+DELETE_TMP_FILES="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -89,4 +90,6 @@ for THREAD in $(seq 0 ${TO}); do
 done
 
 # Removing all temp files that are not used downstream
-rm -f ${TMPFILE_PATH}*
+if [ ${DELETE_TMP_FILES} -eq 1 ]; then
+	rm -f ${TMPFILE_PATH}*
+fi

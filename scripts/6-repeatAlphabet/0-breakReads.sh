@@ -15,6 +15,7 @@ INPUT_DIR=$1
 QUALITY_TRACK_FILE="${INPUT_DIR}/reads-phred.dbdump"
 LOW_QUALITY_LENGTH="100"  # >=100
 N_THREADS="4"
+DELETE_TMP_FILES="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -112,4 +113,6 @@ mv "${INPUT_DIR}/LAshow-reads-repeats-lastReadA.txt" "${INPUT_DIR}/LAshow-reads-
 seq 0 $(( ${N_READS_BROKEN} - 1 )) > "${INPUT_DIR}/reads-ids.txt"
 
 # Removing all temp files that are not used downstream
-rm -f ${TMPFILE_PATH}-3-*
+if [ ${DELETE_TMP_FILES} -eq 1 ]; then
+	rm -f ${TMPFILE_PATH}-3-*
+fi

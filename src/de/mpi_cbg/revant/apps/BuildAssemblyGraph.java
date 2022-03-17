@@ -113,7 +113,7 @@ public class BuildAssemblyGraph {
 		}
 		br1.close();
 		
-		// Outputting input connected components
+		// Printing input connected components
 		System.err.println("Computing input connected components...");
 		component = new int[N_READS];
 		Math.set(component,N_READS-1,-1);

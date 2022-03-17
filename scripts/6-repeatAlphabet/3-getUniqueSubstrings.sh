@@ -13,10 +13,11 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-N_HAPLOTYPES="2"
-HAPLOTYPE_COVERAGE="12"  # Of one haplotype
+N_HAPLOTYPES="1"
+HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_K="8"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
 N_THREADS="4"
+DELETE_TMP_FILES="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -31,8 +32,8 @@ TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 READS_TRANSLATED_BOUNDARIES="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
-MIN_FREQUENCY_UNIQUE=${HAPLOTYPE_COVERAGE}
-MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + (${HAPLOTYPE_COVERAGE}-1) ))
+MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
+MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + ${HAPLOTYPE_COVERAGE}/2 ))
 # Endblocks are allowed if they match just one character, since they are the only way to
 # detect e.g. a transposon that is longer than every read and that occurs just once in
 # the genome, or an extremely long satellite that occurs just once in the genome.
@@ -107,4 +108,6 @@ for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-intervals-*" 
 done
 
 # Removing all temp files that are not used downstream
-rm -f ${TMPFILE_PATH}*
+if [ ${DELETE_TMP_FILES} -eq 1 ]; then
+	rm -f ${TMPFILE_PATH}*
+fi

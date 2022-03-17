@@ -73,7 +73,7 @@ public class GetShortestUniqueIntervals {
 				p=str1.indexOf(RepeatAlphabet.SEPARATOR_MAJOR+"",p+1);
 			}
 			nBlocks++;
-			if (uniqueIntervals.length<nBlocks<<1) uniqueIntervals = new int[nBlocks<<1];
+			if (uniqueIntervals.length<nBlocks*3) uniqueIntervals = new int[nBlocks*3];
 			if (OLD_INTERVALS_FILE_EXISTS) {
 				if (str2.length()==0) lastUniqueInterval=-1;
 				else {

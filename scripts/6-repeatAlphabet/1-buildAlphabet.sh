@@ -15,8 +15,9 @@ INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
 MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
+HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 N_THREADS="4"
-MIN_CHARACTER_FREQUENCY="12"  # Should be the coverage of one haplotype
+DELETE_TMP_FILES="0"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -35,6 +36,7 @@ SORT_OPTIONS=""
 for i in $(seq 1 9); do  # Should be in sync with the serialization of $Character$.
 	SORT_OPTIONS="${SORT_OPTIONS} -k ${i},${i}n"
 done
+MIN_CHARACTER_FREQUENCY=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
 rm -f ${TMPFILE_PATH}*
 
 echo "Splitting the alignments file..."
@@ -235,4 +237,6 @@ paste ${INPUT_DIR}/${TMPFILE_NAME}-18-* | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Setminus ${FULLY_CONTAINED_FILE} ${FULLY_UNIQUE_FILE_NEW} > ${FULLY_CONTAINED_FILE_NEW}
 
 # Removing all temp files that are not used downstream
-rm -f ${TMPFILE_PATH}*
+if [ ${DELETE_TMP_FILES} -eq 1 ]; then
+	rm -f ${TMPFILE_PATH}*
+fi

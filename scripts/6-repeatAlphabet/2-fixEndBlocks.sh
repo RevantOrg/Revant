@@ -15,13 +15,14 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
-HAPLOTYPE_COVERAGE="12"  # Of one haplotype
+HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 TIGHT_MODE="0"
 LOW_QUALITY_TYPE="1"  # 1=replacement, 0=insertion.
 LOW_QUALITY_LENGTH_TOLERANCE="200"  # bps
 MIN_K="2"  # One plus the min length of a context used for disambiguation
-MAX_K="8"  # One plus the max length of a context used for disambiguation
+MAX_K="6"  # One plus the max length of a context used for disambiguation
 N_THREADS="4"
+DELETE_TMP_FILES="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -36,7 +37,7 @@ READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
-MIN_FREQUENCY_UNIQUE=${HAPLOTYPE_COVERAGE}
+MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
 UNIQUE_MODE="1"; MULTI_MODE="0"  # Endblocks are forbidden
 rm -f ${TMPFILE_PATH}*
 
@@ -111,4 +112,6 @@ if [ ${BROKEN_READS} -eq 1 ]; then
 fi
 
 # Removing all temp files that are not used downstream
-rm -f ${TMPFILE_PATH}*
+if [ ${DELETE_TMP_FILES} -eq 1 ]; then
+	rm -f ${TMPFILE_PATH}*
+fi

@@ -27,11 +27,14 @@ N_READS=$(( (${COVERAGE} * ${GENOME_LENGTH}) / ${AVG_READ_LENGTH} ))
 # ----------------------------------------------------------------------------------------
 # 2020 - PBSIM2
 #
-# ${PBSIM2_DIR}/pbsim --depth ${COVERAGE} --length-min ${MIN_READ_LENGTH} --length-max ${MAX_READ_LENGTH} --hmm_model ${PBSIM2_DIR}/../data/P6C4.model --length-mean ${AVG_READ_LENGTH} ${GENOME_DIR}/${GENOME_FILE}
-# PBSIM2_OUTPUT_DIR="${OUTPUT_DIR}/PBSIM2"
-# rm -rf ${PBSIM2_OUTPUT_DIR}
-# mkdir ${PBSIM2_OUTPUT_DIR}
-# mv ./sd_* ${PBSIM2_OUTPUT_DIR}
+${PBSIM2_DIR}/pbsim --depth ${COVERAGE} --length-min ${MIN_READ_LENGTH} --length-max ${MAX_READ_LENGTH} --hmm_model ${PBSIM2_DIR}/../data/P6C4.model --length-mean ${AVG_READ_LENGTH} ${GENOME_DIR}/${GENOME_FILE}
+PBSIM2_OUTPUT_DIR="${OUTPUT_DIR}/PBSIM2"
+rm -rf ${PBSIM2_OUTPUT_DIR}
+mkdir ${PBSIM2_OUTPUT_DIR}
+mv ./sd_* ${PBSIM2_OUTPUT_DIR}
+cat ${PBSIM2_OUTPUT_DIR}/sd_0001.fastq | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > ${PBSIM2_OUTPUT_DIR}/sd_0001.fa
+rm -f ${PBSIM2_OUTPUT_DIR}/sd_0001.fastq
+rm -f ${PBSIM2_OUTPUT_DIR}/sd_0001.maf
 
 
 # ----------------------------------------------------------------------------------------
@@ -66,13 +69,13 @@ N_READS=$(( (${COVERAGE} * ${GENOME_LENGTH}) / ${AVG_READ_LENGTH} ))
 # ----------------------------------------------------------------------------------------
 # 2018 - NPBSS 
 #
-cd ${NPBSS_DIR}
-octave --eval "pkg load statistics; NPBSS('${GENOME_DIR}/${GENOME_FILE}','-dep ${COVERAGE}','-min ${MIN_READ_LENGTH}','-max ${MAX_READ_LENGTH}','-len ${AVG_READ_LENGTH}')"
-cd -
-NPBSS_OUTPUT_DIR="${OUTPUT_DIR}/NPBSS/"
-rm -rf ${NPBSS_OUTPUT_DIR}
-mkdir ${NPBSS_OUTPUT_DIR}
-mv ${GENOME_DIR}/*_CLR.* ${NPBSS_OUTPUT_DIR}
+# cd ${NPBSS_DIR}
+# octave --eval "pkg load statistics; NPBSS('${GENOME_DIR}/${GENOME_FILE}','-dep ${COVERAGE}','-min ${MIN_READ_LENGTH}','-max ${MAX_READ_LENGTH}','-len ${AVG_READ_LENGTH}')"
+# cd -
+# NPBSS_OUTPUT_DIR="${OUTPUT_DIR}/NPBSS/"
+# rm -rf ${NPBSS_OUTPUT_DIR}
+# mkdir ${NPBSS_OUTPUT_DIR}
+# mv ${GENOME_DIR}/*_CLR.* ${NPBSS_OUTPUT_DIR}
 
 
 

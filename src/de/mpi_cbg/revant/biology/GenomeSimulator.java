@@ -20,7 +20,7 @@ import de.mpi_cbg.revant.util.Colors;
  * instance of an existing repeat. In the latter case, the two repeats are connected by an
  * edge in an evolutionary tree. Every repeat is born with a type (identical to the types 
  * used in factorization, e.g. prefix, substring, short-period, long-period), that decides
- *  how to create its instances when it replicates; with an insertion preference, that 
+ * how to create its instances when it replicates; with an insertion preference, that 
  * tells how likely the repeat is to insert into every one of the existing evolutionary 
  * trees; and with a desired frequency in the genome. The new repeat is replicated at 
  * random in the current genome, until its desired frequency or the total repeat bps of 
@@ -246,7 +246,7 @@ public class GenomeSimulator {
 			// New repeat from scratch
 			if (model.hasUnusedRepbaseStrings()) {
 				do {
-					isSatellite=random.nextBoolean();
+					isSatellite=model.getType(random)>=Constants.INTERVAL_PERIODIC;
 					if (isSatellite) {
 						id=random.nextInt(model.lastRepbaseSat+1);
 						isUsed=model.repbaseSatIsUsed[id];
@@ -1533,7 +1533,11 @@ public class GenomeSimulator {
 		
 		
 		public final int getType(Random random) {
-			int out = Arrays.binarySearch(typeProbCumulative,random.nextDouble());
+			double p = random.nextDouble();
+			int out = Arrays.binarySearch(typeProbCumulative,p);
+			
+System.err.println("getType> choosing type "+out+" since p="+p);			
+			
 			return out<0?-out-1:out;
 		}
 		
@@ -1573,7 +1577,7 @@ public class GenomeSimulator {
 		
 		
 		/**
-		 * Loads int $out$ a random string of $length$ basepairs.
+		 * Loads in $out$ a random string of $length$ basepairs.
 		 */
 		public final void getString(int length, StringBuilder out, Random random) {
 			int i, j;

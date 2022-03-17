@@ -1,14 +1,14 @@
 1000   // Min alignment length
 10     // Min short period
 100    // Max short period
-0.1589  // Prob. of repeat type: Alignment
-0.1589  // Prob. of repeat type: Prefix
-0.1589  // Prob. of repeat type: Suffix
-0.1589  // Prob. of repeat type: Prefix+suffix
-0.1589  // Prob. of repeat type: Substring
-0.1589  // Prob. of repeat type: Single deletion
-0.015625  // Prob. of repeat type: Short-period
-0.031250  // Prob. of repeat type: Long-period
+0.1661  // Prob. of repeat type: Alignment
+0.1661  // Prob. of repeat type: Prefix
+0.1661  // Prob. of repeat type: Suffix
+0.1661  // Prob. of repeat type: Prefix+suffix
+0.1661  // Prob. of repeat type: Substring
+0.1661  // Prob. of repeat type: Single deletion
+0.002  // Prob. of repeat type: Short-period
+0.001  // Prob. of repeat type: Long-period
 0.25   // Prob. of character A
 0.25   // Prob. of character C
 0.25   // Prob. of character G
@@ -21,9 +21,9 @@
 0.25   // Prob. of character C in unique regions
 0.25   // Prob. of character G in unique regions
 0.25   // Prob. of character T in unique regions
-0.3    // Prob. of building a repeat from an instance of a past one
-0.3    // Given the above: prob. of using multiple instances instead of just one.
-0.10   // Max period difference when creating a repeat from an instance of a past one
+0.0    // Prob. of building a repeat from an instance of a past one
+0.0    // Given the above: prob. of using multiple instances instead of just one.
+0.0    // Max period difference when creating a repeat from an instance of a past one
 0.10   // Max phase difference when creating an instance of a short period
 0.01   // Max perturbation of insertion probabilities
 0.25   // Probability that an instance gets reverse-complemented
