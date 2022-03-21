@@ -28,7 +28,7 @@ public class CollectKmers {
 		BufferedReader br1, br2;
 		BufferedWriter bw;
 		RepeatAlphabet.Kmer tmpKmer = new RepeatAlphabet.Kmer();
-		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
+		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers, tmpMap;
 		int[] avoidedIntervals;
 		int[] tmpArray2 = new int[K];
 		int[] tmpArray3 = new int[(K)<<1];
@@ -37,7 +37,9 @@ public class CollectKmers {
 		
 		// Collecting k-mers
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
+		RepeatAlphabet.kmerPool_init(K);
 		kmers = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
+		tmpMap = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
 		br1 = new BufferedReader(new FileReader(TRANSLATED_FILE));
 		if (INTERVALS_FILE_EXISTS) {
 			br2 = new BufferedReader(new FileReader(AVOIDED_INTERVALS_FILE));
@@ -56,7 +58,7 @@ public class CollectKmers {
 				}
 			}
 			else lastAvoidedInterval=-1;
-			RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,kmers,null,avoidedIntervals,lastAvoidedInterval,-1,tmpKmer,tmpArray2,tmpArray3);
+			RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,kmers,null,avoidedIntervals,lastAvoidedInterval,-1,tmpKmer,tmpArray2,tmpArray3,tmpMap);
 			str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; row++;
 		}
 		br1.close(); nKmers=kmers.size();
@@ -68,7 +70,7 @@ public class CollectKmers {
 		kmers.keySet().toArray(keys);
 		if (nKmers>1) Arrays.sort(keys,0,nKmers);
 		bw = new BufferedWriter(new FileWriter(KMERS_FILE));
-		for (i=0; i<nKmers; i++) bw.write(keys[i].toString()+","+keys[i].count+"\n");
+		for (i=0; i<nKmers; i++) bw.write(keys[i].toString()+","+keys[i].count+","+keys[i].sameReadCount+"\n");
 		bw.close();
 	}
 

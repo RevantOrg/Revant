@@ -77,7 +77,7 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 	fi
 	FREQUENT_KMERS_FILE="${INPUT_DIR}/frequent-k${K}.txt"
 	echo "Finding frequent ${K}-mers..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} -1 ${FREQUENT_KMERS_FILE} 0 null
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} -1 ${FREQUENT_KMERS_FILE} 0 0 null
 	echo "Computing $((${K}-1))-mers..."
 	K_MINUS_ONE_MERS_FILE="${INPUT_DIR}/kMinusOne-k${K}.txt"
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetKMinusOneMers ${ALPHABET_FILE} ${FREQUENT_KMERS_FILE} ${K} ${K_MINUS_ONE_MERS_FILE}

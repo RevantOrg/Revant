@@ -82,7 +82,7 @@ public class GetShortestUniqueIntervals {
 				}
 			}
 			else lastUniqueInterval=-1;
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,tmpKmer,tmpArray2,tmpArray3);
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,tmpKmer,tmpArray2,tmpArray3,null);
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {

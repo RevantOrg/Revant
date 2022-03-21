@@ -32,6 +32,7 @@ TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 READS_TRANSLATED_BOUNDARIES="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
+TANDEMS_FILE="${INPUT_DIR}/tandems.txt"
 MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
 MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + ${HAPLOTYPE_COVERAGE}/2 ))
 # Endblocks are allowed if they match just one character, since they are the only way to
@@ -89,7 +90,7 @@ for K in $(seq 1 ${MAX_K}); do
 	UNIQUE_KMERS_FILE="${INPUT_DIR}/unique-k${K}.txt"
 	OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding unique ${K}-mers..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} ${MAX_FREQUENCY_UNIQUE} ${UNIQUE_KMERS_FILE} ${MAX_HISTOGRAM_COUNT} ${OUTPUT_FILE_HISTOGRAM}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} ${MAX_FREQUENCY_UNIQUE} ${UNIQUE_KMERS_FILE} ${MAX_HISTOGRAM_COUNT} 1 ${OUTPUT_FILE_HISTOGRAM}
 	echo "Updating shortest unique intervals file..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
@@ -105,6 +106,24 @@ done
 rm -f ${FINAL_INTERVALS_FILE}
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-intervals-*" ); do
 	cat ${FILE} >> ${FINAL_INTERVALS_FILE}
+done
+
+# Collecting tandem intervals
+function tandemsThread() {
+	local LOCAL_TRANSLATED_READS_FILE=$1
+	local LOCAL_TANDEMS_FILE=$2
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_TANDEMS_FILE}
+}
+echo "Collecting tandems..."
+for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
+	tandemsThread ${FILE} ${TMPFILE_PATH}-tandems-${THREAD_ID} &
+done
+wait
+rm -f ${TANDEMS_FILE}
+for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
+	cat ${TMPFILE_PATH}-tandems-${THREAD_ID} >> ${TANDEMS_FILE}
 done
 
 # Removing all temp files that are not used downstream

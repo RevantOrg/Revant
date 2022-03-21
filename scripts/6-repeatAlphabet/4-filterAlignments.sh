@@ -13,9 +13,13 @@
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-MIN_ALIGNMENT_LENGTH="1000"  # In read-read alignments
+MIN_ALIGNMENT_LENGTH_READ_READ="1000"
+MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"
 MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
-FILTERING_MODE="2"  # 0-loose, 1=tight, 2=tight with matching characters.
+FILTERING_MODE="1"  # 0=loose, 1=tight, 2=tight with matching characters.
+SUFFIX_PREFIX_MODE="0"  # 1=in tight mode, keep suffix-prefix alignments that contain a
+# unique sequence of repeats in a read, and that only straddle a unique sequence of
+# repeats on the other read.
 N_THREADS="4"
 DELETE_TMP_FILES="1"
 # REVANT
@@ -54,11 +58,12 @@ N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
 FULLY_CONTAINED_FILE="${INPUT_DIR}/reads-fullyContained-new.txt"
 N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
 UNIQUE_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K_UNIQUE_INTERVALS}.txt"
+TANDEM_INTERVALS_FILE="${INPUT_DIR}/tandems.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 
 function filterThread() {
 	local ALIGNMENTS_FILE_ID=$1
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${INPUT_DIR}/unique-intervals-k1-${MAX_K_UNIQUE_INTERVALS}.txt ${FILTERING_MODE} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${UNIQUE_INTERVALS_FILE} ${TANDEM_INTERVALS_FILE} ${FILTERING_MODE} ${SUFFIX_PREFIX_MODE} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT}
 	if [ ${BROKEN_READS} -eq 1 ]; then
 		NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
 		OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"

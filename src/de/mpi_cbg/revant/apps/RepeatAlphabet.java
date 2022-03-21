@@ -71,11 +71,13 @@ public class RepeatAlphabet {
 	
 	/**
 	 * For every read in $translated$: block boundaries; flags marking non-repetitive
-	 * blocks; full translation.
+	 * blocks; full translation; tandem intervals.
 	 */ 
 	private static int[][] boundaries_all;
 	private static byte[][] isBlockUnique_all;
 	private static int[][][] translation_all;
+	private static int[][] tandems;
+	private static int[] lastTandem;
 	
 	/**
 	 * Temporary space used by procedure $recodeRead()$.
@@ -103,6 +105,9 @@ public class RepeatAlphabet {
 	private static int[] boundaries;
 	private static int[][] intBlocks;
 	private static boolean[] isBlockUnique;
+	private static Pair[] tandemIntervals;
+	private static Kmer[] kmerPool;
+	private static int lastKmerPool;
 	
 	
 	/**
@@ -1883,16 +1888,24 @@ public class RepeatAlphabet {
 	 * Remark: often several characters map to the same block in practice, and most of 
 	 * the k-mers (k>=2) that result from this are rare.
 	 *
+	 * Remark: the procedure enumerates k-mers everywhere, including strictly inside 
+	 * tandems. Substrings that would generate too many k-mers are skipped to avoid large
+	 * slowdowns.
+	 *
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 * 
 	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
-	 * @param tmpArray3 temporary space, of size at least 2k.
+	 * @param tmpArray3 temporary space, of size at least 2k;
+	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3) {
-		int i, j;
-		int nBlocks, sum, start, end, nHaplotypes, out;
+	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap) {
+		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
+		int i, j, p;
+		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
+		Kmer key, value;
+		Iterator<Kmer> iterator;
 		
 		// Loading blocks
 		out=lastAvoidedInterval;
@@ -1910,18 +1923,51 @@ public class RepeatAlphabet {
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		
-		// Loading k-mers
-		j=0;
-		for (i=0; i<=nBlocks-k; i++) {
-			while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
-			if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-			if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
-			nHaplotypes=getKmers_impl(i,k,newKmers,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-			if (newKmers==null && nHaplotypes!=-1 && (k>1?true:i>0&&i<nBlocks-1&&lastInBlock_int[i]==1)) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
+		// Processing every k-mer in the read
+		if (newKmers==null) {
+			j=0;
+			for (i=0; i<=nBlocks-k; i++) {
+				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
+				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
+				nKmers=lastInBlock_int[i]+1;
+				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
+				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
+				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
+				if (nHaplotypes!=-1 && (k>1?true:i>0&&i<nBlocks-1&&lastInBlock_int[i]==0)) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
+			}
 		}
+		else {
+			tmpMap.clear(); lastKmerPool=-1;
+			j=0;
+			for (i=0; i<=nBlocks-k; i++) {
+				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
+				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
+				nKmers=lastInBlock_int[i]+1;
+				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
+				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
+				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
+			}
+			iterator=tmpMap.keySet().iterator();
+			while (iterator.hasNext()) {
+				key=iterator.next();
+				value=newKmers.get(key);
+				if (value==null) {
+					value = new Kmer(key,k);
+					value.count=key.count; value.sameReadCount=(int)key.count;
+					newKmers.put(value,value);
+				}
+				else {
+					value.sameReadCount=Math.max(value.sameReadCount,(int)key.count);
+					value.count+=key.count;
+				}
+			}
+		}
+		
 		return out;
 	}
-	
+
 	
 	/**
 	 * Tells whether window $blocks[first..first+k-1]$ satisfies the following:
@@ -1959,12 +2005,41 @@ public class RepeatAlphabet {
 	}
 	
 	
+	public static final void kmerPool_init(int k) {
+		kmerPool = new Kmer[100];  // Arbitrary
+		for (int i=0; i<kmerPool.length; i++) {
+			kmerPool[i] = new Kmer();
+			kmerPool[i].sequence = new int[k];
+		}
+	}
+	
+	
+	private static final Kmer kmerPool_allocate(int k) {
+		final int GROWTH_RATE = 100;  // Arbitrary
+		final int length = kmerPool.length;
+		lastKmerPool++;
+		if (lastKmerPool==length) {
+			Kmer[] newArray = new Kmer[length+GROWTH_RATE];
+			System.arraycopy(kmerPool,0,newArray,0,length);
+			for (int i=length; i<newArray.length; i++) {
+				newArray[i] = new Kmer();
+				newArray[i].sequence = new int[k];
+			}
+			kmerPool=newArray;
+		}
+		return kmerPool[lastKmerPool];
+	}
+	
+	
 	/**
 	 * If $newKmers$ is not null, adds every possible canonized instance of 
 	 * $intBlocks[first..first+k-1]$ to $newKmers$. Otherwise, checks whether one of the 
 	 * possible canonized instances of $intBlocks[first..first+k-1]$ belongs to
 	 * $oldKmers$, and if so returns an estimate of the number of haplotypes in which it
 	 * occurs (returns -1 otherwise).
+	 *
+	 * Remark: the objects added to $newKmers$ come from $kmerPool$, which is assumed to
+	 * be already initialized.
 	 *
 	 * @param key temporary space;
 	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
@@ -1982,11 +2057,13 @@ public class RepeatAlphabet {
 		while (top1>=0) {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
-				key.set(tmpArray2,0,k); key.canonize(k,tmpArray3);
+				key.set(tmpArray2,0,k,true); key.canonize(k,tmpArray3);
 				if (newKmers!=null) {
 					value=newKmers.get(key);
 					if (value==null) {
-						newKey = new Kmer(key,k); newKey.count=1;
+						newKey=kmerPool_allocate(k);
+						newKey.set(key.sequence,0,k,true); 
+						newKey.count=1;
 						newKmers.put(newKey,newKey);
 					}
 					else value.count++;
@@ -2276,7 +2353,7 @@ public class RepeatAlphabet {
 		while (top1>=0) {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
-				context.set(tmpArray2,0,k); 
+				context.set(tmpArray2,0,k,true); 
 				sameOrientation=context.canonize(k,tmpArray3);
 				key=kmers.get(context);
 				if (key!=null) {
@@ -2352,6 +2429,165 @@ public class RepeatAlphabet {
 			}
 		}
 		return selectedCharacter==-1?-2:selectedCharacter;
+	}
+	
+	
+	/**
+	 * Writes to $outputFile$ the tandem intervals of every translated read in
+	 * $inputFile$, as a sequence of pairs $from,to$.
+	 *
+	 * @return the total number of tandem intervals found.
+	 */
+	public static final long getTandemIntervals(String inputFile, String outputFile) throws IOException {
+		int i;
+		int nBlocks, lastTandem;
+		long out;
+		String str;
+		BufferedReader br;
+		BufferedWriter bw;
+		
+		br = new BufferedReader(new FileReader(inputFile));
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		str=br.readLine(); out=0;
+		while (str!=null) {
+			if (str.length()==0 || str.indexOf(SEPARATOR_MAJOR+"")<0) {
+				bw.newLine();
+				str=br.readLine();
+				continue;
+			}
+			nBlocks=loadBlocks(str); loadIntBlocks(nBlocks);
+			lastTandem=getTandemIntervals_impl(nBlocks);
+			if (lastTandem==-1) {
+				bw.newLine();
+				str=br.readLine();
+				continue;
+			}
+			out+=lastTandem+1;
+			bw.write(tandemIntervals[0].from+""+SEPARATOR_MINOR+""+tandemIntervals[0].to);
+			for (i=1; i<=lastTandem; i++) bw.write(SEPARATOR_MINOR+""+tandemIntervals[i].from+""+SEPARATOR_MINOR+""+tandemIntervals[i].to);
+			bw.newLine();
+			str=br.readLine();
+		}
+		br.close(); bw.close();
+		return out;
+	}
+	
+	
+	/**
+	 * Stores in global variable $tandemIntervals$ the set of all maximal tandem intervals
+	 * of $intBlocks$, where a tandem interval is a substring such that all its blocks
+	 * have a character in common. Tandem intervals that intersect are merged.
+	 *
+	 * Remark: this definition of tandem is likely too simple for real data, since the
+	 * aligner might fail to align some repeat to some tandem unit, or the alignment might
+	 * be a bit off and give rise to a different character in our alphabet. 
+	 *
+	 * Remark: the procedure uses global arrays $stack,stack2$.
+	 *
+	 * @return the last element in $tandemIntervals$.
+	 */
+	private static final int getTandemIntervals_impl(int nBlocks) {
+		int i, j;
+		int max, last1, last2, lastInterval, tandemLength;
+		Pair tmpInterval;
+		int[] tmpArray;
+		
+		// Allocating memory
+		if (tandemIntervals==null) tandemIntervals = new Pair[100];  // Arbitrary
+		max=0;
+		for (i=0; i<nBlocks; i++) max=Math.max(max,lastInBlock_int[i]+1);
+		if (stack==null || stack.length<max) stack = new int[max];
+		if (stack2==null || stack2.length<max) stack2 = new int[max];
+		
+		// Collecting intervals
+		lastInterval=-1;
+		for (i=0; i<nBlocks-1; i++) {
+			System.arraycopy(intBlocks[i],0,stack,0,lastInBlock_int[i]+1);
+			last1=lastInBlock_int[i]; tandemLength=1;
+			for (j=i+1; j<nBlocks; j++) {
+				last2=Math.setIntersection(intBlocks[j],0,lastInBlock_int[j],stack,0,last1,stack2,0);
+				if (last2==-1) break;
+				tandemLength++;
+				tmpArray=stack; stack=stack2; stack2=tmpArray;
+				last1=last2;
+			}
+			if (tandemLength>1) {
+				lastInterval++;
+				if (lastInterval>=tandemIntervals.length) {
+					Pair[] newArray = new Pair[tandemIntervals.length<<1];
+					System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
+					tandemIntervals=newArray;
+				}
+				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(i,i+tandemLength-1);
+				else tandemIntervals[lastInterval].set(i,i+tandemLength-1);
+			}
+		}
+		if (lastInterval<=0) return lastInterval;
+		
+		// Merging overlapping intervals
+		Arrays.sort(tandemIntervals,0,lastInterval+1);
+		j=0;
+		for (i=0; i<=lastInterval; i++) {
+			if (tandemIntervals[i].from<=tandemIntervals[j].to) tandemIntervals[j].to=tandemIntervals[i].to;
+			else {
+				j++;
+				tmpInterval=tandemIntervals[j]; tandemIntervals[j]=tandemIntervals[i]; tandemIntervals[i]=tmpInterval;
+			}
+		}
+		return j;
+	}
+	
+	
+	private static class Pair implements Comparable {
+		public int from, to;
+		
+		public Pair(int f, int t) {
+			set(f,t);
+		}
+		
+		public void set(int f, int t) {
+			this.from=f; this.to=t;
+		}
+		
+		public int compareTo(Object other) {
+			Pair otherPair = (Pair)other;
+			if (from<otherPair.from) return -1;
+			else if (from>otherPair.from) return 1;
+			return 0;
+		}
+	}
+	
+	
+	/**
+	 * Initializes global data structures $tandems,lastTandem$ from the content of 
+	 * $inputFile$.
+	 */
+	public static final void loadTandemIntervals(String inputFile, int nReads) throws IOException {
+		int i, j;
+		int length;
+		String str;
+		BufferedReader br;
+		String[] tokens;
+		
+		tandems = new int[nReads][0];
+		lastTandem = new int[nReads];
+		Math.set(lastTandem,nReads-1,-1);
+		br = new BufferedReader(new FileReader(inputFile));
+		str=br.readLine(); i=-1;
+		while (str!=null) {
+			i++;
+			if (str.length()==0) {
+				str=br.readLine();
+				continue;
+			}
+			tokens=str.split(SEPARATOR_MINOR+"");
+			length=tokens.length;
+			tandems[i] = new int[length];
+			for (j=0; j<length; j++) tandems[i][j]=Integer.parseInt(tokens[j]);
+			lastTandem[i]=length-1;
+			str=br.readLine();
+		}
+		br.close();
 	}
 	
 	
@@ -2477,6 +2713,7 @@ public class RepeatAlphabet {
 	public static class Kmer implements Comparable {
 		public int[] sequence;  // Positions in $alphabet$.
 		public long count;
+		public int sameReadCount;  // Max frequency inside a read
 		
 		/**
 		 * -1: unknown; -2: more than one character. >=0: canonized index in $alphabet$
@@ -2487,9 +2724,7 @@ public class RepeatAlphabet {
 		public Kmer() { }
 		
 		public Kmer(Kmer otherKmer, int k) {
-			sequence = new int[k];
-			System.arraycopy(otherKmer.sequence,0,sequence,0,k);
-			count=0; previousCharacter=-1; nextCharacter=-1;
+			set(otherKmer.sequence,0,k,false);
 		}
 		
 		public Kmer(String str, int k) {
@@ -2504,8 +2739,11 @@ public class RepeatAlphabet {
 			else { previousCharacter=-1; nextCharacter=-1; }
 		}
 		
-		public void set(int[] fromArray, int first, int k) {
-			sequence = new int[k];
+		/**
+		 * @param reuseSequence TRUE=reuses the existing array if long enough.
+		 */
+		public void set(int[] fromArray, int first, int k, boolean reuseSequence) {
+			if (sequence==null || sequence.length<k || !reuseSequence) sequence = new int[k];
 			System.arraycopy(fromArray,first,sequence,0,k);
 			count=0; previousCharacter=-1; nextCharacter=-1;
 		}
@@ -2772,15 +3010,17 @@ public class RepeatAlphabet {
 	 * blueIntervals_reads. 
 	 *
 	 * @param alignmentsFile output of LAshow, assumed to be sorted by readA;
-	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
-	 * for the alignment not to be considered red; this should not be too small, since
-	 * short non-repetitive regions might not address a unique locus of the genome;
+	 * @param minIntersection_nonrepetitive min. length of a non-repetitive substring of 
+	 * the alignment, for the alignment not to be considered red; this should not be too 
+	 * small, since short non-repetitive regions might not address a unique locus of the 
+	 * genome, and they might even be occurrences of short repeats that were not aligned 
+	 * to the repeat database because of heuristics of the aligner;
 	 * @param out output array containing the number of alignments for each type (columns)
 	 * specified in $Alignments.readAlignmentFile_getType()$; row 0: all alignments in 
 	 * input; row 1: all alignments kept in output; row 2: only input alignments that
 	 * intersect a non-repetitive region (these are kept in output).
 	 */
-	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection, long[][] out) throws IOException {
+	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection_nonrepetitive, long[][] out) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		int p;
 		int row, readA, readB, type, value, isRepetitive;
@@ -2816,7 +3056,7 @@ public class RepeatAlphabet {
 			else {
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection);
+				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection_nonrepetitive);
 			}
 			if (isRepetitive!=0) {
 				bw.write("1\n"); str=br.readLine(); row++;
@@ -2840,7 +3080,7 @@ public class RepeatAlphabet {
 				System.err.println("filterAlignments_loose> ERROR: read "+readB+" is neither translated, nor fully unique, nor fully contained in a repeat.");
 				System.exit(1);
 			}
-			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);
+			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive);
 			if (isRepetitive==0) bw.write("0\n"); 
 			else {
 				bw.write("1\n");
@@ -2869,15 +3109,15 @@ public class RepeatAlphabet {
 	 * $blueIntervals$ is unknown;
 	 * @param blueIntervalsStart a position in $blueIntervals$ from which to start
 	 * the search when $blueIntervalsID=-2$;
-	 * @param minIntersection min. length of a non-repetitive substring of the alignment,
-	 * for the alignment to be considered non-repetitive;
+	 * @param minIntersection_nonrepetitive min. length of a non-repetitive substring of 
+	 * the alignment, for the alignment to be considered non-repetitive;
 	 * @return interval $readID[intervalStart..intervalEnd]$:
 	 * -1: belongs to or straddles a non-repetitive region;
 	 * -2: contains a sequence of repeat characters that likely occurs <=H times in the 
 	 *     genome;
 	 *  0: none of the above is true.
 	 */
-	private static final int inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
+	private static final int inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive) {
 		int i, j;
 		int mask, cell, start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
@@ -2891,7 +3131,7 @@ public class RepeatAlphabet {
 				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
 				   )
 				 )
 			   ) return -1;
@@ -2904,7 +3144,7 @@ public class RepeatAlphabet {
 					 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) || 
 					   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
 					   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
 					   )
 					 ) 
 				   ) return -1;
@@ -2923,7 +3163,7 @@ public class RepeatAlphabet {
 					 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 					   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
 					   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
 					   )
 					 )
 				   ) return -1;
@@ -2939,7 +3179,7 @@ public class RepeatAlphabet {
 				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-					  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+					  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
 				   )
 				 )
 			   ) return -1;
@@ -3015,18 +3255,19 @@ public class RepeatAlphabet {
 	 * additionally requires that the intervals of the alignment in the two reads cover
 	 * matching sequences of boundaries and matching characters.
 	 *
-	 * Remark: a suffix-prefix alignment is kept even if it contains a unique interval in
-	 * just one read. This is allowed when the alignment straddles a unique interval on
-	 * the other read, on the side that is opposite to the end of the read.
-	 *
 	 * Remark: the procedure needs the following arrays: 
 	 * translation_all, alphabet | fullyUnique, fullyContained, boundaries_all, 
 	 * blueIntervals, blueIntervals_reads.
 	 *
-	 * @param stats row 2 stores the number of input alignments that overlap a non-
+	 * @param suffixPrefixMode TRUE = a suffix-prefix alignment is kept even if it 
+	 * contains a unique interval in just one read; this is allowed when the alignment
+	 * straddles a unique interval on the other read, on the side that is opposite to the
+	 * end of the read. Alignments kept by this criterion are mostly noisy in practice, so
+	 * it seems safe to disable it.
+	 * @param out row 2 stores the number of input alignments that overlap a non-
 	 * repetitive region on both reads (these are kept in output).
 	 */
-	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, int minIntersection, long[][] out) throws IOException {
+	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, boolean suffixPrefixMode, int minIntersection_nonrepetitive, int minIntersection_repetitive, long[][] out) throws IOException {
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		boolean orientation, overlapsUniqueA, straddlesLeftA, straddlesRightA;
 		int p, q;
@@ -3072,15 +3313,21 @@ public class RepeatAlphabet {
 				}
 				readAInTranslated=lastTranslated;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection);
+				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive);
 				if (q==-1) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
 				}
 				overlapsUniqueA=q==0||q==1; straddlesLeftA=q==3||q==5; straddlesRightA=q==4||q==5;
-				if (!overlapsUniqueA && q!=2 && !(startA<=DISTANCE_THRESHOLD && straddlesRightA) && !(endA>=lengthA-DISTANCE_THRESHOLD && straddlesLeftA)) {
-					bw.write("0\n"); str=br.readLine(); row++;
-					continue;
+				if ( !overlapsUniqueA && q!=2 && 
+					 ( !suffixPrefixMode || 
+					   ( !(startA<=DISTANCE_THRESHOLD && straddlesRightA) && 
+						 !(endA>=lengthA-DISTANCE_THRESHOLD && straddlesLeftA)
+					   )
+					 )
+				   ) {
+   					bw.write("0\n"); str=br.readLine(); row++;
+   					continue;
 				}
 			}
 			// Processing readB
@@ -3105,7 +3352,7 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection);
+			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive);
 			if (q==-1) bw.write("0\n");
 			else if (q==0 || q==1) {
 				if (mode) {
@@ -3130,7 +3377,11 @@ public class RepeatAlphabet {
 					}
 				}
 				else if (straddlesLeftA) {
-					if ((orientation && startB<=DISTANCE_THRESHOLD) || (!orientation && endB>=lengthB-DISTANCE_THRESHOLD)) {
+					if ( suffixPrefixMode && 
+						 ( (orientation && startB<=DISTANCE_THRESHOLD) || 
+						   (!orientation && endB>=lengthB-DISTANCE_THRESHOLD)
+						 )
+					   ) {
 						if (mode) {
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
 								bw.write("1\n");
@@ -3146,7 +3397,11 @@ public class RepeatAlphabet {
 					else bw.write("0\n");
 				}
 				else if (straddlesRightA) {
-					if ((orientation && endB>=lengthB-DISTANCE_THRESHOLD) || (!orientation && startB<=DISTANCE_THRESHOLD)) {
+					if ( suffixPrefixMode && 
+					     ( (orientation && endB>=lengthB-DISTANCE_THRESHOLD) || 
+					       (!orientation && startB<=DISTANCE_THRESHOLD)
+						 )
+					   ) {
 						if (mode) {
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
 								bw.write("1\n");
@@ -3176,16 +3431,13 @@ public class RepeatAlphabet {
 				}
 			}
 			else if (q==3 || q==5) {
-				if (overlapsUniqueA) {
-					if (mode) bw.write("0\n");
-					else {
-						bw.write("1\n");
-						out[1][type]++;
-					}
-				}
-				else if (straddlesLeftA || straddlesRightA) bw.write("0\n");
+				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) bw.write("0\n");
 				else {
-					if ((orientation && startA<=DISTANCE_THRESHOLD) || (!orientation && endA>=lengthA-DISTANCE_THRESHOLD)) {
+					if ( suffixPrefixMode && 
+					     ( (orientation && startA<=DISTANCE_THRESHOLD) || 
+					       (!orientation && endA>=lengthA-DISTANCE_THRESHOLD)
+						 )
+					   ) {
 						if (mode) {
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
 								bw.write("1\n");
@@ -3202,16 +3454,13 @@ public class RepeatAlphabet {
 				}
 			}
 			else if (q==4 || q==5) {
-				if (overlapsUniqueA) {
-					if (mode) bw.write("0\n");
-					else {
-						bw.write("1\n");
-						out[1][type]++;
-					}
-				}
-				else if (straddlesLeftA || straddlesRightA) bw.write("0\n");
+				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) bw.write("0\n");
 				else {
-					if ((orientation && endA>=lengthA-DISTANCE_THRESHOLD) || (!orientation && startA<=DISTANCE_THRESHOLD)) {
+					if ( suffixPrefixMode && 
+					     ( (orientation && endA>=lengthA-DISTANCE_THRESHOLD) || 
+					       (!orientation && startA<=DISTANCE_THRESHOLD)
+					     )
+					   ) {
 						if (mode) {
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
 								bw.write("1\n");
@@ -3249,7 +3498,7 @@ public class RepeatAlphabet {
 	 * 5: both (3) and (4) are true;
 	 * -1: none of the above is true.
 	 */
-	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection) {
+	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive) {
 		boolean straddlesLeft, straddlesRight;
 		int i, j;
 		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
@@ -3263,7 +3512,7 @@ public class RepeatAlphabet {
 			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
 			   ) return 0;
 			else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
 			   		) return 1;
 		}
 		for (i=1; i<nBlocks-1; i++) {
@@ -3274,7 +3523,7 @@ public class RepeatAlphabet {
 				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
 				   ) return 0;
 				else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-				      	   Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+				      	   Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
 				   		) return 1;
 			}
 		}
@@ -3285,7 +3534,7 @@ public class RepeatAlphabet {
 			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
 			   ) return 0;
 			else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection
+			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
 			        ) return 1;
 		}
 		
@@ -3301,8 +3550,8 @@ public class RepeatAlphabet {
 				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
 				   ) return 2;
-				else if (intervalEnd>=start+minIntersection && intervalEnd<end && intervalStart<start) straddlesRight=true;
-				else if (end>=intervalStart+minIntersection && end<intervalEnd && start<intervalStart) straddlesLeft=true;
+				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) straddlesRight=true;
+				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) straddlesLeft=true;
 			}
 			if (straddlesLeft) {
 				if (straddlesRight) return 5;
@@ -3425,6 +3674,133 @@ public class RepeatAlphabet {
 		}
 		return false;
 	}
+	
+	
+	
+	
+	
+	
+	
+	
+	/**
+	 *
+	 *
+	 */
+	public static final void filterAlignments_tandem(String alignmentsFile, String outputFile) throws IOException {
+		boolean containedA, identicalA, containedB, identicalB;
+		int i, p;
+		int row, nBlocks, lastTranslated, lastBlueInterval, blueIntervalA, readA, readB;
+		int firstTandem, lastTandem, firstTandemBlockA, lastTandemBlockA, firstTandemBlockB, lastTandemBlockB;
+		String str;
+		BufferedReader br;
+		BufferedWriter bw;
+		
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		br = new BufferedReader(new FileReader(alignmentsFile));
+		str=br.readLine(); str=br.readLine();  // Skipping header
+		str=br.readLine(); row=0; 
+		lastTranslated=0; lastBlueInterval=0;
+		while (str!=null)  {
+			if (row%1000000==0) System.err.println("Processed "+row+" alignments");
+			Alignments.readAlignmentFile(str);
+			readA=Alignments.readA-1; readB=Alignments.readB-1;
+			if (lastTandem[readA]==-1 || lastTandem[readB]==-1) {
+				bw.write("1\n"); str=br.readLine(); row++;
+				continue;
+			}
+			// Processing readA
+			while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
+			if (lastTranslated==nTranslated || translated[lastTranslated]!=readA) {
+				bw.write("1\n"); str=br.readLine(); row++;
+				continue;
+			}
+			while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
+			if (lastBlueInterval>blueIntervals_last || blueIntervals_reads[lastBlueInterval]!=readA) blueIntervalA=-1;
+			else blueIntervalA=lastBlueInterval;
+			containedA=false; identicalA=false; firstTandemBlockA=-1; lastTandemBlockA=-1;
+			for (i=0; i<lastTandem[readA]; i+=2) {
+				nBlocks=boundaries_all[lastTranslated].length+1;
+				if (tandems[readA][i]==0) firstTandem=0;
+				else firstTandem=boundaries_all[lastTranslated][tandems[readA][i]-1];
+				if (tandems[readA][i+1]==nBlocks-1) lastTandem=Reads.getReadLength(readA)-1;
+				else lastTandem=boundaries_all[lastTranslated][tandems[readA][i+1]];
+				if (Intervals.areApproximatelyIdentical(startA,endA,firstTandem,lastTandem)) identicalA=true;
+				else if (Intervals.isApproximatelyContained(startA,endA,firstTandem,lastTandem)) containedA=true;
+				if (identicalA || containedA) {
+					firstTandemBlockA=tandems[readA][i]; 
+					lastTandemBlockA=tandems[readA][i+1];
+					break;
+				}
+			}
+			if (!containedA && !identicalA) {
+				bw.write("1\n"); str=br.readLine(); row++;
+				continue;
+			}
+			// Processing readB
+			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
+			if (p<0) {
+				bw.write("1\n"); str=br.readLine(); row++;
+				continue;
+			}
+			containedB=false; identicalB=false; firstTandemBlockB=-1; lastTandemBlockB=-1;
+			for (i=0; i<lastTandem[readB]; i+=2) {
+				nBlocks=boundaries_all[p].length+1;
+				if (tandems[readB][i]==0) firstTandem=0;
+				else firstTandem=boundaries_all[p][tandems[readB][i]-1];
+				if (tandems[readB][i+1]==nBlocks-1) lastTandem=Reads.getReadLength(readB)-1;
+				else lastTandem=boundaries_all[p][tandems[readB][i+1]];
+				if (Intervals.areApproximatelyIdentical(startB,endB,firstTandem,lastTandem)) identicalB=true;
+				else if (Intervals.isApproximatelyContained(startB,endB,firstTandem,lastTandem)) containedB=true;
+				if (identicalB || containedB) {
+					firstTandemBlockB=tandems[readB][i];
+					lastTandemBlockB=tandems[readB][i+1];
+					break;
+				}
+			}
+			if (!containedB && !identicalB) {
+				bw.write("1\n"); str=br.readLine(); row++;
+				continue;
+			}
+			// Main logic
+			if ((identicalA && !identicalB && containedB) || (identicalB && !identicalA && containedA) || (containedA && containedB)) {
+				bw.write("0\n"); str=br.readLine(); row++;
+				continue;
+			}
+			blueIntervalB=readInArray(readB,blueIntervals_reads,blueIntervals_reads.length-1,lastBlueInterval);
+			if (blueIntervalA==-1 && blueIntervalB==-1) {
+				bw.write("0\n"); str=br.readLine(); row++;
+				continue;
+			}
+			found=false;
+			for (i=0; i<blueIntervals[blueIntervalA].length; i+=3) {
+				if (blueIntervals[blueIntervalsA][i]==tandemStartA && blueIntervals[blueIntervalsA][i]+blueIntervals[blueIntervalsA][i+1]-1==tandemEndA) {
+					found=true;
+					break;
+				}
+				if (found) break;
+			}
+			if (!found) {
+				for (i=0; i<blueIntervals[blueIntervalB].length; i+=3) {
+					if (blueIntervals[blueIntervalsB][i]==tandemStartB && blueIntervals[blueIntervalsB][i]+blueIntervals[blueIntervalsB][i+1]-1==tandemEndB) {
+						found=true;
+						break;
+					}
+					if (found) break;
+				}
+			}
+			bw.write(found?"1\n":"0\n");
+			str=br.readLine(); row++;
+		}
+		br.close(); bw.close();
+	}
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
