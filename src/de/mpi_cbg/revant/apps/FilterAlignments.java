@@ -60,9 +60,10 @@ public class FilterAlignments {
 		final int MODE = Integer.parseInt(args[12]);
 		final boolean SUFFIX_PREFIX_MODE = Integer.parseInt(args[13])==1;
 		final String ALPHABET_FILE = args[14];  // Discarded if MODE==0
-		final String OUTPUT_FILE = args[15];
-		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[16]);
-		final int MIN_ALIGNMENT_LENGTH_READ_REPEAT = Integer.parseInt(args[17]);
+		final String BITVECTOR_UNIQUE = args[15];
+		final String BITVECTOR_TANDEM = args[16];
+		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[17]);
+		final int MIN_ALIGNMENT_LENGTH_READ_REPEAT = Integer.parseInt(args[18]);
 		
 		// Non-repetitive regions shorter than this might be occurrences of repeats that 
 		// were not aligned to the repeat database because of heuristics of the aligner.
@@ -82,11 +83,13 @@ public class FilterAlignments {
 		Math.set(stats,0);
 		if (MODE==0) {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,false,TRANSLATED_BOUNDARIES_FILE);
-			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,OUTPUT_FILE,MIN_INTERSECTION_NONREPETITIVE,stats);
+			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MIN_INTERSECTION_NONREPETITIVE,stats);
+			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BITVECTOR_TANDEM);
 		}
 		else {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,false,true,TRANSLATED_BOUNDARIES_FILE);
-			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,OUTPUT_FILE,MODE==1?false:true,SUFFIX_PREFIX_MODE,MIN_INTERSECTION_NONREPETITIVE,MIN_INTERSECTION_REPETITIVE,stats);
+			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MODE==1?false:true,SUFFIX_PREFIX_MODE,MIN_INTERSECTION_NONREPETITIVE,MIN_INTERSECTION_REPETITIVE,stats);
+			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BITVECTOR_TANDEM);
 		}
 		System.err.println("All alignments:  (input, output)");
 		System.err.println("Suffix/prefix overlaps: \t"+stats[0][0]+" ("+stats[2][0]+") -> "+stats[1][0]+" ("+(100*((double)(stats[1][0]-stats[0][0]))/stats[0][0])+"%)");

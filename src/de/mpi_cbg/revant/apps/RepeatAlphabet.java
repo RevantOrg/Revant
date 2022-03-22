@@ -3676,21 +3676,21 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
-	
-	
-	
-	
-	
 	/**
-	 *
-	 *
+	 * Writes a zero for every alignment that should not be trusted because it falls 
+	 * inside a tandem on both reads, i.e. inside a sequence of adjacent blocks with a
+	 * character in common. Every block inside a tandem might be tagged with several 
+	 * characters, and it might happen that a sequence of such characters occurs just once
+	 * inside the tandem, and it is considered unique based on its total frequency in the
+	 * read set. In practice such a sequence is likely noise.
 	 */
 	public static final void filterAlignments_tandem(String alignmentsFile, String outputFile) throws IOException {
-		boolean containedA, identicalA, containedB, identicalB;
+		boolean found, containedA, identicalA, containedB, identicalB;
 		int i, p;
-		int row, nBlocks, lastTranslated, lastBlueInterval, blueIntervalA, readA, readB;
-		int firstTandem, lastTandem, firstTandemBlockA, lastTandemBlockA, firstTandemBlockB, lastTandemBlockB;
+		int length, row, nBlocks, readA, readB, startA, endA, startB, endB;
+		int lastTranslated, lastBlueInterval, blueIntervalA, blueIntervalB;
+		int firstTandemPosition, lastTandemPosition, firstTandemBlockA, lastTandemBlockA, firstTandemBlockB, lastTandemBlockB;
+		final int nTranslated = translated.length;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
@@ -3714,18 +3714,19 @@ public class RepeatAlphabet {
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
+			startA=Alignments.startA; endA=Alignments.endA;
 			while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
 			if (lastBlueInterval>blueIntervals_last || blueIntervals_reads[lastBlueInterval]!=readA) blueIntervalA=-1;
 			else blueIntervalA=lastBlueInterval;
 			containedA=false; identicalA=false; firstTandemBlockA=-1; lastTandemBlockA=-1;
 			for (i=0; i<lastTandem[readA]; i+=2) {
 				nBlocks=boundaries_all[lastTranslated].length+1;
-				if (tandems[readA][i]==0) firstTandem=0;
-				else firstTandem=boundaries_all[lastTranslated][tandems[readA][i]-1];
-				if (tandems[readA][i+1]==nBlocks-1) lastTandem=Reads.getReadLength(readA)-1;
-				else lastTandem=boundaries_all[lastTranslated][tandems[readA][i+1]];
-				if (Intervals.areApproximatelyIdentical(startA,endA,firstTandem,lastTandem)) identicalA=true;
-				else if (Intervals.isApproximatelyContained(startA,endA,firstTandem,lastTandem)) containedA=true;
+				if (tandems[readA][i]==0) firstTandemPosition=0;
+				else firstTandemPosition=boundaries_all[lastTranslated][tandems[readA][i]-1];
+				if (tandems[readA][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readA)-1;
+				else lastTandemPosition=boundaries_all[lastTranslated][tandems[readA][i+1]];
+				if (Intervals.areApproximatelyIdentical(startA,endA,firstTandemPosition,lastTandemPosition)) identicalA=true;
+				else if (Intervals.isApproximatelyContained(startA,endA,firstTandemPosition,lastTandemPosition)) containedA=true;
 				if (identicalA || containedA) {
 					firstTandemBlockA=tandems[readA][i]; 
 					lastTandemBlockA=tandems[readA][i+1];
@@ -3742,15 +3743,16 @@ public class RepeatAlphabet {
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
+			startB=Alignments.startB; endB=Alignments.endB;
 			containedB=false; identicalB=false; firstTandemBlockB=-1; lastTandemBlockB=-1;
 			for (i=0; i<lastTandem[readB]; i+=2) {
 				nBlocks=boundaries_all[p].length+1;
-				if (tandems[readB][i]==0) firstTandem=0;
-				else firstTandem=boundaries_all[p][tandems[readB][i]-1];
-				if (tandems[readB][i+1]==nBlocks-1) lastTandem=Reads.getReadLength(readB)-1;
-				else lastTandem=boundaries_all[p][tandems[readB][i+1]];
-				if (Intervals.areApproximatelyIdentical(startB,endB,firstTandem,lastTandem)) identicalB=true;
-				else if (Intervals.isApproximatelyContained(startB,endB,firstTandem,lastTandem)) containedB=true;
+				if (tandems[readB][i]==0) firstTandemPosition=0;
+				else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
+				if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readB)-1;
+				else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
+				if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
+				else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
 				if (identicalB || containedB) {
 					firstTandemBlockB=tandems[readB][i];
 					lastTandemBlockB=tandems[readB][i+1];
@@ -3771,43 +3773,33 @@ public class RepeatAlphabet {
 				bw.write("0\n"); str=br.readLine(); row++;
 				continue;
 			}
-			found=false;
-			for (i=0; i<blueIntervals[blueIntervalA].length; i+=3) {
-				if (blueIntervals[blueIntervalsA][i]==tandemStartA && blueIntervals[blueIntervalsA][i]+blueIntervals[blueIntervalsA][i+1]-1==tandemEndA) {
+			found=false; length=blueIntervals[blueIntervalA].length;
+			for (i=0; i<length; i+=3) {
+				if (blueIntervals[blueIntervalA][i]==firstTandemBlockA && blueIntervals[blueIntervalA][i]+blueIntervals[blueIntervalA][i+1]-1==lastTandemBlockA) {
 					found=true;
 					break;
 				}
-				if (found) break;
 			}
 			if (!found) {
-				for (i=0; i<blueIntervals[blueIntervalB].length; i+=3) {
-					if (blueIntervals[blueIntervalsB][i]==tandemStartB && blueIntervals[blueIntervalsB][i]+blueIntervals[blueIntervalsB][i+1]-1==tandemEndB) {
+				length=blueIntervals[blueIntervalB].length;
+				for (i=0; i<length; i+=3) {
+					if (blueIntervals[blueIntervalB][i]==firstTandemBlockB && blueIntervals[blueIntervalB][i]+blueIntervals[blueIntervalB][i+1]-1==lastTandemBlockB) {
 						found=true;
 						break;
 					}
-					if (found) break;
 				}
 			}
-			bw.write(found?"1\n":"0\n");
-			str=br.readLine(); row++;
+			bw.write(found?"1\n":"0\n"); str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
 	}
+
 	
 	
 	
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
 	
 	// ------------------------- READ BREAKING AT LOW QUALITY ----------------------------
 	
