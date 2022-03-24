@@ -59,18 +59,19 @@ public class FilterAlignments {
 		final String TANDEM_INTERVALS_FILE = args[11];
 		final int MODE = Integer.parseInt(args[12]);
 		final boolean SUFFIX_PREFIX_MODE = Integer.parseInt(args[13])==1;
-		final String ALPHABET_FILE = args[14];  // Discarded if MODE==0
-		final String BITVECTOR_UNIQUE = args[15];
-		final String BITVECTOR_TANDEM = args[16];
-		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[17]);
-		final int MIN_ALIGNMENT_LENGTH_READ_REPEAT = Integer.parseInt(args[18]);
+		final boolean TIGHT_MODE_TANDEM = Integer.parseInt(args[14])==1;
+		final String ALPHABET_FILE = args[15];  // Discarded if MODE==0
+		final String BITVECTOR_UNIQUE = args[16];
+		final String BITVECTOR_TANDEM = args[17];
+		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[18]);
+		final int MIN_ALIGNMENT_LENGTH_READ_REPEAT = Integer.parseInt(args[19]);
 		
 		// Non-repetitive regions shorter than this might be occurrences of repeats that 
 		// were not aligned to the repeat database because of heuristics of the aligner.
 		final int MIN_INTERSECTION_NONREPETITIVE = MIN_ALIGNMENT_LENGTH_READ_REPEAT+IO.quantum;
 		// The constant below is arbitrary, should be defined in a more principled way.
 		final int MIN_INTERSECTION_REPETITIVE = Math.max(MIN_ALIGNMENT_LENGTH_READ_READ>>2,IO.quantum*3);
-		long[][] stats;
+		long[][] stats, tandemStats;
 		
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
@@ -79,22 +80,27 @@ public class FilterAlignments {
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadBlueIntervals(UNIQUE_INTERVALS_FILE);
 		RepeatAlphabet.loadTandemIntervals(TANDEM_INTERVALS_FILE,N_READS);
-		stats = new long[3][3];
+		stats = new long[3][3]; tandemStats = new long[2][3];
 		Math.set(stats,0);
 		if (MODE==0) {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,false,TRANSLATED_BOUNDARIES_FILE);
 			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MIN_INTERSECTION_NONREPETITIVE,stats);
-			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BITVECTOR_TANDEM);
+			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BITVECTOR_TANDEM,TIGHT_MODE_TANDEM,tandemStats);
 		}
 		else {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,false,true,TRANSLATED_BOUNDARIES_FILE);
 			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MODE==1?false:true,SUFFIX_PREFIX_MODE,MIN_INTERSECTION_NONREPETITIVE,MIN_INTERSECTION_REPETITIVE,stats);
-			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BITVECTOR_TANDEM);
+			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BITVECTOR_TANDEM,TIGHT_MODE_TANDEM,tandemStats);
 		}
 		System.err.println("All alignments:  (input, output)");
 		System.err.println("Suffix/prefix overlaps: \t"+stats[0][0]+" ("+stats[2][0]+") -> "+stats[1][0]+" ("+(100*((double)(stats[1][0]-stats[0][0]))/stats[0][0])+"%)");
 		System.err.println("Local substring: \t\t"+stats[0][1]+" ("+stats[2][1]+") -> "+stats[1][1]+" ("+(100*((double)(stats[1][1]-stats[0][1]))/stats[0][1])+"%)");
 		System.err.println("Full containment/identity: \t"+stats[0][2]+" ("+stats[2][2]+") -> "+stats[1][2]+" ("+(100*((double)(stats[1][2]-stats[0][2]))/stats[0][2])+"%)");
+		System.err.println();
+		System.err.println("All alignments, tandem bitvector:  (input, output)");
+		System.err.println("Suffix/prefix overlaps: \t"+tandemStats[0][0]+" -> "+tandemStats[1][0]+" ("+(100*((double)(tandemStats[1][0]-tandemStats[0][0]))/tandemStats[0][0])+"%)");
+		System.err.println("Local substring: \t\t"+tandemStats[0][1]+" -> "+tandemStats[1][1]+" ("+(100*((double)(tandemStats[1][1]-tandemStats[0][1]))/tandemStats[0][1])+"%)");
+		System.err.println("Full containment/identity: \t"+tandemStats[0][2]+" -> "+tandemStats[1][2]+" ("+(100*((double)(tandemStats[1][2]-tandemStats[0][2]))/tandemStats[0][2])+"%)");
 	}
 
 }

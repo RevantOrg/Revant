@@ -1925,6 +1925,7 @@ public class RepeatAlphabet {
 		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
+if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 0");
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
@@ -1938,6 +1939,7 @@ public class RepeatAlphabet {
 			}
 		}
 		else {
+if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1");
 			tmpMap.clear(); lastKmerPool=-1;
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
@@ -1950,19 +1952,24 @@ public class RepeatAlphabet {
 				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
+if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.01  tmpMap contains the following kmers: ");
 			while (iterator.hasNext()) {
 				key=iterator.next();
 				value=newKmers.get(key);
+if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.01  key="+key+" value="+value);
 				if (value==null) {
 					value = new Kmer(key,k);
 					value.count=key.count; value.sameReadCount=(int)key.count;
 					newKmers.put(value,value);
+if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.1  added kmer "+value);
 				}
 				else {
 					value.sameReadCount=Math.max(value.sameReadCount,(int)key.count);
 					value.count+=key.count;
+if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.2  incremented kmer "+value);
 				}
 			}
+if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 2");
 		}
 		
 		return out;
@@ -3679,15 +3686,24 @@ public class RepeatAlphabet {
 	/**
 	 * Writes a zero for every alignment that should not be trusted because it falls 
 	 * inside a tandem on both reads, i.e. inside a sequence of adjacent blocks with a
-	 * character in common. Every block inside a tandem might be tagged with several 
-	 * characters, and it might happen that a sequence of such characters occurs just once
-	 * inside the tandem, and it is considered unique based on its total frequency in the
-	 * read set. In practice such a sequence is likely noise.
+	 * character in common.
+	 *
+	 * Remark: every block inside a tandem might be tagged with several characters, and it
+	 * might happen that a sequence of such characters occurs just once inside the tandem,
+	 * and it is considered unique based on its total frequency in the read set. In 
+	 * practice such a sequence is likely noise.
+	 *
+	 * @param tight TRUE=discards an alignment even if it is contained in a tandem in just
+	 * one read (this is useful in practice);
+	 * @param out output array containing the number of alignments for each type (columns)
+	 * specified in $Alignments.readAlignmentFile_getType()$; row 0: all alignments in 
+	 * input; row 1: all alignments kept in output.
 	 */
-	public static final void filterAlignments_tandem(String alignmentsFile, String outputFile) throws IOException {
+	public static final void filterAlignments_tandem(String alignmentsFile, String outputFile, boolean tight, long[][] out) throws IOException {
+		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean found, containedA, identicalA, containedB, identicalB;
 		int i, p;
-		int length, row, nBlocks, readA, readB, startA, endA, startB, endB;
+		int length, row, type, nBlocks, readA, readB, startA, endA, startB, endB;
 		int lastTranslated, lastBlueInterval, blueIntervalA, blueIntervalB;
 		int firstTandemPosition, lastTandemPosition, firstTandemBlockA, lastTandemBlockA, firstTandemBlockB, lastTandemBlockB;
 		final int nTranslated = translated.length;
@@ -3703,14 +3719,19 @@ public class RepeatAlphabet {
 		while (str!=null)  {
 			if (row%1000000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
+			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
+			out[0][type]++;
 			readA=Alignments.readA-1; readB=Alignments.readB-1;
 			if (lastTandem[readA]==-1 || lastTandem[readB]==-1) {
+				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
 			// Processing readA
 			while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 			if (lastTranslated==nTranslated || translated[lastTranslated]!=readA) {
+if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 1  WHAT??? WE KEPT ALIGNMENT "+str);
+				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
@@ -3733,13 +3754,25 @@ public class RepeatAlphabet {
 					break;
 				}
 			}
-			if (!containedA && !identicalA) {
-				bw.write("1\n"); str=br.readLine(); row++;
-				continue;
+			if (tight) {
+				if (containedA || identicalA) {
+					bw.write("0\n"); str=br.readLine(); row++;
+					continue;
+				}
+			}
+			else {
+				if (!containedA && !identicalA) {
+if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
+					out[1][type]++;
+					bw.write("1\n"); str=br.readLine(); row++;
+					continue;
+				}	
 			}
 			// Processing readB
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
 			if (p<0) {
+if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
+				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
@@ -3751,6 +3784,9 @@ public class RepeatAlphabet {
 				else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
 				if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readB)-1;
 				else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
+				
+if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
+				
 				if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
 				else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
 				if (identicalB || containedB) {
@@ -3759,11 +3795,32 @@ public class RepeatAlphabet {
 					break;
 				}
 			}
+			if (tight) {
+				if (containedB || identicalB) bw.write("0\n"); 
+				else {
+if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 4.0  WHAT??? WE KEPT ALIGNMENT "+str);
+					out[1][type]++;
+					bw.write("1\n");
+				}
+				str=br.readLine(); row++;
+				continue;
+			}
 			if (!containedB && !identicalB) {
+if (readA==638 && readB==1440) {
+	System.err.println("filterAlignments_tandem> 4.1  WHAT??? WE KEPT ALIGNMENT "+str);
+	System.err.println("tandems of readA:");
+	for (int x=0; x<=lastTandem[readA]; x++) System.err.print(tandems[readA][x]+",");
+	System.err.println();
+	System.err.println("tandems of readB:");
+	for (int x=0; x<=lastTandem[readB]; x++) System.err.print(tandems[readB][x]+",");
+	System.err.println();
+	System.err.println("containedA="+containedA+" identicalA="+identicalA+" firstTandemBlockB="+firstTandemBlockB+" lastTandemBlockB="+lastTandemBlockB);
+}
+				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
-			// Main logic
+			// Main logic of non-tight mode
 			if ((identicalA && !identicalB && containedB) || (identicalB && !identicalA && containedA) || (containedA && containedB)) {
 				bw.write("0\n"); str=br.readLine(); row++;
 				continue;
@@ -3773,14 +3830,17 @@ public class RepeatAlphabet {
 				bw.write("0\n"); str=br.readLine(); row++;
 				continue;
 			}
-			found=false; length=blueIntervals[blueIntervalA].length;
-			for (i=0; i<length; i+=3) {
-				if (blueIntervals[blueIntervalA][i]==firstTandemBlockA && blueIntervals[blueIntervalA][i]+blueIntervals[blueIntervalA][i+1]-1==lastTandemBlockA) {
-					found=true;
-					break;
+			found=false; 
+			if (blueIntervalA!=-1) {
+				length=blueIntervals[blueIntervalA].length;
+				for (i=0; i<length; i+=3) {
+					if (blueIntervals[blueIntervalA][i]==firstTandemBlockA && blueIntervals[blueIntervalA][i]+blueIntervals[blueIntervalA][i+1]-1==lastTandemBlockA) {
+						found=true;
+						break;
+					}
 				}
 			}
-			if (!found) {
+			if (!found && blueIntervalB!=-1) {
 				length=blueIntervals[blueIntervalB].length;
 				for (i=0; i<length; i+=3) {
 					if (blueIntervals[blueIntervalB][i]==firstTandemBlockB && blueIntervals[blueIntervalB][i]+blueIntervals[blueIntervalB][i+1]-1==lastTandemBlockB) {
@@ -3789,7 +3849,13 @@ public class RepeatAlphabet {
 					}
 				}
 			}
-			bw.write(found?"1\n":"0\n"); str=br.readLine(); row++;
+			if (found) { out[1][type]++; bw.write("1\n"); 
+			
+if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
+		
+		}
+			else bw.write("0\n");
+			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
 	}
@@ -3999,28 +4065,29 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Given a bitvector that filters the new alignments created by $breakIntervals_
-	 * translateAlignments()$, the procedure builds a corresponding bitvector that filters
+	 * Given bitvectors, that filter the new alignments created by $breakIntervals_
+	 * translateAlignments()$, the procedure builds corresponding bitvectors that filter
 	 * the old alignments.
 	 * 
 	 * Remark: the procedure assumes that $Reads.breakReads_new2old$ has already been
 	 * loaded, and it uses global array $alignments$.
 	 *
-	 * @param bitvectorFile_old output file.
+	 * @param *bitvectorFile_old output files.
 	 */
-	public static final void breakReads_translateBitvector(String bitvectorFile_new, String alignmentsFile_new, String bitvectorFile_old, String alignmentsFile_old) throws IOException {
+	public static final void breakReads_translateBitvector(String bitvectorFile_new, String tandemBitvectorFile_new, String alignmentsFile_new, String bitvectorFile_old, String tandemBitvectorFile_old, String alignmentsFile_old) throws IOException {
 		final int ALIGNMENTS_CAPACITY = 100;  // Arbitrary
 		int i;
 		int currentReadA, oldReadA, oldFirstA, oldReadB, oldFirstB;
-		String str1, str2, str3;
-		BufferedReader br1, br2, br3;
-		BufferedWriter bw;
+		String str1, str2, str3, str4;
+		BufferedReader br1, br2, br3, br4;
+		BufferedWriter bw1, bw2;
 		AlignmentRow tmpAlignment = new AlignmentRow();
 		
 		if (alignments==null || alignments.length<ALIGNMENTS_CAPACITY) alignments = new AlignmentRow[ALIGNMENTS_CAPACITY];
 		for (i=0; i<alignments.length; i++) alignments[i] = new AlignmentRow();
 		AlignmentRow.order=AlignmentRow.ORDER_READA_READB_ORIENTATION_STARTA_STARTB_ENDA_ENDB;
-		bw = new BufferedWriter(new FileWriter(bitvectorFile_old));
+		bw1 = new BufferedWriter(new FileWriter(bitvectorFile_old));
+		bw2 = new BufferedWriter(new FileWriter(tandemBitvectorFile_old));
 		br1 = new BufferedReader(new FileReader(alignmentsFile_new));
 		str1=br1.readLine(); str1=br1.readLine();  // Skipping header
 		str1=br1.readLine();
@@ -4029,6 +4096,8 @@ public class RepeatAlphabet {
 		br3 = new BufferedReader(new FileReader(alignmentsFile_old));
 		str3=br3.readLine(); str3=br3.readLine();  // Skipping header
 		str3=br3.readLine();
+		br4 = new BufferedReader(new FileReader(tandemBitvectorFile_new));
+		str4=br4.readLine();
 		currentReadA=-1; lastAlignment=-1;
 		while (str1!=null) {
 			Alignments.readAlignmentFile_readA(str1);
@@ -4038,7 +4107,7 @@ public class RepeatAlphabet {
 					if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
 					// This procedure calls $Alignments.readAlignmentFile()$, so we should
 					// call it again afterwards.
-					str3=breakReads_translateBitvector_impl(currentReadA,br3,str3,bw,tmpAlignment);
+					str3=breakReads_translateBitvector_impl(currentReadA,br3,str3,bw1,bw2,tmpAlignment);
 				}
 				Alignments.readAlignmentFile(str1);
 				oldFirstA=Reads.breakReads_new2old[Alignments.readA-1][1];
@@ -4047,6 +4116,7 @@ public class RepeatAlphabet {
 				currentReadA=oldReadA; lastAlignment=0; 
 				alignments[lastAlignment].set(oldReadA,oldFirstA+Alignments.startA,oldFirstA+Alignments.endA,oldReadB,oldFirstB+Alignments.startB,oldFirstB+Alignments.endB,Alignments.orientation,Alignments.diffs);
 				alignments[lastAlignment].flag=Integer.parseInt(str2.trim())!=0;
+				alignments[lastAlignment].flag2=Integer.parseInt(str4.trim())!=0;
 			}
 			else {
 				lastAlignment++;
@@ -4062,14 +4132,15 @@ public class RepeatAlphabet {
 				oldFirstB=Reads.breakReads_new2old[Alignments.readB-1][1];
 				alignments[lastAlignment].set(oldReadA,oldFirstA+Alignments.startA,oldFirstA+Alignments.endA,oldReadB,oldFirstB+Alignments.startB,oldFirstB+Alignments.endB,Alignments.orientation,Alignments.diffs);
 				alignments[lastAlignment].flag=Integer.parseInt(str2.trim())!=0;
+				alignments[lastAlignment].flag2=Integer.parseInt(str4.trim())!=0;
 			}
-			str1=br1.readLine(); str2=br2.readLine();
+			str1=br1.readLine(); str2=br2.readLine(); str4=br4.readLine();
 		}
 		if (currentReadA!=-1) {
 			if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
-			breakReads_translateBitvector_impl(currentReadA,br3,str3,bw,tmpAlignment);
+			breakReads_translateBitvector_impl(currentReadA,br3,str3,bw1,bw2,tmpAlignment);
 		}
-		br1.close(); br2.close(); br3.close(); bw.close();
+		br1.close(); br2.close(); br3.close(); br4.close(); bw1.close(); bw2.close();
 	}
 	
 	
@@ -4081,11 +4152,11 @@ public class RepeatAlphabet {
 	 *
 	 * @param br old alignments file;
 	 * @param firstString the first string from $br$ to be processed;
-	 * @param bw output file: old bitvector;
+	 * @param bw* output files (old bitvectors): 1=unique substrings; 2=tandem.
 	 * @param tmpAlignment temporary space;
 	 * @return the new value of $firstString$ after the procedure completes.
 	 */
-	private static final String breakReads_translateBitvector_impl(int currentReadA, BufferedReader br, String firstString, BufferedWriter bw, AlignmentRow tmpAlignment) throws IOException {
+	private static final String breakReads_translateBitvector_impl(int currentReadA, BufferedReader br, String firstString, BufferedWriter bw1, BufferedWriter bw2, AlignmentRow tmpAlignment) throws IOException {
 		int i, p;
 		int readA, readB, intersection, maxIntersection, maxAlignment;
 		String str;
@@ -4096,20 +4167,21 @@ public class RepeatAlphabet {
 			readA=Alignments.readA-1;
 			if (readA>currentReadA) return str;
 			if (readA<currentReadA) {
-				bw.write("0\n");
+				bw1.write("0\n"); bw2.write("1\n");
 				str=br.readLine();
 				continue;
 			}
 			readB=Alignments.readB-1;
 			if (Reads.breakReads_containsLowQuality(readA,Alignments.startA,Alignments.endA) || Reads.breakReads_containsLowQuality(readB,Alignments.startB,Alignments.endB)) {
-				bw.write("0\n");
+				bw1.write("0\n"); bw2.write("1\n");
 				str=br.readLine();
 				continue;
 			}
 			tmpAlignment.set(readA,Alignments.startA,Alignments.endA,readB,Alignments.startB,Alignments.endB,Alignments.orientation,Alignments.diffs);
 			p=Arrays.binarySearch(alignments,0,lastAlignment+1,tmpAlignment);
 			if (p>=0) {
-				bw.write(alignments[p].flag?"1\n":"0\n");
+				bw1.write(alignments[p].flag?"1\n":"0\n");
+				bw2.write(alignments[p].flag2?"1\n":"0\n");
 				str=br.readLine();
 				continue;
 			}
@@ -4134,7 +4206,8 @@ public class RepeatAlphabet {
 				System.err.println("breakIntervals_translateFilter_impl> ERROR: no new alignment intersects the old alignment "+str);
 				System.exit(1);
 			}
-			bw.write(alignments[maxAlignment].flag?"1\n":"0\n");
+			bw1.write(alignments[maxAlignment].flag?"1\n":"0\n");
+			bw2.write(alignments[maxAlignment].flag2?"1\n":"0\n");
 			str=br.readLine();
 		}
 		return null;
@@ -5023,7 +5096,7 @@ public class RepeatAlphabet {
 		/**
 		 * Temporary space
 		 */
-		public boolean flag;
+		public boolean flag, flag2;
 		
 		public AlignmentRow() {
 			this.readA=-1; this.startA=-1; this.endA=-1;

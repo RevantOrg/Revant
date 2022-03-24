@@ -21,7 +21,7 @@ public class BuildAssemblyGraph {
 	private static int[] lastNeighbor;
 	
 	/**
-	 * Remark: the program prints only components of a minimum size.
+	 * Remark: the program prints only large components.
 	 *
 	 * @param args
 	 * 2: 0=loose, 1=tight;
@@ -38,6 +38,7 @@ public class BuildAssemblyGraph {
 		
 		final String ALIGNMENTS_FILE = INPUT_DIR+"/LAshow-reads-reads.txt";
 		final String BITVECTOR_FILE = INPUT_DIR+"/LAshow-reads-reads.txt.mode"+FILTERING_MODE+".bitvector";
+		final String TANDEM_BITVECTOR_FILE = INPUT_DIR+"/LAshow-reads-reads.txt.tandem.bitvector";
 		final String FULLY_UNIQUE_FILE = INPUT_DIR+"/reads-fullyUnique-new.txt";
 		final String READS_TRANSLATED_FILE = INPUT_DIR+"/reads-translated-disambiguated.txt";
 		final String ALPHABET_FILE = INPUT_DIR+"/alphabet-cleaned.txt";
@@ -51,8 +52,8 @@ public class BuildAssemblyGraph {
 		int i, j, k;
 		int type, nAlignments, idGenerator, top, node, neighbor, nComponents, size, nextFullyUnique;
 		double errorRate;
-		String str1, str2;
-		BufferedReader br1, br2;
+		String str1, str2, str3;
+		BufferedReader br1, br2, br3;
 		BufferedWriter bw;
 		boolean[] containsUnique;
 		int[] component, componentSize, stack;
@@ -67,23 +68,24 @@ public class BuildAssemblyGraph {
 		Math.set(lastNeighbor,N_READS-1,-1);
 		br1 = new BufferedReader(new FileReader(ALIGNMENTS_FILE));
 		br2 = new BufferedReader(new FileReader(BITVECTOR_FILE));
+		br3 = new BufferedReader(new FileReader(TANDEM_BITVECTOR_FILE));
 		str1=br1.readLine(); str1=br1.readLine();  // Skipping header
 		str1=br1.readLine(); 
-		str2=br2.readLine(); nAlignments=0;
+		str2=br2.readLine(); str3=br3.readLine(); nAlignments=0;
 		while (str1!=null) {
 			nAlignments++;
 			Alignments.readAlignmentFile(str1);
 			errorRate=((double)(Alignments.diffs<<1))/(Alignments.endA-Alignments.startA+1+Alignments.endB-Alignments.startB+1);
 			if (errorRate>MAX_ERROR_RATE) {
-				str1=br1.readLine(); str2=br2.readLine();
+				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
 			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
 			if ((ALIGNMENT_TYPE==2 && type!=0) || (ALIGNMENT_TYPE==1 && type==2)) {
-				str1=br1.readLine(); str2=br2.readLine(); 
+				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
-			keep=str2.equalsIgnoreCase("1");
+			keep=str2.equalsIgnoreCase("1")&&str3.equalsIgnoreCase("1");
 			addEdge(Alignments.readA-1,Alignments.readB-1,keep);
 			addEdge(Alignments.readB-1,Alignments.readA-1,keep);
 			str1=br1.readLine(); str2=br2.readLine();
