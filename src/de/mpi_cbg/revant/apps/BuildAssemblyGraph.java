@@ -88,10 +88,10 @@ public class BuildAssemblyGraph {
 			keep=str2.equalsIgnoreCase("1")&&str3.equalsIgnoreCase("1");
 			addEdge(Alignments.readA-1,Alignments.readB-1,keep);
 			addEdge(Alignments.readB-1,Alignments.readA-1,keep);
-			str1=br1.readLine(); str2=br2.readLine();
+			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 			if (nAlignments%10000==0) System.err.println("Processed "+nAlignments+" alignments");
 		}
-		br1.close(); br2.close();
+		br1.close(); br2.close(); br3.close();
 		System.err.println("Removing duplicated edges...");
 		for (i=0; i<N_READS; i++) {
 			if (lastNeighbor[i]<=0) continue;

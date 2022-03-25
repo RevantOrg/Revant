@@ -3684,13 +3684,15 @@ if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VI
 	
 	
 	/**
-	 * Writes a zero for every alignment that should not be trusted because it falls 
-	 * inside a tandem on both reads, i.e. inside a sequence of adjacent blocks with a
-	 * character in common.
+	 * Let a tandem be a sequence of adjacent blocks with a character in common. The
+	 * procedure writes a zero for every alignment that should not be trusted because it 
+	 * either (1) falls inside a tandem on both reads, or (2) straddles or contains a
+	 * tandem, and all the shortest unique intervals of the alignment fall inside a 
+	 * tandem.
 	 *
 	 * Remark: every block inside a tandem might be tagged with several characters, and it
 	 * might happen that a sequence of such characters occurs just once inside the tandem,
-	 * and it is considered unique based on its total frequency in the read set. In 
+	 * and that it is considered unique based on its total frequency in the read set. In 
 	 * practice such a sequence is likely noise.
 	 *
 	 * @param tight TRUE=discards an alignment even if it is contained in a tandem in just
@@ -3730,7 +3732,7 @@ if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VI
 			// Processing readA
 			while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 			if (lastTranslated==nTranslated || translated[lastTranslated]!=readA) {
-if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 1  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 1  WHAT??? WE KEPT ALIGNMENT "+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
@@ -3762,7 +3764,7 @@ if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 1  W
 			}
 			else {
 				if (!containedA && !identicalA) {
-if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
 					out[1][type]++;
 					bw.write("1\n"); str=br.readLine(); row++;
 					continue;
@@ -3771,7 +3773,7 @@ if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 2  W
 			// Processing readB
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
 			if (p<0) {
-if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
@@ -3785,7 +3787,7 @@ if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 3  W
 				if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readB)-1;
 				else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
 				
-if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
 				
 				if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
 				else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
@@ -3798,7 +3800,7 @@ if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 3.5 
 			if (tight) {
 				if (containedB || identicalB) bw.write("0\n"); 
 				else {
-if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 4.0  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 4.0  WHAT??? WE KEPT ALIGNMENT "+str);
 					out[1][type]++;
 					bw.write("1\n");
 				}
@@ -3806,7 +3808,7 @@ if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 4.0 
 				continue;
 			}
 			if (!containedB && !identicalB) {
-if (readA==638 && readB==1440) {
+if (readA==940 && readB==1108) {
 	System.err.println("filterAlignments_tandem> 4.1  WHAT??? WE KEPT ALIGNMENT "+str);
 	System.err.println("tandems of readA:");
 	for (int x=0; x<=lastTandem[readA]; x++) System.err.print(tandems[readA][x]+",");
@@ -3851,7 +3853,7 @@ if (readA==638 && readB==1440) {
 			}
 			if (found) { out[1][type]++; bw.write("1\n"); 
 			
-if (readA==638 && readB==1440) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
 		
 		}
 			else bw.write("0\n");
