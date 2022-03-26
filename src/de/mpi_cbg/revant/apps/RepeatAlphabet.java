@@ -3712,7 +3712,7 @@ public class RepeatAlphabet {
 		str=br.readLine(); row=0; 
 		lastTranslated=0; lastBlueInterval=0;
 		while (str!=null)  {
-			if (row%1000000==0) System.err.println("Processed "+row+" alignments");
+			if (row%1000000==0) System.err.println("Processed "+row+" alignments (tandem)");
 			Alignments.readAlignmentFile(str);
 			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
 			out[0][type]++;
@@ -3754,7 +3754,7 @@ public class RepeatAlphabet {
 				}
 				else {
 					if ((identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || (!identicalA && !containedA && !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks))) {
-						if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
 						continue;
@@ -3778,7 +3778,7 @@ public class RepeatAlphabet {
 					else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
 					if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readB)-1;
 					else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
-					if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
 					if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
 					else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
 					if (identicalB || containedB) {
@@ -3795,16 +3795,16 @@ public class RepeatAlphabet {
 				}
 				else {
 					if ((identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || (!identicalB && !containedB && !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks))) {
-						if (readA==940 && readB==1108) {
-							System.err.println("filterAlignments_tandem> 4.1  WHAT??? WE KEPT ALIGNMENT "+str);
-							System.err.println("tandems of readA:");
-							for (int x=0; x<=lastTandem[readA]; x++) System.err.print(tandems[readA][x]+",");
-							System.err.println();
-							System.err.println("tandems of readB:");
-							for (int x=0; x<=lastTandem[readB]; x++) System.err.print(tandems[readB][x]+",");
-							System.err.println();
+if (readA==940 && readB==1108) {
+	System.err.println("filterAlignments_tandem> 4.1  WHAT??? WE KEPT ALIGNMENT "+str);
+	System.err.println("tandems of readA:");
+	for (int x=0; x<=lastTandem[readA]; x++) System.err.print(tandems[readA][x]+",");
+	System.err.println();
+	System.err.println("tandems of readB:");
+	for (int x=0; x<=lastTandem[readB]; x++) System.err.print(tandems[readB][x]+",");
+	System.err.println();
 //							System.err.println("containedA="+containedA+" identicalA="+identicalA+" firstTandemBlockB="+firstTandemBlockB+" lastTandemBlockB="+lastTandemBlockB);
-						}
+}
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
 						continue;
@@ -3812,7 +3812,7 @@ public class RepeatAlphabet {
 				}
 			}
 			else if (bothReads) {
-				if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
@@ -3820,7 +3820,7 @@ public class RepeatAlphabet {
 			if (bothReads) bw.write("0\n");
 			else {
 				bw.write("1\n");
-				if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
+if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
 			}
 			str=br.readLine(); row++;
 		}
@@ -3890,6 +3890,7 @@ public class RepeatAlphabet {
 						found=true;
 						break;
 					}
+					j+=2;
 				}
 				if (!found) return false;
 			}
