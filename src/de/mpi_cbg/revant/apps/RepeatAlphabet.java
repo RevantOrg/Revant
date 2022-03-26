@@ -1925,7 +1925,6 @@ public class RepeatAlphabet {
 		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
-if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 0");
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
@@ -1939,7 +1938,6 @@ if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VI
 			}
 		}
 		else {
-if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1");
 			tmpMap.clear(); lastKmerPool=-1;
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
@@ -1952,24 +1950,19 @@ if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VI
 				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
-if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.01  tmpMap contains the following kmers: ");
 			while (iterator.hasNext()) {
 				key=iterator.next();
 				value=newKmers.get(key);
-if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.01  key="+key+" value="+value);
 				if (value==null) {
 					value = new Kmer(key,k);
 					value.count=key.count; value.sameReadCount=(int)key.count;
 					newKmers.put(value,value);
-if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.1  added kmer "+value);
 				}
 				else {
 					value.sameReadCount=Math.max(value.sameReadCount,(int)key.count);
 					value.count+=key.count;
-if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 1.2  incremented kmer "+value);
 				}
 			}
-if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VITTU> 2");
 		}
 		
 		return out;
@@ -2441,7 +2434,7 @@ if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VI
 	
 	/**
 	 * Writes to $outputFile$ the tandem intervals of every translated read in
-	 * $inputFile$, as a sequence of pairs $from,to$.
+	 * $inputFile$, as a sequence of pairs $firstBlock,lastBlock$.
 	 *
 	 * @return the total number of tandem intervals found.
 	 */
@@ -3684,24 +3677,24 @@ if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VI
 	
 	
 	/**
-	 * Let a tandem be a sequence of adjacent blocks with a character in common. The
-	 * procedure writes a zero for every alignment that should not be trusted because it 
-	 * either (1) falls inside a tandem on both reads, or (2) straddles or contains a
-	 * tandem, and all the shortest unique intervals of the alignment fall inside a 
-	 * tandem.
+	 * Let a tandem be a maximal sequence of adjacent blocks with characters in common.
+	 * The procedure writes a zero for every alignment that should not be trusted because
+	 * it either (1) is strictly contained in a tandem, or (2) is identical to a tandem, 
+	 * but the tandem is not a blue interval, or (3) straddles or contains a tandem, and 
+	 * all blue intervals in the alignment fall inside a tandem.
 	 *
 	 * Remark: every block inside a tandem might be tagged with several characters, and it
 	 * might happen that a sequence of such characters occurs just once inside the tandem,
-	 * and that it is considered unique based on its total frequency in the read set. In 
+	 * and that it is considered blue based on its total frequency in the read set. In 
 	 * practice such a sequence is likely noise.
 	 *
-	 * @param tight TRUE=discards an alignment even if it is contained in a tandem in just
-	 * one read (this is useful in practice);
+	 * @param bothReads discards an alignment if the conditions above hold on both reads
+	 * (TRUE) or on just one read (FALSE);
 	 * @param out output array containing the number of alignments for each type (columns)
 	 * specified in $Alignments.readAlignmentFile_getType()$; row 0: all alignments in 
 	 * input; row 1: all alignments kept in output.
 	 */
-	public static final void filterAlignments_tandem(String alignmentsFile, String outputFile, boolean tight, long[][] out) throws IOException {
+	public static final void filterAlignments_tandem(String alignmentsFile, boolean bothReads, String outputFile, long[][] out) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean found, containedA, identicalA, containedB, identicalB;
 		int i, p;
@@ -3724,150 +3717,192 @@ if (str.equalsIgnoreCase("842:836:556,1471,1774:707:-5")) System.err.println("VI
 			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
 			out[0][type]++;
 			readA=Alignments.readA-1; readB=Alignments.readB-1;
-			if (lastTandem[readA]==-1 || lastTandem[readB]==-1) {
+			if ( (bothReads && (lastTandem[readA]==-1 || lastTandem[readB]==-1)) ||
+				 (!bothReads && (lastTandem[readA]==-1 && lastTandem[readB]==-1))
+			   ) {
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
 			// Processing readA
 			while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
-			if (lastTranslated==nTranslated || translated[lastTranslated]!=readA) {
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 1  WHAT??? WE KEPT ALIGNMENT "+str);
+			if (lastTranslated<nTranslated && translated[lastTranslated]==readA) {
+				startA=Alignments.startA; endA=Alignments.endA;
+				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
+				if (lastBlueInterval>blueIntervals_last || blueIntervals_reads[lastBlueInterval]!=readA) blueIntervalA=-1;
+				else blueIntervalA=lastBlueInterval;
+				nBlocks=boundaries_all[lastTranslated].length+1;
+				containedA=false; identicalA=false; firstTandemBlockA=-1; lastTandemBlockA=-1;
+				for (i=0; i<lastTandem[readA]; i+=2) {
+					if (tandems[readA][i]==0) firstTandemPosition=0;
+					else firstTandemPosition=boundaries_all[lastTranslated][tandems[readA][i]-1];
+					if (tandems[readA][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readA)-1;
+					else lastTandemPosition=boundaries_all[lastTranslated][tandems[readA][i+1]];
+					if (Intervals.areApproximatelyIdentical(startA,endA,firstTandemPosition,lastTandemPosition)) identicalA=true;
+					else if (Intervals.isApproximatelyContained(startA,endA,firstTandemPosition,lastTandemPosition)) containedA=true;
+					if (identicalA || containedA) {
+						firstTandemBlockA=tandems[readA][i]; 
+						lastTandemBlockA=tandems[readA][i+1];
+						break;
+					}
+				}
+				if (!bothReads) {
+					if (containedA || (identicalA && !filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || (!identicalA && filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks))) {
+						bw.write("0\n"); str=br.readLine(); row++;
+						continue;
+					}
+				}
+				else {
+					if ((identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || (!identicalA && !containedA && !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks))) {
+						if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
+						out[1][type]++;
+						bw.write("1\n"); str=br.readLine(); row++;
+						continue;
+					}
+				}
+			}
+			else if (bothReads) {
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
-			}
-			startA=Alignments.startA; endA=Alignments.endA;
-			while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-			if (lastBlueInterval>blueIntervals_last || blueIntervals_reads[lastBlueInterval]!=readA) blueIntervalA=-1;
-			else blueIntervalA=lastBlueInterval;
-			containedA=false; identicalA=false; firstTandemBlockA=-1; lastTandemBlockA=-1;
-			for (i=0; i<lastTandem[readA]; i+=2) {
-				nBlocks=boundaries_all[lastTranslated].length+1;
-				if (tandems[readA][i]==0) firstTandemPosition=0;
-				else firstTandemPosition=boundaries_all[lastTranslated][tandems[readA][i]-1];
-				if (tandems[readA][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readA)-1;
-				else lastTandemPosition=boundaries_all[lastTranslated][tandems[readA][i+1]];
-				if (Intervals.areApproximatelyIdentical(startA,endA,firstTandemPosition,lastTandemPosition)) identicalA=true;
-				else if (Intervals.isApproximatelyContained(startA,endA,firstTandemPosition,lastTandemPosition)) containedA=true;
-				if (identicalA || containedA) {
-					firstTandemBlockA=tandems[readA][i]; 
-					lastTandemBlockA=tandems[readA][i+1];
-					break;
-				}
-			}
-			if (tight) {
-				if (containedA || identicalA) {
-					bw.write("0\n"); str=br.readLine(); row++;
-					continue;
-				}
-			}
-			else {
-				if (!containedA && !identicalA) {
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
-					out[1][type]++;
-					bw.write("1\n"); str=br.readLine(); row++;
-					continue;
-				}	
 			}
 			// Processing readB
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			if (p<0) {
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
-				out[1][type]++;
-				bw.write("1\n"); str=br.readLine(); row++;
-				continue;
-			}
-			startB=Alignments.startB; endB=Alignments.endB;
-			containedB=false; identicalB=false; firstTandemBlockB=-1; lastTandemBlockB=-1;
-			for (i=0; i<lastTandem[readB]; i+=2) {
+			if (p>=0) {
+				blueIntervalB=readInArray(readB,blueIntervals_reads,blueIntervals_reads.length-1,lastBlueInterval);
+				startB=Alignments.startB; endB=Alignments.endB;
 				nBlocks=boundaries_all[p].length+1;
-				if (tandems[readB][i]==0) firstTandemPosition=0;
-				else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
-				if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readB)-1;
-				else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
-				
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
-				
-				if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
-				else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
-				if (identicalB || containedB) {
-					firstTandemBlockB=tandems[readB][i];
-					lastTandemBlockB=tandems[readB][i+1];
-					break;
+				containedB=false; identicalB=false; firstTandemBlockB=-1; lastTandemBlockB=-1;
+				for (i=0; i<lastTandem[readB]; i+=2) {
+					if (tandems[readB][i]==0) firstTandemPosition=0;
+					else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
+					if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readB)-1;
+					else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
+					if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
+					if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
+					else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
+					if (identicalB || containedB) {
+						firstTandemBlockB=tandems[readB][i];
+						lastTandemBlockB=tandems[readB][i+1];
+						break;
+					}
 				}
-			}
-			if (tight) {
-				if (containedB || identicalB) bw.write("0\n"); 
+				if (!bothReads) {
+					if (containedB || (identicalB && !filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || (!identicalB && filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks))) {
+						bw.write("0\n"); str=br.readLine(); row++;
+						continue;
+					}
+				}
 				else {
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 4.0  WHAT??? WE KEPT ALIGNMENT "+str);
-					out[1][type]++;
-					bw.write("1\n");
+					if ((identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || (!identicalB && !containedB && !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks))) {
+						if (readA==940 && readB==1108) {
+							System.err.println("filterAlignments_tandem> 4.1  WHAT??? WE KEPT ALIGNMENT "+str);
+							System.err.println("tandems of readA:");
+							for (int x=0; x<=lastTandem[readA]; x++) System.err.print(tandems[readA][x]+",");
+							System.err.println();
+							System.err.println("tandems of readB:");
+							for (int x=0; x<=lastTandem[readB]; x++) System.err.print(tandems[readB][x]+",");
+							System.err.println();
+//							System.err.println("containedA="+containedA+" identicalA="+identicalA+" firstTandemBlockB="+firstTandemBlockB+" lastTandemBlockB="+lastTandemBlockB);
+						}
+						out[1][type]++;
+						bw.write("1\n"); str=br.readLine(); row++;
+						continue;
+					}
 				}
-				str=br.readLine(); row++;
-				continue;
 			}
-			if (!containedB && !identicalB) {
-if (readA==940 && readB==1108) {
-	System.err.println("filterAlignments_tandem> 4.1  WHAT??? WE KEPT ALIGNMENT "+str);
-	System.err.println("tandems of readA:");
-	for (int x=0; x<=lastTandem[readA]; x++) System.err.print(tandems[readA][x]+",");
-	System.err.println();
-	System.err.println("tandems of readB:");
-	for (int x=0; x<=lastTandem[readB]; x++) System.err.print(tandems[readB][x]+",");
-	System.err.println();
-	System.err.println("containedA="+containedA+" identicalA="+identicalA+" firstTandemBlockB="+firstTandemBlockB+" lastTandemBlockB="+lastTandemBlockB);
-}
+			else if (bothReads) {
+				if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
-			// Main logic of non-tight mode
-			if ((identicalA && !identicalB && containedB) || (identicalB && !identicalA && containedA) || (containedA && containedB)) {
-				bw.write("0\n"); str=br.readLine(); row++;
-				continue;
+			if (bothReads) bw.write("0\n");
+			else {
+				bw.write("1\n");
+				if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
 			}
-			blueIntervalB=readInArray(readB,blueIntervals_reads,blueIntervals_reads.length-1,lastBlueInterval);
-			if (blueIntervalA==-1 && blueIntervalB==-1) {
-				bw.write("0\n"); str=br.readLine(); row++;
-				continue;
-			}
-			found=false; 
-			if (blueIntervalA!=-1) {
-				length=blueIntervals[blueIntervalA].length;
-				for (i=0; i<length; i+=3) {
-					if (blueIntervals[blueIntervalA][i]==firstTandemBlockA && blueIntervals[blueIntervalA][i]+blueIntervals[blueIntervalA][i+1]-1==lastTandemBlockA) {
-						found=true;
-						break;
-					}
-				}
-			}
-			if (!found && blueIntervalB!=-1) {
-				length=blueIntervals[blueIntervalB].length;
-				for (i=0; i<length; i+=3) {
-					if (blueIntervals[blueIntervalB][i]==firstTandemBlockB && blueIntervals[blueIntervalB][i]+blueIntervals[blueIntervalB][i+1]-1==lastTandemBlockB) {
-						found=true;
-						break;
-					}
-				}
-			}
-			if (found) { out[1][type]++; bw.write("1\n"); 
-			
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
-		
-		}
-			else bw.write("0\n");
 			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
 	}
+	
+	
+	/**
+	 * @return TRUE iff $[firstTandemBlock..lastTandemBlock]$ is in 
+	 * $blueIntervals[blueIntervalsID]$.
+	 */
+	private static final boolean filterAlignments_tandem_isBlue(int blueIntervalsID, int firstTandemBlock, int lastTandemBlock) {
+		int i;
+		int firstBlock, lastBlock, lastBlueInterval;
+		
+		if (blueIntervalsID==-1) return false;
+		lastBlueInterval=blueIntervals[blueIntervalsID].length-1;
+		for (i=0; i<lastBlueInterval; i+=3) {
+			firstBlock=blueIntervals[blueIntervalsID][i];
+			if (firstBlock>firstTandemBlock) break;
+			else if (firstBlock==firstTandemBlock) {
+				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
+				if (lastBlock==lastTandemBlock) return true;
+			}
+		}
+		return false;
+	}
 
 	
+	/**
+	 * @return TRUE iff $[intervalStart..intervalEnd]$ strictly contains blue intervals,
+	 * and all blue intervals strictly contained in the interval, are also strictly 
+	 * contained in a tandem. So, if $[intervalStart..intervalEnd]$ contains a tandem, and
+	 * the tandem coincides with a blue interval, the procedure returns FALSE. Blue 
+	 * intervals that coincide with $[intervalStart..intervalEnd]$ are not considered.
+	 */
+	private static final boolean filterAlignments_tandem_allContainedBlueInTandem(int readID, int boundariesAllID, int blueIntervalsID, int intervalStart, int intervalEnd, int nBlocks) {
+		boolean containsBlue, found;
+		int i, j;
+		int firstBlock, lastBlock, firstPosition, lastPosition, lastBlueInterval, lastTandemInterval;
+		
+		if (blueIntervalsID==-1) return false;
+		lastBlueInterval=blueIntervals[blueIntervalsID].length-1;
+		lastTandemInterval=lastTandem[readID];
+		if (lastTandemInterval==-1) return false;
+		j=0; containsBlue=false;
+		for (i=0; i<lastBlueInterval; i+=3) {
+			firstBlock=blueIntervals[blueIntervalsID][i];
+			if (firstBlock==0) firstPosition=0;
+			else firstPosition=boundaries_all[boundariesAllID][firstBlock-1];
+			if (firstPosition>=intervalEnd) break;
+			lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
+			if (lastBlock==nBlocks-1) lastPosition=Reads.getReadLength(readID)-1;
+			else lastPosition=boundaries_all[boundariesAllID][lastBlock];
+			if (lastPosition<=intervalStart) continue;
+			if ( Intervals.isApproximatelyContained(firstPosition,lastPosition,intervalStart,intervalEnd) &&
+				 !Intervals.areApproximatelyIdentical(firstPosition,lastPosition,intervalStart,intervalEnd)
+			   ) {
+				containsBlue=true; found=false;
+				while (j<lastTandemInterval) {
+					if (tandems[readID][j+1]<lastBlock) {
+						j+=2;
+						continue;
+					}
+					if (tandems[readID][j]>firstBlock) break;
+					if (tandems[readID][j]<firstBlock || tandems[readID][j+1]>lastBlock) {
+						found=true;
+						break;
+					}
+				}
+				if (!found) return false;
+			}
+		}
+		return containsBlue;
+	}
 	
 	
 	
 	
-
+	
+	
+	
 	
 	// ------------------------- READ BREAKING AT LOW QUALITY ----------------------------
 	
