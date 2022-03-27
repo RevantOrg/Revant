@@ -13,7 +13,7 @@
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-MIN_ALIGNMENT_LENGTH_READ_READ="1000"
+MIN_ALIGNMENT_LENGTH_READ_READ="500"
 MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"
 MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
 FILTERING_MODE="1"  # 0=loose, 1=tight, 2=tight with matching characters.

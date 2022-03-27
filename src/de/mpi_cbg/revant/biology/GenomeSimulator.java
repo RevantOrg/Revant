@@ -93,8 +93,8 @@ public class GenomeSimulator {
 	 *  8: (output file) the evolutionary tree of simulated repeats, in DOT format ("null" 
 	 *     to discard it);
 	 *
-	 *  9: (output file) an image of the genome (use "null" to discard it);
-	 * 10: pixel width of the output image;
+	 *  9: (output file) a PNG picture of the genome ("null" to discard it);
+	 * 10: width of the output picture, in pixels;
 	 * 
 	 * 11: (output file) the de Bruijn graph of the repeat annotation, in DOT format 
 	 *     ("null" to discard it);
@@ -1535,9 +1535,6 @@ public class GenomeSimulator {
 		public final int getType(Random random) {
 			double p = random.nextDouble();
 			int out = Arrays.binarySearch(typeProbCumulative,p);
-			
-System.err.println("getType> choosing type "+out+" since p="+p);			
-			
 			return out<0?-out-1:out;
 		}
 		

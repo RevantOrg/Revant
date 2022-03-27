@@ -1553,7 +1553,7 @@ public class RepeatAlphabet {
 			else {
 				j=Integer.parseInt(blocks[i][0]);
 				if (j<0) j=-1-j;
-				isUnique=j<=lastUnique;
+				isUnique=j<=lastUnique||j==lastAlphabet+1;
 			}
 			if (!isUnique) {
 				if (first!=-1) {
@@ -1767,7 +1767,7 @@ public class RepeatAlphabet {
 			else {
 				j=Integer.parseInt(blocks[i][0]);
 				if (j<0) j=-1-j;
-				isUnique=j<=lastUnique;
+				isUnique=j<=lastUnique_old||j==lastAlphabet_old+1;
 			}
 			if (!isUnique) {
 				if (first!=-1) {
@@ -1849,7 +1849,7 @@ public class RepeatAlphabet {
 				nAppendedBlocks++;
 			}
 			else {
-				// Reads with a single unique block are recoded to have no block
+				// Reads with a single unique block are recoded as having no block
 				return 0;
 			}
 		}
