@@ -54,6 +54,7 @@ N_READS=$(( (${COVERAGE} * ${GENOME_LENGTH}) / ${AVG_READ_LENGTH} ))
 
 # Simulating reads
 TMP_READS="${INPUT_DIR}/reads.txt"
+rm -f ${TMP_READS}
 if [ ${READ_SIMULATOR} = "pbsim" ]; then
 	# 2020 - PBSIM2
 	${PBSIM_DIR}/pbsim --depth ${COVERAGE} --length-min ${MIN_READ_LENGTH} --length-max ${MAX_READ_LENGTH} --hmm_model ${PBSIM_DIR}/../data/P6C4.model --length-mean ${AVG_READ_LENGTH} ${GENOME_FILE}
@@ -98,6 +99,7 @@ else
 	echo "Simulator not supported"
 	exit 1
 fi
+rm -f ${READS_FILE}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.biology.Repbase2Pacbio ${TMP_READS} ${READS_FILE}
 rm -f ${TMP_READS}
 seq 0 $(( ($(wc -l < ${READS_FILE}) / 2) - 1 )) > ${INPUT_DIR}/reads-ids.txt

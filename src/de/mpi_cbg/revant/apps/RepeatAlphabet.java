@@ -297,6 +297,21 @@ public class RepeatAlphabet {
 		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
 		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
 		
+
+boolean fabio = false;
+for (i=0; i<=lastAlignment; i++) {
+	if (alignments[i].readA==779 && alignments[i].readB==1016) {
+		fabio=true;
+		break;
+	}
+}
+if (fabio) {
+	System.err.println("VITTU> 1  alignments:");
+	for (i=0; i<=lastAlignment; i++) System.err.println(alignments[i]);
+}
+		
+		
+		
 		// Building maximal periodic intervals
 		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1;
 		for (i=0; i<=lastAlignment; i++) {
@@ -326,6 +341,13 @@ public class RepeatAlphabet {
 		}
 		if (lastPoint>0) Arrays.sort(points,0,lastPoint+1);
 		initializeGraph(lastPoint+1);
+
+		
+if (fabio) {
+	System.err.println("VITTU> 2  points:");
+	for (i=0; i<=lastPoint; i++) System.err.println(points[i]);
+}				
+		
 		
 		// Marking points: (0) outside periodic intervals; (1) inside a periodic interval
 		// and close to its endpoints; (-1) inside a periodic interval and far from its
@@ -1522,10 +1544,11 @@ public class RepeatAlphabet {
 	 * Remark: the procedure assumes that global variables $alphabet,alphabetCount$ have
 	 * already been initialized, and it uses global temporary variable $boundaries$.
 	 *
+	 * @param keepPeriodic TRUE=does not filter out rare periodic characters;
 	 * @param read2boundaries boundaries of the characters in $read2characters$;
 	 * @param tmpChar temporary space.
 	 */
-	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, int minCount, int quantum, BufferedWriter bw, Character tmpChar) throws IOException {
+	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, int minCount, boolean keepPeriodic, int quantum, BufferedWriter bw, Character tmpChar) throws IOException {
 		boolean isUnique;
 		int i, j, k;
 		int c, length, first, nBlocks, nBoundaries;
@@ -1545,7 +1568,7 @@ public class RepeatAlphabet {
 			boundaries[0]=Integer.parseInt(read2boundaries);
 		}
 		nBlocks=loadBlocks(read2characters);
-		removeRareCharacters(nBlocks,minCount,lastUnique,lastPeriodic,lastAlphabet);
+		removeRareCharacters(nBlocks,minCount,lastUnique,lastPeriodic,lastAlphabet,keepPeriodic);
 		first=-1;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]==-1) isUnique=true;
@@ -1598,8 +1621,10 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure assumes that global variable $alphabetCount$ has already been
 	 * initialized.
+	 *
+	 * @param keepPeriodic TRUE=does not remove rare periodic characters.
 	 */
-	private static final void removeRareCharacters(int nBlocks, int minCount, int lastUnique, int lastPeriodic, int lastAlphabet) {
+	private static final void removeRareCharacters(int nBlocks, int minCount, int lastUnique, int lastPeriodic, int lastAlphabet, boolean keepPeriodic) {
 		boolean found, deleted, orientation;
 		int i, j, k, h;
 		int c, last, repeat;
@@ -1613,7 +1638,7 @@ public class RepeatAlphabet {
 				if (c<0) {
 					c=-1-c;
 					if (c>lastUnique) {
-						if (alphabetCount[c]<minCount) {
+						if ((keepPeriodic?c>lastPeriodic:true) && alphabetCount[c]<minCount) {
 							repeat=alphabet[c].repeat; orientation=alphabet[c].orientation;
 							h=c+1; found=false;
 							while (h<=lastPeriodic) {
@@ -1633,7 +1658,7 @@ public class RepeatAlphabet {
 						// repeats cannot be negative.
 					}
 				}
-				else if (c>lastUnique && alphabetCount[c]<minCount) deleted=true;
+				else if (c>lastUnique && (keepPeriodic?c>lastPeriodic:true) && alphabetCount[c]<minCount) deleted=true;
 				if (!deleted) blocks[i][++k]=blocks[i][j];
 			}
 			lastInBlock[i]=k;
@@ -1647,12 +1672,13 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: $alphabetCount$ is not valid after the procedure completes.
 	 *
+	 * @param keepPeriodic TRUE=does not remove rare periodic characters;
 	 * @return an array that maps every non-unique character in the original $alphabet$ to
 	 * its position in the new $alphabet$ (or to -1 if the character does not appear in 
 	 * the new alphabet). Positions are relative to the corresponding values of 
 	 * $lastUnique+1$.
 	 */
-	public static final int[] cleanTranslatedRead_updateAlphabet(int nNewCharacters, String newCharactersFile, int minCount) throws IOException {
+	public static final int[] cleanTranslatedRead_updateAlphabet(int nNewCharacters, String newCharactersFile, int minCount, boolean keepPeriodic) throws IOException {
 		int i, j;
 		int lastPeriodicPrime;
 		String str;
@@ -1664,8 +1690,12 @@ public class RepeatAlphabet {
 		// Removing rare characters
 		old2new = new int[lastAlphabet-lastUnique];
 		Math.set(old2new,old2new.length-1,-1);
-		j=lastUnique; lastPeriodicPrime=-1;
-		for (i=lastUnique+1; i<=lastAlphabet; i++) {
+		if (keepPeriodic) {
+			for (i=lastUnique+1; i<=lastPeriodic; i++) old2new[i-lastUnique+1]=i-lastUnique+1;
+			j=lastPeriodic; lastPeriodicPrime=lastPeriodic; 
+		}
+		else { j=lastUnique; lastPeriodicPrime=-1; }
+		for (i=keepPeriodic?lastPeriodic+1:lastUnique+1; i<=lastAlphabet; i++) {
 			if (alphabetCount[i]<minCount) continue;
 			j++;
 			tmpChar=alphabet[j];
@@ -1737,7 +1767,7 @@ public class RepeatAlphabet {
 	 * @param read2characters_new,read2boundaries_new output files;
 	 * @return the number of blocks in the new translation.
 	 */
-	public static final int cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, int minCount, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
+	public static final int cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, int minCount, boolean keepPeriodic, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
 		boolean isUnique;
 		int i, j;
 		int c, length, first, last, nBlocks, nBoundaries, nAppendedBlocks;
@@ -1758,7 +1788,7 @@ public class RepeatAlphabet {
 		}
 		nBlocks=loadBlocks(read2characters_old);
 		alphabet=oldAlphabet; lastUnique=lastUnique_old; lastPeriodic=lastPeriodic_old; lastAlphabet=lastAlphabet_old;
-		removeRareCharacters(nBlocks,minCount,lastUnique_old,lastPeriodic_old,lastAlphabet_old);
+		removeRareCharacters(nBlocks,minCount,lastUnique_old,lastPeriodic_old,lastAlphabet_old,keepPeriodic);
 		alphabet=newAlphabet; lastUnique=lastUnique_new; lastPeriodic=lastPeriodic_new; lastAlphabet=lastAlphabet_new;
 		first=-1; nAppendedBlocks=0;
 		for (i=0; i<nBlocks; i++) {

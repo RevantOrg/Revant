@@ -85,6 +85,9 @@ public class BuildAssemblyGraph {
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
+if ((Alignments.readA==442 && Alignments.readB==780) || (Alignments.readA==780 && Alignments.readB==442)) {
+	System.err.println("FUCK> 1  type="+type+" str2="+str2+" str3="+str3+" str1="+str1);
+}
 			keep=str2.equalsIgnoreCase("1")&&str3.equalsIgnoreCase("1");
 			addEdge(Alignments.readA-1,Alignments.readB-1,keep);
 			addEdge(Alignments.readB-1,Alignments.readA-1,keep);

@@ -10,7 +10,9 @@ import de.mpi_cbg.revant.factorize.Reads;
  * Prints to STDOUT the new value of $maxOpenLength_unique$.
  */
 public class CleanTranslatedReads1 {
-	
+	/**
+	 * @param args 8: keep periodic characters untouched (1/0).
+	 */
 	public static void main(String[] args) throws IOException {
 		final String ALPHABET_FILE = args[0];
 		final String ALPHABET_COUNTS_FILE = args[1];
@@ -20,7 +22,8 @@ public class CleanTranslatedReads1 {
 		final String TRANSLATED_READS_CHARACTERS_FILE = args[5];
 		final String TRANSLATED_READS_BOUNDARIES_FILE = args[6];
 		final int MIN_FREQUENCY = Integer.parseInt(args[7]);
-		final String OUTPUT_FILE = args[8];
+		final boolean KEEP_PERIODIC = Integer.parseInt(args[8])==1;
+		final String OUTPUT_FILE = args[9];
 		
 		int i;
 		String str1, str2;
@@ -38,7 +41,7 @@ public class CleanTranslatedReads1 {
 		bw = new BufferedWriter(new FileWriter(OUTPUT_FILE));
 		i=0; str1=br1.readLine(); str2=br2.readLine();
 		while (str1!=null) {
-			RepeatAlphabet.cleanTranslatedRead_collectCharacterInstances(str1,str2,Reads.readLengths[i],MIN_FREQUENCY,IO.quantum,bw,tmpChar);
+			RepeatAlphabet.cleanTranslatedRead_collectCharacterInstances(str1,str2,Reads.readLengths[i],MIN_FREQUENCY,KEEP_PERIODIC,IO.quantum,bw,tmpChar);
 			i++; str1=br1.readLine(); str2=br2.readLine();
 		}
 		br1.close(); br2.close(); bw.close();

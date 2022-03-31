@@ -21,13 +21,14 @@ public class CleanTranslatedReads3 {
 		final String TRANSLATED_FILE_CHARACTERS_OLD = args[5];
 		final String TRANSLATED_FILE_BOUNDARIES_OLD = args[6];
 		final int MIN_FREQUENCY = Integer.parseInt(args[7]);
-		final String ALPHABET_FILE_NEW = args[8];
-		final String OLD2NEW_FILE = args[9];
-		final String TRANSLATED_FILE_CHARACTERS_NEW = args[10];
-		final String TRANSLATED_FILE_BOUNDARIES_NEW = args[11];
-		final String HISTOGRAM_FILE = args[12];
-		final String FULLY_UNIQUE_FILE_NEW = args[13];
-		final int LAST_TRANSLATED_READ = Integer.parseInt(args[14]);  // Same as in $TranslateReads.java$. -1 if no read has been updated yet.
+		final boolean KEEP_PERIODIC = Integer.parseInt(args[8])==1;
+		final String ALPHABET_FILE_NEW = args[9];
+		final String OLD2NEW_FILE = args[10];
+		final String TRANSLATED_FILE_CHARACTERS_NEW = args[11];
+		final String TRANSLATED_FILE_BOUNDARIES_NEW = args[12];
+		final String HISTOGRAM_FILE = args[13];
+		final String FULLY_UNIQUE_FILE_NEW = args[14];
+		final int LAST_TRANSLATED_READ = Integer.parseInt(args[15]);  // Same as in $TranslateReads.java$. -1 if no read has been updated yet.
 		
 		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
 		
@@ -73,7 +74,7 @@ public class CleanTranslatedReads3 {
 		bw3 = new BufferedWriter(new FileWriter(FULLY_UNIQUE_FILE_NEW));
 		i=LAST_TRANSLATED_READ+1; str1=br1.readLine(); str2=br2.readLine();
 		while (str1!=null && i<N_READS) {
-			nBlocks=RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,old2new,Reads.getReadLength(i),MIN_FREQUENCY,IO.quantum,bw1,bw2,tmpChar);
+			nBlocks=RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,old2new,Reads.getReadLength(i),MIN_FREQUENCY,KEEP_PERIODIC,IO.quantum,bw1,bw2,tmpChar);
 			blocksHistogram[nBlocks]++;
 			bw1.newLine(); bw2.newLine();
 			if (nBlocks==0) bw3.write(Reads.readIDs[i]+"\n");
