@@ -147,6 +147,10 @@ public class RepeatAlphabet {
 	 * Recodes every read, and collects in $outputFile$ every character (not necessarily 
 	 * distinct) with discriminative power.
 	 *
+	 * Remark: the aligner might not find every occurrence of every repeat in every read.
+	 * Such missing occurrences will become non-repetitive sequence, which will induce
+	 * several spurious alignments downstream.
+	 *
 	 * Remark: the error rate in read-repeat alignments should not be too high compared to
 	 * the one used in read-read alignments, otherwise the following could happen. Assume
 	 * that there are many variants of the same repeat, such that each variant occurs in
@@ -200,7 +204,7 @@ public class RepeatAlphabet {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			if ( (2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError ||
-				 Math.min(Alignments.endA-Alignments.startA,Alignments.endB-Alignments.startB)+1<minAlignmentLength
+				 Math.max(Alignments.endA-Alignments.startA,Alignments.endB-Alignments.startB)+1<minAlignmentLength
 			   ) {
 				str=br.readLine(); row++;
 				continue;
@@ -948,7 +952,7 @@ if (fabio) {
 			if (row%100000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			if ( (2.0*Alignments.diffs)/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2)>maxError ||
-				 Math.min(Alignments.endA-Alignments.startA,Alignments.endB-Alignments.startB)+1<minAlignmentLength
+				 Math.max(Alignments.endA-Alignments.startA,Alignments.endB-Alignments.startB)+1<minAlignmentLength
 			   ) {
 				str=br.readLine(); row++;
 				continue;
@@ -1544,7 +1548,10 @@ if (fabio) {
 	 * Remark: the procedure assumes that global variables $alphabet,alphabetCount$ have
 	 * already been initialized, and it uses global temporary variable $boundaries$.
 	 *
-	 * @param keepPeriodic TRUE=does not filter out rare periodic characters;
+	 * @param keepPeriodic TRUE=does not filter out rare periodic characters; periodic
+	 * characters are often supported by a strong signal (of several overlapping read-
+	 * repeat alignments), and removing them and replacing them with non-repetitive
+	 * characters does not allow to remove several spurious alignments downstream;
 	 * @param read2boundaries boundaries of the characters in $read2characters$;
 	 * @param tmpChar temporary space.
 	 */
