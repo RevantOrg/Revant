@@ -20,21 +20,24 @@ public class GetShortestUniqueIntervals {
 	public static void main(String[] args) throws IOException {
 		final int K = Integer.parseInt(args[0]);
 		final String TRANSLATED_FILE = args[1];
-		final String ALPHABET_FILE = args[2];
-		final int UNIQUE_MODE = Integer.parseInt(args[3]);  // See $RepeatAlphabet.isValidWindow()$
-		final int MULTI_MODE = Integer.parseInt(args[4]);
-		final String UNIQUE_KMERS_FILE = args[5];
-		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[6]);
-		final String OLD_INTERVALS_FILE = args[7];  // NULL to discard it
-		final String NEW_INTERVALS_FILE = args[8];  // Output
+		final String BOUNDARIES_FILE = args[2];
+		final String READ_LENGTHS_FILE = args[3];
+		final String ALPHABET_FILE = args[4];
+		final int UNIQUE_MODE = Integer.parseInt(args[5]);  // See $RepeatAlphabet.isValidWindow()$
+		final int MULTI_MODE = Integer.parseInt(args[6]);
+		final String UNIQUE_KMERS_FILE = args[7];
+		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[8]);
+		final String OLD_INTERVALS_FILE = args[9];  // NULL to discard it
+		final String NEW_INTERVALS_FILE = args[10];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
 		
 		int i, p;
-		int row, nBlocks, nPairs, lastUniqueInterval;
-		String str1, str2;
-		BufferedReader br1, br2;
+		int row, nBlocks, nPairs, lastUniqueInterval, readLength;
+		String str1, str2, str3, str4;
+		BufferedReader br1, br2, br3, br4;
 		BufferedWriter bw;
+		RepeatAlphabet.Character tmpChar = new RepeatAlphabet.Character();
 		RepeatAlphabet.Kmer tmpKmer = new RepeatAlphabet.Kmer();
 		RepeatAlphabet.Kmer newKmer;
 		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
@@ -63,8 +66,11 @@ public class GetShortestUniqueIntervals {
 		for (i=0; i<pairs.length; i++) pairs[i] = new Pair();
 		if (OLD_INTERVALS_FILE_EXISTS) br2 = new BufferedReader(new FileReader(OLD_INTERVALS_FILE));
 		else br2=null;
+		br3 = new BufferedReader(new FileReader(BOUNDARIES_FILE));
+		br4 = new BufferedReader(new FileReader(READ_LENGTHS_FILE));
 		bw = new BufferedWriter(new FileWriter(NEW_INTERVALS_FILE));
-		str1=br1.readLine(); str2=OLD_INTERVALS_FILE_EXISTS?br2.readLine():null; row=0;
+		str1=br1.readLine(); str2=OLD_INTERVALS_FILE_EXISTS?br2.readLine():null; 
+		str3=br3.readLine(); str4=br4.readLine(); row=0;
 		while (str1!=null) {
 			if (row%100000==0) System.err.println("Processed "+row+" reads");
 			nBlocks=0; p=str1.indexOf(RepeatAlphabet.SEPARATOR_MAJOR+"");
@@ -77,12 +83,14 @@ public class GetShortestUniqueIntervals {
 			if (OLD_INTERVALS_FILE_EXISTS) {
 				if (str2.length()==0) lastUniqueInterval=-1;
 				else {
-					tokens=str2.split(","); lastUniqueInterval=tokens.length-1;
+					tokens=str2.split(RepeatAlphabet.SEPARATOR_MINOR+""); lastUniqueInterval=tokens.length-1;
 					for (i=0; i<=lastUniqueInterval; i++) uniqueIntervals[i]=Integer.parseInt(tokens[i]);
 				}
 			}
 			else lastUniqueInterval=-1;
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,tmpKmer,tmpArray2,tmpArray3,null);
+			RepeatAlphabet.loadBoundaries(str3);
+			readLength=Integer.parseInt(str4);
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,readLength,RepeatAlphabet.boundaries,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {
@@ -93,14 +101,15 @@ public class GetShortestUniqueIntervals {
 				}
 				for (i=0; i<nPairs; i++) pairs[i].set(uniqueIntervals[3*i],uniqueIntervals[3*i+1],uniqueIntervals[3*i+2]);
 				if (nPairs>1) Arrays.sort(pairs,0,nPairs);
-				bw.write(pairs[0].position+","+pairs[0].length+","+pairs[0].nHaplotypes);
-				for (i=1; i<nPairs; i++) bw.write(","+pairs[i].position+","+pairs[i].length+","+pairs[i].nHaplotypes);
+				bw.write(pairs[0].position+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[0].length+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[0].nHaplotypes);
+				for (i=1; i<nPairs; i++) bw.write((RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[i].position+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[i].length+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[i].nHaplotypes);
 			}
 			bw.newLine();
-			str1=br1.readLine(); str2=OLD_INTERVALS_FILE_EXISTS?br2.readLine():null; row++;
+			str1=br1.readLine(); str2=OLD_INTERVALS_FILE_EXISTS?br2.readLine():null; 
+			str3=br3.readLine(); str4=br4.readLine(); row++;
 		}
 		if (OLD_INTERVALS_FILE_EXISTS) br2.close();
-		br1.close(); bw.close();
+		br1.close(); br3.close(); br4.close(); bw.close();
 	}
 
 

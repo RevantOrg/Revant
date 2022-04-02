@@ -35,6 +35,7 @@ READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
+READS_BOUNDARIES_FILE="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
@@ -44,21 +45,27 @@ rm -f ${TMPFILE_PATH}*
 function kmersThread() {
 	local LOCAL_K=$1
 	local LOCAL_TRANSLATED_READS_FILE=$2
-	local LOCAL_KMERS_FILE=$3
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} null ${LOCAL_KMERS_FILE}
+	local LOCAL_BOUNDARIES_FILE=$3
+	local LOCAL_READ_LENGTHS_FILE=$4
+	local LOCAL_KMERS_FILE=$5
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} null ${LOCAL_KMERS_FILE}
 }
 
 function fixThread() {
 	local LOCAL_OLD_TRANSLATED_FILE=$1
-	local LOCAL_KMERS_FILE=$2
-	local LOCAL_K=$3
-	local LOCAL_NEW_TRANSLATED_FILE=$4
-	local LOCAL_STATS_FILE=$5
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixEndBlocks ${ALPHABET_FILE} ${LOCAL_OLD_TRANSLATED_FILE} ${LOCAL_KMERS_FILE} ${LOCAL_K} ${TIGHT_MODE} ${LOCAL_NEW_TRANSLATED_FILE} ${LOCAL_STATS_FILE}
+	local LOCAL_BOUNDARIES_FILE=$2
+	local LOCAL_READ_LENGTHS_FILE=$3
+	local LOCAL_KMERS_FILE=$4
+	local LOCAL_K=$5
+	local LOCAL_NEW_TRANSLATED_FILE=$6
+	local LOCAL_STATS_FILE=$7
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixEndBlocks ${ALPHABET_FILE} ${LOCAL_OLD_TRANSLATED_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${LOCAL_KMERS_FILE} ${LOCAL_K} ${TIGHT_MODE} ${LOCAL_NEW_TRANSLATED_FILE} ${LOCAL_STATS_FILE}
 }
 
 rm -f "${TMPFILE_PATH}-1-*"
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-1-"
+split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_BOUNDARIES_FILE} "${TMPFILE_PATH}-z1-"
+split -l $(( ${N_READS} / ${N_THREADS} )) ${READ_LENGTHS_FILE} "${TMPFILE_PATH}-z2-"
 for K in $(seq ${MIN_K} ${MAX_K}); do
 	SORT_OPTIONS_KMERS=""
 	for i in $(seq 1 ${K}); do
@@ -67,7 +74,7 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 	echo "Collecting ${K}-mers..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-1-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-1-}
-		kmersThread ${K} ${FILE} ${TMPFILE_PATH}-kmers-${K}-${THREAD_ID} &
+		kmersThread ${K} ${FILE} ${TMPFILE_PATH}-z1-${THREAD_ID} ${TMPFILE_PATH}-z2-${THREAD_ID} ${TMPFILE_PATH}-kmers-${K}-${THREAD_ID} &
 	done
 	wait
 	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-kmers-${K}-* > ${TMPFILE_PATH}-${K}.txt
@@ -84,7 +91,7 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 	echo "Disambiguating read ends using contexts of length $((${K}-1))..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-$((${K}-1))-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-$((${K}-1))-}
-		fixThread ${FILE} ${K_MINUS_ONE_MERS_FILE} $((${K}-1)) ${TMPFILE_PATH}-${K}-${THREAD_ID} ${TMPFILE_PATH}-counts-${K}-${THREAD_ID} &
+		fixThread ${FILE} ${TMPFILE_PATH}-z1-${THREAD_ID} ${TMPFILE_PATH}-z2-${THREAD_ID} ${K_MINUS_ONE_MERS_FILE} $((${K}-1)) ${TMPFILE_PATH}-${K}-${THREAD_ID} ${TMPFILE_PATH}-counts-${K}-${THREAD_ID} &
 	done
 	wait
 	N_FIXED="0"; N_FIXABLE="0"; N_ENDS="0";

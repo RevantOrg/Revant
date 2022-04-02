@@ -102,7 +102,7 @@ public class RepeatAlphabet {
 	 */
 	private static String[][] blocks;
 	private static int[] lastInBlock, lastInBlock_int;
-	private static int[] boundaries;
+	public static int[] boundaries;
 	private static int[][] intBlocks;
 	private static boolean[] isBlockUnique;
 	private static Pair[] tandemIntervals;
@@ -1456,8 +1456,11 @@ if (fabio) {
 	 * negative ID into a list of positive IDs, and builds array $isBlockUnique$.
 	 *
 	 * Remark: the procedure follows the logic of $incrementCharacterCounts()$.
+	 *
+	 * @param boundaries of each block;
+	 * @param tmpChar temporary space.
 	 */
-	private static final void loadIntBlocks(int nBlocks) {
+	private static final void loadIntBlocks(int nBlocks, int[] boundaries, int readLength, Character tmpChar) {
 		boolean orientation, unique, found;
 		int i, j, k, c;
 		int to, last, value, nElements, repeat;
@@ -1485,10 +1488,14 @@ if (fabio) {
 					value=-1-value;
 					if (value<=lastUnique) { found=true; nElements+=lastUnique+1-value; }
 					else {
+						tmpChar.copyFrom(alphabet[value]);
+						tmpChar.length=(i==nBlocks-1?readLength:boundaries[i])-(i==0?0:boundaries[i-1]+1);
+						if (i==0) tmpChar.openStart=true;
+						if (i==nBlocks-1) tmpChar.openEnd=true;
 						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
 						for (k=value; k<=lastPeriodic; k++) {
 							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
-							if (alphabet[k].implies(alphabet[value],-1)) { found=true; nElements++; }
+							if (alphabet[k].implies(tmpChar,-1)) { found=true; nElements++; }
 						}
 					}
 				}
@@ -1512,16 +1519,45 @@ if (fabio) {
 						unique=true;
 					}
 					else {
+						tmpChar.copyFrom(alphabet[value]);
+						tmpChar.length=(i==nBlocks-1?readLength:boundaries[i])-(i==0?0:boundaries[i-1]+1);
+						if (i==0) tmpChar.openStart=true;
+						if (i==nBlocks-1) tmpChar.openEnd=true;
 						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
 						for (c=value; c<=lastPeriodic; c++) {
 							if (alphabet[c].repeat!=repeat || alphabet[c].orientation!=orientation) break;
-							if (alphabet[c].implies(alphabet[value],-1)) intBlocks[i][++k]=c;
+							if (alphabet[c].implies(tmpChar,-1)) intBlocks[i][++k]=c;
 						}
 					}
 				}
 			}
 			lastInBlock_int[i]=k; isBlockUnique[i]=unique;
 		}
+	}
+	
+	
+	/**
+	 * Stores in global variable $boundaries[0..X]$ the contents of $str$, where $X$ is
+	 * returned in output.
+	 */
+	public static final int loadBoundaries(String str) {
+		int i;
+		int nBoundaries;
+		String[] tokens;
+		
+		if (str.length()==0) nBoundaries=0;
+		else if (str.indexOf(SEPARATOR_MINOR+"")>=0) {
+			tokens=str.split(SEPARATOR_MINOR+"");
+			nBoundaries=tokens.length;
+			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
+			for (i=0; i<nBoundaries; i++) boundaries[i]=Integer.parseInt(tokens[i]);
+		}
+		else {
+			nBoundaries=1;
+			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
+			boundaries[0]=Integer.parseInt(str);
+		}
+		return nBoundaries-1;
 	}
 
 
@@ -1562,18 +1598,7 @@ if (fabio) {
 		String[] tokens;
 		
 		if (read2characters.length()==0) return;
-		if (read2boundaries.length()==0) nBoundaries=0;
-		else if (read2boundaries.indexOf(SEPARATOR_MINOR+"")>=0) {
-			tokens=read2boundaries.split(SEPARATOR_MINOR+"");
-			nBoundaries=tokens.length;
-			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
-			for (i=0; i<nBoundaries; i++) boundaries[i]=Integer.parseInt(tokens[i]);
-		}
-		else {
-			nBoundaries=1;
-			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
-			boundaries[0]=Integer.parseInt(read2boundaries);
-		}
+		nBoundaries=loadBoundaries(read2boundaries)+1;
 		nBlocks=loadBlocks(read2characters);
 		removeRareCharacters(nBlocks,minCount,lastUnique,lastPeriodic,lastAlphabet,keepPeriodic);
 		first=-1;
@@ -1781,18 +1806,7 @@ if (fabio) {
 		String[] tokens;
 		
 		if (read2characters_old.length()==0) return 0;
-		if (read2boundaries_old.length()==0) nBoundaries=0;
-		else if (read2boundaries_old.indexOf(SEPARATOR_MINOR+"")>=0) {
-			tokens=read2boundaries_old.split(SEPARATOR_MINOR+"");
-			nBoundaries=tokens.length;
-			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
-			for (i=0; i<nBoundaries; i++) boundaries[i]=Integer.parseInt(tokens[i]);
-		}
-		else {
-			nBoundaries=1;
-			if (boundaries==null || boundaries.length<nBoundaries) boundaries = new int[nBoundaries];
-			boundaries[0]=Integer.parseInt(read2boundaries_old);
-		}
+		nBoundaries=loadBoundaries(read2boundaries_old)+1;
 		nBlocks=loadBlocks(read2characters_old);
 		alphabet=oldAlphabet; lastUnique=lastUnique_old; lastPeriodic=lastPeriodic_old; lastAlphabet=lastAlphabet_old;
 		removeRareCharacters(nBlocks,minCount,lastUnique_old,lastPeriodic_old,lastAlphabet_old,keepPeriodic);
@@ -1937,12 +1951,16 @@ if (fabio) {
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap) {
+	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
 		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
 		Kmer key, value;
 		Iterator<Kmer> iterator;
+		
+boolean fabio = str.equalsIgnoreCase("1954,1955,2765,2766,2806,2807:993,1176:4:796:2:1170:1482:2447:2404:2244:4:2290:1892,2476:8:2399,2708:381:845:-1014");
+if (fabio) System.err.println("VITTU> 1");
+
 		
 		// Loading blocks
 		out=lastAvoidedInterval;
@@ -1955,35 +1973,56 @@ if (fabio) {
 		}
 		nBlocks++;
 		if (nBlocks<k) return out;
-		loadBlocks(str); loadIntBlocks(nBlocks);
+		loadBlocks(str); loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		
+if (fabio) {
+	System.err.println("VITTU> intBlocks:");
+	for (int x=0; x<nBlocks; x++) {
+		System.err.print(x+": ");
+		for (int y=0; y<=lastInBlock_int[x]; y++) System.err.print(intBlocks[x][y]+",");
+		System.err.println();
+	}
+}		
+		
+		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
+if (fabio) System.err.println("VITTU> 2");			
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
+if (fabio) System.err.println("VITTU> 3  considering window ["+i+".."+(i+k-1)+"]");
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
+if (fabio) System.err.println("VITTU> 4");
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
+if (fabio) System.err.println("VITTU> 5");
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-				if (nHaplotypes!=-1 && (k>1?true:i>0&&i<nBlocks-1&&lastInBlock_int[i]==0)) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
+				if (nHaplotypes!=-1 && (k>1?true:i>0&&i<nBlocks-1&&lastInBlock_int[i]==0)) { 
+if (fabio) System.err.println("VITTU> 6  adding to avoidedIntervals");
+					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
+				}
 			}
 		}
 		else {
+if (fabio) System.err.println("VITTU> 7");
 			tmpMap.clear(); lastKmerPool=-1;
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
+if (fabio) System.err.println("VITTU> 8  considering window ["+i+".."+(i+k-1)+"]");
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
+if (fabio) System.err.println("VITTU> 9  uniqueMode="+uniqueMode+" multiMode="+multiMode+" i="+i+" k="+k+" nBlocks="+nBlocks+" lastInBlock_int["+(i+k-1)+"]="+lastInBlock_int[i+k-1]);
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
-				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
+				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
+if (fabio) System.err.println("VITTU> 10");				
 				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
@@ -2244,14 +2283,14 @@ if (fabio) {
 	 * $i$ of row 1 the number of internal blocks that contain $i>=2$ characters, for 
 	 * every read with at least 3 blocks.
 	 */
-	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, BufferedWriter bw, int[] out, int[][] ambiguityHistogram) throws IOException {
+	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] boundaries, int readLength, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, Character tmpChar, BufferedWriter bw, int[] out, int[][] ambiguityHistogram) throws IOException {
 		int i, j, c, d, p, q;
 		int nBlocks, sum, fixedFirst, fixedLast;
 		
 		if (str.length()==0) { bw.newLine(); return; }
 		
 		// Loading blocks
-		nBlocks=loadBlocks(str); loadIntBlocks(nBlocks);
+		nBlocks=loadBlocks(str); loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
 		if (IO.CONSISTENCY_CHECKS) {
 			for (i=1; i<nBlocks-1; i++) {
 				for (j=0; j<=lastInBlock_int[i]; j++) {
@@ -2471,41 +2510,48 @@ if (fabio) {
 	
 	/**
 	 * Writes to $outputFile$ the tandem intervals of every translated read in
-	 * $inputFile$, as a sequence of pairs $firstBlock,lastBlock$.
+	 * $translatedFile$, as a sequence of pairs $firstBlock,lastBlock$.
 	 *
 	 * @return the total number of tandem intervals found.
 	 */
-	public static final long getTandemIntervals(String inputFile, String outputFile) throws IOException {
+	public static final long getTandemIntervals(String translatedFile, String boundariesFile, String readLengthsFile, String outputFile) throws IOException {
 		int i;
-		int nBlocks, lastTandem;
+		int nBlocks, lastTandem, readLength;
 		long out;
-		String str;
-		BufferedReader br;
+		String str1, str2, str3;
+		Character tmpChar;
+		BufferedReader br1, br2, br3;
 		BufferedWriter bw;
 		
-		br = new BufferedReader(new FileReader(inputFile));
+		tmpChar = new Character();
+		br1 = new BufferedReader(new FileReader(translatedFile));
+		br2 = new BufferedReader(new FileReader(boundariesFile));
+		br3 = new BufferedReader(new FileReader(readLengthsFile));
 		bw = new BufferedWriter(new FileWriter(outputFile));
-		str=br.readLine(); out=0;
-		while (str!=null) {
-			if (str.length()==0 || str.indexOf(SEPARATOR_MAJOR+"")<0) {
+		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); out=0;
+		while (str1!=null) {
+			if (str1.length()==0 || str1.indexOf(SEPARATOR_MAJOR+"")<0) {
 				bw.newLine();
-				str=br.readLine();
+				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
-			nBlocks=loadBlocks(str); loadIntBlocks(nBlocks);
+			nBlocks=loadBlocks(str1); 
+			loadBoundaries(str2);
+			readLength=Integer.parseInt(str3);
+			loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
 			lastTandem=getTandemIntervals_impl(nBlocks);
 			if (lastTandem==-1) {
 				bw.newLine();
-				str=br.readLine();
+				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
 			out+=lastTandem+1;
 			bw.write(tandemIntervals[0].from+""+SEPARATOR_MINOR+""+tandemIntervals[0].to);
 			for (i=1; i<=lastTandem; i++) bw.write(SEPARATOR_MINOR+""+tandemIntervals[i].from+""+SEPARATOR_MINOR+""+tandemIntervals[i].to);
 			bw.newLine();
-			str=br.readLine();
+			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 		}
-		br.close(); bw.close();
+		br1.close(); br2.close(); br3.close(); bw.close();
 		return out;
 	}
 	
@@ -2870,6 +2916,8 @@ if (fabio) {
 	 * Loads $translated$ and, for every read in it, the row of the boundaries file in
 	 * $boundaries_all$.
 	 *
+	 * Remark: the procedure assumes that read lengths have already been loaded.
+	 *
 	 * @param loadIsBlockUnique loads the bitvector $isBlockUnique_all$ for every read in 
 	 * $translated$;
 	 * @param loadTranslation loads in $translation_all$ the translation of every read 
@@ -2877,8 +2925,9 @@ if (fabio) {
 	 */
 	public static final void loadAllBoundaries(String translatedFile, boolean loadIsBlockUnique, boolean loadTranslation, String boundariesFile) throws IOException {
 		int i, j, r;
-		int read, cell, mask, block, nBlocks, nBytes, nReads, nBoundaries;
+		int read, cell, mask, block, nBlocks, nBytes, nReads, nBoundaries, readLength;
 		String str;
+		Character tmpChar;
 		BufferedReader br;
 		String[] tokens;
 		
@@ -2925,7 +2974,9 @@ if (fabio) {
 		br.close();
 		
 		// Loading $isBlockUnique_all$.
+		tmpChar=null;
 		if (loadIsBlockUnique) {
+			tmpChar = new Character();
 			isBlockUnique_all = new byte[nReads][0];
 			br = new BufferedReader(new FileReader(translatedFile));
 			str=br.readLine(); r=-1;
@@ -2936,7 +2987,7 @@ if (fabio) {
 				}
 				r++;
 				nBlocks=loadBlocks(str);
-				loadIntBlocks(nBlocks);
+				loadIntBlocks(nBlocks,boundaries_all[r],Reads.getReadLength(r),tmpChar);
 				nBytes=Math.ceil(nBlocks,8);
 				isBlockUnique_all[r] = new byte[nBytes];
 				for (i=0; i<nBytes; i++) {
@@ -2956,6 +3007,7 @@ if (fabio) {
 		
 		// Loading $translation_all$.
 		if (loadTranslation) {
+			if (tmpChar==null) tmpChar = new Character();
 			translation_all = new int[nReads][0][0];
 			br = new BufferedReader(new FileReader(translatedFile));
 			str=br.readLine(); r=-1;
@@ -2966,7 +3018,7 @@ if (fabio) {
 				}
 				r++;
 				nBlocks=loadBlocks(str);
-				loadIntBlocks(nBlocks);
+				loadIntBlocks(nBlocks,boundaries_all[r],Reads.getReadLength(r),tmpChar);
 				translation_all[r] = new int[nBlocks][0];
 				for (i=0; i<nBlocks; i++) {
 					translation_all[r][i] = new int[lastInBlock_int[i]+1];
@@ -3703,9 +3755,9 @@ if (fabio) {
 	/**
 	 * @return TRUE iff the translated read in $str$ contains a non-repetitive character.
 	 */
-	public static final boolean containsUnique(String str) {
+	public static final boolean containsUnique(String str, int[] boundaries, int readLength, Character tmpChar) {
 		final int nBlocks = loadBlocks(str); 
-		loadIntBlocks(nBlocks);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
 		for (int i=0; i<nBlocks; i++) {
 			if (isBlockUnique[i]) return true;
 		}
@@ -4313,12 +4365,14 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  W
 		int last1, last2, leftEnd1_last, leftEnd2_last, rightEnd1_last, rightEnd2_last;
 		String str1, str2, str3;
 		StringBuilder leftEnd1_str, leftEnd2_str;
+		Character tmpChar;
 		BufferedReader br1, br2, br3;
 		BufferedWriter bw;
 		int[] leftEnd1, leftEnd2, rightEnd1, rightEnd2;
 		int[] tmpArray, tmpArray1, tmpArray2;
 		String[] tokens;
 		
+		tmpChar = new Character();
 		leftEnd1 = new int[CAPACITY]; leftEnd2 = new int[CAPACITY];
 		rightEnd1 = new int[CAPACITY]; rightEnd2 = new int[CAPACITY];
 		tmpArray1 = new int[CAPACITY]; tmpArray2 = new int[CAPACITY];
@@ -4346,19 +4400,20 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  W
 				}
 				else {
 					bw.write(str2.substring(0,str2.lastIndexOf(SEPARATOR_MAJOR+"")));
-					loadIntBlocks(nBlocks);
+					loadBoundaries(str3);
+					loadIntBlocks(nBlocks,boundaries,Reads.readLengths[r],tmpChar);
 					if (lastInBlock_int[nBlocks-1]>=leftEnd1.length) leftEnd1 = new int[lastInBlock_int[nBlocks-1]+1];
 					System.arraycopy(intBlocks[nBlocks-1],0,leftEnd1,0,lastInBlock_int[nBlocks-1]+1);
 					leftEnd1_last=lastInBlock_int[nBlocks-1];
 					leftEnd1_str.delete(0,leftEnd1_str.length());
 					leftEnd1_str.append(str1.lastIndexOf(SEPARATOR_MAJOR+"")+1);
-					nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks);
+					nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks,boundaries,Reads.readLengths[r],tmpChar);
 					if (lastInBlock_int[nBlocks-1]>=leftEnd2.length) leftEnd2 = new int[lastInBlock_int[nBlocks-1]+1];
 					System.arraycopy(intBlocks[nBlocks-1],0,leftEnd2,0,lastInBlock_int[nBlocks-1]+1);
 					leftEnd2_last=lastInBlock_int[nBlocks-1];
 					leftEnd2_str.delete(0,leftEnd2_str.length());
 					leftEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
-					leftLength=Reads.readLengths[r]-Integer.parseInt(str3.substring(str3.lastIndexOf(",")+1).trim())-1;
+					leftLength=Reads.readLengths[r]-boundaries[nBlocks-2]-1;
 					leftUnique=isBlockUnique[nBlocks-1];
 				}
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
@@ -4374,14 +4429,15 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  W
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
-			loadIntBlocks(nBlocks);
+			loadBoundaries(str3);
+			loadIntBlocks(nBlocks,boundaries,Reads.readLengths[r],tmpChar);
 			if (lastInBlock_int[0]>=rightEnd1.length) rightEnd1 = new int[lastInBlock_int[0]+1];
 			System.arraycopy(intBlocks[0],0,rightEnd1,0,lastInBlock_int[0]+1);
 			rightEnd1_last=lastInBlock_int[0];
 			if (lastInBlock_int[nBlocks-1]>=tmpArray1.length) tmpArray1 = new int[lastInBlock_int[nBlocks-1]+1];
 			System.arraycopy(intBlocks[nBlocks-1],0,tmpArray1,0,lastInBlock_int[nBlocks-1]+1);
 			last1=lastInBlock_int[nBlocks-1];
-			nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks);
+			nBlocks=loadBlocks(str2); loadIntBlocks(nBlocks,boundaries,Reads.readLengths[r],tmpChar);
 			if (lastInBlock_int[0]>=rightEnd2.length) rightEnd2 = new int[lastInBlock_int[0]+1];
 			System.arraycopy(intBlocks[0],0,rightEnd2,0,lastInBlock_int[0]+1);
 			rightEnd2_last=lastInBlock_int[0];
@@ -4391,7 +4447,7 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  W
 			last2=lastInBlock_int[nBlocks-1];
 			if ((leftEnd1_last>0 && leftEnd2_last==0) || (rightEnd1_last>0 && rightEnd2_last==0 && leftEnd2_last>=0)) {
 				nAttempted++;
-				success=breakReads_checkDisambiguation_impl(mode,mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftUnique,leftLength,rightUnique,Integer.parseInt(str3.substring(0,str3.indexOf(","))),lengthThreshold,leftEnd1,leftEnd1_last,leftEnd1_str,leftEnd2_str,rightEnd1,rightEnd1_last,str1,str2,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
+				success=breakReads_checkDisambiguation_impl(mode,mode?Reads.breakReads_new2old[r][1]-Reads.breakReads_new2old[r-1][2]-1:0,leftUnique,leftLength,rightUnique,boundaries[0],lengthThreshold,leftEnd1,leftEnd1_last,leftEnd1_str,leftEnd2_str,rightEnd1,rightEnd1_last,str1,str2,leftEnd2,leftEnd2_last,rightEnd2,rightEnd2_last,bw);
 				if (!success) {
 					nRolledBack++;
 					System.err.println("breakReads_checkDisambiguation> rolled back: "+str1+" <- "+str2);
@@ -4409,7 +4465,7 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  W
 			leftEnd2_last=last2;
 			leftEnd2_str.delete(0,leftEnd2_str.length());
 			leftEnd2_str.append(str2.lastIndexOf(SEPARATOR_MAJOR+"")+1);
-			leftLength=Reads.readLengths[r]-Integer.parseInt(str3.substring(str3.lastIndexOf(",")+1).trim());
+			leftLength=Reads.readLengths[r]-boundaries[nBlocks-2]-1;
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 		}
 		if (leftEnd2_str.length()!=0) bw.write(SEPARATOR_MAJOR+leftEnd2_str.toString()+"\n");

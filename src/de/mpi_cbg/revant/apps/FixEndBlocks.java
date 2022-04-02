@@ -23,17 +23,20 @@ public class FixEndBlocks {
 	public static void main(String[] args) throws IOException {
 		final String ALPHABET_FILE = args[0];
 		final String OLD_TRANSLATED_FILE = args[1];
-		final String KMERS_FILE = args[2];
-		final int K = Integer.parseInt(args[3]);
-		final boolean TIGHT_MODE = Integer.parseInt(args[4])==1;
-		final String NEW_TRANSLATED_FILE = args[5];
-		final String STATS_FILE = args[6];
+		final String BOUNDARIES_FILE = args[2];
+		final String READ_LENGTHS_FILE = args[3];
+		final String KMERS_FILE = args[4];
+		final int K = Integer.parseInt(args[5]);
+		final boolean TIGHT_MODE = Integer.parseInt(args[6])==1;
+		final String NEW_TRANSLATED_FILE = args[7];
+		final String STATS_FILE = args[8];
 		
 		int i;
-		int nReads, nFixed, last;
-		String str;
-		BufferedReader br;
+		int nReads, nFixed, last, readLength;
+		String str1, str2, str3;
+		BufferedReader br1, br2, br3;
 		BufferedWriter bw;
+		RepeatAlphabet.Character tmpChar;
 		RepeatAlphabet.Kmer newKmer, context;
 		HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> kmers;
 		int[] out, tmpArray1, tmpArray2, tmpArray3;
@@ -42,16 +45,17 @@ public class FixEndBlocks {
 		// Loading k-mers and alphabet
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		kmers = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
-		br = new BufferedReader(new FileReader(KMERS_FILE));
-		str=br.readLine();
-		while (str!=null) {
-			newKmer = new RepeatAlphabet.Kmer(str,K);
+		br1 = new BufferedReader(new FileReader(KMERS_FILE));
+		str1=br1.readLine();
+		while (str1!=null) {
+			newKmer = new RepeatAlphabet.Kmer(str1,K);
 			kmers.put(newKmer,newKmer);
-			str=br.readLine();
+			str1=br1.readLine();
 		}
-		br.close();
+		br1.close();
 		
 		// Fixing end blocks
+		tmpChar = new RepeatAlphabet.Character();
 		context = new RepeatAlphabet.Kmer();
 		context.sequence = new int[K];
 		out = new int[] {0,0};
@@ -59,15 +63,19 @@ public class FixEndBlocks {
 		tmpArray2 = new int[K]; tmpArray3 = new int[(K)<<1];
 		ambiguityHistogram = new int[2][MAX_AMBIGUITY_HISTOGRAM+1];
 		Arrays.fill(ambiguityHistogram[0],0); Arrays.fill(ambiguityHistogram[1],0);
-		br = new BufferedReader(new FileReader(OLD_TRANSLATED_FILE));
+		br1 = new BufferedReader(new FileReader(OLD_TRANSLATED_FILE));
+		br2 = new BufferedReader(new FileReader(BOUNDARIES_FILE));
+		br3 = new BufferedReader(new FileReader(READ_LENGTHS_FILE));
 		bw = new BufferedWriter(new FileWriter(NEW_TRANSLATED_FILE));
-		str=br.readLine(); nReads=0;
-		while (str!=null) {
+		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); nReads=0;
+		while (str1!=null) {
 			nReads++;
-			RepeatAlphabet.fixEndBlocks(str,K,kmers,TIGHT_MODE,context,tmpArray1,tmpArray2,tmpArray3,bw,out,ambiguityHistogram);
-			str=br.readLine();
+			RepeatAlphabet.loadBoundaries(str2);			
+			readLength=Integer.parseInt(str3);
+			RepeatAlphabet.fixEndBlocks(str1,K,kmers,TIGHT_MODE,context,RepeatAlphabet.boundaries,readLength,tmpArray1,tmpArray2,tmpArray3,tmpChar,bw,out,ambiguityHistogram);
+			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 		}
-		br.close(); bw.close();
+		br1.close(); br2.close(); br3.close(); bw.close();
 		bw = new BufferedWriter(new FileWriter(STATS_FILE));
 		bw.write(out[0]+","+out[1]+","+nReads+"\n");
 		bw.close();

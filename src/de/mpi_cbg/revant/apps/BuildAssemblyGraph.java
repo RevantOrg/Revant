@@ -41,6 +41,7 @@ public class BuildAssemblyGraph {
 		final String TANDEM_BITVECTOR_FILE = INPUT_DIR+"/LAshow-reads-reads.txt.tandem.bitvector";
 		final String FULLY_UNIQUE_FILE = INPUT_DIR+"/reads-fullyUnique-new.txt";
 		final String READS_TRANSLATED_FILE = INPUT_DIR+"/reads-translated-disambiguated.txt";
+		final String BOUNDARIES_FILE = INPUT_DIR+"/reads-translated-boundaries-new.txt";
 		final String ALPHABET_FILE = INPUT_DIR+"/alphabet-cleaned.txt";
 		final String READ_IDS_FILE = INPUT_DIR+"/reads-ids.txt";
 		final String READ_LENGTHS_FILE = INPUT_DIR+"/reads-lengths.txt";
@@ -53,6 +54,7 @@ public class BuildAssemblyGraph {
 		int type, nAlignments, idGenerator, top, node, neighbor, nComponents, size, nextFullyUnique;
 		double errorRate;
 		String str1, str2, str3;
+		RepeatAlphabet.Character tmpChar;
 		BufferedReader br1, br2, br3;
 		BufferedWriter bw;
 		boolean[] containsUnique;
@@ -61,6 +63,7 @@ public class BuildAssemblyGraph {
 		
 		// Building the graph
 		System.err.println("Building the graph...");
+		tmpChar = new RepeatAlphabet.Character();
 		Reads.loadReadIDs(READ_IDS_FILE,N_READS);
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
 		neighbors = new int[N_READS][0];
@@ -103,17 +106,21 @@ public class BuildAssemblyGraph {
 			lastNeighbor[i]=k;
 		}
 		
-		// Building $containsUnique$.
+		// Building $containsUnique$.		
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		containsUnique = new boolean[N_READS];
 		Arrays.fill(containsUnique,false);
 		br1 = new BufferedReader(new FileReader(READS_TRANSLATED_FILE));
-		str1=br1.readLine(); j=0;
+		br2 = new BufferedReader(new FileReader(BOUNDARIES_FILE));
+		str1=br1.readLine(); str2=br2.readLine(); j=0;
 		while (str1!=null) {
-			if (str1.length()!=0) containsUnique[j]=RepeatAlphabet.containsUnique(str1);
-			j++; str1=br1.readLine();
+			if (str1.length()!=0) {
+				RepeatAlphabet.loadBoundaries(str2);
+				containsUnique[j]=RepeatAlphabet.containsUnique(str1,RepeatAlphabet.boundaries,Reads.getReadLength(j),tmpChar);
+			}
+			j++; str1=br1.readLine(); str2=br2.readLine();
 		}
-		br1.close();
+		br1.close(); br2.close();
 		
 		// Printing input connected components
 		System.err.println("Computing input connected components...");
