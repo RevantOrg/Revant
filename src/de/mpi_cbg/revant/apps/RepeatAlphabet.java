@@ -301,21 +301,6 @@ public class RepeatAlphabet {
 		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
 		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
 		
-
-boolean fabio = false;
-for (i=0; i<=lastAlignment; i++) {
-	if (alignments[i].readA==779 && alignments[i].readB==1016) {
-		fabio=true;
-		break;
-	}
-}
-if (fabio) {
-	System.err.println("VITTU> 1  alignments:");
-	for (i=0; i<=lastAlignment; i++) System.err.println(alignments[i]);
-}
-		
-		
-		
 		// Building maximal periodic intervals
 		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1;
 		for (i=0; i<=lastAlignment; i++) {
@@ -344,14 +329,7 @@ if (fabio) {
 			points[++lastPoint]=alignments[i].endA;
 		}
 		if (lastPoint>0) Arrays.sort(points,0,lastPoint+1);
-		initializeGraph(lastPoint+1);
-
-		
-if (fabio) {
-	System.err.println("VITTU> 2  points:");
-	for (i=0; i<=lastPoint; i++) System.err.println(points[i]);
-}				
-		
+		initializeGraph(lastPoint+1);		
 		
 		// Marking points: (0) outside periodic intervals; (1) inside a periodic interval
 		// and close to its endpoints; (-1) inside a periodic interval and far from its
@@ -502,7 +480,7 @@ if (fabio) {
 				sequence=newSequence;
 			}
 			sequence[lastInSequence].setUnique(lengthA-i,i<=distanceThreshold,true);
-		}
+		}		
 	}
 	
 	
@@ -1461,6 +1439,7 @@ if (fabio) {
 	 * @param tmpChar temporary space.
 	 */
 	private static final void loadIntBlocks(int nBlocks, int[] boundaries, int readLength, Character tmpChar) {
+		final int QUANTUM = IO.quantum;
 		boolean orientation, unique, found;
 		int i, j, k, c;
 		int to, last, value, nElements, repeat;
@@ -1493,14 +1472,37 @@ if (fabio) {
 						if (i==0) tmpChar.openStart=true;
 						if (i==nBlocks-1) tmpChar.openEnd=true;
 						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
+						tmpChar.quantize(QUANTUM);
 						for (k=value; k<=lastPeriodic; k++) {
 							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
 							if (alphabet[k].implies(tmpChar,-1)) { found=true; nElements++; }
+						}
+						if (!found) {
+							// Looking for a shorter version, since the length of 
+							// character $value$ was not computed in the same way as we do
+							// here.
+							tmpChar.length-=QUANTUM;
+							for (k=value; k<=lastPeriodic; k++) {
+								if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
+								if (alphabet[k].implies(tmpChar,-1)) { found=true; nElements++; }
+							}
 						}
 					}
 				}
 				if (!found) {
 					System.err.println("loadIntBlocks> ERROR: character ID "+blocks[i][j]+" in a translated read is not implied by any character in the alphabet.");
+					System.err.println("tmpChar: "+tmpChar);
+					System.err.println("alphabet["+value+"]: "+alphabet[value]);
+					System.err.println("readLength="+readLength);
+					System.err.println("blocks: ");
+					for (int x=0; x<nBlocks; x++) {
+						System.err.print(x+": ");
+						for (int y=0; y<=lastInBlock[x]; y++) System.err.print(blocks[x][y]+",");
+						System.err.println();
+					}
+					System.err.print("boundaries: ");
+					for (int x=0; x<nBlocks-1; x++) System.err.print(boundaries[x]+",");
+					System.err.println();
 					System.exit(1);
 				}
 			}
@@ -1524,9 +1526,21 @@ if (fabio) {
 						if (i==0) tmpChar.openStart=true;
 						if (i==nBlocks-1) tmpChar.openEnd=true;
 						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
+						tmpChar.quantize(QUANTUM);
+						found=false;
 						for (c=value; c<=lastPeriodic; c++) {
 							if (alphabet[c].repeat!=repeat || alphabet[c].orientation!=orientation) break;
-							if (alphabet[c].implies(tmpChar,-1)) intBlocks[i][++k]=c;
+							if (alphabet[c].implies(tmpChar,-1)) { found=true; intBlocks[i][++k]=c; }
+						}
+						if (!found) {
+							// Looking for a shorter version, since the length of 
+							// character $value$ was not computed in the same way as we do
+							// here.
+							tmpChar.length-=QUANTUM;
+							for (c=value; c<=lastPeriodic; c++) {
+								if (alphabet[c].repeat!=repeat || alphabet[c].orientation!=orientation) break;
+								if (alphabet[c].implies(tmpChar,-1)) { found=true; intBlocks[i][++k]=c; }
+							}
 						}
 					}
 				}
@@ -2916,7 +2930,8 @@ if (fabio) System.err.println("VITTU> 10");
 	 * Loads $translated$ and, for every read in it, the row of the boundaries file in
 	 * $boundaries_all$.
 	 *
-	 * Remark: the procedure assumes that read lengths have already been loaded.
+	 * Remark: the procedure assumes that the read length of every read has already been 
+	 * loaded in $Reads.readLengths$.
 	 *
 	 * @param loadIsBlockUnique loads the bitvector $isBlockUnique_all$ for every read in 
 	 * $translated$;
@@ -2987,7 +3002,7 @@ if (fabio) System.err.println("VITTU> 10");
 				}
 				r++;
 				nBlocks=loadBlocks(str);
-				loadIntBlocks(nBlocks,boundaries_all[r],Reads.getReadLength(r),tmpChar);
+				loadIntBlocks(nBlocks,boundaries_all[r],Reads.getReadLength(translated[r]),tmpChar);
 				nBytes=Math.ceil(nBlocks,8);
 				isBlockUnique_all[r] = new byte[nBytes];
 				for (i=0; i<nBytes; i++) {
@@ -3018,7 +3033,7 @@ if (fabio) System.err.println("VITTU> 10");
 				}
 				r++;
 				nBlocks=loadBlocks(str);
-				loadIntBlocks(nBlocks,boundaries_all[r],Reads.getReadLength(r),tmpChar);
+				loadIntBlocks(nBlocks,boundaries_all[r],Reads.getReadLength(translated[r]),tmpChar);
 				translation_all[r] = new int[nBlocks][0];
 				for (i=0; i<nBlocks; i++) {
 					translation_all[r][i] = new int[lastInBlock_int[i]+1];
