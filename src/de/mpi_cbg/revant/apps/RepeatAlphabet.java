@@ -2010,7 +2010,7 @@ if (fabio) System.err.println("VITTU> 2");
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
 if (fabio) System.err.println("VITTU> 3  considering window ["+i+".."+(i+k-1)+"]");
-				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
 if (fabio) System.err.println("VITTU> 4");
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
@@ -2031,7 +2031,7 @@ if (fabio) System.err.println("VITTU> 7");
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
 if (fabio) System.err.println("VITTU> 8  considering window ["+i+".."+(i+k-1)+"]");
-				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode)) continue;
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
 if (fabio) System.err.println("VITTU> 9  uniqueMode="+uniqueMode+" multiMode="+multiMode+" i="+i+" k="+k+" nBlocks="+nBlocks+" lastInBlock_int["+(i+k-1)+"]="+lastInBlock_int[i+k-1]);
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
@@ -2060,7 +2060,10 @@ if (fabio) System.err.println("VITTU> 10");
 
 	
 	/**
-	 * Tells whether window $blocks[first..first+k-1]$ satisfies the following:
+	 * Tells whether window $blocks[first..first+k-1]$ satisfies the following conditions.
+	 *
+	 * Remark: the procedure assumes that global variable $boundaries$ has been loaded 
+	 * with the boundaries of the current blocks.
 	 *
 	 * @param uniqueMode blocks with unique characters:
 	 * 0: are allowed; 
@@ -2072,8 +2075,10 @@ if (fabio) System.err.println("VITTU> 10");
 	 *    match several characters because they contain just a fraction of a character);
 	 * 2: are not allowed.
 	 */
-	private static final boolean isValidWindow(int first, int k, int nBlocks, int uniqueMode, int multiMode) {
+	private static final boolean isValidWindow(int first, int k, int nBlocks, int uniqueMode, int multiMode, int readLength) {
+		final int MIN_BLOCK_LENGTH = IO.quantum<<1;  // Arbitrary
 		int i;
+		int start, end;
 		
 		if (uniqueMode==1) {
 			if (isBlockUnique[first] || isBlockUnique[first+k-1]) return false;
@@ -2091,6 +2096,23 @@ if (fabio) System.err.println("VITTU> 10");
 				if (lastInBlock_int[first+i]>0) return false;
 			}
 		}
+		
+		// Avoiding short blocks
+		if (nBlocks>1) {
+			if (first==0) { start=0; end=boundaries[0]; }
+			else if (first==nBlocks-1) { start=boundaries[nBlocks-2]; end=readLength-1; }
+			else { start=boundaries[first-1]; end=boundaries[first]; }
+			if (end-start+1<MIN_BLOCK_LENGTH) return false;
+			if (first+k-1==0) { start=0; end=boundaries[0]; }
+			else if (first+k-1==nBlocks-1) { start=boundaries[nBlocks-2]; end=readLength-1; }
+			else { start=boundaries[first+k-2]; end=boundaries[first+k-1]; }
+			if (end-start+1<MIN_BLOCK_LENGTH) return false;
+			for (i=1; i<=k-2; i++) {
+				if (boundaries[i]-boundaries[i-1]<MIN_BLOCK_LENGTH) return false;
+			}
+		}
+		else { /* NOP: a single block is assumed to be long. */ }
+		
 		return true;
 	}
 	
@@ -2529,6 +2551,7 @@ if (fabio) System.err.println("VITTU> 10");
 	 * @return the total number of tandem intervals found.
 	 */
 	public static final long getTandemIntervals(String translatedFile, String boundariesFile, String readLengthsFile, String outputFile) throws IOException {
+		final int IDENTITY_THRESHOLD = IO.quantum;
 		int i;
 		int nBlocks, lastTandem, readLength;
 		long out;
@@ -2553,7 +2576,7 @@ if (fabio) System.err.println("VITTU> 10");
 			loadBoundaries(str2);
 			readLength=Integer.parseInt(str3);
 			loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
-			lastTandem=getTandemIntervals_impl(nBlocks);
+			lastTandem=getTandemIntervals_impl(nBlocks,IDENTITY_THRESHOLD);
 			if (lastTandem==-1) {
 				bw.newLine();
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
@@ -2577,15 +2600,16 @@ if (fabio) System.err.println("VITTU> 10");
 	 *
 	 * Remark: this definition of tandem is likely too simple for real data, since the
 	 * aligner might fail to align some repeat to some tandem unit, or the alignment might
-	 * be a bit off and give rise to a different character in our alphabet. 
+	 * be a bit off and give rise to a different character in our alphabet.
 	 *
 	 * Remark: the procedure uses global arrays $stack,stack2$.
 	 *
 	 * @return the last element in $tandemIntervals$.
 	 */
-	private static final int getTandemIntervals_impl(int nBlocks) {
-		int i, j;
-		int max, last1, last2, lastInterval, tandemLength;
+	private static final int getTandemIntervals_impl(int nBlocks, int distanceThreshold) {
+		boolean found;
+		int i, j, k;
+		int max, last1, last2, lastInterval, tandemLength, from, to;
 		Pair tmpInterval;
 		int[] tmpArray;
 		
@@ -2609,14 +2633,40 @@ if (fabio) System.err.println("VITTU> 10");
 				last1=last2;
 			}
 			if (tandemLength>1) {
+				found=false;
+				if (i==1) {
+					for (j=0; j<=lastInBlock_int[0]; j++) {
+						for (k=0; k<=last1; k++) {
+							if (alphabet[intBlocks[0][j]].isSuffixOf(alphabet[stack[k]],distanceThreshold)) {
+								found=true;
+								break;
+							}
+						}
+						if (found) break;
+					}
+				}
+				from=found?0:i;
+				found=false;
+				if (i+tandemLength==nBlocks-1) {
+					for (j=0; j<=lastInBlock_int[nBlocks-1]; j++) {
+						for (k=0; k<=last1; k++) {
+							if (alphabet[intBlocks[nBlocks-1][j]].isPrefixOf(alphabet[stack[k]],distanceThreshold)) {
+								found=true;
+								break;
+							}
+						}
+						if (found) break;
+					}
+				}
+				to=found?nBlocks-1:i+tandemLength-1;
 				lastInterval++;
 				if (lastInterval>=tandemIntervals.length) {
 					Pair[] newArray = new Pair[tandemIntervals.length<<1];
 					System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
 					tandemIntervals=newArray;
 				}
-				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(i,i+tandemLength-1);
-				else tandemIntervals[lastInterval].set(i,i+tandemLength-1);
+				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(from,to);
+				else tandemIntervals[lastInterval].set(from,to);
 			}
 		}
 		if (lastInterval<=0) return lastInterval;
@@ -5151,6 +5201,25 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  W
 			length=Math.round(length,quantum)*quantum;
 		}
 		
+		
+		/**
+		 * Not necessarily proper
+		 */
+		public final boolean isSuffixOf(Character otherCharacter, int threshold) {
+			if (repeat!=otherCharacter.repeat || repeat==UNIQUE || orientation!=otherCharacter.orientation) return false;
+			if (start==-1) return length<=otherCharacter.length+threshold;
+			else return Math.abs(end,otherCharacter.end)<=threshold && start>=otherCharacter.start-threshold;
+		}
+		
+		
+		/**
+		 * Not necessarily proper
+		 */
+		public final boolean isPrefixOf(Character otherCharacter, int threshold) {
+			if (repeat!=otherCharacter.repeat || repeat==UNIQUE || orientation!=otherCharacter.orientation) return false;
+			if (start==-1) return length<=otherCharacter.length+threshold;
+			else return Math.abs(start,otherCharacter.start)<=threshold && end<=otherCharacter.end+threshold;
+		}
 	}
 	
 	

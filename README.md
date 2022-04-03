@@ -55,6 +55,9 @@ The pipeline is organized in the following steps, that are reflected both by the
 
 
 
+# Codebase
+![Visualization of the codebase](./diagram.svg)
+
 
 
 # Acknowledgements
