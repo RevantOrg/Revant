@@ -46,7 +46,9 @@ public class FilterAlignments {
 	/**
 	 * @param args 
 	 * 14: discards alignments thar are not trustworthy in terms of tandems on both reads 
-	 *     (1) or on just one read (0).
+	 *     (1) or on just one read (0);
+	 * 20: only unique intervals with at least this number of blocks are considered
+	*      trustworthy.
 	 */
 	public static void main(String[] args) throws IOException {
 		final String ALIGNMENTS_FILE = args[0];
@@ -69,6 +71,7 @@ public class FilterAlignments {
 		final String BITVECTOR_TANDEM = args[17];
 		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[18]);
 		final int MIN_ALIGNMENT_LENGTH_READ_REPEAT = Integer.parseInt(args[19]);
+		final int MIN_BLUE_INTERVAL_LENGTH = Integer.parseInt(args[20]);
 		
 		// Non-repetitive regions shorter than this might be occurrences of repeats that 
 		// were not aligned to the repeat database because of heuristics of the aligner.
@@ -88,12 +91,12 @@ public class FilterAlignments {
 		Math.set(stats,0);
 		if (MODE==0) {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,false,TRANSLATED_BOUNDARIES_FILE);
-			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MIN_INTERSECTION_NONREPETITIVE,stats);
+			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MIN_INTERSECTION_NONREPETITIVE,MIN_BLUE_INTERVAL_LENGTH,stats);
 			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,BITVECTOR_TANDEM,tandemStats);
 		}
 		else {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,false,true,TRANSLATED_BOUNDARIES_FILE);
-			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MODE==1?false:true,SUFFIX_PREFIX_MODE,MIN_INTERSECTION_NONREPETITIVE,MIN_INTERSECTION_REPETITIVE,stats);
+			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MODE==1?false:true,SUFFIX_PREFIX_MODE,MIN_INTERSECTION_NONREPETITIVE,MIN_INTERSECTION_REPETITIVE,MIN_BLUE_INTERVAL_LENGTH,stats);
 			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,BITVECTOR_TANDEM,tandemStats);
 		}
 		System.err.println("All alignments:  (input, output)");

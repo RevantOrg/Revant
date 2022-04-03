@@ -20,7 +20,10 @@ FILTERING_MODE="1"  # 0=loose, 1=tight, 2=tight with matching characters.
 SUFFIX_PREFIX_MODE="0"  # 1=in tight mode, keep suffix-prefix alignments that contain a
 # unique sequence of repeats in a read, and that only straddle a unique sequence of
 # repeats on the other read.
-BOTH_READS_TANDEM="0"  # 1=discards alignments iff affected by tandems in both reads.
+BOTH_READS_TANDEM="0"  # Discards an alignment affected by tandems in both reads (1) or
+# in a single read (0).
+MIN_UNIQUE_INTERVAL_LENGTH="1"  # Unique intervals shorter than this are not considered
+# trustworthy. Leaving it to one works best in practice.
 N_THREADS="4"
 DELETE_TMP_FILES="1"
 # REVANT
@@ -64,7 +67,7 @@ ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 
 function filterThread() {
 	local ALIGNMENTS_FILE_ID=$1
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${UNIQUE_INTERVALS_FILE} ${TANDEM_INTERVALS_FILE} ${FILTERING_MODE} ${SUFFIX_PREFIX_MODE} ${BOTH_READS_TANDEM} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${UNIQUE_INTERVALS_FILE} ${TANDEM_INTERVALS_FILE} ${FILTERING_MODE} ${SUFFIX_PREFIX_MODE} ${BOTH_READS_TANDEM} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${MIN_UNIQUE_INTERVAL_LENGTH}
 	if [ ${BROKEN_READS} -eq 1 ]; then
 		NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
 		OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"

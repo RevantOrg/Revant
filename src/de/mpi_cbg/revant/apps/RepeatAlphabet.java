@@ -1972,7 +1972,7 @@ public class RepeatAlphabet {
 		Kmer key, value;
 		Iterator<Kmer> iterator;
 		
-boolean fabio = str.equalsIgnoreCase("1954,1955,2765,2766,2806,2807:993,1176:4:796:2:1170:1482:2447:2404:2244:4:2290:1892,2476:8:2399,2708:381:845:-1014");
+boolean fabio = str.equalsIgnoreCase("-3:876:4:1828:1200:1833:2309:4:2386,3056,3118,3148:2051");
 if (fabio) System.err.println("VITTU> 1");
 
 		
@@ -2169,7 +2169,8 @@ if (fabio) System.err.println("VITTU> 10");
 		while (top1>=0) {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
-				key.set(tmpArray2,0,k,true); key.canonize(k,tmpArray3);
+				key.set(tmpArray2,0,k,true); 
+				key.canonize(k,tmpArray3);
 				if (newKmers!=null) {
 					value=newKmers.get(key);
 					if (value==null) {
@@ -3174,7 +3175,7 @@ if (fabio) System.err.println("VITTU> 10");
 	 * input; row 1: all alignments kept in output; row 2: only input alignments that
 	 * intersect a non-repetitive region (these are kept in output).
 	 */
-	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection_nonrepetitive, long[][] out) throws IOException {
+	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection_nonrepetitive, int minBlueIntervalLength, long[][] out) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		int p;
 		int row, readA, readB, type, value, isRepetitive;
@@ -3210,7 +3211,7 @@ if (fabio) System.err.println("VITTU> 10");
 			else {
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection_nonrepetitive);
+				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection_nonrepetitive,minBlueIntervalLength);
 			}
 			if (isRepetitive!=0) {
 				bw.write("1\n"); str=br.readLine(); row++;
@@ -3234,7 +3235,7 @@ if (fabio) System.err.println("VITTU> 10");
 				System.err.println("filterAlignments_loose> ERROR: read "+readB+" is neither translated, nor fully unique, nor fully contained in a repeat.");
 				System.exit(1);
 			}
-			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive);
+			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minBlueIntervalLength);
 			if (isRepetitive==0) bw.write("0\n"); 
 			else {
 				bw.write("1\n");
@@ -3267,11 +3268,11 @@ if (fabio) System.err.println("VITTU> 10");
 	 * the alignment, for the alignment to be considered non-repetitive;
 	 * @return interval $readID[intervalStart..intervalEnd]$:
 	 * -1: belongs to or straddles a non-repetitive region;
-	 * -2: contains a sequence of repeat characters that likely occurs <=H times in the 
-	 *     genome;
+	 * -2: contains a sequence of $>=minBlueIntervalLength$ repeat characters that likely
+	 *     occurs <=H times in the genome;
 	 *  0: none of the above is true.
 	 */
-	private static final int inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive) {
+	private static final int inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minBlueIntervalLength) {
 		int i, j;
 		int mask, cell, start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
@@ -3343,6 +3344,7 @@ if (fabio) System.err.println("VITTU> 10");
 		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
 		if (blueIntervalsID!=-1) {
 			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
+				if (blueIntervals[blueIntervalsID][i+1]<minBlueIntervalLength) continue;		
 				firstBlock=blueIntervals[blueIntervalsID][i];
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
@@ -3421,7 +3423,7 @@ if (fabio) System.err.println("VITTU> 10");
 	 * @param out row 2 stores the number of input alignments that overlap a non-
 	 * repetitive region on both reads (these are kept in output).
 	 */
-	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, boolean suffixPrefixMode, int minIntersection_nonrepetitive, int minIntersection_repetitive, long[][] out) throws IOException {
+	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, boolean suffixPrefixMode, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength, long[][] out) throws IOException {
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		boolean orientation, overlapsUniqueA, straddlesLeftA, straddlesRightA;
 		int p, q;
@@ -3467,7 +3469,7 @@ if (fabio) System.err.println("VITTU> 10");
 				}
 				readAInTranslated=lastTranslated;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive);
+				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
 				if (q==-1) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
@@ -3506,7 +3508,7 @@ if (fabio) System.err.println("VITTU> 10");
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive);
+			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
 			if (q==-1) bw.write("0\n");
 			else if (q==0 || q==1) {
 				if (mode) {
@@ -3643,8 +3645,8 @@ if (fabio) System.err.println("VITTU> 10");
 	 * @return interval $readID[intervalStart..intervalEnd]$:
 	 * 0: fully belongs to a non-repetitive region;
 	 * 1: straddles a non-repetitive region;
-	 * 2: contains a sequence of repeat characters that is likely to occur <=H times in 
-	 *    the genome, where H is the number of haplotypes;
+	 * 2: contains a sequence of $>=minBlueIntervalLength$ repeat characters that is 
+	 *    likely to occur <=H times in the genome, where H is the number of haplotypes;
 	 * 3: straddles, but does not fully contain, a sequence in point (2), on the left side
 	 *    of the interval;
 	 * 4: straddles, but does not fully contain, a sequence in point (2), on the right
@@ -3652,7 +3654,7 @@ if (fabio) System.err.println("VITTU> 10");
 	 * 5: both (3) and (4) are true;
 	 * -1: none of the above is true.
 	 */
-	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive) {
+	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength) {
 		boolean straddlesLeft, straddlesRight;
 		int i, j;
 		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
@@ -3697,6 +3699,7 @@ if (fabio) System.err.println("VITTU> 10");
 		if (blueIntervalsID!=-1) {
 			straddlesLeft=false; straddlesRight=false;
 			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
+				if (blueIntervals[blueIntervalsID][i+1]<minBlueIntervalLength) continue;
 				firstBlock=blueIntervals[blueIntervalsID][i];
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
