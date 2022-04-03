@@ -1,7 +1,12 @@
-- name: Checkout code
-  uses: actions/checkout@master
-- name: Repo Visualizer
-  uses: githubocto/repo-visualizer@0.8.1
-  with:
-    output_file: "diagram.svg"
-    excluded_paths: "data"
+on: push
+jobs:
+  visualize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+      - name: Repo Visualizer
+        uses: githubocto/repo-visualizer@0.8.1
+          with:
+            output_file: "diagram.svg"
+            excluded_paths: "data"
