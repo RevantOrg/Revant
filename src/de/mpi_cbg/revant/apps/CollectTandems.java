@@ -12,9 +12,12 @@ public class CollectTandems {
 		final String TRANSLATED_FILE = args[1];
 		final String BOUNDARIES_FILE = args[2];
 		final String READ_LENGTHS_FILE = args[3];
-		final String TANDEMS_FILE = args[4];  // Output file
+		final String REPEAT_LENGTHS_FILE = args[4];
+		final int N_REPEATS = Integer.parseInt(args[5]);
+		final String TANDEMS_FILE = args[6];  // Output file
 		
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
+		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		final long nIntervals = RepeatAlphabet.getTandemIntervals(TRANSLATED_FILE,BOUNDARIES_FILE,READ_LENGTHS_FILE,TANDEMS_FILE);
 		System.err.println(nIntervals+" tandem intervals found");
 	}

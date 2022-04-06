@@ -16,7 +16,7 @@ INPUT_DIR=$1
 N_HAPLOTYPES="1"
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_K="8"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
-N_THREADS="4"
+N_THREADS="1"
 DELETE_TMP_FILES="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
@@ -33,6 +33,8 @@ READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 READS_TRANSLATED_BOUNDARIES="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 TANDEMS_FILE="${INPUT_DIR}/tandems.txt"
+REPEAT_LENGTHS_FILE="${INPUT_DIR}/repeats-lengths.txt"
+N_REPEATS=$(wc -l < ${REPEAT_LENGTHS_FILE})
 MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
 MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + ${HAPLOTYPE_COVERAGE}/2 ))
 # Endblocks are allowed if they match just one character, since they are the only way to
@@ -120,7 +122,7 @@ function tandemsThread() {
 	local LOCAL_BOUNDARIES_FILE=$2
 	local LOCAL_READ_LENGTHS_FILE=$3
 	local LOCAL_TANDEMS_FILE=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${LOCAL_TANDEMS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
 }
 echo "Collecting tandems..."
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do

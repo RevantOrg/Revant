@@ -2544,10 +2544,12 @@ if (fabio) System.err.println("VITTU> 10");
 		return selectedCharacter==-1?-2:selectedCharacter;
 	}
 	
-	
+private static boolean fabio;	
 	/**
 	 * Writes to $outputFile$ the tandem intervals of every translated read in
 	 * $translatedFile$, as a sequence of pairs $firstBlock,lastBlock$.
+	 *
+	 * Remark: the procedure assumes that array $repeatLength$ has already been loaded.
 	 *
 	 * @return the total number of tandem intervals found.
 	 */
@@ -2577,7 +2579,8 @@ if (fabio) System.err.println("VITTU> 10");
 			loadBoundaries(str2);
 			readLength=Integer.parseInt(str3);
 			loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
-			lastTandem=getTandemIntervals_impl(nBlocks,IDENTITY_THRESHOLD);
+fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:2571");
+			lastTandem=getTandemIntervals_impl(nBlocks,boundaries,readLength,IDENTITY_THRESHOLD,tmpChar);
 			if (lastTandem==-1) {
 				bw.newLine();
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
@@ -2603,14 +2606,16 @@ if (fabio) System.err.println("VITTU> 10");
 	 * aligner might fail to align some repeat to some tandem unit, or the alignment might
 	 * be a bit off and give rise to a different character in our alphabet.
 	 *
-	 * Remark: the procedure uses global arrays $stack,stack2$.
+	 * Remark: the procedure assumes that array $repeatLength$ has already been loaded, 
+	 * and it uses global arrays $stack,stack2$.
 	 *
+	 * @param tmpChar temporary space;
 	 * @return the last element in $tandemIntervals$.
 	 */
-	private static final int getTandemIntervals_impl(int nBlocks, int distanceThreshold) {
+	private static final int getTandemIntervals_impl(int nBlocks, int[] boundaries, int readLength, int distanceThreshold, Character tmpChar) {
 		boolean found;
 		int i, j, k;
-		int max, last1, last2, lastInterval, tandemLength, from, to;
+		int max, last1, last2, lastInterval, tandemLength, from, to, length, repeatLength;
 		Pair tmpInterval;
 		int[] tmpArray;
 		
@@ -2637,8 +2642,18 @@ if (fabio) System.err.println("VITTU> 10");
 				found=false;
 				if (i==1) {
 					for (j=0; j<=lastInBlock_int[0]; j++) {
+						if (alphabet[intBlocks[0][j]].repeat==-1) continue;
+						tmpChar.copyFrom(alphabet[intBlocks[0][j]]);
+						tmpChar.openStart=true;
+						repeatLength=repeatLengths[tmpChar.repeat];
+						length=boundaries[0];
+						if (intBlocks[0][j]<=lastPeriodic) tmpChar.length=length;
+						else {
+							if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+							else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+						}
 						for (k=0; k<=last1; k++) {
-							if (alphabet[intBlocks[0][j]].isSuffixOf(alphabet[stack[k]],distanceThreshold)) {
+							if (tmpChar.isSuffixOf(alphabet[stack[k]],distanceThreshold)) {
 								found=true;
 								break;
 							}
@@ -2650,8 +2665,18 @@ if (fabio) System.err.println("VITTU> 10");
 				found=false;
 				if (i+tandemLength==nBlocks-1) {
 					for (j=0; j<=lastInBlock_int[nBlocks-1]; j++) {
+						if (alphabet[intBlocks[nBlocks-1][j]].repeat==-1) continue;
+						tmpChar.copyFrom(alphabet[intBlocks[nBlocks-1][j]]);
+						tmpChar.openEnd=true;
+						repeatLength=repeatLengths[tmpChar.repeat];
+						length=readLength-boundaries[nBlocks-2];
+						if (intBlocks[nBlocks-1][j]<=lastPeriodic) tmpChar.length=length;
+						else {
+							if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+							else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+						}
 						for (k=0; k<=last1; k++) {
-							if (alphabet[intBlocks[nBlocks-1][j]].isPrefixOf(alphabet[stack[k]],distanceThreshold)) {
+							if (tmpChar.isPrefixOf(alphabet[stack[k]],distanceThreshold)) {
 								found=true;
 								break;
 							}
@@ -2671,6 +2696,15 @@ if (fabio) System.err.println("VITTU> 10");
 			}
 		}
 		if (lastInterval<=0) return lastInterval;
+		
+		// Adding intervals $[0..1]$ and $[nBlocks-2..nBlocks-1]$, if any.
+		--------->
+		
+		
+		
+		
+		
+		
 		
 		// Merging overlapping intervals
 		Arrays.sort(tandemIntervals,0,lastInterval+1);
