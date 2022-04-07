@@ -2609,11 +2609,12 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 	 * Remark: the procedure assumes that array $repeatLength$ has already been loaded, 
 	 * and it uses global arrays $stack,stack2$.
 	 *
+	 * @param nBlocks assumed >1;
 	 * @param tmpChar temporary space;
 	 * @return the last element in $tandemIntervals$.
 	 */
 	private static final int getTandemIntervals_impl(int nBlocks, int[] boundaries, int readLength, int distanceThreshold, Character tmpChar) {
-		boolean found;
+		boolean found, processFirstBlock, processLastBlock;
 		int i, j, k;
 		int max, last1, last2, lastInterval, tandemLength, from, to, length, repeatLength;
 		Pair tmpInterval;
@@ -2627,7 +2628,7 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 		if (stack2==null || stack2.length<max) stack2 = new int[max];
 		
 		// Collecting intervals
-		lastInterval=-1;
+		processFirstBlock=true; processLastBlock=true; lastInterval=-1;
 		for (i=0; i<nBlocks-1; i++) {
 			System.arraycopy(intBlocks[i],0,stack,0,lastInBlock_int[i]+1);
 			last1=lastInBlock_int[i]; tandemLength=1;
@@ -2640,14 +2641,13 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 			}
 			if (tandemLength>1) {
 				found=false;
-				if (i==1) {
-					for (j=0; j<=lastInBlock_int[0]; j++) {
-						if (alphabet[intBlocks[0][j]].repeat==-1) continue;
-						tmpChar.copyFrom(alphabet[intBlocks[0][j]]);
-						tmpChar.openStart=true;
+				if (i>0) {
+					for (j=0; j<=lastInBlock_int[i-1]; j++) {
+						if (intBlocks[i-1][j]>lastAlphabet || alphabet[intBlocks[i-1][j]].repeat==-1) continue;
+						tmpChar.copyFrom(alphabet[intBlocks[i-1][j]]);
 						repeatLength=repeatLengths[tmpChar.repeat];
-						length=boundaries[0];
-						if (intBlocks[0][j]<=lastPeriodic) tmpChar.length=length;
+						length=boundaries[i-1]-(i==1?0:boundaries[i-2]);
+						if (intBlocks[i-1][j]<=lastPeriodic) tmpChar.length=length;
 						else {
 							if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
 							else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
@@ -2661,16 +2661,16 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 						if (found) break;
 					}
 				}
-				from=found?0:i;
+				from=found?i-1:i;
 				found=false;
-				if (i+tandemLength==nBlocks-1) {
-					for (j=0; j<=lastInBlock_int[nBlocks-1]; j++) {
-						if (alphabet[intBlocks[nBlocks-1][j]].repeat==-1) continue;
-						tmpChar.copyFrom(alphabet[intBlocks[nBlocks-1][j]]);
+				if (i+tandemLength<=nBlocks-1) {
+					for (j=0; j<=lastInBlock_int[i+tandemLength]; j++) {
+						if (intBlocks[i+tandemLength][j]>lastAlphabet || alphabet[intBlocks[i+tandemLength][j]].repeat==-1) continue;
+						tmpChar.copyFrom(alphabet[intBlocks[i+tandemLength][j]]);
 						tmpChar.openEnd=true;
 						repeatLength=repeatLengths[tmpChar.repeat];
-						length=readLength-boundaries[nBlocks-2];
-						if (intBlocks[nBlocks-1][j]<=lastPeriodic) tmpChar.length=length;
+						length=(i+tandemLength==nBlocks-1?readLength:boundaries[i+tandemLength])-boundaries[i+tandemLength-1];
+						if (intBlocks[i+tandemLength][j]<=lastPeriodic) tmpChar.length=length;
 						else {
 							if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
 							else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
@@ -2684,7 +2684,7 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 						if (found) break;
 					}
 				}
-				to=found?nBlocks-1:i+tandemLength-1;
+				to=found?i+tandemLength:i+tandemLength-1;
 				lastInterval++;
 				if (lastInterval>=tandemIntervals.length) {
 					Pair[] newArray = new Pair[tandemIntervals.length<<1];
@@ -2693,20 +2693,79 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 				}
 				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(from,to);
 				else tandemIntervals[lastInterval].set(from,to);
+				if (from<=1) processFirstBlock=false;
+				if (to>=nBlocks-2) processLastBlock=false;
 			}
 		}
-		if (lastInterval<=0) return lastInterval;
 		
-		// Adding intervals $[0..1]$ and $[nBlocks-2..nBlocks-1]$, if any.
-		--------->
-		
-		
-		
-		
-		
-		
+		// Adding interval $[0..1]$ if it is a tandem.
+		if (processFirstBlock) {
+			found=false;
+			for (i=0; i<=lastInBlock_int[0]; i++) {
+				if (intBlocks[0][i]>lastAlphabet || alphabet[intBlocks[0][i]].repeat==-1) continue;
+				tmpChar.copyFrom(alphabet[intBlocks[0][i]]);
+				repeatLength=repeatLengths[tmpChar.repeat];
+				length=boundaries[0];
+				if (intBlocks[0][i]<=lastPeriodic) tmpChar.length=length;
+				else {
+					if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+					else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+				}
+				for (j=0; j<=lastInBlock_int[1]; j++) {
+					if (tmpChar.isSuffixOf(alphabet[intBlocks[1][j]],distanceThreshold)) {
+						found=true;
+						break;
+					}
+				}
+				if (found) break;
+			}
+			if (found) {
+				lastInterval++;
+				if (lastInterval>=tandemIntervals.length) {
+					Pair[] newArray = new Pair[tandemIntervals.length<<1];
+					System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
+					tandemIntervals=newArray;
+				}
+				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(0,1);
+				else tandemIntervals[lastInterval].set(0,1);
+			}
+		}
+	
+		// Adding interval $[nBlocks-2..nBlocks-1]$ if it is a tandem.
+		if (processLastBlock) {
+			found=false;
+			for (i=0; i<=lastInBlock_int[nBlocks-1]; i++) {
+				if (intBlocks[nBlocks-1][i]>lastAlphabet || alphabet[intBlocks[nBlocks-1][i]].repeat==-1) continue;
+				tmpChar.copyFrom(alphabet[intBlocks[nBlocks-1][i]]);
+				repeatLength=repeatLengths[tmpChar.repeat];
+				length=readLength-boundaries[nBlocks-2];
+				if (intBlocks[nBlocks-1][i]<=lastPeriodic) tmpChar.length=length;
+				else {
+					if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+					else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+				}
+				for (j=0; j<=lastInBlock_int[nBlocks-2]; j++) {
+					if (tmpChar.isPrefixOf(alphabet[intBlocks[nBlocks-2][j]],distanceThreshold)) {
+						found=true;
+						break;
+					}
+				}
+				if (found) break;
+			}
+			if (found) {
+				lastInterval++;
+				if (lastInterval>=tandemIntervals.length) {
+					Pair[] newArray = new Pair[tandemIntervals.length<<1];
+					System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
+					tandemIntervals=newArray;
+				}
+				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(nBlocks-2,nBlocks-1);
+				else tandemIntervals[lastInterval].set(nBlocks-2,nBlocks-1);
+			}
+		}
 		
 		// Merging overlapping intervals
+		if (lastInterval<=0) return lastInterval;
 		Arrays.sort(tandemIntervals,0,lastInterval+1);
 		j=0;
 		for (i=0; i<=lastInterval; i++) {
