@@ -3962,11 +3962,16 @@ public class RepeatAlphabet {
 	 *
 	 * @param bothReads discards an alignment if the conditions above hold on both reads
 	 * (TRUE) or on just one read (FALSE);
+	 * @param minIntersection_nonrepetitive min. length of a non-repetitive substring of 
+	 * the alignment, for the alignment not to be considered red; this should not be too 
+	 * small, since short non-repetitive regions might not address a unique locus of the 
+	 * genome, and they might even be occurrences of short repeats that were not aligned 
+	 * to the repeat database because of heuristics of the aligner;
 	 * @param out output array containing the number of alignments for each type (columns)
 	 * specified in $Alignments.readAlignmentFile_getType()$; row 0: all alignments in 
 	 * input; row 1: all alignments kept in output.
 	 */
-	public static final void filterAlignments_tandem(String alignmentsFile, boolean bothReads, String outputFile, long[][] out) throws IOException {
+	public static final void filterAlignments_tandem(String alignmentsFile, boolean bothReads, int minIntersection_nonrepetitive, String outputFile, long[][] out) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean found, containedA, identicalA, containedB, identicalB;
 		int i, p;
@@ -4019,9 +4024,9 @@ public class RepeatAlphabet {
 					}
 				}
 				if (!bothReads) {
-if (readA==786 && readB==436) {
+if (readA==609 && readB==1702) {
 	System.err.println("filterAlignments_tandem> 0  str="+str);
-	System.err.println("filterAlignments_tandem> identicalA="+identicalA+" filterAlignments_tandem_allContainedBlueInTandem="+filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks)+" filterAlignments_tandem_containsUnique="+filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,Reads.getReadLength(readA)));
+	System.err.println("filterAlignments_tandem> identicalA="+identicalA+" filterAlignments_tandem_allContainedBlueInTandem="+filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks)+" filterAlignments_tandem_containsUnique="+filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,Reads.getReadLength(readA),minIntersection_nonrepetitive));
 	System.err.println("filterAlignments_tandem> translation_all: ");
 	for (int x=0; x<nBlocks; x++) {
 		System.err.print(x+": ");
@@ -4031,19 +4036,19 @@ if (readA==786 && readB==436) {
 }
 					if ( containedA || 
 					     (identicalA && !filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || 
-					     (!identicalA && filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks) && !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,Reads.getReadLength(readA)))
+					     (!identicalA && filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks) && !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,Reads.getReadLength(readA),minIntersection_nonrepetitive))
 					   ) {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 1");
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 1");
 						bw.write("0\n"); str=br.readLine(); row++;
 						continue;
 					}
 				}
 				else {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 2  str="+str);
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 2  str="+str);
 					if ( (identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || 
 					     (!identicalA && !containedA && !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks))
 					   ) {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 3");
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 3");
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
 						continue;
@@ -4051,7 +4056,7 @@ if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 3");
 				}
 			}
 			else if (bothReads) {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 4  str="+str);
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 4  str="+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
@@ -4077,22 +4082,22 @@ if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 4  st
 					}
 				}
 				if (!bothReads) {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 5  str="+str);
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 5  str="+str);
 					if ( containedB || 
 					     (identicalB && !filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
-					     (!identicalB && filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks) && !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,Reads.getReadLength(readB)))
+					     (!identicalB && filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks) && !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,Reads.getReadLength(readB),minIntersection_nonrepetitive))
 					   ) {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 6");
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 6");
 						bw.write("0\n"); str=br.readLine(); row++;
 						continue;
 					}
 				}
 				else {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 7  str="+str);
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 7  str="+str);
 					if ( (identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
 					     (!identicalB && !containedB && !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks))
 					   ) {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 8");
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 8");
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
 						continue;
@@ -4100,12 +4105,12 @@ if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 8");
 				}
 			}
 			else if (bothReads) {
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 9  str="+str);
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 9  str="+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
-if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 10");
+if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10");
 			if (bothReads) bw.write("0\n");
 			else bw.write("1\n");
 			str=br.readLine(); row++;
@@ -4190,7 +4195,7 @@ if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 10");
 	 *
 	 * @return TRUE iff $[intervalStart..intervalEnd]$ contains a non-repetitive block.
 	 */
-	private static final boolean filterAlignments_tandem_containsUnique(int boundariesAllID, int intervalStart, int intervalEnd, int nBlocks, int readLength) {
+	private static final boolean filterAlignments_tandem_containsUnique(int boundariesAllID, int intervalStart, int intervalEnd, int nBlocks, int readLength, int minIntersection_nonrepetitive) {
 		int i, j, c;
 		int start, end, last;
 		
@@ -4201,7 +4206,7 @@ if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 10");
 				if (c>lastUnique && c<=lastAlphabet) break;
 				start=i==0?0:boundaries_all[boundariesAllID][i-1]+1;
 				end=i==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][i];
-				if (Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)) return true;
+				if (end-start+1>=minIntersection_nonrepetitive && Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)) return true;
 			}
 		}
 		return false;
