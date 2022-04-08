@@ -90,7 +90,7 @@ public class FilterAlignments {
 		stats = new long[3][3]; tandemStats = new long[2][3];
 		Math.set(stats,0);
 		if (MODE==0) {
-			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,false,TRANSLATED_BOUNDARIES_FILE);
+			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,true,TRANSLATED_BOUNDARIES_FILE);
 			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MIN_INTERSECTION_NONREPETITIVE,MIN_BLUE_INTERVAL_LENGTH,stats);
 			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,BITVECTOR_TANDEM,tandemStats);
 		}

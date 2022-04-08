@@ -24,7 +24,7 @@ BOTH_READS_TANDEM="0"  # Discards an alignment affected by tandems in both reads
 # in a single read (0).
 MIN_UNIQUE_INTERVAL_LENGTH="1"  # Unique intervals shorter than this are not considered
 # trustworthy. Leaving it to one works best in practice.
-N_THREADS="4"
+N_THREADS="1"
 DELETE_TMP_FILES="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"

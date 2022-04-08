@@ -1972,10 +1972,6 @@ public class RepeatAlphabet {
 		Kmer key, value;
 		Iterator<Kmer> iterator;
 		
-boolean fabio = str.equalsIgnoreCase("-3:876:4:1828:1200:1833:2309:4:2386,3056,3118,3148:2051");
-if (fabio) System.err.println("VITTU> 1");
-
-		
 		// Loading blocks
 		out=lastAvoidedInterval;
 		if (str.length()<(k<<1)-1) return out;
@@ -1992,51 +1988,32 @@ if (fabio) System.err.println("VITTU> 1");
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 		
-if (fabio) {
-	System.err.println("VITTU> intBlocks:");
-	for (int x=0; x<nBlocks; x++) {
-		System.err.print(x+": ");
-		for (int y=0; y<=lastInBlock_int[x]; y++) System.err.print(intBlocks[x][y]+",");
-		System.err.println();
-	}
-}		
-		
-		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
-if (fabio) System.err.println("VITTU> 2");			
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-if (fabio) System.err.println("VITTU> 3  considering window ["+i+".."+(i+k-1)+"]");
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
-if (fabio) System.err.println("VITTU> 4");
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-if (fabio) System.err.println("VITTU> 5");
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 				if (nHaplotypes!=-1 && (k>1?true:i>0&&i<nBlocks-1&&lastInBlock_int[i]==0)) { 
-if (fabio) System.err.println("VITTU> 6  adding to avoidedIntervals");
 					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
 				}
 			}
 		}
 		else {
-if (fabio) System.err.println("VITTU> 7");
 			tmpMap.clear(); lastKmerPool=-1;
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-if (fabio) System.err.println("VITTU> 8  considering window ["+i+".."+(i+k-1)+"]");
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
-if (fabio) System.err.println("VITTU> 9  uniqueMode="+uniqueMode+" multiMode="+multiMode+" i="+i+" k="+k+" nBlocks="+nBlocks+" lastInBlock_int["+(i+k-1)+"]="+lastInBlock_int[i+k-1]);
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-if (fabio) System.err.println("VITTU> 10");				
 				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
@@ -2544,7 +2521,7 @@ if (fabio) System.err.println("VITTU> 10");
 		return selectedCharacter==-1?-2:selectedCharacter;
 	}
 	
-private static boolean fabio;	
+
 	/**
 	 * Writes to $outputFile$ the tandem intervals of every translated read in
 	 * $translatedFile$, as a sequence of pairs $firstBlock,lastBlock$.
@@ -2579,7 +2556,6 @@ private static boolean fabio;
 			loadBoundaries(str2);
 			readLength=Integer.parseInt(str3);
 			loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
-fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:2571");
 			lastTandem=getTandemIntervals_impl(nBlocks,boundaries,readLength,IDENTITY_THRESHOLD,tmpChar);
 			if (lastTandem==-1) {
 				bw.newLine();
@@ -2599,8 +2575,10 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 	
 	/**
 	 * Stores in global variable $tandemIntervals$ the set of all maximal tandem intervals
-	 * of $intBlocks$, where a tandem interval is a substring such that all its blocks
-	 * have a character in common. Tandem intervals that intersect are merged.
+	 * of $intBlocks$, where a tandem interval is a maximal substring such that all its
+	 * blocks have a character in common. The procedure searches also for maximal 
+	 * intervals that all share an inexact character, with some limited tolerance. Tandem 
+	 * intervals that intersect are merged (adjacent tandem intervals are not merged).
 	 *
 	 * Remark: this definition of tandem is likely too simple for real data, since the
 	 * aligner might fail to align some repeat to some tandem unit, or the alignment might
@@ -2614,9 +2592,10 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 	 * @return the last element in $tandemIntervals$.
 	 */
 	private static final int getTandemIntervals_impl(int nBlocks, int[] boundaries, int readLength, int distanceThreshold, Character tmpChar) {
+		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean found, processFirstBlock, processLastBlock;
-		int i, j, k;
-		int max, last1, last2, lastInterval, tandemLength, from, to, length, repeatLength;
+		int i, j, k, h, c, d;
+		int max, last1, last2, lastInterval, tandemLength, from, to, toPrime, length, repeatLength;
 		Pair tmpInterval;
 		int[] tmpArray;
 		
@@ -2627,7 +2606,7 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 		if (stack==null || stack.length<max) stack = new int[max];
 		if (stack2==null || stack2.length<max) stack2 = new int[max];
 		
-		// Collecting intervals
+		// Collecting intervals that share a character
 		processFirstBlock=true; processLastBlock=true; lastInterval=-1;
 		for (i=0; i<nBlocks-1; i++) {
 			System.arraycopy(intBlocks[i],0,stack,0,lastInBlock_int[i]+1);
@@ -2761,6 +2740,48 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 				}
 				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(nBlocks-2,nBlocks-1);
 				else tandemIntervals[lastInterval].set(nBlocks-2,nBlocks-1);
+			}
+		}
+		
+		// Collecting intervals that share similar characters
+		for (i=0; i<nBlocks-1; i++) {
+			to=0;
+			for (j=0; j<=lastInBlock_int[i]; j++) {
+				c=intBlocks[i][j];
+				if (c<=lastUnique || c>lastAlphabet) continue;
+				toPrime=0;
+				for (k=i+1; k<=nBlocks-1; k++) {
+					found=false;
+					for (h=0; h<=lastInBlock_int[k]; h++) {
+						d=intBlocks[k][h];
+						if (d<=lastUnique || d>lastAlphabet) continue;
+						if ( alphabet[d].repeat==alphabet[c].repeat && alphabet[d].orientation==alphabet[c].orientation &&
+							 ( (alphabet[c].repeat<=lastPeriodic && Math.abs(alphabet[c].length,alphabet[d].length)<=IDENTITY_THRESHOLD) ||
+							   ( alphabet[c].repeat>lastPeriodic && 
+								 ( (alphabet[c].start==alphabet[d].start && Math.abs(alphabet[c].end,alphabet[d].end)<=IDENTITY_THRESHOLD) ||
+								   (alphabet[c].end==alphabet[d].end && Math.abs(alphabet[c].start,alphabet[d].start)<=IDENTITY_THRESHOLD)
+								 )
+							   )
+							 )
+						   ) {
+							found=true;
+							break;
+						}
+					}
+					if (!found) break;
+					else toPrime=k;
+				}
+				to=Math.max(to,toPrime);
+			}
+			if (to!=0) {
+				lastInterval++;
+				if (lastInterval>=tandemIntervals.length) {
+					Pair[] newArray = new Pair[tandemIntervals.length<<1];
+					System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
+					tandemIntervals=newArray;
+				}
+				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(i,to);
+				else tandemIntervals[lastInterval].set(i,to);
 			}
 		}
 		
@@ -3930,8 +3951,9 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 	 * Let a tandem be a maximal sequence of adjacent blocks with characters in common.
 	 * The procedure writes a zero for every alignment that should not be trusted because
 	 * it either (1) is strictly contained in a tandem, or (2) is identical to a tandem, 
-	 * but the tandem is not a blue interval, or (3) straddles or contains a tandem, and 
-	 * all blue intervals in the alignment fall inside a tandem.
+	 * but the tandem is not a blue interval, or (3) straddles or contains a tandem, does
+	 * not contain a nonrepetitive character, and all blue intervals in the alignment fall
+	 * inside a tandem.
 	 *
 	 * Remark: every block inside a tandem might be tagged with several characters, and it
 	 * might happen that a sequence of such characters occurs just once inside the tandem,
@@ -3997,14 +4019,31 @@ fabio=str1.equalsIgnoreCase("2571:2570:754,846:3:138:750:2463,2901:751:839:2572:
 					}
 				}
 				if (!bothReads) {
-					if (containedA || (identicalA && !filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || (!identicalA && filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks))) {
+if (readA==786 && readB==436) {
+	System.err.println("filterAlignments_tandem> 0  str="+str);
+	System.err.println("filterAlignments_tandem> identicalA="+identicalA+" filterAlignments_tandem_allContainedBlueInTandem="+filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks)+" filterAlignments_tandem_containsUnique="+filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,Reads.getReadLength(readA)));
+	System.err.println("filterAlignments_tandem> translation_all: ");
+	for (int x=0; x<nBlocks; x++) {
+		System.err.print(x+": ");
+		for (int y=0; y<translation_all[readA][x].length; y++) System.err.print(translation_all[readA][x][y]+",");
+		System.err.println();
+	}
+}
+					if ( containedA || 
+					     (identicalA && !filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || 
+					     (!identicalA && filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks) && !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,Reads.getReadLength(readA)))
+					   ) {
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 1");
 						bw.write("0\n"); str=br.readLine(); row++;
 						continue;
 					}
 				}
 				else {
-					if ((identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || (!identicalA && !containedA && !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks))) {
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 2  str="+str);
+					if ( (identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || 
+					     (!identicalA && !containedA && !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks))
+					   ) {
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 3");
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
 						continue;
@@ -4012,6 +4051,7 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  W
 				}
 			}
 			else if (bothReads) {
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 4  str="+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
@@ -4028,7 +4068,6 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 2  W
 					else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
 					if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=Reads.getReadLength(readB)-1;
 					else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3.5  ["+startB+".."+endB+"] :: ["+firstTandemPosition+".."+lastTandemPosition+"]");				
 					if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
 					else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
 					if (identicalB || containedB) {
@@ -4038,23 +4077,22 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3.5 
 					}
 				}
 				if (!bothReads) {
-					if (containedB || (identicalB && !filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || (!identicalB && filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks))) {
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 5  str="+str);
+					if ( containedB || 
+					     (identicalB && !filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
+					     (!identicalB && filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks) && !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,Reads.getReadLength(readB)))
+					   ) {
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 6");
 						bw.write("0\n"); str=br.readLine(); row++;
 						continue;
 					}
 				}
 				else {
-					if ((identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || (!identicalB && !containedB && !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks))) {
-if (readA==940 && readB==1108) {
-	System.err.println("filterAlignments_tandem> 4.1  WHAT??? WE KEPT ALIGNMENT "+str);
-	System.err.println("tandems of readA:");
-	for (int x=0; x<=lastTandem[readA]; x++) System.err.print(tandems[readA][x]+",");
-	System.err.println();
-	System.err.println("tandems of readB:");
-	for (int x=0; x<=lastTandem[readB]; x++) System.err.print(tandems[readB][x]+",");
-	System.err.println();
-//							System.err.println("containedA="+containedA+" identicalA="+identicalA+" firstTandemBlockB="+firstTandemBlockB+" lastTandemBlockB="+lastTandemBlockB);
-}
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 7  str="+str);
+					if ( (identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
+					     (!identicalB && !containedB && !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks))
+					   ) {
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 8");
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
 						continue;
@@ -4062,16 +4100,14 @@ if (readA==940 && readB==1108) {
 				}
 			}
 			else if (bothReads) {
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 3  WHAT??? WE KEPT ALIGNMENT "+str);
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 9  str="+str);
 				out[1][type]++;
 				bw.write("1\n"); str=br.readLine(); row++;
 				continue;
 			}
+if (readA==786 && readB==436) System.err.println("filterAlignments_tandem> 10");
 			if (bothReads) bw.write("0\n");
-			else {
-				bw.write("1\n");
-if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  WHAT??? WE KEPT ALIGNMENT "+str);		
-			}
+			else bw.write("1\n");
 			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
@@ -4146,6 +4182,29 @@ if (readA==940 && readB==1108) System.err.println("filterAlignments_tandem> 5  W
 			}
 		}
 		return containsBlue;
+	}
+	
+	
+	/**
+	 * Remark: this procedure assumes that $translation_all$ has already been loaded.
+	 *
+	 * @return TRUE iff $[intervalStart..intervalEnd]$ contains a non-repetitive block.
+	 */
+	private static final boolean filterAlignments_tandem_containsUnique(int boundariesAllID, int intervalStart, int intervalEnd, int nBlocks, int readLength) {
+		int i, j, c;
+		int start, end, last;
+		
+		for (i=0; i<=nBlocks-1; i++) {
+			last=translation_all[boundariesAllID][i].length-1;
+			for (j=0; j<=last; j++) {
+				c=translation_all[boundariesAllID][i][j];
+				if (c>lastUnique && c<=lastAlphabet) break;
+				start=i==0?0:boundaries_all[boundariesAllID][i-1]+1;
+				end=i==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][i];
+				if (Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)) return true;
+			}
+		}
+		return false;
 	}
 	
 	
