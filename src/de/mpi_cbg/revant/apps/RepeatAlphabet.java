@@ -192,6 +192,7 @@ public class RepeatAlphabet {
 		if (sequenceLengths==null || sequenceLengths.length<MAX_SEQUENCE_LENGTH) sequenceLengths = new int[MAX_SEQUENCE_LENGTH];
 		Math.set(sequenceLengths,MAX_SEQUENCE_LENGTH-1,0);
 		if (tmpCharacter==null) tmpCharacter = new Character();
+		if (stack==null || stack.length<ALIGNMENTS_CAPACITY) stack = new int[ALIGNMENTS_CAPACITY];
 		
 		// Collecting characters from all recoded reads
 		maxOpenLength_unique=0;
@@ -285,13 +286,13 @@ public class RepeatAlphabet {
 	 * the procedure does not look them up in $alphabet$: this is left to the caller.
 	 *
 	 * Remark: the procedure uses global arrays $alignments,periodicIntervals,points,
-	 * sequence$.
+	 * sequence,stack$. $stack$ is assumed to be non-null.
 	 */
 	public static final void recodeRead(int distanceThreshold) {
 		final int CLUSTERING_DISTANCE = distanceThreshold;
 		final int MAX_DENSE_LENGTH = (CLUSTERING_DISTANCE)<<1;  // Arbitrary
 		int i, j, k;
-		int lastPeriodicInterval, currentReadB, currentStart, currentEnd, first, firstZero;
+		int lastPeriodicInterval, currentStart, currentEnd, first, firstZero, lastStack;
 		int firstJForNextI, inPeriodic;
 		int startA, endA, newLength, component, nComponents;
 		final int lengthA = Reads.getReadLength(alignments[0].readA);
@@ -300,22 +301,37 @@ public class RepeatAlphabet {
 		if (points.length<(lastAlignment+1)<<1) points = new int[(lastAlignment+1)<<1];
 		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
 		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+		if (stack.length<lastAlignment+1) stack = new int[lastAlignment+1];
 		
 		// Building maximal periodic intervals
-		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1; currentReadB=-1;
+		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1; lastStack=-1;
 		for (i=0; i<=lastAlignment; i++) {
 			if (!isPeriodic[alignments[i].readB]) continue;
 			if (currentStart==-1) {
-				currentStart=alignments[i].startA; currentEnd=alignments[i].endA; currentReadB=alignments[i].readB;
+				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
+				lastStack=0; stack[0]=alignments[i].readB;
 				continue;
 			}
-			if (alignments[i].startA>=currentEnd-distanceThreshold && alignments[i].readB!=currentReadB) {
+			if (alignments[i].startA<currentEnd-distanceThreshold) {
+				currentEnd=Math.max(currentEnd,alignments[i].endA);
+				stack[++lastStack]=alignments[i].readB;
+				continue;
+			}
+			if (lastStack>0) {
+				Arrays.sort(stack,0,lastStack+1);
+				j=0;
+				for (k=1; k<=lastStack; k++) {
+					if (stack[k]!=stack[j]) stack[++j]=stack[k];
+				}
+				lastStack=j;
+			}
+			if (alignments[i].startA>currentEnd+distanceThreshold || Arrays.binarySearch(stack,0,lastStack+1,alignments[i].readB)<0) {
 				periodicIntervals[++lastPeriodicInterval]=currentStart;
 				periodicIntervals[++lastPeriodicInterval]=currentEnd;
-				currentStart=alignments[i].startA; currentEnd=alignments[i].endA; currentReadB=alignments[i].readB;
-				continue;
+				currentStart=alignments[i].startA; currentEnd=alignments[i].endA; 
+				lastStack=0; stack[0]=alignments[i].readB;
 			}
-			currentEnd=Math.max(currentEnd,alignments[i].endA);
+			else currentEnd=Math.max(currentEnd,alignments[i].endA);
 		}
 		if (currentStart!=-1) {
 			periodicIntervals[++lastPeriodicInterval]=currentStart;
@@ -403,7 +419,7 @@ public class RepeatAlphabet {
 			if (connectedComponent[i]==-1) continue;
 			points[++j]=points[i];
 		}
-		lastPoint=j;		
+		lastPoint=j;
 		
 		// Clustering all surviving points
 		for (i=0; i<lastPoint; i++) {
@@ -479,7 +495,7 @@ public class RepeatAlphabet {
 				sequence=newSequence;
 			}
 			sequence[lastInSequence].setUnique(lengthA-i,i<=distanceThreshold,true);
-		}		
+		}
 	}
 	
 	
@@ -915,6 +931,7 @@ public class RepeatAlphabet {
 		if (tmpCharacter==null) tmpCharacter = new Character();
 		histogram = new long[MAX_HISTOGRAM_LENGTH+1];
 		Math.set(histogram,MAX_HISTOGRAM_LENGTH,0L);
+		if (stack==null || stack.length<ALIGNMENTS_CAPACITY) stack = new int[ALIGNMENTS_CAPACITY];
 		
 		// Translating every read using the alphabet
 		bw1 = new BufferedWriter(new FileWriter(outputFile_characters));
@@ -4033,7 +4050,7 @@ if (readA==609 && readB==1702) {
 	System.err.println("filterAlignments_tandem> translation_all: ");
 	for (int x=0; x<nBlocks; x++) {
 		System.err.print(x+": ");
-		for (int y=0; y<translation_all[readA][x].length; y++) System.err.print(translation_all[readA][x][y]+",");
+		for (int y=0; y<translation_all[lastTranslated][x].length; y++) System.err.print(translation_all[lastTranslated][x][y]+",");
 		System.err.println();
 	}
 }
