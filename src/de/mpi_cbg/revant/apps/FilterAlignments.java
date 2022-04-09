@@ -92,12 +92,12 @@ public class FilterAlignments {
 		if (MODE==0) {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,true,TRANSLATED_BOUNDARIES_FILE);
 			RepeatAlphabet.filterAlignments_loose(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MIN_INTERSECTION_NONREPETITIVE,MIN_BLUE_INTERVAL_LENGTH,stats);
-			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,MIN_INTERSECTION_NONREPETITIVE,BITVECTOR_TANDEM,tandemStats);
+			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,MIN_INTERSECTION_NONREPETITIVE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,BITVECTOR_TANDEM,tandemStats);
 		}
 		else {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,false,true,TRANSLATED_BOUNDARIES_FILE);
 			RepeatAlphabet.filterAlignments_tight(ALIGNMENTS_FILE,BITVECTOR_UNIQUE,MODE==1?false:true,SUFFIX_PREFIX_MODE,MIN_INTERSECTION_NONREPETITIVE,MIN_INTERSECTION_REPETITIVE,MIN_BLUE_INTERVAL_LENGTH,stats);
-			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,MIN_INTERSECTION_NONREPETITIVE,BITVECTOR_TANDEM,tandemStats);
+			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,MIN_INTERSECTION_NONREPETITIVE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,BITVECTOR_TANDEM,tandemStats);
 		}
 		System.err.println("All alignments:  (input, output)");
 		System.err.println("Suffix/prefix overlaps: \t"+stats[0][0]+" ("+stats[2][0]+") -> "+stats[1][0]+" ("+(100*((double)(stats[1][0]-stats[0][0]))/stats[0][0])+"%)");
