@@ -291,7 +291,7 @@ public class RepeatAlphabet {
 		final int CLUSTERING_DISTANCE = distanceThreshold;
 		final int MAX_DENSE_LENGTH = (CLUSTERING_DISTANCE)<<1;  // Arbitrary
 		int i, j, k;
-		int lastPeriodicInterval, currentStart, currentEnd, first, firstZero;
+		int lastPeriodicInterval, currentReadB, currentStart, currentEnd, first, firstZero;
 		int firstJForNextI, inPeriodic;
 		int startA, endA, newLength, component, nComponents;
 		final int lengthA = Reads.getReadLength(alignments[0].readA);
@@ -302,17 +302,17 @@ public class RepeatAlphabet {
 		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
 		
 		// Building maximal periodic intervals
-		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1;
+		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1; currentReadB=-1;
 		for (i=0; i<=lastAlignment; i++) {
 			if (!isPeriodic[alignments[i].readB]) continue;
 			if (currentStart==-1) {
-				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
+				currentStart=alignments[i].startA; currentEnd=alignments[i].endA; currentReadB=alignments[i].readB;
 				continue;
 			}
-			if (alignments[i].startA>=currentEnd-distanceThreshold) {
+			if (alignments[i].startA>=currentEnd-distanceThreshold && alignments[i].readB!=currentReadB) {
 				periodicIntervals[++lastPeriodicInterval]=currentStart;
 				periodicIntervals[++lastPeriodicInterval]=currentEnd;
-				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
+				currentStart=alignments[i].startA; currentEnd=alignments[i].endA; currentReadB=alignments[i].readB;
 				continue;
 			}
 			currentEnd=Math.max(currentEnd,alignments[i].endA);
@@ -468,7 +468,6 @@ public class RepeatAlphabet {
 			else if (!isPeriodic[alignments[j].readB] && Intervals.isApproximatelyContained(startA,endA,alignments[j].startA,alignments[j].endA)) newBlock.addCharacter(alignments[j],distanceThreshold,startA,endA,tmpCharacter);
 			j++;
 		}
-		
 		// Last non-repetitive block (if any).
 		i=points[lastPoint];
 		if (lengthA-i>distanceThreshold) {
@@ -2691,6 +2690,7 @@ public class RepeatAlphabet {
 					else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
 				}
 				for (j=0; j<=lastInBlock_int[1]; j++) {
+					if (intBlocks[1][j]>lastAlphabet || alphabet[intBlocks[1][j]].repeat==-1) continue;
 					if (tmpChar.isSuffixOf(alphabet[intBlocks[1][j]],distanceThreshold)) {
 						found=true;
 						break;
@@ -2724,6 +2724,7 @@ public class RepeatAlphabet {
 					else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
 				}
 				for (j=0; j<=lastInBlock_int[nBlocks-2]; j++) {
+					if (intBlocks[nBlocks-2][j]>lastAlphabet || alphabet[intBlocks[nBlocks-2][j]].repeat==-1) continue;
 					if (tmpChar.isPrefixOf(alphabet[intBlocks[nBlocks-2][j]],distanceThreshold)) {
 						found=true;
 						break;
