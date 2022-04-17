@@ -12,6 +12,7 @@ import java.text.*;
 import de.mpi_cbg.revant.util.Math;
 import de.mpi_cbg.revant.util.Constants;
 import de.mpi_cbg.revant.util.Colors;
+import de.mpi_cbg.revant.util.IO;
 
 
 /**
@@ -30,8 +31,6 @@ import de.mpi_cbg.revant.util.Colors;
  * in input, and it classifies Repbase repeats into satellites and non-satellites.
  */
 public class GenomeSimulator {
-	
-	public static final char[] DNA_ALPHABET = new char[] {'a','c','g','t'};
 	
 	/**
 	 * Repeats. All unique substrings of the genome are assumed to belong to the same 
@@ -1379,37 +1378,37 @@ public class GenomeSimulator {
 			for (i=1; i<N_REPEAT_TYPES; i++) typeProbCumulative[i]=typeProb[i]+typeProbCumulative[i-1];
 			
 			// Loading $charProb*$.
-			charProb = new double[DNA_ALPHABET.length];
-			for (i=0; i<DNA_ALPHABET.length; i++) {
+			charProb = new double[IO.DNA_ALPHABET_LOWERCASE.length];
+			for (i=0; i<IO.DNA_ALPHABET_LOWERCASE.length; i++) {
 				str=br.readLine();
 				p=str.indexOf("/");
 				charProb[i]=Double.parseDouble(p>=0?str.substring(0,p).trim():str.trim());
 			}
-			charProbCumulative = new double[DNA_ALPHABET.length];
+			charProbCumulative = new double[IO.DNA_ALPHABET_LOWERCASE.length];
 			charProbCumulative[0]=charProb[0];
-			for (i=1; i<DNA_ALPHABET.length; i++) charProbCumulative[i]=charProb[i]+charProbCumulative[i-1];
+			for (i=1; i<IO.DNA_ALPHABET_LOWERCASE.length; i++) charProbCumulative[i]=charProb[i]+charProbCumulative[i-1];
 			
 			// Loading $charProbShortPeriod*$.
-			charProbShortPeriod = new double[DNA_ALPHABET.length];
-			for (i=0; i<DNA_ALPHABET.length; i++) {
+			charProbShortPeriod = new double[IO.DNA_ALPHABET_LOWERCASE.length];
+			for (i=0; i<IO.DNA_ALPHABET_LOWERCASE.length; i++) {
 				str=br.readLine();
 				p=str.indexOf("/");
 				charProbShortPeriod[i]=Double.parseDouble(p>=0?str.substring(0,p).trim():str.trim());
 			}
-			charProbShortPeriodCumulative = new double[DNA_ALPHABET.length];
+			charProbShortPeriodCumulative = new double[IO.DNA_ALPHABET_LOWERCASE.length];
 			charProbShortPeriodCumulative[0]=charProbShortPeriod[0];
-			for (i=1; i<DNA_ALPHABET.length; i++) charProbShortPeriodCumulative[i]=charProbShortPeriod[i]+charProbShortPeriodCumulative[i-1];
+			for (i=1; i<IO.DNA_ALPHABET_LOWERCASE.length; i++) charProbShortPeriodCumulative[i]=charProbShortPeriod[i]+charProbShortPeriodCumulative[i-1];
 			
 			// Loading $charProbUnique*$.
-			charProbUnique = new double[DNA_ALPHABET.length];
-			for (i=0; i<DNA_ALPHABET.length; i++) {
+			charProbUnique = new double[IO.DNA_ALPHABET_LOWERCASE.length];
+			for (i=0; i<IO.DNA_ALPHABET_LOWERCASE.length; i++) {
 				str=br.readLine();
 				p=str.indexOf("/");
 				charProbUnique[i]=Double.parseDouble(p>=0?str.substring(0,p).trim():str.trim());
 			}
-			charProbUniqueCumulative = new double[DNA_ALPHABET.length];
+			charProbUniqueCumulative = new double[IO.DNA_ALPHABET_LOWERCASE.length];
 			charProbUniqueCumulative[0]=charProbUnique[0];
-			for (i=1; i<DNA_ALPHABET.length; i++) charProbUniqueCumulative[i]=charProbUnique[i]+charProbUniqueCumulative[i-1];
+			for (i=1; i<IO.DNA_ALPHABET_LOWERCASE.length; i++) charProbUniqueCumulative[i]=charProbUnique[i]+charProbUniqueCumulative[i-1];
 			
 			// Loading from-instance probabilities
 			str=br.readLine();
@@ -1583,7 +1582,7 @@ public class GenomeSimulator {
 			out.ensureCapacity(length);
 			for (i=0; i<length; i++) {
 				j=Arrays.binarySearch(charProbCumulative,random.nextDouble());
-				out.append(DNA_ALPHABET[j<0?-j-1:j]);
+				out.append(IO.DNA_ALPHABET_LOWERCASE[j<0?-j-1:j]);
 			}
 		}
 		
@@ -1595,7 +1594,7 @@ public class GenomeSimulator {
 			out.ensureCapacity(length);
 			for (i=0; i<length; i++) {
 				j=Arrays.binarySearch(charProbShortPeriodCumulative,random.nextDouble());
-				out.append(DNA_ALPHABET[j<0?-j-1:j]);
+				out.append(IO.DNA_ALPHABET_LOWERCASE[j<0?-j-1:j]);
 			}
 		}
 		
@@ -1607,7 +1606,7 @@ public class GenomeSimulator {
 			out.ensureCapacity(length);
 			for (i=0; i<length; i++) {
 				j=Arrays.binarySearch(charProbUniqueCumulative,random.nextDouble());
-				out.append(DNA_ALPHABET[j<0?-j-1:j]);
+				out.append(IO.DNA_ALPHABET_LOWERCASE[j<0?-j-1:j]);
 			}
 		}
 		
@@ -1661,19 +1660,19 @@ public class GenomeSimulator {
 		
 			p=0;
 			while (p<length) {
-				c=Arrays.binarySearch(DNA_ALPHABET,0,DNA_ALPHABET.length,sb.charAt(p));
+				c=Arrays.binarySearch(IO.DNA_ALPHABET_LOWERCASE,0,IO.DNA_ALPHABET_LOWERCASE.length,sb.charAt(p));
 				prob=random.nextDouble();
 				if (prob<=mismatchProb) {
 					do { cPrime=random.nextInt(4); }
 					while (cPrime==c);
-					sb.append(DNA_ALPHABET[cPrime]);
+					sb.append(IO.DNA_ALPHABET_LOWERCASE[cPrime]);
 					p++;
 				}
 				else if (prob<=mPlusI) {
 					nBases=1+random.nextInt(maxIndelLength);
 					for (i=0; i<nBases; i++) {
 						cPrime=random.nextInt(4);
-						sb.append(DNA_ALPHABET[cPrime]);
+						sb.append(IO.DNA_ALPHABET_LOWERCASE[cPrime]);
 					}
 				}
 				else if (prob<=mPlusIPlusD) {
@@ -1681,7 +1680,7 @@ public class GenomeSimulator {
 					p+=nBases;
 				}
 				else {
-					sb.append(DNA_ALPHABET[c]);
+					sb.append(IO.DNA_ALPHABET_LOWERCASE[c]);
 					p++;
 				}
 			}
@@ -1691,7 +1690,7 @@ public class GenomeSimulator {
 				nBases=1+random.nextInt(maxIndelLength);
 				for (i=0; i<nBases; i++) {
 					cPrime=random.nextInt(4);
-					sb.append(DNA_ALPHABET[cPrime]);
+					sb.append(IO.DNA_ALPHABET_LOWERCASE[cPrime]);
 				}
 			}
 			sb.delete(0,length);
@@ -1708,8 +1707,7 @@ public class GenomeSimulator {
 		 */
 		private final void loadRepbase(String file, int minAlignmentLength) throws IOException {
 			final int CAPACITY = 100;  // Arbitrary
-			final String SAT_LABEL_1 = "satellite";
-			final String SAT_LABEL_2 = "sat";
+			final String SAT_LABEL = "sat";
 			boolean currentIsSat;
 			String str;
 			StringBuilder buffer;
@@ -1725,7 +1723,7 @@ public class GenomeSimulator {
 			str=br.readLine(); currentIsSat=false;
 			while (str!=null) {
 				if (str.length()!=0 && str.charAt(0)=='>') {
-					cleanBuffer(buffer);
+					IO.removeNonDNACharacters(buffer);
 					if (buffer.length()!=0) {
 						if (currentIsSat) repbaseSat[lastRepbaseSat]=buffer.toString();
 						else {
@@ -1735,7 +1733,7 @@ public class GenomeSimulator {
 						buffer.delete(0,buffer.length());
 					}
 					str=str.toLowerCase();
-					if (str.indexOf(SAT_LABEL_1)>=0 || str.indexOf(SAT_LABEL_2)>=0) {
+					if (str.indexOf(SAT_LABEL)>=0) {
 						lastRepbaseSat++;
 						if (lastRepbaseSat==repbaseSat.length) {
 							String[] newArray = new String[repbaseSat.length<<1];
@@ -1770,7 +1768,7 @@ public class GenomeSimulator {
 				str=br.readLine();
 			}
 			br.close();
-			cleanBuffer(buffer);
+			IO.removeNonDNACharacters(buffer);
 			if (buffer.length()!=0) {
 				if (currentIsSat) repbaseSat[lastRepbaseSat]=buffer.toString();
 				else {
@@ -1783,18 +1781,6 @@ public class GenomeSimulator {
 			repbaseSatIsUsed = new boolean[lastRepbaseSat+1];
 			Math.set(repbaseSatIsUsed,lastRepbaseSat,false);
 			System.err.println("Repbase file loaded: "+(lastRepbase+1)+" non-satellites, "+(lastRepbaseSat+1)+" satellites.");
-		}
-		
-		
-		/**
-		 * Removes non-DNA characters from $sb$.
-		 */
-		private static final void cleanBuffer(StringBuilder sb) {
-			int i = 0;
-			while (i<sb.length()) {
-				if (Arrays.binarySearch(DNA_ALPHABET,0,DNA_ALPHABET.length,sb.charAt(i))<0) sb.deleteCharAt(i);
-				else i++;  
-			}
 		}
 		
 		

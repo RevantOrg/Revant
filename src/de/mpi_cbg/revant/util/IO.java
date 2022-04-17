@@ -1,5 +1,6 @@
 package de.mpi_cbg.revant.util;
 
+import java.util.Arrays;
 import java.util.Random;
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -68,6 +69,8 @@ public class IO {
 	
 	public static final String FRAGMENTS_REFERENCE_FILE = "LAshow-fragments-reference";
 	public static final String REFERENCE_FRAGMENTS_FILE = "LAshow-reference-fragments";
+	
+	public static final char[] DNA_ALPHABET_LOWERCASE = new char[] {'a','c','g','t'};
 
 
 	/**
@@ -221,6 +224,24 @@ public class IO {
 	 */
 	public static final void writeFakeHeader(int id, int stringLength, String suffix, BufferedWriter bw) throws IOException {
 		bw.write(">U0/"+id+"/0_"+stringLength+(suffix!=null?" "+suffix:"")+"\n");
+	}
+	
+	
+	/**
+	 * @param sb assumed to contain only lowercase characters.
+	 */
+	public static final void removeNonDNACharacters(StringBuilder sb) {
+		char c;
+		int i;
+		final int alphabetLength = DNA_ALPHABET_LOWERCASE.length;
+		final int length = sb.length();
+		
+		sb.ensureCapacity(length<<1);
+		for (i=0; i<length; i++) {
+			c=sb.charAt(i);
+			if (Arrays.binarySearch(DNA_ALPHABET_LOWERCASE,0,alphabetLength,c)>=0) sb.append(c);
+		}
+		sb.delete(0,length);
 	}
 
 }

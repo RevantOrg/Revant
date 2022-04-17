@@ -27,7 +27,7 @@ MIN_ALIGNMENT_LENGTH_READ_READ="500"
 READ_READ_IDENTITY=".75"
 MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"
 READ_REPEAT_IDENTITY=".85"
-MAX_MEMORY="10"  # In GB
+MAX_MEMORY="12"  # In GB
 N_THREADS="4"
 # Programs
 DALIGNER_DIR="/Users/ramseysnow/git/DALIGNER"
@@ -63,20 +63,21 @@ if [ ${READ_SIMULATOR} = "pbsim" ]; then
 	rm -f ${INPUT_DIR}/sd_0001.fastq ${INPUT_DIR}/sd_0001.maf ${INPUT_DIR}/sd_0001.ref
 elif [ ${READ_SIMULATOR} = "pass" ]; then
 	# 2019 - PaSS
-	# PASS_OUTPUT_DIR="${OUTPUT_DIR}/PaSS"
-	# rm -rf ${PASS_OUTPUT_DIR}
-	# mkdir ${PASS_OUTPUT_DIR}
-	# # Building index
-	# perl ${PASS_DIR}/pacbio_mkindex.pl ${INPUT_DIR}/${GENOME_FILE} ${PASS_OUTPUT_DIR}
-	# PASS_MACHINE="pacbio_RS"  # CLR
-	# #PASS_MACHINE="pacbio_sequel"  # CCS
-	# PASS_ERROR_MODEL="${PASS_DIR}/E.coli/ecoli.config"  # RS
-	# #PASS_ERROR_MODEL="${PASS_DIR}/C.elegan/elegan.config"  # RS
-	# #PASS_ERROR_MODEL="${PASS_DIR}/Arabidopsis/arab.config"  # Sequel
-	# #PASS_ERROR_MODEL="${PASS_DIR}/sim.config"  # Example dataset
-	# N_THREADS="2"
-	# ${PASS_DIR}/PaSS -list ${PASS_OUTPUT_DIR}/percentage.txt -index ${PASS_OUTPUT_DIR}/index -m ${PASS_MACHINE} -c ${PASS_ERROR_MODEL} -r ${N_READS} -t ${N_THREADS} -o ${PASS_OUTPUT_DIR}/reads-PaSS -d
-	:
+	PASS_OUTPUT_DIR="${INPUT_DIR}/PaSS"
+	rm -rf ${PASS_OUTPUT_DIR}
+	mkdir ${PASS_OUTPUT_DIR}
+	# Building index
+	perl ${PASS_DIR}/pacbio_mkindex.pl ${GENOME_FILE} ${PASS_OUTPUT_DIR}
+	PASS_MACHINE="pacbio_RS"  # CLR
+	#PASS_MACHINE="pacbio_sequel"  # CCS
+	PASS_ERROR_MODEL="${PASS_DIR}/E.coli/ecoli.config"  # RS
+	#PASS_ERROR_MODEL="${PASS_DIR}/C.elegan/elegan.config"  # RS
+	#PASS_ERROR_MODEL="${PASS_DIR}/Arabidopsis/arab.config"  # Sequel
+	#PASS_ERROR_MODEL="${PASS_DIR}/sim.config"  # Example dataset
+	${PASS_DIR}/PaSS -list ${PASS_OUTPUT_DIR}/percentage.txt -index ${PASS_OUTPUT_DIR}/index -m ${PASS_MACHINE} -c ${PASS_ERROR_MODEL} -r ${N_READS} -t ${N_THREADS} -o ${PASS_OUTPUT_DIR}/reads-PaSS -d
+	cat ${PASS_OUTPUT_DIR}/reads-PaSS.fq | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > ${TMP_READS}
+	rm -rf ${PASS_OUTPUT_DIR}/../reftemp/
+	rm -rf ${PASS_OUTPUT_DIR}
 elif [ ${READ_SIMULATOR} = "npbss" ]; then
 	# 2018 - NPBSS
 	# cd ${NPBSS_DIR}
@@ -109,6 +110,7 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.uti
 READS_DB="${INPUT_DIR}/reads.db"
 DBrm ${READS_DB}
 ${DAZZDB_DIR}/fasta2DB ${READS_DB} ${READS_FILE}
+DBsplit -x16 ${READS_DB}
 daligner -T${N_THREADS} -M${MAX_MEMORY} -e${READ_READ_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_READ} ${READS_DB} ${READS_DB}
 mv ./*.las ${INPUT_DIR}
 LAsort ${INPUT_DIR}/reads.reads.las
@@ -116,7 +118,7 @@ rm -f ${INPUT_DIR}/reads.reads.las
 LAshow ${READS_DB} ${INPUT_DIR}/reads.reads.S.las > ${INPUT_DIR}/LAshow-reads-reads.txt
 rm -f ${INPUT_DIR}/reads.reads.S.las
 REPEATS_FILE=$(basename ${REPEATS_DB} .db)
-daligner -T${N_THREADS} -M0 -t100000 -e${READ_REPEAT_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${REPEATS_DB} ${READS_DB}
+daligner -T${N_THREADS} -M0 -t100000000 -e${READ_REPEAT_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${REPEATS_DB} ${READS_DB}
 mv ./*.las ${INPUT_DIR}
 LAsort ${INPUT_DIR}/reads.${REPEATS_FILE}.las
 rm -f ${INPUT_DIR}/reads.${REPEATS_FILE}.las
