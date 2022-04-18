@@ -4903,31 +4903,10 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	
 	
 	// ------------------------ INACCURATE PERIODIC ENDPOINTS ----------------------------
-	
-	
-	/**
-	 *
-	 *
-	 * Remark: the procedure needs the following arrays: 
-	 * translation_all, boundaries_all, alphabet.
-	 */
-	public static final void decideEndpoint(int threshold, String alignmentsFile) throws IOException {
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-	}
-	
-	
+
 	
 	private static Spacer[] spacers;
-	private static int lastSpacer;
+	private static int lastSpacer, nAdjacencies;
 	private static int[][] spacerNeighbors;
 	private static int[] lastSpacerNeighbor;
 	
@@ -4944,7 +4923,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		final int LAST_THREE_BITS = 0x00000007;
 		boolean found;
 		int i, j, k, c;
-		int cell, mask, length, nBlocks, nSpacers, nAdjacencies;
+		int cell, mask, length, nBlocks, nSpacers;
 		final int nTranslatedReads = translated.length;
 		boolean[] isBlockPeriodic;
 		int[] lengthHistogram;
@@ -5015,8 +4994,8 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	 * intersect when projected to the same read. An edge $(x,y)$ is represented with two
 	 * integers in $spacerNeighbors[x]$: the first is either $y$ or $-1-y$, depending on
 	 * the orientation of the alignment; the second is the quantity to add to $y.first$ to
-	 * get the projection of $x.first$ on $y$'s read. The entry in $spacerNeighbors[y]$ 
-	 * for the same edge might have a different second integer.
+	 * get the projection of $x.first$ on $y$'s read (might be negative). The entry in 
+	 * $spacerNeighbors[y]$ for the same edge might have a different absolute value.
 	 *
 	 * Remark: the second integer is infinity when a spacer is projected to an adjacency.
 	 */
@@ -5229,6 +5208,228 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	}
 	
 	
+	/**
+	 * Assigns a breakpoint to every spacer, by first propagating adjacencies depth-first,
+	 * and then propagating arbitrary decisions from every spacer that was not reached 
+	 * from and adjacency.
+	 *
+	 * Remark: alternatively, one could propagate breadth-first, but the traversal order
+	 * is not likely to matter in practice. Doing a global alignment of all the reads that
+	 * cover the same spacer in the genome is infeasible in practice.
+	 */
+	public static final void fixSpacers() throws IOException {
+		final int IDENTITY_THRESHOLD = IO.quantum;
+		boolean orientation;
+		int i, j;
+		int top, currentSpacer, neighbor, offset, breakpoint, nFixed;
+		
+		// Propagating from adjacencies
+		if (stack==null || stack.length<lastSpacer+1) stack = new int[lastSpacer+1];
+		nFixed=0;
+		if (nAdjacencies!=0) {
+			for (i=0; i<=lastSpacer; i++) {
+				if (spacers[i].first!=spacers[i].last || spacers[i].breakpoint!=-1) continue;
+				spacers[i].breakpoint=spacers[i].first; nFixed++;
+				top=0; stack[0]=i;
+				while (top>=0) {
+					currentSpacer=stack[top--];
+					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
+						neighbor=spacerNeighbors[i][j];
+						if (neighbor<0) {
+							neighbor=-1-neighbor;
+							orientation=false;
+						}
+						else orientation=true;
+						if (spacers[neighbor].breakpoint!=-1) continue;
+						offset=spacerNeighbors[i][j+1];
+						breakpoint=spacers[neighbor].first+offset+(orientation?spacers[currentSpacer].breakpoint-spacers[currentSpacer].first:spacers[currentSpacer].last-spacers[currentSpacer].breakpoint);
+						if (spacers[neighbor].breakpoint>=spacers[neighbor].first && spacers[neighbor].breakpoint<=spacers[neighbor].last) {
+							spacers[neighbor].breakpoint=breakpoint;
+							stack[top++]=neighbor;
+							nFixed++;
+						}
+					}
+				}
+			}
+		}
+		
+		// Propagating from arbitrary non-adjacencies
+		if (nFixed<lastSpacer+1) {
+			for (i=0; i<=lastSpacer; i++) {
+				if (spacers[i].breakpoint!=-1) continue;
+				spacers[i].breakpoint=(spacers[i].first+spacers[i].last)>>1;  // Arbitrary
+				nFixed++;
+				top=0; stack[0]=i;
+				while (top>=0) {
+					currentSpacer=stack[top--];
+					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
+						neighbor=spacerNeighbors[i][j];
+						if (neighbor<0) {
+							neighbor=-1-neighbor;
+							orientation=false;
+						}
+						else orientation=true;
+						if (spacers[neighbor].breakpoint!=-1) continue;
+						offset=spacerNeighbors[i][j+1];
+						breakpoint=spacers[neighbor].first+offset+(orientation?spacers[currentSpacer].breakpoint-spacers[currentSpacer].first:spacers[currentSpacer].last-spacers[currentSpacer].breakpoint);
+						if (spacers[neighbor].breakpoint>=spacers[neighbor].first && spacers[neighbor].breakpoint<=spacers[neighbor].last) {
+							spacers[neighbor].breakpoint=breakpoint;
+							stack[top++]=neighbor;
+							nFixed++;
+						}
+					}
+				}
+			}
+		}
+		
+		if (nFixed!=lastSpacer+1) {
+			System.err.println("fixSpacers> ERROR: fixed "+nFixed+" spacers out of "+(lastSpacer+1));
+			System.err.println("Spacers that were not fixed:");
+			for (int x=0; x<=lastSpacer; x++) {
+				if (spacers[x].breakpoint==-1) System.err.println(spacers[x]);
+			}
+			System.exit(1);
+		}
+	}
+	
+	
+	/**
+	 * Stores $spacers$ to multiple files, each containing reads up to $lastRead[i]$ 
+	 * (zero-based).
+	 */
+	public static final void serializeSpacers(String prefix, int[] lastRead) throws IOException {
+		int i, j;
+		BufferedWriter bw;
+		
+		j=0;
+		bw = new BufferedWriter(new FileWriter(prefix+"-"+j));
+		for (i=0; i<=lastSpacer; i++) {
+			while (spacers[i].read>lastRead[j]) {
+				bw.close();
+				j++;
+				bw = new BufferedWriter(new FileWriter(prefix+"-"+j));
+			}
+			spacers[i].serialize(bw);
+		}
+		bw.close();
+	}
+	
+	
+	/**
+	 * Alters an existing read translation using spacer breakpoints. Every new character 
+	 * instance that is not already in $alphabet$ is written to $bw$. Every character in
+	 * $alphabet$ that is used in the new translation is marked in $used$. 
+	 *
+	 * @param used same size as $alphabet$;
+	 * @param spacersCursor current position in $spacers$;
+	 * @param tmpBoolean of size at least equal to the number of blocks;
+	 * @return the new value of $spacersCursor$.
+	 */
+	public static final int fixPeriodicEndpoints_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, int readLength, BufferedWriter bw, boolean[] used, Spacer tmpSpacer, Character tmpChar, Character[] tmpCharacters1, Character[] tmpCharacters2, boolean[] tmpBoolean) throws IOException {
+		final int QUANTUM = IO.quantum;
+		boolean found, isUnique;
+		int i, j, p, c;
+		int length, nBlocks, lastLeft, lastRight;
+		String[] tokens;
+		Character[] leftCharacters = tmpCharacters1;
+		Character[] rightCharacters = tmpCharacters2;
+		Character[] tmpArray;
+		
+		// Applying breakpoints
+		if (read2characters.length()==0) return spacersCursor;
+		loadBoundaries(read2boundaries);
+		nBlocks=loadBlocks(read2characters);
+		Math.set(tmpBoolean,nBlocks-1,false);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
+		i=1; lastLeft=-1;
+		while (i<=nBlocks-2) {
+			if (!isBlockUnique[i]) {
+				if (lastLeft!=-1) {
+					for (j=0; j<=lastLeft; j++) {
+						leftCharacters[j].quantize(QUANTUM);
+						p=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,leftCharacters[j]);
+						if (p>=0) used[p]=true;
+						else bw.write(leftCharacters[j].toString()+"\n");
+					}
+					tmpBoolean[i-1]=true;
+					lastLeft=-1;
+				}
+				i++;
+				continue;
+			}
+			if (lastLeft==-1) {
+				length=boundaries[i-1]-(i-1==0?0:boundaries[i-2]);
+				for (j=0; j<=lastInBlock_int[i-1]; j++) {
+					c=intBlocks[i-1][j];
+					if (c>lastUnique && c<=lastPeriodic) {
+						lastLeft++;
+						leftCharacters[lastLeft].copyFrom(alphabet[c]);
+						leftCharacters[lastLeft].length=length;  // Not quantized
+					}
+				}
+				if (lastLeft==-1) {
+					i+=2;
+					continue;
+				}
+			}
+			lastRight=-1;
+			for (j=0; j<=lastInBlock_int[i+1]; j++) {
+				c=intBlocks[i+1][j];
+				if (c>lastUnique && c<=lastPeriodic) rightCharacters[++lastRight].copyFrom(alphabet[c]);
+			}
+			if (lastRight==-1) {
+				i+=3; lastLeft=-1;
+				continue;
+			}
+			while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[i-1])) spacersCursor++;
+			if (spacersCursor>lastSpacer || spacers[spacersCursor].first>boundaries[i-1]) {
+				System.err.println("ERROR: spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
+				System.exit(1);
+			}
+			length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
+			for (j=0; j<=lastLeft; j++) {
+				leftCharacters[j].length+=length;
+				leftCharacters[j].quantize(QUANTUM);
+				p=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,leftCharacters[j]);
+				if (p>=0) used[p]=true;
+				else bw.write(leftCharacters[j].toString()+"\n");
+			}
+			tmpBoolean[i-1]=true;
+			length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
+			for (j=0; j<=lastRight; j++) rightCharacters[j].length+=length;
+			tmpArray=rightCharacters;
+			rightCharacters=leftCharacters;
+			leftCharacters=tmpArray;
+			lastLeft=lastRight;
+			tmpBoolean[i]=true;
+			i+=2;
+		}
+		if (lastLeft!=-1) {
+			for (j=0; j<=lastLeft; j++) {
+				leftCharacters[j].quantize(QUANTUM);
+				p=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,leftCharacters[j]);
+				if (p>=0) used[p]=true;
+				else bw.write(leftCharacters[j].toString()+"\n");
+			}
+			tmpBoolean[nBlocks-1]=true;
+		}
+		
+		// Marking as used every character in every other block
+		for (i=0; i<nBlocks; i++) {
+			if (tmpBoolean[i]) continue;
+			for (j=0; j<=lastInBlock_int[i]; j++) used[intBlocks[i][j]]=true;
+		}
+		
+		return spacersCursor;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
 	private static class Spacer implements Comparable {
 		public int read, first, last, breakpoint;
 		public int blockID;
@@ -5251,6 +5452,23 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		}
 		
 		public String toString() { return read+"["+first+".."+breakpoint+".."+last+"] ("+blockID+")"; }
+		
+		public void serialize(BufferedWriter bw) throws IOException {
+			bw.write(read+""+SEPARATOR_MINOR);
+			bw.write(first+""+SEPARATOR_MINOR);
+			bw.write(last+""+SEPARATOR_MINOR);
+			bw.write(breakpoint+""+SEPARATOR_MINOR);
+			bw.write(blockID+(SEPARATOR_MINOR+"\n"));
+		}
+		
+		public void deserialize(String str) throws IOException {
+			String[] tokens = str.split(SEPARATOR_MINOR+"");
+			read=Integer.parseInt(tokens[0]);
+			first=Integer.parseInt(tokens[1]);
+			last=Integer.parseInt(tokens[2]);
+			breakpoint=Integer.parseInt(tokens[3]);
+			blockID=Integer.parseInt(tokens[4]);
+		}
 	}
 	
 	
