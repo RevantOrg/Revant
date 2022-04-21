@@ -4906,50 +4906,60 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 
 	
 	private static Spacer[] spacers;
-	private static int lastSpacer, nAdjacencies;
+	private static int lastSpacer, nFixedSpacers;
 	private static int[][] spacerNeighbors;
 	private static int[] lastSpacerNeighbor;
 	
 	
 	
 	/**
-	 * Loads in $spacers$ every pair of adjacent periodic blocks, and every short non-
-	 * repetitive block between two periodic blocks.
+	 * Loads in $spacers$: (1) every pair of adjacent periodic blocks (which may both 
+	 * contain non-periodic repeats as well), and every short non-repetitive block 
+	 * between two periodic blocks such that (2) one of them contains non-periodic 
+	 * repeats, or (3) none of them contains non-periodic repeats.
+	 * A spacer of type (1) and (2) is called \emph{fixed}, since there is just one way of
+	 * assigning its breakpoint.
 	 *
 	 * Remark: the procedure needs the following arrays: 
 	 * translation_all, isBlockUnique_all, boundaries_all.
 	 */
 	public static final void loadSpacers(int maxSpacerLength) {
 		final int LAST_THREE_BITS = 0x00000007;
-		boolean found;
+		boolean foundPeriodic, foundNonperiodic;
 		int i, j, k, c;
 		int cell, mask, length, nBlocks, nSpacers;
 		final int nTranslatedReads = translated.length;
-		boolean[] isBlockPeriodic;
+		boolean[] isBlockPeriodic, isBlockNonperiodic;
 		int[] lengthHistogram;
 		
 		isBlockPeriodic = new boolean[100];  // Arbitrary
-		nSpacers=0; nAdjacencies=0;
+		isBlockNonperiodic = new boolean[100];  // Arbitrary
+		nSpacers=0; nFixedSpacers=0;
 		lengthHistogram = new int[11];  // Arbitrary, multiples of $IO.quantum$.
 		Math.set(lengthHistogram,lengthHistogram.length-1,0);
 		for (i=0; i<nTranslatedReads; i++) {
 			nBlocks=translation_all[i].length;
 			if (isBlockPeriodic.length<nBlocks) isBlockPeriodic = new boolean[nBlocks];
+			if (isBlockNonperiodic.length<nBlocks) isBlockNonperiodic = new boolean[nBlocks];
 			for (j=0; j<nBlocks; j++) {
-				found=false;
+				foundPeriodic=false; foundNonperiodic=false;
 				length=translation_all[i][j].length;
 				for (k=0; k<length; k++) {
 					c=translation_all[i][j][k];
 					if (c>lastUnique && c<=lastPeriodic) {
-						found=true;
-						break;
+						foundPeriodic=true;
+						if (foundNonperiodic) break;
+					}
+					else if (c>lastPeriodic) {
+						foundNonperiodic=true;
+						if (foundPeriodic) break;
 					}
 				}
-				isBlockPeriodic[j]=found;
+				isBlockPeriodic[j]=foundPeriodic; isBlockNonperiodic[j]=foundNonperiodic;
 			}
 			for (j=1; j<nBlocks-1; j++) {
 				cell=isBlockUnique_all[i][j>>3]; mask=1<<(j&LAST_THREE_BITS);
-				if ((cell&mask)!=0 && isBlockPeriodic[j-1] && isBlockPeriodic[j+1]) {
+				if ((cell&mask)!=0 && isBlockPeriodic[j-1] && isBlockPeriodic[j+1] && !(isBlockNonperiodic[j-1] && isBlockNonperiodic[j+1])) {
 					length=boundaries_all[i][j]-boundaries_all[i][j-1];
 					lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
 					if (length<=maxSpacerLength) {
@@ -4959,45 +4969,45 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 							System.arraycopy(spacers,0,newArray,0,spacers.length);
 							spacers=newArray;
 						}
-						spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][j-1],boundaries_all[i][j],j);
+						spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][j-1],boundaries_all[i][j],j,isBlockNonperiodic[j-1],isBlockNonperiodic[j+1]);
 					}
 				}
 				else if (isBlockPeriodic[j] && isBlockPeriodic[j-1]) {
-					lastSpacer++; nAdjacencies++;
+					lastSpacer++; nFixedSpacers++;
 					if (lastSpacer==spacers.length) {
 						Spacer[] newArray = new Spacer[spacers.length<<1];
 						System.arraycopy(spacers,0,newArray,0,spacers.length);
 						spacers=newArray;
 					}
-					spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][j-1],boundaries_all[i][j-1],j);
+					spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][j-1],boundaries_all[i][j-1],j,true,true);
 				}
 			}
 			if (isBlockPeriodic[nBlocks-1] && isBlockPeriodic[nBlocks-2]) {
-				lastSpacer++; nAdjacencies++;
+				lastSpacer++; nFixedSpacers++;
 				if (lastSpacer==spacers.length) {
 					Spacer[] newArray = new Spacer[spacers.length<<1];
 					System.arraycopy(spacers,0,newArray,0,spacers.length);
 					spacers=newArray;
 				}
-				spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][nBlocks-2],boundaries_all[i][nBlocks-2],nBlocks-1);
+				spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][nBlocks-2],boundaries_all[i][nBlocks-2],nBlocks-1,true,true);
 			}
 		}
-		System.err.println("Loaded "+nSpacers+" spacers ("+(((double)nSpacers)/nTranslatedReads)+" per translated read) and "+nAdjacencies+" periodic-periodic adjacencies ("+(((double)nAdjacencies)/nTranslatedReads)+" per translated read).");
+		System.err.println("Loaded "+nSpacers+" spacers ("+(((double)nSpacers)/nTranslatedReads)+" per translated read) and "+nFixedSpacers+" fixed spacers ("+(((double)nFixedSpacers)/nTranslatedReads)+" per translated read).");
 		System.err.println("Histogram of all observed spacer lengths:");
 		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);
 	}
 	
 	
 	/**
-	 * Creates an edge between two spacers iff at least one of them is not an adjacency,
-	 * and there is a read-read alignment in $alignmentsFile$ that makes the two spacers
+	 * Creates an edge between two spacers iff at least one of them is not fixed, and 
+	 * there is a read-read alignment in $alignmentsFile$ that makes the two spacers
 	 * intersect when projected to the same read. An edge $(x,y)$ is represented with two
 	 * integers in $spacerNeighbors[x]$: the first is either $y$ or $-1-y$, depending on
 	 * the orientation of the alignment; the second is the quantity to add to $y.first$ to
 	 * get the projection of $x.first$ on $y$'s read (might be negative). The entry in 
 	 * $spacerNeighbors[y]$ for the same edge might have a different absolute value.
 	 *
-	 * Remark: the second integer is infinity when a spacer is projected to an adjacency.
+	 * Remark: the second integer is infinity when projecting to a fixed spacer.
 	 */
 	private static final void loadSpacerNeighbors(String alignmentsFile) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
@@ -5060,22 +5070,23 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	
 	
 	private static final boolean loadSpacerNeighbors_impl(int spacerAID, int spacerBID, int minIntersection, int identityThreshold) {
-		boolean addEdge;
+		boolean fixedA, fixedB, addEdge;
 		int startA, endA, startB, endB, offsetAB, offsetBA;
 		double ratio;
 		final Spacer spacerA = spacers[spacerAID];
 		final Spacer spacerB = spacers[spacerBID];
 		
 		// Evaluating conditions
-		if (spacerA.first==spacerA.last && spacerB.first==spacerB.last) return false;
-		if (spacerA.first==spacerA.last) {
+		fixedA=spacerA.isFixed(); fixedB=spacerB.isFixed();
+		if (fixedA && fixedB) return false;
+		if (fixedA) {
 			ratio=((double)(Alignments.endB-Alignments.startB+1))/(Alignments.endA-Alignments.startA+1);
 			if (Alignments.orientation) startB=Alignments.startB+(int)((spacerA.first-Alignments.startA)*ratio);
 			else startB=Alignments.endB-(int)((spacerA.first-Alignments.startA)*ratio);
 			addEdge=startB>spacerB.first+identityThreshold && startB<spacerB.last-identityThreshold;
 			offsetAB=startB-spacerB.first; offsetBA=Math.POSITIVE_INFINITY;
 		}
-		else if (spacerB.first==spacerB.last) {
+		else if (fixedB) {
 			ratio=((double)(Alignments.endA-Alignments.startA+1))/(Alignments.endB-Alignments.startB+1);
 			if (Alignments.orientation) startA=Alignments.startA+(int)((spacerB.first-Alignments.startB)*ratio);
 			else startA=Alignments.endA-(int)((spacerB.first-Alignments.startB)*ratio);
@@ -5209,27 +5220,27 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	
 	
 	/**
-	 * Assigns a breakpoint to every spacer, by first propagating adjacencies depth-first,
-	 * and then propagating arbitrary decisions from every spacer that was not reached 
-	 * from and adjacency.
+	 * Assigns a breakpoint to every spacer, by first propagating the breakpoints of fixed
+	 * spacers depth-first, and then by propagating arbitrary decisions from every spacer
+	 * that was not reached from a fixed spacer.
 	 *
 	 * Remark: alternatively, one could propagate breadth-first, but the traversal order
 	 * is not likely to matter in practice. Doing a global alignment of all the reads that
 	 * cover the same spacer in the genome is infeasible in practice.
 	 */
-	public static final void fixSpacers() throws IOException {
+	public static final void assignBreakpoints() throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean orientation;
 		int i, j;
-		int top, currentSpacer, neighbor, offset, breakpoint, nFixed;
+		int top, currentSpacer, neighbor, offset, breakpoint, nAssigned;
 		
-		// Propagating from adjacencies
+		// Propagating from fixed spacers
 		if (stack==null || stack.length<lastSpacer+1) stack = new int[lastSpacer+1];
-		nFixed=0;
-		if (nAdjacencies!=0) {
+		nAssigned=0;
+		if (nFixedSpacers!=0) {
 			for (i=0; i<=lastSpacer; i++) {
-				if (spacers[i].first!=spacers[i].last || spacers[i].breakpoint!=-1) continue;
-				spacers[i].breakpoint=spacers[i].first; nFixed++;
+				if (!spacers[i].isFixed() || spacers[i].breakpoint!=-1) continue;
+				spacers[i].setBreakpoint(); nAssigned++;
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
@@ -5246,19 +5257,18 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 						if (spacers[neighbor].breakpoint>=spacers[neighbor].first && spacers[neighbor].breakpoint<=spacers[neighbor].last) {
 							spacers[neighbor].breakpoint=breakpoint;
 							stack[top++]=neighbor;
-							nFixed++;
+							nAssigned++;
 						}
 					}
 				}
 			}
 		}
 		
-		// Propagating from arbitrary non-adjacencies
-		if (nFixed<lastSpacer+1) {
+		// Propagating from arbitrary non-fixed spacers
+		if (nAssigned<lastSpacer+1) {
 			for (i=0; i<=lastSpacer; i++) {
 				if (spacers[i].breakpoint!=-1) continue;
-				spacers[i].breakpoint=(spacers[i].first+spacers[i].last)>>1;  // Arbitrary
-				nFixed++;
+				spacers[i].setBreakpoint(); nAssigned++;
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
@@ -5275,16 +5285,16 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 						if (spacers[neighbor].breakpoint>=spacers[neighbor].first && spacers[neighbor].breakpoint<=spacers[neighbor].last) {
 							spacers[neighbor].breakpoint=breakpoint;
 							stack[top++]=neighbor;
-							nFixed++;
+							nAssigned++;
 						}
 					}
 				}
 			}
 		}
 		
-		if (nFixed!=lastSpacer+1) {
-			System.err.println("fixSpacers> ERROR: fixed "+nFixed+" spacers out of "+(lastSpacer+1));
-			System.err.println("Spacers that were not fixed:");
+		if (nAssigned!=lastSpacer+1) {
+			System.err.println("fixSpacers> ERROR: assigned "+nAssigned+" spacers out of "+(lastSpacer+1));
+			System.err.println("Spacers that were not assigned:");
 			for (int x=0; x<=lastSpacer; x++) {
 				if (spacers[x].breakpoint==-1) System.err.println(spacers[x]);
 			}
@@ -5318,7 +5328,9 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	/**
 	 * Alters an existing read translation using spacer breakpoints. Every new character 
 	 * instance that is not already in $alphabet$ is written to $bw$. Every character in
-	 * $alphabet$ that is used in the new translation is marked in $used$. 
+	 * $alphabet$ that is used in the new translation is marked in $used$.
+	 *
+	 * Remark: non-periodic repeats do not change after this procedure completes.
 	 *
 	 * @param used same size as $alphabet$;
 	 * @param spacersCursor current position in $spacers$;
@@ -5360,12 +5372,10 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			if (lastLeft==-1) {
 				length=boundaries[i-1]-(i-1==0?0:boundaries[i-2]);
 				for (j=0; j<=lastInBlock_int[i-1]; j++) {
-					c=intBlocks[i-1][j];
-					if (c>lastUnique && c<=lastPeriodic) {
-						lastLeft++;
-						leftCharacters[lastLeft].copyFrom(alphabet[c]);
-						leftCharacters[lastLeft].length=length;  // Not quantized
-					}
+					c=intBlocks[i-1][j];					
+					lastLeft++;
+					leftCharacters[lastLeft].copyFrom(alphabet[c]);
+					leftCharacters[lastLeft].length=length;  // Not quantized
 				}
 				if (lastLeft==-1) {
 					i+=2;
@@ -5375,7 +5385,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			lastRight=-1;
 			for (j=0; j<=lastInBlock_int[i+1]; j++) {
 				c=intBlocks[i+1][j];
-				if (c>lastUnique && c<=lastPeriodic) rightCharacters[++lastRight].copyFrom(alphabet[c]);
+				rightCharacters[++lastRight].copyFrom(alphabet[c]);
 			}
 			if (lastRight==-1) {
 				i+=3; lastLeft=-1;
@@ -5431,14 +5441,25 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	
 	
 	private static class Spacer implements Comparable {
+		boolean fixedLeft, fixedRight;
 		public int read, first, last, breakpoint;
 		public int blockID;
 		
 		public Spacer() { }
 		
-		public Spacer(int r, int f, int l, int id) {
+		public Spacer(int r, int f, int l, int id, boolean fl, boolean fr) {
 			this.read=r; this.first=f; this.last=l; this.blockID=id;
+			this.fixedLeft=fl; this.fixedRight=fr;
 			breakpoint=-1;
+		}
+		
+		public boolean isFixed() { return fixedLeft||fixedRight; }
+		
+		public void setBreakpoint() {
+			if (first==last) breakpoint=first;
+			else if (fixedLeft) breakpoint=first;
+			else if (fixedRight) breakpoint=last;
+			else breakpoint=(first+last)>>1;  // Arbitrary
 		}
 		
 		/**
@@ -5458,7 +5479,9 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			bw.write(first+""+SEPARATOR_MINOR);
 			bw.write(last+""+SEPARATOR_MINOR);
 			bw.write(breakpoint+""+SEPARATOR_MINOR);
-			bw.write(blockID+(SEPARATOR_MINOR+"\n"));
+			bw.write(blockID+SEPARATOR_MINOR);
+			bw.write((fixedLeft?"1":"0")+SEPARATOR_MINOR);
+			bw.write((fixedRight?"1":"0")+(SEPARATOR_MINOR+"\n"));
 		}
 		
 		public void deserialize(String str) throws IOException {
@@ -5468,6 +5491,8 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			last=Integer.parseInt(tokens[2]);
 			breakpoint=Integer.parseInt(tokens[3]);
 			blockID=Integer.parseInt(tokens[4]);
+			fixedLeft=Integer.parseInt(tokens[5])==1;
+			fixedRight=Integer.parseInt(tokens[6])==1;
 		}
 	}
 	
