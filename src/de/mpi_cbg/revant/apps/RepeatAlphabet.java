@@ -4907,7 +4907,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	
 	private static Spacer[] spacers;
 	private static int lastSpacer, nFixedSpacers;
-	private static int[][] spacerNeighbors;
+	private static double[][] spacerNeighbors;
 	private static int[] lastSpacerNeighbor;
 	
 	
@@ -5007,19 +5007,24 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	 * get the projection of $x.first$ on $y$'s read (might be negative). The entry in 
 	 * $spacerNeighbors[y]$ for the same edge might have a different absolute value.
 	 *
+	 * Remark: $spacerNeighbors[i]$ is sorted by decreasing alignment similarity for every
+	 * $i$.
+	 *
 	 * Remark: the second integer is infinity when projecting to a fixed spacer.
 	 */
 	private static final void loadSpacerNeighbors(String alignmentsFile) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int MIN_INTERSECTION = IO.quantum;  // Arbitrary
-		final int CAPACITY = 4;  // Arbitrary, even.
-		int i, j, p;
-		int firstSpacer, readA, readB, nEdges, row;
+		final int CAPACITY = 6;  // Arbitrary, mutliple of 3.
+		int i, j, k, p;
+		int firstSpacer, readA, readB, nEdges, row, max, last;
 		String str;
 		BufferedReader br;
 		Spacer tmpSpacer = new Spacer();
+		Edge[] edges;
 		
-		spacerNeighbors = new int[lastSpacer+1][CAPACITY];
+		// Loading edges
+		spacerNeighbors = new double[lastSpacer+1][CAPACITY];
 		lastSpacerNeighbor = new int[lastSpacer+1];
 		Math.set(lastSpacerNeighbor,lastSpacer,-1);
 		br = new BufferedReader(new FileReader(alignmentsFile));
@@ -5066,6 +5071,26 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		}
 		br.close();
 		System.err.println("Loaded "+nEdges+" spacer edges");
+		
+		// Sorting edges
+		max=0;
+		for (i=0; i<=lastSpacer; i++) max=Math.max(max,lastSpacerNeighbor[i]);
+		max+=1;
+		edges = new Edge[max];
+		for (i=0; i<max; i++) edges[i] = new Edge();
+		for (i=0; i<=lastSpacer; i++) {
+			last=lastSpacerNeighbor[i];
+			if (last==0) continue;
+			nEdges=(last+1)/3;
+			for (j=0; j<last; j+=3) edges[j].set(spacerNeighbors[i][j],spacerNeighbors[i][j+1],spacerNeighbors[i][j+2]);
+			Arrays.sort(edges,0,nEdges);
+			k=-1;
+			for (j=0; j<nEdges; j++) {
+				spacerNeighbors[i][++k]=edges[i].neighbor;
+				spacerNeighbors[i][++k]=edges[i].offset;
+			}
+			lastSpacerNeighbor[i]=k;
+		}
 	}
 	
 	
@@ -5122,20 +5147,45 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		
 		// Adding edges
 		if (lastSpacerNeighbor[spacerAID]+2>=spacerNeighbors[spacerAID].length) {
-			int[] newArray = new int[spacerNeighbors[spacerAID].length<<1];
+			double[] newArray = new double[spacerNeighbors[spacerAID].length<<1];
 			System.arraycopy(spacerNeighbors[spacerAID],0,newArray,0,spacerNeighbors[spacerAID].length);
 			spacerNeighbors[spacerAID]=newArray;
 		}
+		ratio=((double)(Alignments.diffs<<1))/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2);
 		spacerNeighbors[spacerAID][lastSpacerNeighbor[spacerAID]++]=Alignments.orientation?spacerBID:-1-spacerBID;
 		spacerNeighbors[spacerAID][lastSpacerNeighbor[spacerAID]++]=offsetAB;
+		spacerNeighbors[spacerAID][lastSpacerNeighbor[spacerAID]++]=ratio;
 		if (lastSpacerNeighbor[spacerBID]+2>=spacerNeighbors[spacerBID].length) {
-			int[] newArray = new int[spacerNeighbors[spacerBID].length<<1];
+			double[] newArray = new double[spacerNeighbors[spacerBID].length<<1];
 			System.arraycopy(spacerNeighbors[spacerBID],0,newArray,0,spacerNeighbors[spacerBID].length);
 			spacerNeighbors[spacerBID]=newArray;
 		}
 		spacerNeighbors[spacerBID][lastSpacerNeighbor[spacerBID]++]=Alignments.orientation?spacerAID:-1-spacerAID;
 		spacerNeighbors[spacerBID][lastSpacerNeighbor[spacerBID]++]=offsetBA;
+		spacerNeighbors[spacerBID][lastSpacerNeighbor[spacerBID]++]=ratio;
 		return true;
+	}
+	
+	
+	private static class Edge implements Comparable {
+		public double neighbor, offset, diffs;
+		
+		public Edge() { }
+		
+		public Edge(double n, double o, double d) {
+			set(n,o,d);
+		}
+		
+		public void set(double n, double o, double d) {
+			this.neighbor=n; this.offset=o; this.diffs=d;
+		}
+		
+		public int compareTo(Object other) {
+			Edge otherEdge = (Edge)other;
+			if (diffs<otherEdge.diffs) return -1;
+			else if (diffs>otherEdge.diffs) return 1;
+			return 0;
+		}
 	}
 	
 	
@@ -5224,9 +5274,10 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	 * spacers depth-first, and then by propagating arbitrary decisions from every spacer
 	 * that was not reached from a fixed spacer.
 	 *
-	 * Remark: alternatively, one could propagate breadth-first, but the traversal order
-	 * is not likely to matter in practice. Doing a global alignment of all the reads that
-	 * cover the same spacer in the genome is infeasible in practice.
+	 * Remark: one could alternatively propagate breadth-first, and the traversal order is
+	 * not likely to matter in practice. Depth-first makes sense since edges are sorted by
+	 * decreasing similarity. Doing a global alignment of all the reads that cover the 
+	 * same spacer in the genome is infeasible in practice.
 	 */
 	public static final void assignBreakpoints() throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
@@ -5245,14 +5296,14 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 				while (top>=0) {
 					currentSpacer=stack[top--];
 					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
-						neighbor=spacerNeighbors[i][j];
+						neighbor=(int)spacerNeighbors[i][j];
 						if (neighbor<0) {
 							neighbor=-1-neighbor;
 							orientation=false;
 						}
 						else orientation=true;
 						if (spacers[neighbor].breakpoint!=-1) continue;
-						offset=spacerNeighbors[i][j+1];
+						offset=(int)spacerNeighbors[i][j+1];
 						breakpoint=spacers[neighbor].first+offset+(orientation?spacers[currentSpacer].breakpoint-spacers[currentSpacer].first:spacers[currentSpacer].last-spacers[currentSpacer].breakpoint);
 						if (spacers[neighbor].breakpoint>=spacers[neighbor].first && spacers[neighbor].breakpoint<=spacers[neighbor].last) {
 							spacers[neighbor].breakpoint=breakpoint;
@@ -5273,14 +5324,14 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 				while (top>=0) {
 					currentSpacer=stack[top--];
 					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
-						neighbor=spacerNeighbors[i][j];
+						neighbor=(int)spacerNeighbors[i][j];
 						if (neighbor<0) {
 							neighbor=-1-neighbor;
 							orientation=false;
 						}
 						else orientation=true;
 						if (spacers[neighbor].breakpoint!=-1) continue;
-						offset=spacerNeighbors[i][j+1];
+						offset=(int)spacerNeighbors[i][j+1];
 						breakpoint=spacers[neighbor].first+offset+(orientation?spacers[currentSpacer].breakpoint-spacers[currentSpacer].first:spacers[currentSpacer].last-spacers[currentSpacer].breakpoint);
 						if (spacers[neighbor].breakpoint>=spacers[neighbor].first && spacers[neighbor].breakpoint<=spacers[neighbor].last) {
 							spacers[neighbor].breakpoint=breakpoint;
