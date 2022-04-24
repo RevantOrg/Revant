@@ -17,6 +17,7 @@ KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic
 MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
+MAX_SPACER_LENGTH="400"  # 0=assume that the endpoints of periodic repeats are accurate
 N_THREADS="4"
 DELETE_TMP_FILES="1"
 # REVANT
@@ -170,6 +171,75 @@ rm -f ${FULLY_CONTAINED_FILE}
 for THREAD in $(seq 0 ${TO}); do
 	cat ${TMPFILE_PATH}-11-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
 done
+
+
+
+------------>
+if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
+	echo "Splitting the alignments file..."
+	if [ ${BROKEN_READS} -eq 1 ]; then
+		# Reusing the chunks of the read-read alignments file that are already there (we
+		# assume that they all have the header).
+		for FILE in $(ls ${INPUT_DIR}/breakReads-tmp-2-*.txt ); do
+			ID=$(basename ${FILE} .txt)
+			ID=${ID#breakReads-tmp-2-}
+			mv ${INPUT_DIR}/breakReads-tmp-2-${ID}.txt ${TMPFILE_PATH}-spacers-1-${ID}.txt
+		done
+	else
+		N_ALIGNMENTS=$(( $(wc -l < ${READ_READ_ALIGNMENTS_FILE}) - 2 ))
+		LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${READ_READ_ALIGNMENTS_FILE} ${TMPFILE_PATH}-spacers-1- ${LAST_READA_FILE}
+	fi
+	echo "Alignments filtered and split in ${N_THREADS} parts"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${READ_READ_ALIGNMENTS_FILE} ${N_THREADS} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-2-
+	echo "Collecting character instances..."
+	function collectionThread_spacers() {
+		local SPACERS_FILE_ID=$1
+		local N_SPACERS = $(wc -l < ${SPACERS_FILE_ID})
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints2 ${MAX_SPACER_LENGTH} ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt ${N_SPACERS} ${ALPHABET_FILE} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt
+		sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt | uniq - ${TMPFILE_PATH}-spacers-4-${SPACERS_FILE_ID}.txt
+	}
+	if [ -e ${TMPFILE_PATH}-spacers-1-${N_THREADS}.txt ]; then
+		TO=${N_THREADS}
+	else
+		TO=$(( ${N_THREADS} - 1 ))
+	fi
+	for THREAD in $(seq 0 ${TO}); do
+		collectionThread_spacers ${THREAD} &
+	done
+	wait
+	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-4-*.txt | uniq - ${TMPFILE_PATH}-spacers-5.txt
+	N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-spacers-5.txt)
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-spacers-5.txt ${TMPFILE_PATH}-spacers-6-
+	echo "Compacting character instances..."
+	if [ -e ${TMPFILE_PATH}-6-${N_THREADS}.txt ]; then
+		TO=${N_THREADS}
+	else
+		TO=$(( ${N_THREADS} - 1 ))
+	fi
+	for THREAD in $(seq 0 ${TO}); do
+		compactionThread ${THREAD} "${TMPFILE_PATH}-spacers-6-" "${TMPFILE_PATH}-spacers-7-" "${TMPFILE_PATH}-spacers-8-" &
+	done
+	wait
+	ALPHABET_FILE_SPACERS="${INPUT_DIR}/alphabet-spacers.txt"
+	rm -f ${ALPHABET_FILE_SPACERS}
+---->	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "${TMPFILE_NAME}-spacers-6-" "${TMPFILE_NAME}-2-unique-" ${ALPHABET_FILE}
+	for THREAD in $(seq 0 ${TO}); do
+		tail -n +2 ${TMPFILE_PATH}-7-${THREAD}.txt >> ${ALPHABET_FILE}
+	done
+	ALPHABET_SIZE=$( wc -l < ${ALPHABET_FILE} )
+	ALPHABET_SIZE=$(( ${ALPHABET_SIZE} - 1 ))
+	
+	
+	
+	
+fi
+
+
+
+
+
 
 echo "Discarding rare characters..."
 COUNTS_FILE="${INPUT_DIR}/alphabet-counts.txt"
