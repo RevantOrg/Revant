@@ -577,12 +577,12 @@ public class RepeatAlphabet {
 					 alphabet[j].implies_tooFarAfter(alphabet[i])
 				   ) break;
 				if (alphabet[j].flag==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].flag=0;
+				if (alphabet[i].implies(alphabet[j])) alphabet[j].flag=0;
 			}
 			for (j=i-1; j>=0; j--) {
 				if (alphabet[j].repeat!=alphabet[i].repeat || alphabet[j].orientation!=alphabet[i].orientation) break;
 				if (alphabet[j].flag==0) continue;
-				if (alphabet[i].implies(alphabet[j],distanceThreshold)) alphabet[j].flag=0;
+				if (alphabet[i].implies(alphabet[j])) alphabet[j].flag=0;
 			}
 		}
 		j=lastUnique;
@@ -1124,9 +1124,9 @@ public class RepeatAlphabet {
 				k=i;
 				while (k>lastUnique && alphabet[k].repeat==repeat && alphabet[k].orientation==orientation && alphabet[k].length>=length) k--;
 				k++;
-				while (k<=lastPeriodic && alphabet[k].repeat==repeat && alphabet[k].orientation==orientation && !alphabet[k].implies(character,-1)) k++;
+				while (k<=lastPeriodic && alphabet[k].repeat==repeat && alphabet[k].orientation==orientation && !alphabet[k].implies(character)) k++;
 				i=k;
-				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation || !alphabet[i].implies(character,-1)) {
+				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation || !alphabet[i].implies(character)) {
 					System.err.println("translate_periodic> ERROR: open periodic repeat not found in the alphabet");
 					System.err.println("query: "+character);
 					System.err.println("first candidate in alphabet: "+alphabet[i]);
@@ -1201,14 +1201,14 @@ public class RepeatAlphabet {
 				found=false;
 				for (j=i; j<=lastAlphabet; j++) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation) break;
-					if (alphabet[j].implies(character,quantum)) {
+					if (alphabet[j].implies(character)) {
 					   found=true;
 					   last=appendToStack(j,last);
 					}
 				}
 				for (j=i-1; j>lastPeriodic; j--) {
 					if (alphabet[j].repeat!=repeat || alphabet[j].orientation!=orientation) break;
-					if (alphabet[j].implies(character,quantum)) {
+					if (alphabet[j].implies(character)) {
 						found=true;
 						last=appendToStack(j,last);
 					}
@@ -1268,7 +1268,7 @@ public class RepeatAlphabet {
 						repeat=alphabet[c].repeat; orientation=alphabet[c].orientation;
 						for (k=c; k<=lastPeriodic; k++) {
 							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
-							if (alphabet[k].implies(alphabet[c],-1)) characterCount[k]++;
+							if (alphabet[k].implies(alphabet[c])) characterCount[k]++;
 						}
 					}
 				}
@@ -1491,7 +1491,7 @@ public class RepeatAlphabet {
 						tmpChar.quantize(QUANTUM);
 						for (k=value; k<=lastPeriodic; k++) {
 							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
-							if (alphabet[k].implies(tmpChar,-1)) { found=true; nElements++; }
+							if (alphabet[k].implies(tmpChar)) { found=true; nElements++; }
 						}
 						if (!found) {
 							// Looking for a shorter version, since the length of 
@@ -1500,7 +1500,7 @@ public class RepeatAlphabet {
 							tmpChar.length-=QUANTUM;
 							for (k=value; k<=lastPeriodic; k++) {
 								if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
-								if (alphabet[k].implies(tmpChar,-1)) { found=true; nElements++; }
+								if (alphabet[k].implies(tmpChar)) { found=true; nElements++; }
 							}
 						}
 					}
@@ -1546,7 +1546,7 @@ public class RepeatAlphabet {
 						found=false;
 						for (c=value; c<=lastPeriodic; c++) {
 							if (alphabet[c].repeat!=repeat || alphabet[c].orientation!=orientation) break;
-							if (alphabet[c].implies(tmpChar,-1)) { found=true; intBlocks[i][++k]=c; }
+							if (alphabet[c].implies(tmpChar)) { found=true; intBlocks[i][++k]=c; }
 						}
 						if (!found) {
 							// Looking for a shorter version, since the length of 
@@ -1555,7 +1555,7 @@ public class RepeatAlphabet {
 							tmpChar.length-=QUANTUM;
 							for (c=value; c<=lastPeriodic; c++) {
 								if (alphabet[c].repeat!=repeat || alphabet[c].orientation!=orientation) break;
-								if (alphabet[c].implies(tmpChar,-1)) { found=true; intBlocks[i][++k]=c; }
+								if (alphabet[c].implies(tmpChar)) { found=true; intBlocks[i][++k]=c; }
 							}
 						}
 					}
@@ -1705,7 +1705,7 @@ public class RepeatAlphabet {
 							h=c+1; found=false;
 							while (h<=lastPeriodic) {
 								if (alphabet[h].repeat!=repeat || alphabet[h].orientation!=orientation) break;
-								if (alphabetCount[h]>=minCount && alphabet[h].implies(alphabet[c],-1)) {
+								if (alphabetCount[h]>=minCount && alphabet[h].implies(alphabet[c])) {
 									found=true;
 									break;
 								}
@@ -5718,9 +5718,9 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			k=p;
 			while (k>lastUnique_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && newAlphabet[k].length>=length) k--;
 			k++;
-			while (k<=lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character,-1)) k++;
+			while (k<=lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character)) k++;
 			p=k;
-			if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation || !newAlphabet[p].implies(character,-1)) {
+			if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation || !newAlphabet[p].implies(character)) {
 				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: open periodic repeat not found in the new alphabet");
 				System.err.println("query: "+character);
 				System.err.println("first candidate in the new alphabet: "+newAlphabet[p]);
@@ -6223,7 +6223,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		 * imply one another, since fully-open and half-open unique characters are 
 		 * assumed to have been discarded.
 		 */
-		public final boolean implies(Character otherCharacter, int quantum) {
+		public final boolean implies(Character otherCharacter) {
 			if (start==-1) {  // Periodic
 				if (length<otherCharacter.length) return false;
 				else if (length==otherCharacter.length) {
