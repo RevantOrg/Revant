@@ -5012,7 +5012,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	 * get the projection of $x.first$ on $y$'s read (might be negative). The entry in 
 	 * $spacerNeighbors[y]$ for the same edge might have a different absolute value.
 	 *
-	 * Remark: the procedure is sequential since alignments involve random $readB$s.
+	 * Remark: the procedure is sequential just for simplicity.
 	 *
 	 * Remark: $spacerNeighbors[i]$ is sorted by decreasing alignment similarity for every
 	 * $i$. The second integer is infinity when projecting to a fixed spacer.
@@ -5026,6 +5026,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		String str;
 		BufferedReader br;
 		Spacer tmpSpacer = new Spacer();
+		Edge tmpEdge;
 		Edge[] edges;
 		
 		// Loading edges
@@ -5077,7 +5078,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		br.close();
 		System.err.println("Loaded "+nEdges+" spacer edges");
 		
-		// Sorting edges
+		// Removing duplicates and sorting edges
 		max=0;
 		for (i=0; i<=lastSpacer; i++) max=Math.max(max,lastSpacerNeighbor[i]);
 		max+=1;
@@ -5088,7 +5089,23 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			if (last==0) continue;
 			nEdges=(last+1)/3;
 			for (j=0; j<last; j+=3) edges[j].set(spacerNeighbors[i][j],spacerNeighbors[i][j+1],spacerNeighbors[i][j+2]);
-			Arrays.sort(edges,0,nEdges);
+			if (nEdges>1) {
+				Edge.order=Edge.ORDER_NEIGHBOR;
+				Arrays.sort(edges,0,nEdges);
+				k=0;
+				for (j=1; j<nEdges; j++) {
+					if (edges[j].neighbor!=edges[k].neighbor) {
+						k++;
+						tmpEdge=edges[k]; edges[k]=edges[j]; edges[j]=tmpEdge;
+					}
+					else edges[k].diffs=Math.min(edges[k].diffs,edges[j].diffs);
+				}
+				nEdges=k+1;
+			}
+			if (nEdges>1) {
+				Edge.order=Edge.ORDER_DIFFS;
+				Arrays.sort(edges,0,nEdges);
+			}
 			k=-1;
 			for (j=0; j<nEdges; j++) {
 				spacerNeighbors[i][++k]=edges[i].neighbor;
@@ -5173,6 +5190,10 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	
 	
 	private static class Edge implements Comparable {
+		public static final int ORDER_NEIGHBOR = 0;
+		public static final int ORDER_DIFFS = 1;
+		public static int order;
+		
 		public double neighbor, offset, diffs;
 		
 		public Edge() { }
@@ -5187,8 +5208,14 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		
 		public int compareTo(Object other) {
 			Edge otherEdge = (Edge)other;
-			if (diffs<otherEdge.diffs) return -1;
-			else if (diffs>otherEdge.diffs) return 1;
+			if (order==ORDER_NEIGHBOR) {
+				if (neighbor<otherEdge.neighbor) return -1;
+				else if (neighbor>otherEdge.neighbor) return 1;
+			}
+			else if (order==ORDER_DIFFS) {
+				if (diffs<otherEdge.diffs) return -1;
+				else if (diffs>otherEdge.diffs) return 1;
+			}
 			return 0;
 		}
 	}

@@ -172,10 +172,14 @@ for THREAD in $(seq 0 ${TO}); do
 	cat ${TMPFILE_PATH}-11-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
 done
 
+
+
+
 echo "Fixing periodic endpoints..."
 if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 	echo "Splitting the alignments file..."
+	LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
 	if [ ${BROKEN_READS} -eq 1 ]; then
 		# Reusing the chunks of the read-read alignments file that are already there (we
 		# assume that they all have the header).
@@ -186,10 +190,9 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		done
 	else
 		N_ALIGNMENTS=$(( $(wc -l < ${READ_READ_ALIGNMENTS_FILE}) - 2 ))
-		LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${READ_READ_ALIGNMENTS_FILE} ${TMPFILE_PATH}-spacers-1- ${LAST_READA_FILE}
 	fi
-	echo "Alignments filtered and split in ${N_THREADS} parts"
+	echo "Read-read alignments filtered and split in ${N_THREADS} parts"
 	echo "Collecting spacers and assigning breakpoints to them..."
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${READ_READ_ALIGNMENTS_FILE} ${N_THREADS} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-2-
 	if [ -e ${TMPFILE_PATH}-spacers-2-${N_THREADS}.txt ]; then
@@ -207,7 +210,7 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	function collectionThread_spacers() {
 		local SPACERS_FILE_ID=$1
 		local N_SPACERS = $(wc -l < ${SPACERS_FILE_ID})
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints2 ${MAX_SPACER_LENGTH} ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt ${N_SPACERS} ${ALPHABET_FILE} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-8-${THREAD}.txt ${TMPFILE_PATH}-9-${THREAD}.txt ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-spacers-3-unique-${SPACERS_FILE_ID}.txt
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints2 ${MAX_SPACER_LENGTH} ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt ${N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-spacers-2-ids-${THREAD}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD}.txt ${TMPFILE_PATH}-8-${THREAD}.txt ${TMPFILE_PATH}-9-${THREAD}.txt ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-spacers-3-unique-${SPACERS_FILE_ID}.txt
 		sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt | uniq - ${TMPFILE_PATH}-spacers-4-${SPACERS_FILE_ID}.txt
 	}
 	for THREAD in $(seq 0 ${TO}); do
@@ -230,23 +233,24 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	done
 	ALPHABET_SIZE_SPACERS=$( wc -l < ${ALPHABET_FILE_SPACERS} )
 	ALPHABET_SIZE_SPACERS=$(( ${ALPHABET_SIZE_SPACERS} - 1 ))
+	echo "Translating reads into the spacers-induced alphabet..."
 	function translationThread_spacers() {
 		local THREAD_ID=$1
 		local READ2CHARACTERS_FILE_NEW=$2
 		local READ2BOUNDARIES_FILE_NEW=$3
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${SPACERS_FILE} ${N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW} ${READ2BOUNDARIES_FILE_NEW}	
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH}  --------> make it work on chunk    ${SPACERS_FILE} ${N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW} ${READ2BOUNDARIES_FILE_NEW}	
 	}
 	for THREAD in $(seq 0 ${TO}); do
-		translationThread_spacers ${THREAD} ------------> &
+		translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" &
 	done
-	
-	
-	
-	
-	
+	wait
+	rm -f ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES}
+	for THREAD in $(seq 0 ${TO}); do
+		cat ${TMPFILE_PATH}-spacers-9-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+		cat ${TMPFILE_PATH}-spacers-10-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
+	done
 fi
-
-
+echo "Periodic endpoints fixed"
 
 
 
