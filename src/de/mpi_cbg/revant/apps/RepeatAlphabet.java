@@ -4942,6 +4942,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		nSpacers=0; nFixedSpacers=0;
 		lengthHistogram = new int[11];  // Arbitrary, multiples of $IO.quantum$.
 		Math.set(lengthHistogram,lengthHistogram.length-1,0);
+		lastSpacer=-1;
 		for (i=0; i<nTranslatedReads; i++) {
 			nBlocks=translation_all[i].length;
 			if (isBlockPeriodic.length<nBlocks) isBlockPeriodic = new boolean[nBlocks];
@@ -5034,10 +5035,11 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		lastSpacerNeighbor = new int[lastSpacer+1];
 		Math.set(lastSpacerNeighbor,lastSpacer,-1);
 		br = new BufferedReader(new FileReader(alignmentsFile));
+		str=br.readLine(); str=br.readLine();  // Skipping header
 		str=br.readLine(); firstSpacer=0; nEdges=0; row=0;
 		while (str!=null) {
 			row++;
-			if (row%100000==0) System.err.println("Processed "+row+" alignments");
+			if (row%1000000==0) System.err.println("Processed "+row+" alignments");
 			Alignments.readAlignmentFile(str);
 			readA=Alignments.readA-1;
 			if (readA<spacers[firstSpacer].read) {
@@ -5108,8 +5110,8 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			}
 			k=-1;
 			for (j=0; j<nEdges; j++) {
-				spacerNeighbors[i][++k]=edges[i].neighbor;
-				spacerNeighbors[i][++k]=edges[i].offset;
+				spacerNeighbors[i][++k]=edges[j].neighbor;
+				spacerNeighbors[i][++k]=edges[j].offset;
 			}
 			lastSpacerNeighbor[i]=k;
 		}
@@ -5174,17 +5176,17 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			spacerNeighbors[spacerAID]=newArray;
 		}
 		ratio=((double)(Alignments.diffs<<1))/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2);
-		spacerNeighbors[spacerAID][lastSpacerNeighbor[spacerAID]++]=Alignments.orientation?spacerBID:-1-spacerBID;
-		spacerNeighbors[spacerAID][lastSpacerNeighbor[spacerAID]++]=offsetAB;
-		spacerNeighbors[spacerAID][lastSpacerNeighbor[spacerAID]++]=ratio;
+		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=Alignments.orientation?spacerBID:-1-spacerBID;
+		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=offsetAB;
+		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=ratio;
 		if (lastSpacerNeighbor[spacerBID]+2>=spacerNeighbors[spacerBID].length) {
 			double[] newArray = new double[spacerNeighbors[spacerBID].length<<1];
 			System.arraycopy(spacerNeighbors[spacerBID],0,newArray,0,spacerNeighbors[spacerBID].length);
 			spacerNeighbors[spacerBID]=newArray;
 		}
-		spacerNeighbors[spacerBID][lastSpacerNeighbor[spacerBID]++]=Alignments.orientation?spacerAID:-1-spacerAID;
-		spacerNeighbors[spacerBID][lastSpacerNeighbor[spacerBID]++]=offsetBA;
-		spacerNeighbors[spacerBID][lastSpacerNeighbor[spacerBID]++]=ratio;
+		spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=Alignments.orientation?spacerAID:-1-spacerAID;
+		spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=offsetBA;
+		spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=ratio;
 		return true;
 	}
 	
@@ -5396,12 +5398,12 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		BufferedWriter bw;
 		
 		j=0;
-		bw = new BufferedWriter(new FileWriter(prefix+"-"+j+".txt"));
+		bw = new BufferedWriter(new FileWriter(prefix+j+".txt"));
 		for (i=0; i<=lastSpacer; i++) {
 			while (spacers[i].read>lastRead[j]) {
 				bw.close();
 				j++;
-				bw = new BufferedWriter(new FileWriter(prefix+"-"+j+".txt"));
+				bw = new BufferedWriter(new FileWriter(prefix+j+".txt"));
 			}
 			spacers[i].serialize(bw);
 		}
@@ -5436,14 +5438,16 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 	 *
 	 * @param used same size as $alphabet$;
 	 * @param spacersCursor current position in $spacers$;
+	 * @param isBlock* temporary space, with a number of cells at least equal to the
+	 * number of blocks in the translation;
 	 * @return the new value of $spacersCursor$.
 	 */
-	public static final int fixPeriodicEndpoints_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, int readLength, int maxSpacerLength, BufferedWriter bw, boolean[] used) throws IOException {
+	public static final int fixPeriodicEndpoints_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, int readLength, int maxSpacerLength, BufferedWriter bw, boolean[] used, boolean[] isBlockPeriodic, boolean[] isBlockNonperiodic) throws IOException {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
-		boolean found, isUnique;
+		boolean found, foundPeriodic, foundNonperiodic, isUnique;
 		int i, j, k, p, c;
-		int length, nBlocks, lastLeft, lastRight;
+		int length, nBlocks, last, lastLeft, lastRight;
 		String[] tokens;
 		Character[] tmpArray;
 		
@@ -5463,9 +5467,27 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
 		Math.set(tmpBoolean,nBlocks-1,false);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
+		if (nBlocks>=3) {
+			for (i=0; i<nBlocks; i++) {
+				foundPeriodic=false; foundNonperiodic=false;
+				last=lastInBlock_int[i];
+				for (j=0; j<=last; j++) {
+					c=intBlocks[i][j];
+					if (c>lastUnique && c<=lastPeriodic) {
+						foundPeriodic=true;
+						if (foundNonperiodic) break;
+					}
+					else if (c>lastPeriodic) {
+						foundNonperiodic=true;
+						if (foundPeriodic) break;
+					}
+				}
+				isBlockPeriodic[i]=foundPeriodic; isBlockNonperiodic[i]=foundNonperiodic;
+			}
+		}
 		i=1; lastLeft=-1;
 		while (i<=nBlocks-2) {
-			if (!isBlockUnique[i] || boundaries[i]-boundaries[i-1]>maxSpacerLength) {
+			if (!isBlockUnique[i] || !isBlockPeriodic[i-1] || !isBlockPeriodic[i+1] || (isBlockNonperiodic[i-1] && isBlockNonperiodic[i+1]) || boundaries[i]-boundaries[i-1]>maxSpacerLength) {
 				if (lastLeft!=-1) {
 					for (j=0; j<=lastLeft; j++) {
 						leftCharacters[j].quantize(QUANTUM);
@@ -5556,6 +5578,8 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		return spacersCursor;
 	}
 	
+
+private static String fabio;
 	
 	/**
 	 * Like $fixPeriodicEndpoints_collectCharacterInstances()$, but looks up in the new
@@ -5566,10 +5590,14 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		final int QUANTUM = IO.quantum;
 		boolean found, isUnique;
 		int i, j, k, p, q, c;
-		int length, nBlocks, lastLeft, lastRight, currentBoundary, nBoundariesWritten;
+		int length, nBlocks, last, lastLeft, lastRight, currentBoundary, nBoundariesWritten;
 		Character character;
 		Character[] tmpArray;
 		
+
+fabio=readID+":  "+read2characters_old+"\n boundaries: "+read2boundaries_old+"  readLength="+readLength;
+
+	
 		if (read2characters_old.length()==0) return spacersCursor;
 		if (tmpCharacter==null) tmpCharacter = new Character();
 		if (leftCharacters==null) {
@@ -5586,8 +5614,12 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			for (j=0; j<=lastInBlock[0]; j++) {
 				c=Integer.parseInt(blocks[0][j]);
 				if (c<0) c=-1-c;
-				tmpCharacter.copyFrom(oldAlphabet[c]);
-				fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+				else {
+					tmpCharacter.copyFrom(oldAlphabet[c]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 1  updating the translation of character "+tmpCharacter);
+					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				}
 			}
 			if (nBlocks==2) {
 				read2characters_new.write(SEPARATOR_MAJOR+"");
@@ -5595,8 +5627,12 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 				for (j=0; j<=lastInBlock[1]; j++) {
 					c=Integer.parseInt(blocks[1][j]);
 					if (c<0) c=-1-c;
-					tmpCharacter.copyFrom(oldAlphabet[c]);
-					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+					else {
+						tmpCharacter.copyFrom(oldAlphabet[c]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 2  updating the translation of character "+tmpCharacter);
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					}
 				}
 			}
 			read2characters_new.newLine(); read2boundaries_new.newLine();
@@ -5620,6 +5656,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 					for (j=0; j<=lastLeft; j++) {
 						character=leftCharacters[j];
 						if (character.start==-1) character.quantize(QUANTUM);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 3  updating the translation of character "+character);
 						fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 					}
 					lastLeft=-1;
@@ -5628,8 +5665,12 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 					for (j=0; j<=lastInBlock[i-1]; j++) {
 						c=Integer.parseInt(blocks[i-1][j]);
 						if (c<0) c=-1-c;
-						tmpCharacter.copyFrom(oldAlphabet[c]);
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+						else {
+							tmpCharacter.copyFrom(oldAlphabet[c]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 4  updating the translation of character "+tmpCharacter);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						}
 					}
 				}
 				if (isUnique) {
@@ -5639,11 +5680,16 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 					if (q==lastAlphabet_old+1) read2characters_new.write((lastAlphabet_new+1)+"");
 					else {
 						tmpCharacter.copyFrom(oldAlphabet[q]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 5  updating the translation of character "+tmpCharacter);
 						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 					}
-					i+=2; currentBoundary=boundaries[i];
+					currentBoundary=boundaries[i];
+					i+=2;
 				}
-				else { i++; currentBoundary=boundaries[i-1]; }
+				else { 
+					currentBoundary=boundaries[i-1]; 
+					i++;
+				}
 				continue;
 			}
 			if (lastLeft==-1) {
@@ -5665,8 +5711,12 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 					for (j=0; j<=lastInBlock[i-1]; j++) {
 						c=Integer.parseInt(blocks[i-1][j]);
 						if (c<0) c=-1-c;
-						tmpCharacter.copyFrom(oldAlphabet[c]);
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+						else {
+							tmpCharacter.copyFrom(oldAlphabet[c]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 6  updating the translation of character "+tmpCharacter);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						}
 					}
 					read2characters_new.write(SEPARATOR_MAJOR+"");
 					read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[i-1]);
@@ -5674,15 +5724,21 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 					if (q==lastAlphabet_old+1) read2characters_new.write((lastAlphabet_new+1)+"");
 					else {
 						tmpCharacter.copyFrom(oldAlphabet[q]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 7  updating the translation of character "+tmpCharacter);
 						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 					}
-					i+=2; currentBoundary=boundaries[i];
+					currentBoundary=boundaries[i];
+					i+=2;
 					continue;
 				}
 				length=boundaries[i-1]-(i-1==0?0:boundaries[i-2]);
 				for (j=0; j<=lastInBlock[i-1]; j++) {
 					c=Integer.parseInt(blocks[i-1][j]);
 					if (c<0) c=-1-c;
+					if (c==lastAlphabet_old+1) {
+						System.err.println("ERROR: this should never happen: the longest open unique character is on the left side.");
+						System.exit(1);
+					}
 					lastLeft++;
 					if (lastLeft==leftCharacters.length) {
 						Character[] newArray = new Character[leftCharacters.length<<1];
@@ -5691,6 +5747,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 						leftCharacters=newArray;
 					}
 					leftCharacters[lastLeft].copyFrom(oldAlphabet[c]);
+					if (c<0 && i-1==0) leftCharacters[lastLeft].openStart=true;
 					if (leftCharacters[lastLeft].start==-1) leftCharacters[lastLeft].length=length;  // Not quantized
 				}
 			}
@@ -5712,6 +5769,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 				for (j=0; j<=lastLeft; j++) {
 					character=leftCharacters[j];
 					if (character.start==-1) character.quantize(QUANTUM);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 8  updating the translation of character "+character);
 					fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 				}
 				read2characters_new.write(SEPARATOR_MAJOR+"");
@@ -5720,6 +5778,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 				if (q==lastAlphabet_old+1) read2characters_new.write((lastAlphabet_new+1)+"");
 				else {
 					tmpCharacter.copyFrom(oldAlphabet[q]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 9  updating the translation of character "+tmpCharacter);
 					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 				}
 				read2characters_new.write(SEPARATOR_MAJOR+"");
@@ -5728,8 +5787,12 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 				for (j=0; j<=lastInBlock[i+1]; j++) {
 					c=Integer.parseInt(blocks[i+1][j]);
 					if (c<0) c=-1-c;
-					tmpCharacter.copyFrom(oldAlphabet[c]);
-					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+					else {
+						tmpCharacter.copyFrom(oldAlphabet[c]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 10  updating the translation of character "+tmpCharacter);
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					}
 				}
 				if (i+1<nBlocks-1) currentBoundary=boundaries[i+1];
 				i+=3; lastLeft=-1;
@@ -5739,6 +5802,10 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			for (j=0; j<=lastInBlock[i+1]; j++) {
 				c=Integer.parseInt(blocks[i+1][j]);
 				if (c<0) c=-1-c;
+				if (c==lastAlphabet_old+1) {
+					System.err.println("ERROR: this should never happen: the longest open unique character is on the right side.");
+					System.exit(1);
+				}
 				lastRight++;
 				if (lastRight==rightCharacters.length) {
 					Character[] newArray = new Character[rightCharacters.length<<1];
@@ -5758,6 +5825,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			for (j=0; j<=lastLeft; j++) {
 				character=leftCharacters[j];
 				if (character.start==-1) { character.length+=length; character.quantize(QUANTUM); }
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 11  updating the translation of character "+character);
 				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 			}
 			length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
@@ -5768,7 +5836,8 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			rightCharacters=leftCharacters;
 			leftCharacters=tmpArray;
 			lastLeft=lastRight;
-			i+=2; currentBoundary=spacers[spacersCursor].breakpoint;
+			currentBoundary=spacers[spacersCursor].breakpoint;
+			i+=2;
 		}
 		if (lastLeft!=-1) {
 			read2characters_new.write(SEPARATOR_MAJOR+"");
@@ -5777,18 +5846,23 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			for (j=0; j<=lastLeft; j++) {
 				character=leftCharacters[j];
 				if (character.start==-1) character.quantize(QUANTUM);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 12  updating the translation of character "+character);
 				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 			}
 		}
 		if (i==nBlocks-1) {
 			read2characters_new.write(SEPARATOR_MAJOR+"");
-			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[nBlocks-1]);
+			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[nBlocks-2]);
 			nBoundariesWritten++;
 			for (j=0; j<=lastInBlock[nBlocks-1]; j++) {
 				c=Integer.parseInt(blocks[nBlocks-1][j]);
 				if (c<0) c=-1-c;
-				tmpCharacter.copyFrom(oldAlphabet[c]);
-				fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+				else {
+					tmpCharacter.copyFrom(oldAlphabet[c]);
+if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 13  updating the translation of character "+tmpCharacter);
+					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				}
 			}
 		}
 		read2characters_new.newLine(); read2boundaries_new.newLine();
@@ -5803,19 +5877,24 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 		int repeat, length;
 		
 		repeat=character.repeat; orientation=character.orientation; length=character.length;
-		p=Arrays.binarySearch(newAlphabet,character.start==-1?lastUnique_new+1:lastPeriodic_new+1,character.start==-1?lastPeriodic_new+1:lastAlphabet_new+1,character);
+		if (character.repeat==UNIQUE) p=Arrays.binarySearch(newAlphabet,0,lastUnique_new+1,character);
+		else {
+			if (character.start==-1) p=Arrays.binarySearch(newAlphabet,lastUnique_new+1,lastPeriodic_new+1,character);
+			else p=Arrays.binarySearch(newAlphabet,lastPeriodic_new+1,lastAlphabet_new+1,character);
+		}
 		if (p<0) {
 			p=-1-p;
+if (character.repeat==167 && character.length==2800) System.err.println("fixPeriodicEndpoints_updateTranslation_impl> 1  p="+p);
 			if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) p--;
 			k=p;
 			while (k>lastUnique_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && newAlphabet[k].length>=length) k--;
+if (character.repeat==167 && character.length==2800) System.err.println("fixPeriodicEndpoints_updateTranslation_impl> 2  k="+k);
 			k++;
 			while (k<=lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character)) k++;
+if (character.repeat==167 && character.length==2800) System.err.println("fixPeriodicEndpoints_updateTranslation_impl> 3  k="+k);
 			p=k;
 			if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation || !newAlphabet[p].implies(character)) {
-				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: open periodic repeat not found in the new alphabet");
-				System.err.println("query: "+character);
-				System.err.println("first candidate in the new alphabet: "+newAlphabet[p]);
+				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: open character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]+"\n old translation: "+fabio);
 				System.exit(1);
 			}
 			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+(-1-p));
@@ -5863,7 +5942,7 @@ if (readA==609 && readB==1702) System.err.println("filterAlignments_tandem> 10")
 			bw.write(first+""+SEPARATOR_MINOR);
 			bw.write(last+""+SEPARATOR_MINOR);
 			bw.write(breakpoint+""+SEPARATOR_MINOR);
-			bw.write(blockID+SEPARATOR_MINOR);
+			bw.write(blockID+""+SEPARATOR_MINOR);
 			bw.write((fixedLeft?"1":"0")+SEPARATOR_MINOR);
 			bw.write((fixedRight?"1":"0")+(SEPARATOR_MINOR+"\n"));
 		}

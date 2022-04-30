@@ -193,26 +193,24 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${READ_READ_ALIGNMENTS_FILE} ${TMPFILE_PATH}-spacers-1- ${LAST_READA_FILE}
 	fi
 	echo "Read-read alignments filtered and split in ${N_THREADS} parts"
+	# Splitting read translations based on read-read alignments. This is necesary, since
+	# the previous translated file chunks were split by balancing read-repeat alignments,
+	# rather than read-read alignments.
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-1-1- ${TMPFILE_PATH}-spacers-1-2-
 	echo "Collecting spacers and assigning breakpoints to them..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${READ_READ_ALIGNMENTS_FILE} ${N_THREADS} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-2-
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${READ_READ_ALIGNMENTS_FILE} ${N_THREADS} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-2-
+	echo "Collecting instances of spacer-induced characters..."
+	function collectionThread_spacers() {
+		local SPACERS_FILE_ID=$1
+		local LOCAL_N_SPACERS=$(wc -l < ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt)
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints2 ${MAX_SPACER_LENGTH} ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-spacers-2-ids-${THREAD}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD}.txt ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-spacers-3-unique-${SPACERS_FILE_ID}.txt
+		sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt | uniq - ${TMPFILE_PATH}-spacers-4-${SPACERS_FILE_ID}.txt
+	}
 	if [ -e ${TMPFILE_PATH}-spacers-2-${N_THREADS}.txt ]; then
 		TO=${N_THREADS}
 	else
 		TO=$(( ${N_THREADS} - 1 ))
 	fi
-	SPACERS_FILE="${TMPFILE_PATH}-spacers.txt"
-	rm -f ${SPACERS_FILE}
-	for i in $(seq 0 ${TO}); do
-		cat ${TMPFILE_PATH}-spacers-2-${i}.txt >> ${SPACERS_FILE}
-	done
-	N_SPACERS=$(wc -l < ${SPACERS_FILE})
-	echo "Collecting instances of spacer-induced characters..."
-	function collectionThread_spacers() {
-		local SPACERS_FILE_ID=$1
-		local N_SPACERS = $(wc -l < ${SPACERS_FILE_ID})
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints2 ${MAX_SPACER_LENGTH} ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt ${N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-spacers-2-ids-${THREAD}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD}.txt ${TMPFILE_PATH}-8-${THREAD}.txt ${TMPFILE_PATH}-9-${THREAD}.txt ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-spacers-3-unique-${SPACERS_FILE_ID}.txt
-		sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt | uniq - ${TMPFILE_PATH}-spacers-4-${SPACERS_FILE_ID}.txt
-	}
 	for THREAD in $(seq 0 ${TO}); do
 		collectionThread_spacers ${THREAD} &
 	done
@@ -238,7 +236,9 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		local THREAD_ID=$1
 		local READ2CHARACTERS_FILE_NEW=$2
 		local READ2BOUNDARIES_FILE_NEW=$3
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH}  --------> make it work on chunk    ${SPACERS_FILE} ${N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW} ${READ2BOUNDARIES_FILE_NEW}	
+		local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-spacers-2-${THREAD_ID}.txt"
+		local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-spacers-2-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW} ${READ2BOUNDARIES_FILE_NEW}
 	}
 	for THREAD in $(seq 0 ${TO}); do
 		translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" &
