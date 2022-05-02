@@ -5654,7 +5654,7 @@ fabio=readID+":  "+read2characters_old+"\n boundaries: "+read2boundaries_old+"  
 						tmpCharacter.quantize(QUANTUM);
 					}
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 1  updating the translation of character "+tmpCharacter);
-					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 				}
 			}
 			if (nBlocks==2) {
@@ -5679,7 +5679,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 1 
 							tmpCharacter.quantize(QUANTUM);
 						}
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 2  updating the translation of character "+tmpCharacter);
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 					}
 				}
 			}
@@ -5705,7 +5705,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 2 
 						character=leftCharacters[j];
 						character.quantize(QUANTUM);
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 3  updating the translation of character "+character);
-						fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 					}
 					lastLeft=-1;
 				}
@@ -5736,7 +5736,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 3 
 								tmpCharacter.quantize(QUANTUM);
 							}
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 4  updating the translation of character "+tmpCharacter);
-							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 						}
 					}
 				}
@@ -5748,7 +5748,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 4 
 					else {
 						tmpCharacter.copyFrom(oldAlphabet[q]);
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 5  updating the translation of character "+tmpCharacter);
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 					}
 					currentBoundary=boundaries[i];
 					i+=2;
@@ -5801,7 +5801,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 5 
 								tmpCharacter.quantize(QUANTUM);
 							}
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 6  updating the translation of character "+tmpCharacter);
-							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 						}
 					}
 					read2characters_new.write(SEPARATOR_MAJOR+"");
@@ -5811,7 +5811,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 6 
 					else {
 						tmpCharacter.copyFrom(oldAlphabet[q]);
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 7  updating the translation of character "+tmpCharacter);
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 					}
 					currentBoundary=boundaries[i];
 					i+=2;
@@ -5873,7 +5873,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 7 
 					character=leftCharacters[j];
 					if (character.start==-1) character.quantize(QUANTUM);
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 8  updating the translation of character "+character);
-					fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 				}
 				read2characters_new.write(SEPARATOR_MAJOR+"");
 				read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[i-1]);
@@ -5882,7 +5882,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 8 
 				else {
 					tmpCharacter.copyFrom(oldAlphabet[q]);
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 9  updating the translation of character "+tmpCharacter);
-					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,true,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 				}
 				read2characters_new.write(SEPARATOR_MAJOR+"");
 				read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[i]);
@@ -5913,7 +5913,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 9 
 							tmpCharacter.quantize(QUANTUM);
 						}
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 10  updating the translation of character "+tmpCharacter);
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 					}
 				}
 				if (i+1<nBlocks-1) currentBoundary=boundaries[i+1];
@@ -5968,7 +5968,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 10
 				if (character.length!=0) character.length+=length;
 				character.quantize(QUANTUM);
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 11  updating the translation of character "+character);
-				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 			}
 			length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
 			for (j=0; j<=lastRight; j++) {
@@ -5989,7 +5989,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 11
 				character=leftCharacters[j];
 				character.quantize(QUANTUM);
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 12  updating the translation of character "+character);
-				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 			}
 		}
 		if (i==nBlocks-1) {
@@ -6015,7 +6015,7 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 12
 						tmpCharacter.quantize(QUANTUM);
 					}
 if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 13  updating the translation of character "+tmpCharacter);
-					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 				}
 			}
 		}
@@ -6025,53 +6025,88 @@ if (readID==1363) System.err.println("fixPeriodicEndpoints_updateTranslation> 13
 	}
 	
 	
-	private static final void fixPeriodicEndpoints_updateTranslation_impl(Character character, boolean firstCharacterInBlock, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new) throws IOException {
+	/**
+	 * @param quantum if $character$ is not found in $newAlphabet$, the procedure tries
+	 * again by changing the length of $character$ by $quantum$. This is useful since, due
+	 * to quantization, even the length of a character that was not altered by 
+	 * $fixPeriodicEndpoints_updateTranslation()$, where the length is derived from the 
+	 * boundaries file, might be slightly different from the length of the character
+	 * pointed to by the block in the translation file.
+	 */
+	private static final void fixPeriodicEndpoints_updateTranslation_impl(Character character, boolean firstCharacterInBlock, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int quantum, BufferedWriter read2characters_new) throws IOException {
 		boolean orientation;
 		int k, p;
 		int repeat, length;
 		
 		repeat=character.repeat; orientation=character.orientation;
-		if (character.repeat==UNIQUE) p=Arrays.binarySearch(newAlphabet,0,lastUnique_new+1,character);
-		else if (character.start==-1) {
-			p=Arrays.binarySearch(newAlphabet,lastUnique_new+1,lastPeriodic_new+1,character);
-			if (p>=0) read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+p);
-			else {
-				length=character.length;
-				p=-1-p;
-				if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) p--;
-				k=p;
-				while (k>lastUnique_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && newAlphabet[k].length>=length) k--;
-				k++;
-				while (k<=lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character)) k++;
-				p=k;
-				if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation || !newAlphabet[p].implies(character)) {
-					System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]+"\n old translation: "+fabio);
-					System.exit(1);
-				}
-				read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+(-1-p));
+		if (character.repeat==UNIQUE) {
+			p=Arrays.binarySearch(newAlphabet,0,lastUnique_new+1,character);
+			if (p<0) {
+				character.length+=quantum;
+				p=Arrays.binarySearch(newAlphabet,0,lastUnique_new+1,character);
+				character.length-=quantum;
 			}
+			if (p<0) {
+				character.length-=quantum;
+				p=Arrays.binarySearch(newAlphabet,0,lastUnique_new+1,character);
+				character.length+=quantum;
+			}
+			if (p<0) {
+				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: unique character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]+"\n old translation: "+fabio);
+				System.exit(1);
+			}
+			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+(newAlphabet[p].equals(character)?p:-1-p));
+		}
+		else if (character.start==-1) {
+			p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
+			if (p<0) {
+				character.length+=quantum;
+				p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
+				character.length-=quantum;
+			}
+			if (p<0) {
+				character.length-=quantum;
+				p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
+				character.length+=quantum;
+			}
+			if (p<0) {
+				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]+"\n old translation: "+fabio);
+				System.exit(1);
+			}
+			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+(newAlphabet[p].equals(character)?p:-1-p));
 		}
 		else {
 			p=Arrays.binarySearch(newAlphabet,lastPeriodic_new+1,lastAlphabet_new+1,character);
-			if (p>=0) read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+p);
-			else {
-				p=-1-p;
-if (character.repeat==246 && character.start==0 && character.end==2600) System.err.println("fixPeriodicEndpoints_updateTranslation_impl> 1  p="+p);
-				if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) p--;
-				k=p;
-				while (k>lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation) k--;
-if (character.repeat==246 && character.start==0 && character.end==2600) System.err.println("fixPeriodicEndpoints_updateTranslation_impl> 2  k="+k);
-				k++;
-				while (k<=lastAlphabet_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character)) k++;
-if (character.repeat==246 && character.start==0 && character.end==2600) System.err.println("fixPeriodicEndpoints_updateTranslation_impl> 3  k="+k);
-				p=k;
-				if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation || !newAlphabet[p].implies(character)) {
-					System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: nonperiodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]+"\n old translation: "+fabio);
-					System.exit(1);
-				}
-				read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+p);
+			if (p<0) {
+				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: nonperiodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[-1-p]+"\n old translation: "+fabio);
+				System.exit(1);
 			}
+			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+p);
 		}
+	}
+	
+	
+	/**
+	 * @return if $character$ occurs in $newAlphabet$, the position of it; otherwise, the 
+	 * position of the smallest element of $newAlphabet$ that implies $character$; -1
+	 * if no element of $newAlphabet$ implies $character$.
+	 */
+	private static final int fixPeriodicEndpoints_lookupPeriodic(Character character, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new) {
+		boolean orientation;
+		int k, p;
+		int repeat, length;
+		
+		p=Arrays.binarySearch(newAlphabet,lastUnique_new+1,lastPeriodic_new+1,character);
+		if (p>=0) return p;
+		repeat=character.repeat; orientation=character.orientation; length=character.length;
+		p=-1-p;
+		if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) p--;
+		k=p;
+		while (k>lastUnique_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && newAlphabet[k].length>=length) k--;
+		k++;
+		while (k<=lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character)) k++;
+		p=k;
+		return p;
 	}
 	
 	
