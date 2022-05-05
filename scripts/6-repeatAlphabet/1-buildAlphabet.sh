@@ -238,17 +238,19 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		local READ2BOUNDARIES_FILE_NEW=$3
 		local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-spacers-2-${THREAD_ID}.txt"
 		local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-spacers-2-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW} ${READ2BOUNDARIES_FILE_NEW}
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-spacers-2-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt
 	}
 	for THREAD in $(seq 0 ${TO}); do
 		translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" &
 	done
 	wait
+cp ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}--ORIGINAL
 	rm -f ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES}
 	for THREAD in $(seq 0 ${TO}); do
 		cat ${TMPFILE_PATH}-spacers-9-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 		cat ${TMPFILE_PATH}-spacers-10-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
 	done
+	mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 fi
 echo "Periodic endpoints fixed"
 

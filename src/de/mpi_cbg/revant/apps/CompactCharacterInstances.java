@@ -18,6 +18,8 @@ public class CompactCharacterInstances {
 		if (RepeatAlphabet.lastAlphabet>=0) { 
 			RepeatAlphabet.compactInstances(IO.quantum,IO.quantum<<1);
 			RepeatAlphabet.closeAlphabetByRC();
+			// $compactInstances()$ might be needed again: see $closeAlphabetByRC()$.
+			RepeatAlphabet.compactInstances(IO.quantum,IO.quantum<<1);
 		}
 		RepeatAlphabet.serializeAlphabet(OUTPUT_FILE);
 	}
