@@ -17,7 +17,7 @@ KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic
 MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
-MAX_SPACER_LENGTH="400"  # 0=assume that the endpoints of periodic repeats are accurate
+MAX_SPACER_LENGTH="0"  # 0=assume that the endpoints of periodic repeats are accurate
 N_THREADS="4"
 DELETE_TMP_FILES="1"
 # REVANT
@@ -326,9 +326,13 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.app
 
 # Removing all temp files that are not used downstream
 if [ ${DELETE_TMP_FILES} -eq 1 ]; then
-	mkdir ${INPUT_DIR}/preserve
-	mv ${TMPFILE_PATH}-spacers-1-*.txt ${INPUT_DIR}/preserve
+	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+		mkdir ${INPUT_DIR}/preserve
+		mv ${TMPFILE_PATH}-spacers-1-*.txt ${INPUT_DIR}/preserve
+	fi
 	rm -f ${TMPFILE_PATH}*
-	mv ${INPUT_DIR}/preserve/*.txt ${INPUT_DIR}
-	rm -rf ${INPUT_DIR}/preserve
+	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+		mv ${INPUT_DIR}/preserve/*.txt ${INPUT_DIR}
+		rm -rf ${INPUT_DIR}/preserve
+	fi
 fi
