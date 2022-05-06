@@ -244,8 +244,9 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" &
 	done
 	wait
-cp ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}--ORIGINAL
-	rm -f ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES}
+	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
+	mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-prespacers
+	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prespacers
 	for THREAD in $(seq 0 ${TO}); do
 		cat ${TMPFILE_PATH}-spacers-9-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 		cat ${TMPFILE_PATH}-spacers-10-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
@@ -325,5 +326,9 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.app
 
 # Removing all temp files that are not used downstream
 if [ ${DELETE_TMP_FILES} -eq 1 ]; then
+	mkdir ${INPUT_DIR}/preserve
+	mv ${TMPFILE_PATH}-spacers-1-*.txt ${INPUT_DIR}/preserve
 	rm -f ${TMPFILE_PATH}*
+	mv ${INPUT_DIR}/preserve/*.txt ${INPUT_DIR}
+	rm -rf ${INPUT_DIR}/preserve
 fi

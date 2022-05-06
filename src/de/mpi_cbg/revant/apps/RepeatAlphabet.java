@@ -5631,8 +5631,11 @@ public class RepeatAlphabet {
 	/**
 	 * Like $fixPeriodicEndpoints_collectCharacterInstances()$, but looks up in the new
 	 * alphabet every existing and new character induced by fixing spacers.
+	 *
+	 * @param out the procedure cumulates the number of spacers fixed at every length 
+	 * (multiple of $IO.quantum$).
 	 */
-	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new) throws IOException {
+	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int[] out) throws IOException {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		boolean found, isUnique;
@@ -5979,6 +5982,7 @@ public class RepeatAlphabet {
 				read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
 				nBoundariesWritten++;
 			}
+			out[Math.min((boundaries[i]-boundaries[i-1])/IO.quantum,out.length-1)]++;
 			length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
 			for (j=0; j<=lastLeft; j++) {
 				character=leftCharacters[j];
@@ -6069,7 +6073,7 @@ public class RepeatAlphabet {
 				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: unique character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]);
 				System.exit(1);
 			}
-			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+(newAlphabet[p].equals(character)?p:-1-p));
+			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+p);
 		}
 		else if (character.start==-1) {
 			p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
@@ -6087,7 +6091,7 @@ public class RepeatAlphabet {
 				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]);
 				System.exit(1);
 			}
-			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+(newAlphabet[p].equals(character)?p:-1-p));
+			read2characters_new.write((firstCharacterInBlock?"":(SEPARATOR_MINOR+""))+p);
 		}
 		else {
 			p=Arrays.binarySearch(newAlphabet,lastPeriodic_new+1,lastAlphabet_new+1,character);

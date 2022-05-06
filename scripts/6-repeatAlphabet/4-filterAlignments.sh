@@ -12,6 +12,7 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
+MAX_SPACER_LENGTH="400"  # Same as in $1-buildAlphabet.sh$.
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 MIN_ALIGNMENT_LENGTH_READ_READ="500"
 MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"
@@ -39,7 +40,15 @@ TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 rm -f ${TMPFILE_PATH}*
 
 echo "Splitting the alignments file..."
-if [ ${BROKEN_READS} -eq 1 ]; then
+if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+	# Reusing the chunks of the read-read alignments file that are already there (we
+	# assume that they all have the header).
+	for FILE in $(ls ${INPUT_DIR}/buildAlphabet-tmp-spacers-1-*.txt ); do
+		ID=$(basename ${FILE} .txt)
+		ID=${ID#buildAlphabet-tmp-spacers-1-}
+		mv ${INPUT_DIR}/buildAlphabet-tmp-spacers-1-${ID}.txt ${TMPFILE_PATH}-1-${ID}.txt
+	done
+elif [ ${BROKEN_READS} -eq 1 ]; then
 	# Reusing the chunks of the read-read alignments file that are already there (we
 	# assume that they all have the header).
 	for FILE in $(ls ${INPUT_DIR}/breakReads-tmp-2-*.txt ); do
