@@ -12,7 +12,7 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
-MAX_SPACER_LENGTH="0"  # Same as in $1-buildAlphabet.sh$.
+MAX_SPACER_LENGTH="500"  # Same as in $1-buildAlphabet.sh$.
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 MIN_ALIGNMENT_LENGTH_READ_READ="500"
 MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"

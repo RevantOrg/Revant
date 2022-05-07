@@ -5006,6 +5006,13 @@ public class RepeatAlphabet {
 		System.err.println("Loaded "+nSpacers+" spacers ("+(((double)nSpacers)/nTranslatedReads)+" per translated read) and "+nFixedSpacers+" fixed spacers ("+(((double)nFixedSpacers)/nTranslatedReads)+" per translated read).");
 		System.err.println("Histogram of all observed spacer lengths:");
 		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);
+		
+		
+		
+System.err.println("Spacers:");		
+for (int x=0; x<=lastSpacer; x++) System.err.println(spacers[x]);
+
+		
 	}
 	
 	
@@ -5067,6 +5074,7 @@ public class RepeatAlphabet {
 				   ) {
 					readB=Alignments.readB-1;
 					p=readHasSpacer(readB,firstSpacer,tmpSpacer);
+if (readA==0) System.err.println("loadSpacerNeighbors> 0  p="+p);					
 					if (p>=0) {
 						for (j=p; j<=lastSpacer; j++) {
 							if (spacers[j].read!=readB) break;
@@ -5075,7 +5083,10 @@ public class RepeatAlphabet {
 								   Intervals.isApproximatelyContained(spacers[j].first,spacers[j].last,Alignments.startB,Alignments.endB) &&
 								   !Intervals.areApproximatelyIdentical(spacers[j].first,spacers[j].last,Alignments.startB,Alignments.endB)
 								 )
-							   ) nEdges+=loadSpacerNeighbors_impl(i,j,MIN_INTERSECTION,IDENTITY_THRESHOLD)?1:0;
+							   ) {
+if (readA==0) System.err.println("loadSpacerNeighbors> 1  calling loadSpacerNeighbors_impl() on i="+i+" j="+j);	
+								   nEdges+=loadSpacerNeighbors_impl(i,j,MIN_INTERSECTION,IDENTITY_THRESHOLD)?1:0;
+							   }
 						}
 					}
 				}
@@ -5095,7 +5106,7 @@ public class RepeatAlphabet {
 			last=lastSpacerNeighbor[i];
 			if (last==0) continue;
 			nEdges=(last+1)/3;
-			for (j=0; j<last; j+=3) edges[j].set(spacerNeighbors[i][j],spacerNeighbors[i][j+1],spacerNeighbors[i][j+2]);
+			for (j=0; j<last; j+=3) edges[j/3].set(spacerNeighbors[i][j],spacerNeighbors[i][j+1],spacerNeighbors[i][j+2]);
 			if (nEdges>1) {
 				Edge.order=Edge.ORDER_NEIGHBOR;
 				Arrays.sort(edges,0,nEdges);
@@ -5120,6 +5131,12 @@ public class RepeatAlphabet {
 			}
 			lastSpacerNeighbor[i]=k;
 		}
+		
+		
+System.err.println("Spacer edges from spacer 0:");
+for (int x=0; x<=lastSpacerNeighbor[0]; x+=2) System.err.println("-> "+spacers[(int)(spacerNeighbors[0][x]>=0?spacerNeighbors[0][x]:-1-spacerNeighbors[0][x])]+" offset="+spacerNeighbors[0][x+1]);
+		
+		
 	}
 	
 	
@@ -5181,6 +5198,7 @@ public class RepeatAlphabet {
 			spacerNeighbors[spacerAID]=newArray;
 		}
 		ratio=((double)(Alignments.diffs<<1))/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2);
+if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge from spacer "+spacerAID+" to spacer "+(Alignments.orientation?spacerBID:-1-spacerBID));		
 		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=Alignments.orientation?spacerBID:-1-spacerBID;
 		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=offsetAB;
 		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=ratio;
@@ -5711,19 +5729,25 @@ public class RepeatAlphabet {
 		}
 		i=1; lastLeft=-1; currentBoundary=-1; nBoundariesWritten=0;
 		while (i<=nBlocks-2) {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 0  considering block "+i);
 			if (lastInBlock[i]>0) { isUnique=false; q=-1; }
 			else {
 				q=Integer.parseInt(blocks[i][0]);
 				if (q<0) q=-1-q;
 				isUnique=q<=lastUnique_old||q==lastAlphabet_old+1;
 			}
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 1  isUnique="+isUnique);
 			if (!isUnique || boundaries[i]-boundaries[i-1]>maxSpacerLength) {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 2");
 				if (i>1) {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 3");
 					read2characters_new.write(SEPARATOR_MAJOR+"");
 					read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
 					nBoundariesWritten++;
 				}
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 4");
 				if (lastLeft!=-1) {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 5  lastLeft="+lastLeft);
 					for (j=0; j<=lastLeft; j++) {
 						character=leftCharacters[j];
 						character.quantize(QUANTUM);
@@ -5732,7 +5756,9 @@ public class RepeatAlphabet {
 					lastLeft=-1;
 				}
 				else {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 6  lastInBlock[i-1]="+lastInBlock[i-1]);
 					for (j=0; j<=lastInBlock[i-1]; j++) {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 7  j="+j);
 						c=Integer.parseInt(blocks[i-1][j]);
 						if (c<0) c=-1-c;
 						if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
@@ -5761,7 +5787,9 @@ public class RepeatAlphabet {
 						}
 					}
 				}
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 8  isUnique="+isUnique);
 				if (isUnique) {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 9");
 					read2characters_new.write(SEPARATOR_MAJOR+"");
 					read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[i-1]);
 					nBoundariesWritten++;
@@ -5774,12 +5802,15 @@ public class RepeatAlphabet {
 					i+=2;
 				}
 				else { 
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 10");
 					currentBoundary=boundaries[i-1];
 					i++;
 				}
 				continue;
 			}
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 11  lastLeft="+lastLeft);
 			if (lastLeft==-1) {
+if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 12");
 				found=false;
 				for (j=0; j<=lastInBlock[i-1]; j++) {
 					c=Integer.parseInt(blocks[i-1][j]);
@@ -6001,14 +6032,44 @@ public class RepeatAlphabet {
 			currentBoundary=spacers[spacersCursor].breakpoint;
 			i+=2;
 		}
+		read2characters_new.write(SEPARATOR_MAJOR+"");
+		read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
+		nBoundariesWritten++;
 		if (lastLeft!=-1) {
-			read2characters_new.write(SEPARATOR_MAJOR+"");
-			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
-			nBoundariesWritten++;
 			for (j=0; j<=lastLeft; j++) {
 				character=leftCharacters[j];
 				character.quantize(QUANTUM);
 				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+			}
+		}
+		else if (i-1<=nBlocks-1) {
+			for (j=0; j<=lastInBlock[i-1]; j++) {
+				c=Integer.parseInt(blocks[i-1][j]);
+				if (c<0) c=-1-c;
+				if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+				else {
+					tmpCharacter.copyFrom(oldAlphabet[c]);
+					if (c>lastUnique_old && c<=lastPeriodic_old) {
+						if (i-1==nBlocks-1) {
+							tmpCharacter.length=readLength-boundaries[i-2];
+							if (tmpCharacter.orientation) {
+								tmpCharacter.openStart=false;
+								tmpCharacter.openEnd=true;
+							}
+							else {
+								tmpCharacter.openStart=true;
+								tmpCharacter.openEnd=false;
+							}
+						}
+						else {
+							tmpCharacter.length=boundaries[i-1]-boundaries[i-2];
+							tmpCharacter.openStart=false;
+							tmpCharacter.openEnd=false;
+						}
+						tmpCharacter.quantize(QUANTUM);
+					}
+					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+				}
 			}
 		}
 		if (i==nBlocks-1) {
