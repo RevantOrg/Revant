@@ -4925,9 +4925,12 @@ public class RepeatAlphabet {
 	 * between two periodic blocks such that (2) one of them contains non-periodic 
 	 * repeats, or (3) none of them contains non-periodic repeats.
 	 * A spacer of type (1) and (2) is called \emph{fixed}, since there is just one way of
-	 * assigning its breakpoint.
+	 * assigning its breakpoint. Short non-repetitive blocks at the beginning/end of the
+	 * read are loaded like (3).
 	 *
 	 * Remark: the procedure is sequential just for simplicity.
+	 *
+	 * Remark: the procedure assumes that $Reads.readLengths$ has already been loaded.
 	 *
 	 * Remark: the procedure needs the following arrays: 
 	 * translation_all, isBlockUnique_all, boundaries_all.
@@ -4936,7 +4939,7 @@ public class RepeatAlphabet {
 		final int LAST_THREE_BITS = 0x00000007;
 		boolean foundPeriodic, foundNonperiodic;
 		int i, j, k, c;
-		int cell, mask, length, nBlocks, nSpacers;
+		int cell, mask, length, nBlocks, nSpacers, readLength;
 		final int nTranslatedReads = translated.length;
 		boolean[] isBlockPeriodic, isBlockNonperiodic;
 		int[] lengthHistogram;
@@ -4950,6 +4953,7 @@ public class RepeatAlphabet {
 		lastSpacer=-1;
 		for (i=0; i<nTranslatedReads; i++) {
 			nBlocks=translation_all[i].length;
+			if (nBlocks<2) continue;
 			if (isBlockPeriodic.length<nBlocks) isBlockPeriodic = new boolean[nBlocks];
 			if (isBlockNonperiodic.length<nBlocks) isBlockNonperiodic = new boolean[nBlocks];
 			for (j=0; j<nBlocks; j++) {
@@ -4968,6 +4972,22 @@ public class RepeatAlphabet {
 				}
 				isBlockPeriodic[j]=foundPeriodic; isBlockNonperiodic[j]=foundNonperiodic;
 			}
+			// First block
+			cell=isBlockUnique_all[i][0]; mask=1;
+			if ((cell&mask)!=0 && isBlockPeriodic[1] && !isBlockNonperiodic[1]) {
+				length=boundaries_all[i][0];
+				lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
+				if (length<=maxSpacerLength) {
+					lastSpacer++; nSpacers++;
+					if (lastSpacer==spacers.length) {
+						Spacer[] newArray = new Spacer[spacers.length<<1];
+						System.arraycopy(spacers,0,newArray,0,spacers.length);
+						spacers=newArray;
+					}
+					spacers[lastSpacer] = new Spacer(translated[i],0,boundaries_all[i][0],0,false,false);
+				}
+			}
+			// Intermediate blocks
 			for (j=1; j<nBlocks-1; j++) {
 				cell=isBlockUnique_all[i][j>>3]; mask=1<<(j&LAST_THREE_BITS);
 				if ((cell&mask)!=0 && isBlockPeriodic[j-1] && isBlockPeriodic[j+1] && !(isBlockNonperiodic[j-1] && isBlockNonperiodic[j+1])) {
@@ -5001,6 +5021,22 @@ public class RepeatAlphabet {
 					spacers=newArray;
 				}
 				spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][nBlocks-2],boundaries_all[i][nBlocks-2],nBlocks-1,true,true);
+			}
+			// Last block
+			cell=isBlockUnique_all[i][(nBlocks-1)>>3]; mask=1<<((nBlocks-1)&LAST_THREE_BITS);
+			if ((cell&mask)!=0 && isBlockPeriodic[nBlocks-2] && !isBlockNonperiodic[nBlocks-2]) {
+				readLength=Reads.getReadLength(translated[i]);
+				length=readLength-boundaries_all[i][nBlocks-2];
+				lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
+				if (length<=maxSpacerLength) {
+					lastSpacer++; nSpacers++;
+					if (lastSpacer==spacers.length) {
+						Spacer[] newArray = new Spacer[spacers.length<<1];
+						System.arraycopy(spacers,0,newArray,0,spacers.length);
+						spacers=newArray;
+					}
+					spacers[lastSpacer] = new Spacer(translated[i],boundaries_all[i][nBlocks-2],readLength-1,nBlocks-1,false,false);
+				}
 			}
 		}
 		System.err.println("Loaded "+nSpacers+" spacers ("+(((double)nSpacers)/nTranslatedReads)+" per translated read) and "+nFixedSpacers+" fixed spacers ("+(((double)nFixedSpacers)/nTranslatedReads)+" per translated read).");
@@ -5336,12 +5372,14 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 	 * decreasing similarity (but one could put all edges in a priority queue instead). 
 	 * Doing a global alignment of all the reads that have overlapping spacers is
 	 * impractical.
+	 *
+	 * Remark: the procedure assumes that $Reads.readLengths$ has already been loaded.
 	 */
 	public static final void assignBreakpoints() throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
-		boolean orientation;
+		boolean orientation, propagate;
 		int i, j;
-		int top, currentSpacer, neighbor, offset, breakpoint, nAssigned;
+		int top, currentSpacer, neighbor, offset, breakpoint, readLength, nAssigned;
 		
 		// Propagating from fixed spacers
 		if (stack==null || stack.length<lastSpacer+1) stack = new int[lastSpacer+1];
@@ -5349,7 +5387,7 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 		if (nFixedSpacers!=0) {
 			for (i=0; i<=lastSpacer; i++) {
 				if (!spacers[i].isFixed() || spacers[i].breakpoint!=-1) continue;
-				spacers[i].setBreakpoint(); nAssigned++;
+				spacers[i].setBreakpoint(Reads.getReadLength(spacers[i].read)); nAssigned++;
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
@@ -5377,7 +5415,10 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 		if (nAssigned<lastSpacer+1) {
 			for (i=0; i<=lastSpacer; i++) {
 				if (spacers[i].breakpoint!=-1) continue;
-				spacers[i].setBreakpoint(); nAssigned++;
+				readLength=Reads.getReadLength(spacers[i].read);
+				propagate=spacers[i].setBreakpoint(readLength); 
+				nAssigned++;
+				if (!propagate) continue;
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
@@ -5474,7 +5515,6 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 		String[] tokens;
 		Character[] tmpArray;
 		
-		// Applying breakpoints
 		if (read2characters.length()==0) return spacersCursor;
 		if (tmpCharacter==null) tmpCharacter = new Character();
 		if (leftCharacters==null) {
@@ -5490,7 +5530,7 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
 		Math.set(tmpBoolean,nBlocks-1,false);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
-		if (nBlocks>=3) {
+		if (nBlocks>=2) {
 			for (i=0; i<nBlocks; i++) {
 				foundPeriodic=false; foundNonperiodic=false;
 				last=lastInBlock_int[i];
@@ -5508,7 +5548,42 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 				isBlockPeriodic[i]=foundPeriodic; isBlockNonperiodic[i]=foundNonperiodic;
 			}
 		}
-		i=1; lastLeft=-1;
+		
+		// First block
+		lastLeft=-1;
+		if (isBlockUnique[0] && isBlockPeriodic[1] && !isBlockNonperiodic[1] && boundaries[0]<=maxSpacerLength) {
+			while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID) spacersCursor++;
+			if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>0) {
+				System.err.println("ERROR: spacer not found: "+readID+"[0.."+boundaries[0]+"]");
+				System.exit(1);
+			}
+			length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
+			for (j=0; j<=lastInBlock_int[1]; j++) {
+				c=intBlocks[1][j];
+				lastLeft++;
+				if (lastLeft==leftCharacters.length) {
+					Character[] newArray = new Character[leftCharacters.length<<1];
+					System.arraycopy(leftCharacters,0,newArray,0,leftCharacters.length);
+					for (k=leftCharacters.length; k<newArray.length; k++) newArray[k] = new Character();
+					leftCharacters=newArray;
+				}
+				leftCharacters[lastLeft].copyFrom(alphabet[c]);
+				leftCharacters[lastLeft].length+=length;  // Not quantized
+				if (leftCharacters[lastLeft].orientation) {
+					leftCharacters[lastLeft].openStart=true;
+					leftCharacters[lastLeft].openEnd=false;
+				}
+				else {
+					leftCharacters[lastLeft].openStart=false;
+					leftCharacters[lastLeft].openEnd=true;
+				}
+			}
+			i=2;
+			tmpBoolean[0]=true;
+		}
+		else i=1;
+		
+		// Intermediary blocks
 		while (i<=nBlocks-2) {
 			if (!isBlockUnique[i] || !isBlockPeriodic[i-1] || !isBlockPeriodic[i+1] || (isBlockNonperiodic[i-1] && isBlockNonperiodic[i+1]) || boundaries[i]-boundaries[i-1]>maxSpacerLength) {
 				if (lastLeft!=-1) {
@@ -5600,7 +5675,7 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 				continue;
 			}
 			while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[i-1])) spacersCursor++;
-			if (spacersCursor>lastSpacer || spacers[spacersCursor].first>boundaries[i-1]) {
+			if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[i-1]) {
 				System.err.println("ERROR: spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
 				System.exit(1);
 			}
@@ -5626,14 +5701,53 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 			tmpBoolean[i]=true;
 			i+=2;
 		}
-		if (lastLeft!=-1) {
-			for (j=0; j<=lastLeft; j++) {
-				if (leftCharacters[j].start==-1) leftCharacters[j].quantize(QUANTUM);
-				p=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,leftCharacters[j]);
-				if (p>=0) used[p]=true;
-				else bw.write(leftCharacters[j].toString()+"\n");
+		
+		// Last block
+		if (i==nBlocks-1) {
+			if (isBlockUnique[nBlocks-1] && isBlockPeriodic[nBlocks-2] && !isBlockNonperiodic[nBlocks-2] && readLength-boundaries[nBlocks-2]<=maxSpacerLength) {
+				while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[nBlocks-2])) spacersCursor++;
+				if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[nBlocks-2]) {
+					System.err.println("ERROR: spacer not found: "+readID+"["+boundaries[nBlocks-2]+".."+(readLength-1)+"]");
+					System.exit(1);
+				}
+				length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
+				if (lastLeft==-1) {
+					System.err.println("ERROR: lastLeft is empty but the last block is a spacer.");
+					System.exit(1);
+				}
+				for (j=0; j<=lastLeft; j++) {
+					leftCharacters[j].length+=length;
+					if (leftCharacters[j].orientation) leftCharacters[j].openEnd=true;
+					else leftCharacters[j].openStart=true;
+					leftCharacters[j].quantize(QUANTUM);
+					p=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,leftCharacters[j]);
+					if (p>=0) used[p]=true;
+					else bw.write(leftCharacters[j].toString()+"\n");
+				}
+				tmpBoolean[nBlocks-2]=true; tmpBoolean[nBlocks-1]=true;
 			}
-			tmpBoolean[nBlocks-1]=true;
+			else {
+				if (lastLeft!=-1) {
+					for (j=0; j<=lastLeft; j++) {
+						if (leftCharacters[j].start==-1) leftCharacters[j].quantize(QUANTUM);
+						p=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,leftCharacters[j]);
+						if (p>=0) used[p]=true;
+						else bw.write(leftCharacters[j].toString()+"\n");
+					}
+					tmpBoolean[nBlocks-2]=true;
+				}
+			}
+		}
+		else {
+			if (lastLeft!=-1) {
+				for (j=0; j<=lastLeft; j++) {
+					if (leftCharacters[j].start==-1) leftCharacters[j].quantize(QUANTUM);
+					p=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,leftCharacters[j]);
+					if (p>=0) used[p]=true;
+					else bw.write(leftCharacters[j].toString()+"\n");
+				}
+				tmpBoolean[nBlocks-1]=true;
+			}
 		}
 		
 		// Marking as used every character in every other block
@@ -6204,11 +6318,18 @@ if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 12");
 		
 		public boolean isFixed() { return fixedLeft||fixedRight; }
 		
-		public void setBreakpoint() {
-			if (first==last) breakpoint=first;
-			else if (fixedLeft) breakpoint=first;
-			else if (fixedRight) breakpoint=last;
-			else breakpoint=(first+last)>>1;  // Arbitrary
+		/**
+		 * @param readLength of $read$;
+		 * @return TRUE iff the breakpoint value should be propagated (breakpoints that
+		 * are not an adjacency between two distinct repeats should not be propagated).
+		 */
+		public boolean setBreakpoint(int readLength) {
+			if (first==last) { breakpoint=first; return true; }
+			else if (fixedLeft) { breakpoint=first; return true; }
+			else if (fixedRight) { breakpoint=last; return true; }
+			else if (first==0) { breakpoint=first; return false; }
+			else if (last==readLength-1) { breakpoint=last; return false; }
+			else { breakpoint=(first+last)>>1; return true; }  // Arbitrary
 		}
 		
 		/**
