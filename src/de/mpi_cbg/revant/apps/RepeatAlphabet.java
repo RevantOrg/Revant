@@ -3154,11 +3154,13 @@ public class RepeatAlphabet {
 	 * @param loadIsBlockUnique loads the bitvector $isBlockUnique_all$ for every read in 
 	 * $translated$;
 	 * @param loadTranslation loads in $translation_all$ the translation of every read 
-	 * in $translated$.
+	 * in $translated$;
+	 * @return the max length of a block in $translation_all$, if this data structure is 
+	 * loaded; not defined otherwise.
 	 */
-	public static final void loadAllBoundaries(String translatedFile, boolean loadIsBlockUnique, boolean loadTranslation, String boundariesFile) throws IOException {
+	public static final int loadAllBoundaries(String translatedFile, boolean loadIsBlockUnique, boolean loadTranslation, String boundariesFile) throws IOException {
 		int i, j, r;
-		int read, cell, mask, block, nBlocks, nBytes, nReads, nBoundaries, readLength;
+		int read, cell, mask, block, nBlocks, nBytes, nReads, nBoundaries, readLength, max;
 		String str;
 		Character tmpChar;
 		BufferedReader br;
@@ -3239,6 +3241,7 @@ public class RepeatAlphabet {
 		}
 		
 		// Loading $translation_all$.
+		max=0;
 		if (loadTranslation) {
 			if (tmpChar==null) tmpChar = new Character();
 			translation_all = new int[nReads][0][0];
@@ -3256,11 +3259,13 @@ public class RepeatAlphabet {
 				for (i=0; i<nBlocks; i++) {
 					translation_all[r][i] = new int[lastInBlock_int[i]+1];
 					System.arraycopy(intBlocks[i],0,translation_all[r][i],0,lastInBlock_int[i]+1);
+					max=Math.max(max,lastInBlock_int[i]+1);
 				}
 				str=br.readLine();
 			}
 			br.close();
 		}
+		return max;
 	}
 	
 	
@@ -4924,18 +4929,23 @@ public class RepeatAlphabet {
 	 * contain non-periodic repeats as well), and every short non-repetitive block 
 	 * between two periodic blocks such that (2) one of them contains non-periodic 
 	 * repeats, or (3) none of them contains non-periodic repeats.
-	 * A spacer of type (1) and (2) is called \emph{fixed}, since there is just one way of
+	 * A spacer of type (1,2) is called \emph{fixed}, since there is just one way of
 	 * assigning its breakpoint. Short non-repetitive blocks at the beginning/end of the
-	 * read are loaded like (3).
+	 * read are loaded like (3). Elements in (2,3) are loaded only if the periodic blocks
+	 * do not contain the same repeat in the same orientation (in that case we assume that
+	 * the aligner worked correctly, and that those are indeed two nearby occurrences of 
+	 * the same periodic repeat).
 	 *
 	 * Remark: the procedure is sequential just for simplicity.
 	 *
 	 * Remark: the procedure assumes that $Reads.readLengths$ has already been loaded.
 	 *
-	 * Remark: the procedure needs the following arrays: 
+	 * Remark: the procedure needs the following arrays:
 	 * translation_all, isBlockUnique_all, boundaries_all.
+	 *
+	 * @param maxBlockLength max length of a block in $translation_all$.
 	 */
-	public static final void loadSpacers(int maxSpacerLength) {
+	public static final void loadSpacers(int maxSpacerLength, int maxBlockLength) {
 		final int LAST_THREE_BITS = 0x00000007;
 		boolean foundPeriodic, foundNonperiodic;
 		int i, j, k, c;
@@ -4943,6 +4953,8 @@ public class RepeatAlphabet {
 		final int nTranslatedReads = translated.length;
 		boolean[] isBlockPeriodic, isBlockNonperiodic;
 		int[] lengthHistogram;
+		int[] tmpArray1 = new int[maxBlockLength];
+		int[] tmpArray2 = new int[maxBlockLength];
 		
 		spacers = new Spacer[100];  // Arbitrary
 		isBlockPeriodic = new boolean[100];  // Arbitrary
@@ -4993,7 +5005,7 @@ public class RepeatAlphabet {
 				if ((cell&mask)!=0 && isBlockPeriodic[j-1] && isBlockPeriodic[j+1] && !(isBlockNonperiodic[j-1] && isBlockNonperiodic[j+1])) {
 					length=boundaries_all[i][j]-boundaries_all[i][j-1];
 					lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
-					if (length<=maxSpacerLength) {
+					if (length<=maxSpacerLength && !samePeriod(translation_all[i][j-1],translation_all[i][j-1].length,translation_all[i][j+1],translation_all[i][j+1].length,tmpArray1,tmpArray2)) {
 						lastSpacer++; nSpacers++;
 						if (lastSpacer==spacers.length) {
 							Spacer[] newArray = new Spacer[spacers.length<<1];
@@ -5041,14 +5053,76 @@ public class RepeatAlphabet {
 		}
 		System.err.println("Loaded "+nSpacers+" spacers ("+(((double)nSpacers)/nTranslatedReads)+" per translated read) and "+nFixedSpacers+" fixed spacers ("+(((double)nFixedSpacers)/nTranslatedReads)+" per translated read).");
 		System.err.println("Histogram of all observed spacer lengths:");
-		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);
+		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);		
+	}
+	
+	
+	/**
+	 * @param array* assumed to contain valid positions in $alphabet$;
+	 * @param tmpArray* temporary space, assumed to be large enough;
+	 * @return TRUE iff $arrays1,array2$ both contain a periodic character with the same 
+	 * periodic repeat in the same orientation.
+	 */
+	private static final boolean samePeriod(int[] array1, int length1, int[] array2, int length2, int[] tmpArray1, int[] tmpArray2) {
+		int i, c;
+		int last1, last2;
+		Character character;
 		
+		last1=-1;
+		for (i=0; i<length1; i++) {
+			c=array1[i];
+			if (c>lastUnique && c<=lastPeriodic) {
+				character=alphabet[c];
+				tmpArray1[++last1]=character.orientation?character.repeat:-1-character.repeat;
+			}
+		}
+		if (last1==-1) return false;
+		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
+		last2=-1;
+		for (i=0; i<length2; i++) {
+			c=array2[i];
+			if (c>lastUnique && c<=lastPeriodic) {
+				character=alphabet[c];
+				tmpArray2[++last2]=character.orientation?character.repeat:-1-character.repeat;
+			}
+		}
+		if (last2==-1) return false;
+		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
+		return Math.nonemptyIntersection(tmpArray1,0,last1,tmpArray2,0,last2);
+	}
+	
+	
+	/**
+	 * Variant of the procedure above.
+	 */
+	private static final boolean samePeriod(String[] array1, int length1, String[] array2, int length2, Character[] alphabet, int lastUnique, int lastPeriodic, int[] tmpArray1, int[] tmpArray2) {
+		int i, c;
+		int last1, last2;
+		Character character;
 		
-		
-System.err.println("Spacers:");		
-for (int x=0; x<=lastSpacer; x++) System.err.println(spacers[x]);
-
-		
+		last1=-1;
+		for (i=0; i<length1; i++) {
+			c=Integer.parseInt(array1[i]);
+			if (c<0) c=-1-c;			
+			if (c>lastUnique && c<=lastPeriodic) {
+				character=alphabet[c];
+				tmpArray1[++last1]=character.orientation?character.repeat:-1-character.repeat;
+			}
+		}
+		if (last1==-1) return false;
+		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
+		last2=-1;
+		for (i=0; i<length2; i++) {
+			c=Integer.parseInt(array2[i]);
+			if (c<0) c=-1-c;
+			if (c>lastUnique && c<=lastPeriodic) {
+				character=alphabet[c];
+				tmpArray2[++last2]=character.orientation?character.repeat:-1-character.repeat;
+			}
+		}
+		if (last2==-1) return false;
+		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
+		return Math.nonemptyIntersection(tmpArray1,0,last1,tmpArray2,0,last2);
 	}
 	
 	
@@ -5110,7 +5184,6 @@ for (int x=0; x<=lastSpacer; x++) System.err.println(spacers[x]);
 				   ) {
 					readB=Alignments.readB-1;
 					p=readHasSpacer(readB,firstSpacer,tmpSpacer);
-if (readA==0) System.err.println("loadSpacerNeighbors> 0  p="+p);					
 					if (p>=0) {
 						for (j=p; j<=lastSpacer; j++) {
 							if (spacers[j].read!=readB) break;
@@ -5119,10 +5192,7 @@ if (readA==0) System.err.println("loadSpacerNeighbors> 0  p="+p);
 								   Intervals.isApproximatelyContained(spacers[j].first,spacers[j].last,Alignments.startB,Alignments.endB) &&
 								   !Intervals.areApproximatelyIdentical(spacers[j].first,spacers[j].last,Alignments.startB,Alignments.endB)
 								 )
-							   ) {
-if (readA==0) System.err.println("loadSpacerNeighbors> 1  calling loadSpacerNeighbors_impl() on i="+i+" j="+j);	
-								   nEdges+=loadSpacerNeighbors_impl(i,j,MIN_INTERSECTION,IDENTITY_THRESHOLD)?1:0;
-							   }
+							   ) nEdges+=loadSpacerNeighbors_impl(i,j,MIN_INTERSECTION,IDENTITY_THRESHOLD)?1:0;
 						}
 					}
 				}
@@ -5166,13 +5236,7 @@ if (readA==0) System.err.println("loadSpacerNeighbors> 1  calling loadSpacerNeig
 				spacerNeighbors[i][++k]=edges[j].offset;
 			}
 			lastSpacerNeighbor[i]=k;
-		}
-		
-		
-System.err.println("Spacer edges from spacer 0:");
-for (int x=0; x<=lastSpacerNeighbor[0]; x+=2) System.err.println("-> "+spacers[(int)(spacerNeighbors[0][x]>=0?spacerNeighbors[0][x]:-1-spacerNeighbors[0][x])]+" offset="+spacerNeighbors[0][x+1]);
-		
-		
+		}		
 	}
 	
 	
@@ -5234,7 +5298,6 @@ for (int x=0; x<=lastSpacerNeighbor[0]; x+=2) System.err.println("-> "+spacers[(
 			spacerNeighbors[spacerAID]=newArray;
 		}
 		ratio=((double)(Alignments.diffs<<1))/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2);
-if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge from spacer "+spacerAID+" to spacer "+(Alignments.orientation?spacerBID:-1-spacerBID));		
 		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=Alignments.orientation?spacerBID:-1-spacerBID;
 		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=offsetAB;
 		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=ratio;
@@ -5504,9 +5567,11 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 	 * @param spacersCursor current position in $spacers$;
 	 * @param isBlock* temporary space, with a number of cells at least equal to the
 	 * number of blocks in the translation;
+	 * @param tmpArray* temporary space, with a number of cells at least equal to the max
+	 * number of elements in a block of the translation;
 	 * @return the new value of $spacersCursor$.
 	 */
-	public static final int fixPeriodicEndpoints_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, int readLength, int maxSpacerLength, BufferedWriter bw, boolean[] used, boolean[] isBlockPeriodic, boolean[] isBlockNonperiodic) throws IOException {
+	public static final int fixPeriodicEndpoints_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, int readLength, int maxSpacerLength, BufferedWriter bw, boolean[] used, boolean[] isBlockPeriodic, boolean[] isBlockNonperiodic, int[] tmpArray1, int[] tmpArray2) throws IOException {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		boolean found, foundPeriodic, foundNonperiodic, isUnique;
@@ -5549,7 +5614,8 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 			}
 		}
 		
-		// First block
+		// First block. Remark: if the block is unique and shrinks, it does not create a
+		// new character in the alphabet.
 		lastLeft=-1;
 		if (isBlockUnique[0] && isBlockPeriodic[1] && !isBlockNonperiodic[1] && boundaries[0]<=maxSpacerLength) {
 			while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID) spacersCursor++;
@@ -5585,7 +5651,9 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 		
 		// Intermediary blocks
 		while (i<=nBlocks-2) {
-			if (!isBlockUnique[i] || !isBlockPeriodic[i-1] || !isBlockPeriodic[i+1] || (isBlockNonperiodic[i-1] && isBlockNonperiodic[i+1]) || boundaries[i]-boundaries[i-1]>maxSpacerLength) {
+			if ( !isBlockUnique[i] || !isBlockPeriodic[i-1] || !isBlockPeriodic[i+1] || (isBlockNonperiodic[i-1] && isBlockNonperiodic[i+1]) || 
+			     boundaries[i]-boundaries[i-1]>maxSpacerLength || samePeriod(intBlocks[i-1],lastInBlock_int[i-1]+1,intBlocks[i+1],lastInBlock_int[i+1]+1,tmpArray1,tmpArray2)
+			   ) {
 				if (lastLeft!=-1) {
 					for (j=0; j<=lastLeft; j++) {
 						if (leftCharacters[j].start==-1) {
@@ -5702,7 +5770,8 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 			i+=2;
 		}
 		
-		// Last block
+		// Last block. Remark: if the block is unique and shrinks, it does not create a
+		// new character in the alphabet.
 		if (i==nBlocks-1) {
 			if (isBlockUnique[nBlocks-1] && isBlockPeriodic[nBlocks-2] && !isBlockNonperiodic[nBlocks-2] && readLength-boundaries[nBlocks-2]<=maxSpacerLength) {
 				while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[nBlocks-2])) spacersCursor++;
@@ -5765,12 +5834,14 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 	 * alphabet every existing and new character induced by fixing spacers.
 	 *
 	 * @param out the procedure cumulates the number of spacers fixed at every length 
-	 * (multiple of $IO.quantum$).
+	 * (multiple of $IO.quantum$);
+	 * @param tmpArray* temporary space, with a number of cells at least equal to the max
+	 * number of elements in a block of the translation.
 	 */
-	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int[] out) throws IOException {
+	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int[] out, Character tmpCharacter, int[] tmpArray1, int[] tmpArray2) throws IOException {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
-		boolean found, isUnique;
+		boolean found, foundNonperiodic, isUnique;
 		int i, j, k, p, q, c;
 		int length, nBlocks, last, lastLeft, lastRight, currentBoundary, nBoundariesWritten;
 		Character character;
@@ -5791,7 +5862,9 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 		}
 		loadBoundaries(read2boundaries_old);
 		nBlocks=loadBlocks(read2characters_old);
-		if (nBlocks<3) {
+		
+		// First block
+		if (nBlocks==1) {
 			for (j=0; j<=lastInBlock[0]; j++) {
 				c=Integer.parseInt(blocks[0][j]);
 				if (c<0) c=-1-c;
@@ -5799,21 +5872,119 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 				else {
 					tmpCharacter.copyFrom(oldAlphabet[c]);					
 					if (c>lastUnique_old && c<=lastPeriodic_old) {
-						tmpCharacter.length=nBlocks==1?readLength:boundaries[0];
-						if (tmpCharacter.orientation) {
-							tmpCharacter.openStart=true;
-							tmpCharacter.openEnd=nBlocks==1;
-						}
-						else {
-							tmpCharacter.openStart=nBlocks==1;
-							tmpCharacter.openEnd=true;
-						}
+						tmpCharacter.length=readLength;
+						tmpCharacter.openStart=true;
+						tmpCharacter.openEnd=true;
 						tmpCharacter.quantize(QUANTUM);
 					}
 					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 				}
 			}
-			if (nBlocks==2) {
+			read2characters_new.newLine(); read2boundaries_new.newLine();
+			return spacersCursor;
+		}
+		if (lastInBlock[0]>0) isUnique=false;
+		else {
+			q=Integer.parseInt(blocks[0][0]);
+			if (q<0) q=-1-q;
+			isUnique=q<=lastUnique_old||q==lastAlphabet_old+1;
+		}
+		found=false; foundNonperiodic=false;
+		for (j=0; j<=lastInBlock[1]; j++) {
+			c=Integer.parseInt(blocks[1][j]);
+			if (c<0) c=-1-c;
+			if (c>lastUnique_old && c<=lastPeriodic_old) found=true;
+			else foundNonperiodic=true;
+		}
+		if (isUnique && boundaries[0]<=maxSpacerLength && found && !foundNonperiodic) {
+			while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID) spacersCursor++;
+			if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>0) {
+				System.err.println("ERROR: spacer not found: "+readID+"[0.."+boundaries[0]+"]");
+				System.exit(1);
+			}
+			if (spacers[spacersCursor].breakpoint>QUANTUM) {
+				tmpCharacter.repeat=UNIQUE; tmpCharacter.orientation=true;
+				tmpCharacter.start=-1; tmpCharacter.end=-1;
+				tmpCharacter.openStart=true; tmpCharacter.openEnd=false;
+				tmpCharacter.length=spacers[spacersCursor].breakpoint;
+				tmpCharacter.quantize(QUANTUM);
+				p=fixPeriodicEndpoints_lookupUnique(tmpCharacter,newAlphabet,lastUnique_new,lastAlphabet_new);
+				read2characters_new.write(p+"");
+				currentBoundary=spacers[spacersCursor].breakpoint;
+			}
+			else currentBoundary=boundaries[0];
+			length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
+			lastLeft=-1;
+			for (j=0; j<=lastInBlock[1]; j++) {
+				c=Integer.parseInt(blocks[1][j]);
+				if (c<0) c=-1-c;
+				lastLeft++;
+				if (lastLeft==leftCharacters.length) {
+					Character[] newArray = new Character[leftCharacters.length<<1];
+					System.arraycopy(leftCharacters,0,newArray,0,leftCharacters.length);
+					for (k=leftCharacters.length; k<newArray.length; k++) newArray[k] = new Character();
+					leftCharacters=newArray;
+				}
+				leftCharacters[lastLeft].copyFrom(alphabet[c]);
+				if (nBlocks==2) {
+					leftCharacters[lastLeft].length=readLength-boundaries[0];
+					leftCharacters[lastLeft].length+=length;  // Not quantized
+					if (leftCharacters[lastLeft].orientation) {
+						leftCharacters[lastLeft].openStart=spacers[spacersCursor].breakpoint<=QUANTUM;
+						leftCharacters[lastLeft].openEnd=true;
+					}
+					else {
+						leftCharacters[lastLeft].openStart=true;
+						leftCharacters[lastLeft].openEnd=spacers[spacersCursor].breakpoint<=QUANTUM;
+					}
+				}
+				else {
+					leftCharacters[lastLeft].length+=length;  // Not quantized
+					if (leftCharacters[lastLeft].orientation) {
+						leftCharacters[lastLeft].openStart=spacers[spacersCursor].breakpoint<=QUANTUM;
+						leftCharacters[lastLeft].openEnd=false;
+					}
+					else {
+						leftCharacters[lastLeft].openStart=false;
+						leftCharacters[lastLeft].openEnd=spacers[spacersCursor].breakpoint<=QUANTUM;
+					}
+				}
+			}
+			i=2;
+		}
+		else { i=1; lastLeft=-1; currentBoundary=-1; }
+		if (nBlocks==2) {
+			if (lastLeft!=-1) {
+				read2characters_new.write(SEPARATOR_MAJOR+"");
+				read2boundaries_new.write(currentBoundary+"");
+				for (j=0; j<=lastLeft; j++) {
+					character=leftCharacters[j];
+					character.quantize(QUANTUM);
+					fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+				}
+			}
+			else {
+				for (j=0; j<=lastInBlock[0]; j++) {
+					c=Integer.parseInt(blocks[0][j]);
+					if (c<0) c=-1-c;
+					if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+					else {
+						tmpCharacter.copyFrom(oldAlphabet[c]);					
+						if (c>lastUnique_old && c<=lastPeriodic_old) {
+							tmpCharacter.length=boundaries[0];
+							if (tmpCharacter.orientation) {
+								tmpCharacter.openStart=true;
+								tmpCharacter.openEnd=false;
+							}
+							else {
+								tmpCharacter.openStart=false;
+								tmpCharacter.openEnd=true;
+							}
+							tmpCharacter.quantize(QUANTUM);
+						}
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+					}
+				}
 				read2characters_new.write(SEPARATOR_MAJOR+"");
 				read2boundaries_new.write(boundaries[0]+"");
 				for (j=0; j<=lastInBlock[1]; j++) {
@@ -5841,27 +6012,23 @@ if (spacerAID==0) System.err.println("loadSpacerNeighbors_impl> 0  adding edge f
 			read2characters_new.newLine(); read2boundaries_new.newLine();
 			return spacersCursor;
 		}
-		i=1; lastLeft=-1; currentBoundary=-1; nBoundariesWritten=0;
+		
+		// Intermediate blocks
+		nBoundariesWritten=0;
 		while (i<=nBlocks-2) {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 0  considering block "+i);
 			if (lastInBlock[i]>0) { isUnique=false; q=-1; }
 			else {
 				q=Integer.parseInt(blocks[i][0]);
 				if (q<0) q=-1-q;
 				isUnique=q<=lastUnique_old||q==lastAlphabet_old+1;
 			}
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 1  isUnique="+isUnique);
-			if (!isUnique || boundaries[i]-boundaries[i-1]>maxSpacerLength) {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 2");
+			if (!isUnique || boundaries[i]-boundaries[i-1]>maxSpacerLength || samePeriod(blocks[i-1],lastInBlock[i-1]+1,blocks[i+1],lastInBlock[i+1]+1,oldAlphabet,lastUnique_old,lastPeriodic_old,tmpArray1,tmpArray2)) {
 				if (i>1) {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 3");
 					read2characters_new.write(SEPARATOR_MAJOR+"");
 					read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
 					nBoundariesWritten++;
 				}
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 4");
 				if (lastLeft!=-1) {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 5  lastLeft="+lastLeft);
 					for (j=0; j<=lastLeft; j++) {
 						character=leftCharacters[j];
 						character.quantize(QUANTUM);
@@ -5870,9 +6037,7 @@ if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 5  la
 					lastLeft=-1;
 				}
 				else {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 6  lastInBlock[i-1]="+lastInBlock[i-1]);
 					for (j=0; j<=lastInBlock[i-1]; j++) {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 7  j="+j);
 						c=Integer.parseInt(blocks[i-1][j]);
 						if (c<0) c=-1-c;
 						if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
@@ -5901,9 +6066,7 @@ if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 7  j=
 						}
 					}
 				}
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 8  isUnique="+isUnique);
 				if (isUnique) {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 9");
 					read2characters_new.write(SEPARATOR_MAJOR+"");
 					read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[i-1]);
 					nBoundariesWritten++;
@@ -5916,15 +6079,12 @@ if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 9");
 					i+=2;
 				}
 				else { 
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 10");
 					currentBoundary=boundaries[i-1];
 					i++;
 				}
 				continue;
 			}
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 11  lastLeft="+lastLeft);
 			if (lastLeft==-1) {
-if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 12");
 				found=false;
 				for (j=0; j<=lastInBlock[i-1]; j++) {
 					c=Integer.parseInt(blocks[i-1][j]);
@@ -6146,26 +6306,82 @@ if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 12");
 			currentBoundary=spacers[spacersCursor].breakpoint;
 			i+=2;
 		}
-		read2characters_new.write(SEPARATOR_MAJOR+"");
-		read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
-		nBoundariesWritten++;
-		if (lastLeft!=-1) {
-			for (j=0; j<=lastLeft; j++) {
-				character=leftCharacters[j];
-				character.quantize(QUANTUM);
-				fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+		
+		// Last block
+		if (i==nBlocks-1) {
+			read2characters_new.write(SEPARATOR_MAJOR+"");
+			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
+			nBoundariesWritten++;
+			if (lastInBlock[nBlocks-1]>0) isUnique=false;
+			else {
+				q=Integer.parseInt(blocks[nBlocks-1][0]);
+				if (q<0) q=-1-q;
+				isUnique=q<=lastUnique_old||q==lastAlphabet_old+1;
 			}
-		}
-		else if (i-1<=nBlocks-1) {
-			for (j=0; j<=lastInBlock[i-1]; j++) {
-				c=Integer.parseInt(blocks[i-1][j]);
+			found=false; foundNonperiodic=false;
+			for (j=0; j<=lastInBlock[nBlocks-2]; j++) {
+				c=Integer.parseInt(blocks[nBlocks-2][j]);
 				if (c<0) c=-1-c;
-				if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+				if (c>lastUnique_old && c<=lastPeriodic_old) found=true;
+				else foundNonperiodic=true;
+			}
+			if (isUnique && readLength-boundaries[nBlocks-2]<=maxSpacerLength && found && !foundNonperiodic) {
+				while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID && spacers[spacersCursor].first<boundaries[nBlocks-2]) spacersCursor++;
+				if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[nBlocks-2]) {
+					System.err.println("ERROR: spacer not found: "+readID+"["+boundaries[nBlocks-2]+".."+(readLength-1)+"]");
+					System.exit(1);
+				}
+				if (readLength-spacers[spacersCursor].breakpoint>QUANTUM) {
+					length=spacers[spacersCursor].breakpoint-boundaries[nBlocks-2];
+					if (lastLeft!=-1) {
+						for (j=0; j<=lastLeft; j++) {
+							character=leftCharacters[j];
+							character.length+=length;
+							character.quantize(QUANTUM);
+							fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+						}
+					}
+					else {
+						for (j=0; j<=lastInBlock[nBlocks-2]; j++) {
+							c=Integer.parseInt(blocks[nBlocks-2][j]);
+							if (c<0) c=-1-c;
+							tmpCharacter.copyFrom(oldAlphabet[c]);
+							tmpCharacter.length=boundaries[nBlocks-2]-boundaries[nBlocks-3]+length;
+							tmpCharacter.openStart=false;
+							tmpCharacter.openEnd=false;
+							tmpCharacter.quantize(QUANTUM);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+						}
+					}
+					read2characters_new.write(SEPARATOR_MAJOR+"");
+					read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+spacers[spacersCursor].breakpoint);
+					nBoundariesWritten++;
+					tmpCharacter.repeat=UNIQUE; tmpCharacter.orientation=true;
+					tmpCharacter.start=-1; tmpCharacter.end=-1;
+					tmpCharacter.openStart=false; tmpCharacter.openEnd=true;
+					tmpCharacter.length=readLength-spacers[spacersCursor].breakpoint;
+					tmpCharacter.quantize(QUANTUM);
+					p=fixPeriodicEndpoints_lookupUnique(tmpCharacter,newAlphabet,lastUnique_new,lastAlphabet_new);
+					read2characters_new.write(p+"");
+				}
 				else {
-					tmpCharacter.copyFrom(oldAlphabet[c]);
-					if (c>lastUnique_old && c<=lastPeriodic_old) {
-						if (i-1==nBlocks-1) {
-							tmpCharacter.length=readLength-boundaries[i-2];
+					length=readLength-boundaries[nBlocks-2];
+					if (lastLeft!=-1) {
+						for (j=0; j<=lastLeft; j++) {
+							character=leftCharacters[j];
+							character.length+=length;
+							if (character.orientation) character.openEnd=true;
+							else character.openStart=true;
+							character.quantize(QUANTUM);
+							fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+						}
+					}
+					else {
+						for (j=0; j<=lastInBlock[nBlocks-2]; j++) {
+							c=Integer.parseInt(blocks[nBlocks-2][j]);
+							if (c<0) c=-1-c;
+							tmpCharacter.copyFrom(oldAlphabet[c]);
+							tmpCharacter.length+=length;
 							if (tmpCharacter.orientation) {
 								tmpCharacter.openStart=false;
 								tmpCharacter.openEnd=true;
@@ -6174,44 +6390,98 @@ if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 12");
 								tmpCharacter.openStart=true;
 								tmpCharacter.openEnd=false;
 							}
+							tmpCharacter.quantize(QUANTUM);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 						}
-						else {
-							tmpCharacter.length=boundaries[i-1]-boundaries[i-2];
-							tmpCharacter.openStart=false;
-							tmpCharacter.openEnd=false;
-						}
-						tmpCharacter.quantize(QUANTUM);
-					}
-					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+					}					
 				}
 			}
-		}
-		if (i==nBlocks-1) {
-			read2characters_new.write(SEPARATOR_MAJOR+"");
-			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[nBlocks-2]);
-			nBoundariesWritten++;
-			for (j=0; j<=lastInBlock[nBlocks-1]; j++) {
-				c=Integer.parseInt(blocks[nBlocks-1][j]);
-				if (c<0) c=-1-c;
-				if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+			else {
+				if (lastLeft!=-1) {
+					for (j=0; j<=lastLeft; j++) {
+						character=leftCharacters[j];
+						character.quantize(QUANTUM);
+						fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+					}
+				}
 				else {
-					tmpCharacter.copyFrom(oldAlphabet[c]);
-					if (c>lastUnique_old && c<=lastPeriodic_old) {
-						tmpCharacter.length=readLength-boundaries[i-1];
-						if (tmpCharacter.orientation) {
-							tmpCharacter.openStart=false;
-							tmpCharacter.openEnd=true;
-						}
+					for (j=0; j<=lastInBlock[nBlocks-2]; j++) {
+						c=Integer.parseInt(blocks[nBlocks-2][j]);
+						if (c<0) c=-1-c;
+						if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
 						else {
-							tmpCharacter.openStart=true;
-							tmpCharacter.openEnd=false;
+							tmpCharacter.copyFrom(oldAlphabet[c]);
+							if (c>lastUnique_old && c<=lastPeriodic_old) {
+								tmpCharacter.length=boundaries[nBlocks-2]-boundaries[nBlocks-3];
+								tmpCharacter.openStart=false;
+								tmpCharacter.openEnd=false;
+								tmpCharacter.quantize(QUANTUM);
+							}
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 						}
-						tmpCharacter.quantize(QUANTUM);
 					}
-					fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+				}
+				read2characters_new.write(SEPARATOR_MAJOR+"");
+				read2boundaries_new.write(boundaries[nBlocks-2]+"");
+				for (j=0; j<=lastInBlock[nBlocks-1]; j++) {
+					c=Integer.parseInt(blocks[nBlocks-1][j]);
+					if (c<0) c=-1-c;
+					if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+					else {
+						tmpCharacter.copyFrom(oldAlphabet[c]);
+						if (c>lastUnique_old && c<=lastPeriodic_old) {
+							tmpCharacter.length=readLength-boundaries[nBlocks-2];
+							if (tmpCharacter.orientation) {
+								tmpCharacter.openStart=false;
+								tmpCharacter.openEnd=true;
+							}
+							else {
+								tmpCharacter.openStart=true;
+								tmpCharacter.openEnd=false;
+							}
+							tmpCharacter.quantize(QUANTUM);
+						}
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+					}
 				}
 			}
 		}
+		else if (i==nBlocks) {
+			read2characters_new.write(SEPARATOR_MAJOR+"");
+			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
+			nBoundariesWritten++;
+			if (lastLeft!=-1) {
+				for (j=0; j<=lastLeft; j++) {
+					character=leftCharacters[j];
+					character.quantize(QUANTUM);
+					fixPeriodicEndpoints_updateTranslation_impl(character,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+				}
+			}
+			else {
+				for (j=0; j<=lastInBlock[nBlocks-1]; j++) {
+					c=Integer.parseInt(blocks[nBlocks-1][j]);
+					if (c<0) c=-1-c;
+					if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+					else {
+						tmpCharacter.copyFrom(oldAlphabet[c]);
+						if (c>lastUnique_old && c<=lastPeriodic_old) {
+							tmpCharacter.length=readLength-boundaries[nBlocks-2];
+							if (tmpCharacter.orientation) {
+								tmpCharacter.openStart=false;
+								tmpCharacter.openEnd=true;
+							}
+							else {
+								tmpCharacter.openStart=true;
+								tmpCharacter.openEnd=false;
+							}
+							tmpCharacter.quantize(QUANTUM);
+						}
+						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+					}
+				}
+			}
+		}
+		else { /* NOP: this case has already been fully handled before.	*/ }
 		read2characters_new.newLine(); read2boundaries_new.newLine();
 		
 		return spacersCursor;
@@ -6300,6 +6570,22 @@ if (readID==2) System.err.println("fixPeriodicEndpoints_updateTranslation> 12");
 		while (k<=lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character)) k++;
 		p=k;
 		return p;
+	}
+	
+	
+	/**
+	 * @return if $character$ occurs in $newAlphabet$, the position of it; otherwise, the 
+	 * position of the smallest element of $newAlphabet$ that implies $character$; -1
+	 * if no element of $newAlphabet$ implies $character$.
+	 */
+	private static final int fixPeriodicEndpoints_lookupUnique(Character character, Character[] newAlphabet, int lastUnique_new, int lastAlphabet_new) {
+		int p;
+		
+		p=Arrays.binarySearch(newAlphabet,0,lastUnique_new+1,character);
+		if (p>=0) return p;
+		p=-1-p;
+		if (newAlphabet[p].repeat!=UNIQUE) return lastAlphabet_new+1;
+		else return p;
 	}
 	
 	

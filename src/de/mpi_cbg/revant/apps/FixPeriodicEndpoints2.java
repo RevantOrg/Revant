@@ -35,6 +35,7 @@ public class FixPeriodicEndpoints2 {
 		BufferedReader br1, br2, br3, br4;
 		BufferedWriter bw;
 		boolean[] used, isBlockPeriodic, isBlockNonperiodic;
+		int[] tmpArray1, tmpArray2;
 		
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.deserializeSpacers(SPACERS_FILE,N_SPACERS);
@@ -47,15 +48,21 @@ public class FixPeriodicEndpoints2 {
 		br3 = new BufferedReader(new FileReader(TRANSLATED_READS_CHARACTERS_FILE));
 		br4 = new BufferedReader(new FileReader(TRANSLATED_READS_BOUNDARIES_FILE));
 		bw = new BufferedWriter(new FileWriter(OUTPUT_FILE));
+		tmpArray1 = new int[CAPACITY]; tmpArray2 = new int[CAPACITY];  // Arbitrary
 		i=0; j=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine();
 		while (str1!=null) {
-			nBlocks=1+((str3.length()+1)>>1);  // Loose upper bound
+			nBlocks=1+((str4.length()+1)>>1);  // Loose upper bound
 			if (isBlockPeriodic.length<nBlocks) {
 				isBlockPeriodic = new boolean[nBlocks];
 				isBlockNonperiodic = new boolean[nBlocks];
 			}
-			j=RepeatAlphabet.fixPeriodicEndpoints_collectCharacterInstances(Integer.parseInt(str1),j,str3,str4,Integer.parseInt(str2),MAX_SPACER_LENGTH,bw,used,isBlockPeriodic,isBlockNonperiodic);
+			nBlocks=(str3.length()+1)>>1;  // Loose upper bound
+			if (tmpArray1.length<nBlocks) {
+				tmpArray1 = new int[nBlocks];
+				tmpArray2 = new int[nBlocks];
+			}
+			j=RepeatAlphabet.fixPeriodicEndpoints_collectCharacterInstances(Integer.parseInt(str1),j,str3,str4,Integer.parseInt(str2),MAX_SPACER_LENGTH,bw,used,isBlockPeriodic,isBlockNonperiodic,tmpArray1,tmpArray2);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine();
 		}
 		br1.close(); br2.close(); br3.close(); br4.close();

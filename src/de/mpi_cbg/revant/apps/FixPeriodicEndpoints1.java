@@ -28,6 +28,7 @@ public class FixPeriodicEndpoints1 {
 		final String OUTPUT_PREFIX = args[10];
 		
 		int i, j;
+		int maxBlockLength;
 		String str1, str2;
 		BufferedReader br1, br2;
 		BufferedWriter bw1, bw2;
@@ -37,8 +38,8 @@ public class FixPeriodicEndpoints1 {
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
 		Reads.loadReadIDs(READ_IDS_FILE,N_READS);
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
-		RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_CHARACTERS_FILE,true,true,TRANSLATED_READS_BOUNDARIES_FILE);
-		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH);
+		maxBlockLength=RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_CHARACTERS_FILE,true,true,TRANSLATED_READS_BOUNDARIES_FILE);
+		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
 		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE);
 		RepeatAlphabet.assignBreakpoints();
 		lastRead = new int[N_BLOCKS];
