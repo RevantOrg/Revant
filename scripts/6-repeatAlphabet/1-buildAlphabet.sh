@@ -248,12 +248,14 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
 	mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-prespacers
 	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prespacers
+	cp ${FULLY_CONTAINED_FILE} ${TMPFILE_PATH}-spacers-12.txt
+	mv ${FULLY_CONTAINED_FILE} ${FULLY_CONTAINED_FILE}-prespacers
 	for THREAD in $(seq 0 ${TO}); do
 		cat ${TMPFILE_PATH}-spacers-9-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 		cat ${TMPFILE_PATH}-spacers-10-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
-		cat ${TMPFILE_PATH}-spacers-11-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
+		cat ${TMPFILE_PATH}-spacers-11-${THREAD}.txt >> ${TMPFILE_PATH}-spacers-12.txt
 	done
-	sort --parallel=${N_THREADS} ${FULLY_CONTAINED_FILE}
+	sort --parallel=${N_THREADS} -n ${TMPFILE_PATH}-spacers-12.txt > ${FULLY_CONTAINED_FILE}
 	mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 fi
 echo "Periodic endpoints fixed"
