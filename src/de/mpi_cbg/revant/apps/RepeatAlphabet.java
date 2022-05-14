@@ -3682,6 +3682,7 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
+if (p<0) System.err.println("ERROR: readB="+readB+" not found in translated, but not found also in fullyUnique and fullyContained");			
 			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
 			if (q==-1) bw.write("0\n");
 			else if (q==0 || q==1) {
@@ -6568,6 +6569,7 @@ public class RepeatAlphabet {
 		}
 		else { /* NOP: this case has already been fully handled before.	*/ }
 		read2characters_new.newLine(); read2boundaries_new.newLine();
+		if (nBoundariesWritten==0) fullyContained_new.write(readID+"\n");
 		
 		return spacersCursor;
 	}
