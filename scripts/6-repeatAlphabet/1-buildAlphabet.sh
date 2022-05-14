@@ -236,12 +236,13 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		local THREAD_ID=$1
 		local READ2CHARACTERS_FILE_NEW=$2
 		local READ2BOUNDARIES_FILE_NEW=$3
+		local FULLYCONTAINED_FILE_NEW=$4
 		local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-spacers-2-${THREAD_ID}.txt"
 		local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-spacers-2-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-spacers-2-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt ${FULLYCONTAINED_FILE_NEW}${THREAD_ID}.txt
 	}
 	for THREAD in $(seq 0 ${TO}); do
-		translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" &
+		translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" "${TMPFILE_PATH}-spacers-11-" &
 	done
 	wait
 	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
@@ -250,7 +251,9 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	for THREAD in $(seq 0 ${TO}); do
 		cat ${TMPFILE_PATH}-spacers-9-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 		cat ${TMPFILE_PATH}-spacers-10-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
+		cat ${TMPFILE_PATH}-spacers-11-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
 	done
+	sort --parallel=${N_THREADS} ${FULLY_CONTAINED_FILE}
 	mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 fi
 echo "Periodic endpoints fixed"

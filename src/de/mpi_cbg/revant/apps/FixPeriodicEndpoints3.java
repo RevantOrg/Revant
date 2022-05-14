@@ -23,12 +23,13 @@ public class FixPeriodicEndpoints3 {
 		final String READ2BOUNDARIES_FILE_OLD = args[8];  // Of a chunk of reads
 		final String READ2CHARACTERS_FILE_NEW = args[9];  // Of a chunk of reads
 		final String READ2BOUNDARIES_FILE_NEW = args[10];  // Of a chunk of reads
+		final String FULLYCONTAINED_FILE_NEW = args[11];  // Of a chunk of reads
 		
 		int i, j;
 		int sum, lastUnique_old, lastPeriodic_old, lastAlphabet_old, lastUnique_new, lastPeriodic_new, lastAlphabet_new, nBlocks;
 		String str1, str2, str3, str4;
 		BufferedReader br1, br2, br3, br4;
-		BufferedWriter bw1, bw2;
+		BufferedWriter bw1, bw2, bw3;
 		RepeatAlphabet.Character tmpCharacter;
 		boolean[] used;
 		int[] histogram, tmpArray1, tmpArray2;
@@ -55,6 +56,7 @@ public class FixPeriodicEndpoints3 {
 		br4 = new BufferedReader(new FileReader(READ2BOUNDARIES_FILE_OLD));
 		bw1 = new BufferedWriter(new FileWriter(READ2CHARACTERS_FILE_NEW));
 		bw2 = new BufferedWriter(new FileWriter(READ2BOUNDARIES_FILE_NEW));
+		bw3 = new BufferedWriter(new FileWriter(FULLYCONTAINED_FILE_NEW));
 		i=0; j=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine();
 		while (str1!=null) {
@@ -63,10 +65,10 @@ public class FixPeriodicEndpoints3 {
 				tmpArray1 = new int[nBlocks];
 				tmpArray2 = new int[nBlocks];
 			}
-			j=RepeatAlphabet.fixPeriodicEndpoints_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,MAX_SPACER_LENGTH,str3,str4,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,histogram,tmpCharacter,tmpArray1,tmpArray2);
+			j=RepeatAlphabet.fixPeriodicEndpoints_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,MAX_SPACER_LENGTH,str3,str4,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,histogram,tmpCharacter,tmpArray1,tmpArray2);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine();
 		}
-		br1.close(); br2.close(); br3.close(); br4.close(); bw1.close(); bw2.close();
+		br1.close(); br2.close(); br3.close(); br4.close(); bw1.close(); bw2.close(); bw3.close();
 		sum=0;
 		for (i=0; i<histogram.length; i++) sum+=histogram[i];
 		System.err.println("Fixed "+sum+" spacers. Histogram of fixed spacers lengths:");

@@ -5595,27 +5595,29 @@ public class RepeatAlphabet {
 		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
 		Math.set(tmpBoolean,nBlocks-1,false);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
-		if (nBlocks>=2) {
-			for (i=0; i<nBlocks; i++) {
-				foundPeriodic=false; foundNonperiodic=false;
-				last=lastInBlock_int[i];
-				for (j=0; j<=last; j++) {
-					c=intBlocks[i][j];
-					if (c>lastUnique && c<=lastPeriodic) {
-						foundPeriodic=true;
-						if (foundNonperiodic) break;
-					}
-					else if (c>lastPeriodic) {
-						foundNonperiodic=true;
-						if (foundPeriodic) break;
-					}
+		if (nBlocks==1) {
+			for (j=0; j<=lastInBlock_int[0]; j++) used[intBlocks[0][j]]=true;
+			return spacersCursor;
+		}
+		for (i=0; i<nBlocks; i++) {
+			foundPeriodic=false; foundNonperiodic=false;
+			last=lastInBlock_int[i];
+			for (j=0; j<=last; j++) {
+				c=intBlocks[i][j];
+				if (c>lastUnique && c<=lastPeriodic) {
+					foundPeriodic=true;
+					if (foundNonperiodic) break;
 				}
-				isBlockPeriodic[i]=foundPeriodic; isBlockNonperiodic[i]=foundNonperiodic;
+				else if (c>lastPeriodic) {
+					foundNonperiodic=true;
+					if (foundPeriodic) break;
+				}
 			}
+			isBlockPeriodic[i]=foundPeriodic; isBlockNonperiodic[i]=foundNonperiodic;
 		}
 		
 		// First block. Remark: if the block is unique and shrinks, it does not create a
-		// new character in the alphabet.
+		// new unique character in the alphabet.
 		lastLeft=-1;
 		if (isBlockUnique[0] && isBlockPeriodic[1] && !isBlockNonperiodic[1] && boundaries[0]<=maxSpacerLength) {
 			while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID) spacersCursor++;
@@ -5771,7 +5773,7 @@ public class RepeatAlphabet {
 		}
 		
 		// Last block. Remark: if the block is unique and shrinks, it does not create a
-		// new character in the alphabet.
+		// new unique character in the alphabet.
 		if (i==nBlocks-1) {
 			if (isBlockUnique[nBlocks-1] && isBlockPeriodic[nBlocks-2] && !isBlockNonperiodic[nBlocks-2] && readLength-boundaries[nBlocks-2]<=maxSpacerLength) {
 				while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[nBlocks-2])) spacersCursor++;
@@ -5838,7 +5840,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray* temporary space, with a number of cells at least equal to the max
 	 * number of elements in a block of the translation.
 	 */
-	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int[] out, Character tmpCharacter, int[] tmpArray1, int[] tmpArray2) throws IOException {
+	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int[] out, Character tmpCharacter, int[] tmpArray1, int[] tmpArray2) throws IOException {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		boolean found, foundNonperiodic, isUnique;
@@ -5911,9 +5913,9 @@ public class RepeatAlphabet {
 				p=fixPeriodicEndpoints_lookupUnique(tmpCharacter,newAlphabet,lastUnique_new,lastAlphabet_new);
 				read2characters_new.write(p+"");
 				currentBoundary=spacers[spacersCursor].breakpoint;
+				length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
 			}
-			else currentBoundary=boundaries[0];
-			length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
+			else { currentBoundary=-1; length=boundaries[0]; }
 			lastLeft=-1;
 			for (j=0; j<=lastInBlock[1]; j++) {
 				c=Integer.parseInt(blocks[1][j]);
@@ -5955,8 +5957,11 @@ public class RepeatAlphabet {
 		else { i=1; lastLeft=-1; currentBoundary=-1; }
 		if (nBlocks==2) {
 			if (lastLeft!=-1) {
-				read2characters_new.write(SEPARATOR_MAJOR+"");
-				read2boundaries_new.write(currentBoundary+"");
+				if (currentBoundary!=-1) {
+					read2characters_new.write(SEPARATOR_MAJOR+"");
+					read2boundaries_new.write(currentBoundary+"");
+				}
+				else fullyContained_new.write(readID+"\n");
 				for (j=0; j<=lastLeft; j++) {
 					character=leftCharacters[j];
 					character.quantize(QUANTUM);
@@ -5964,48 +5969,105 @@ public class RepeatAlphabet {
 				}
 			}
 			else {
+				if (lastInBlock[1]>0) isUnique=false;
+				else {
+					q=Integer.parseInt(blocks[1][0]);
+					if (q<0) q=-1-q;
+					isUnique=q<=lastUnique_old||q==lastAlphabet_old+1;
+				}
+				found=false; foundNonperiodic=false;
 				for (j=0; j<=lastInBlock[0]; j++) {
 					c=Integer.parseInt(blocks[0][j]);
 					if (c<0) c=-1-c;
-					if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
-					else {
-						tmpCharacter.copyFrom(oldAlphabet[c]);					
-						if (c>lastUnique_old && c<=lastPeriodic_old) {
-							tmpCharacter.length=boundaries[0];
-							if (tmpCharacter.orientation) {
-								tmpCharacter.openStart=true;
-								tmpCharacter.openEnd=false;
-							}
-							else {
-								tmpCharacter.openStart=false;
-								tmpCharacter.openEnd=true;
-							}
+					if (c>lastUnique_old && c<=lastPeriodic_old) found=true;
+					else foundNonperiodic=true;
+				}
+				if (isUnique && readLength-boundaries[0]<=maxSpacerLength && found && !foundNonperiodic) {
+					while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[0])) spacersCursor++;
+					if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[0]) {
+						System.err.println("ERROR: spacer not found: "+readID+"["+boundaries[0]+".."+(readLength-1)+"]");
+						System.exit(1);
+					}
+					if (readLength-spacers[spacersCursor].breakpoint<QUANTUM) {
+						for (j=0; j<=lastInBlock[0]; j++) {
+							c=Integer.parseInt(blocks[0][j]);
+							if (c<0) c=-1-c;
+							tmpCharacter.copyFrom(oldAlphabet[c]);					
+							tmpCharacter.length=readLength;
+							tmpCharacter.openStart=true;
+							tmpCharacter.openEnd=true;
 							tmpCharacter.quantize(QUANTUM);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 						}
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+						fullyContained_new.write(readID+"\n");
+					}
+					else {
+						length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
+						for (j=0; j<=lastInBlock[0]; j++) {
+							c=Integer.parseInt(blocks[0][j]);
+							if (c<0) c=-1-c;
+							tmpCharacter.copyFrom(oldAlphabet[c]);					
+							tmpCharacter.length+=length;
+							tmpCharacter.openStart=true;
+							tmpCharacter.openEnd=false;
+							tmpCharacter.quantize(QUANTUM);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+						}
+						read2characters_new.write(SEPARATOR_MAJOR+"");
+						read2boundaries_new.write(spacers[spacersCursor].breakpoint+"");
+						tmpCharacter.repeat=UNIQUE; tmpCharacter.orientation=true;
+						tmpCharacter.start=-1; tmpCharacter.end=-1;
+						tmpCharacter.openStart=false; tmpCharacter.openEnd=true;
+						tmpCharacter.length=readLength-spacers[spacersCursor].breakpoint;
+						tmpCharacter.quantize(QUANTUM);
+						p=fixPeriodicEndpoints_lookupUnique(tmpCharacter,newAlphabet,lastUnique_new,lastAlphabet_new);
+						read2characters_new.write(p+"");
 					}
 				}
-				read2characters_new.write(SEPARATOR_MAJOR+"");
-				read2boundaries_new.write(boundaries[0]+"");
-				for (j=0; j<=lastInBlock[1]; j++) {
-					c=Integer.parseInt(blocks[1][j]);
-					if (c<0) c=-1-c;
-					if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
-					else {
-						tmpCharacter.copyFrom(oldAlphabet[c]);
-						if (c>lastUnique_old && c<=lastPeriodic_old) {
-							tmpCharacter.length=readLength-boundaries[0];
-							if (tmpCharacter.orientation) {
-								tmpCharacter.openStart=false;
-								tmpCharacter.openEnd=true;
+				else {
+					for (j=0; j<=lastInBlock[0]; j++) {
+						c=Integer.parseInt(blocks[0][j]);
+						if (c<0) c=-1-c;
+						if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+						else {
+							tmpCharacter.copyFrom(oldAlphabet[c]);					
+							if (c>lastUnique_old && c<=lastPeriodic_old) {
+								tmpCharacter.length=boundaries[0];
+								if (tmpCharacter.orientation) {
+									tmpCharacter.openStart=true;
+									tmpCharacter.openEnd=false;
+								}
+								else {
+									tmpCharacter.openStart=false;
+									tmpCharacter.openEnd=true;
+								}
+								tmpCharacter.quantize(QUANTUM);
 							}
-							else {
-								tmpCharacter.openStart=true;
-								tmpCharacter.openEnd=false;
-							}
-							tmpCharacter.quantize(QUANTUM);
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
 						}
-						fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+					}
+					read2characters_new.write(SEPARATOR_MAJOR+"");
+					read2boundaries_new.write(boundaries[0]+"");
+					for (j=0; j<=lastInBlock[1]; j++) {
+						c=Integer.parseInt(blocks[1][j]);
+						if (c<0) c=-1-c;
+						if (c==lastAlphabet_old+1) read2characters_new.write((j==0?"":(SEPARATOR_MINOR+""))+(lastAlphabet_new+1));
+						else {
+							tmpCharacter.copyFrom(oldAlphabet[c]);
+							if (c>lastUnique_old && c<=lastPeriodic_old) {
+								tmpCharacter.length=readLength-boundaries[0];
+								if (tmpCharacter.orientation) {
+									tmpCharacter.openStart=false;
+									tmpCharacter.openEnd=true;
+								}
+								else {
+									tmpCharacter.openStart=true;
+									tmpCharacter.openEnd=false;
+								}
+								tmpCharacter.quantize(QUANTUM);
+							}
+							fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,j==0,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new);
+						}
 					}
 				}
 			}
