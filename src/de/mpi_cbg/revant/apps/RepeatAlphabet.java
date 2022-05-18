@@ -4931,17 +4931,17 @@ public class RepeatAlphabet {
 	 * of a periodic and a non-periodic repeat, which are in reality consecutive in the 
 	 * genome. We observed gaps of length <=500 bps (and even reaching some kbps) with 
 	 * daligner on pbsv-simulated CLR reads from a simulated, fully-repetitive genome. The 
-	 * position and length of such gaps is not concordant across reads, and thus it breaks 
+	 * position and length of such gaps is not concordant across reads, and this breaks 
 	 * down our entire approach based on unique k-mers on the repeat alphabet.
 	 * Specifically, the approach does not break down because every such configuration is
 	 * considered a unique signature and the overlap graph is too complex, but because no
 	 * such configuration is considered a signature since it is too rare, and the overlap
 	 * graph is too fragmented. We try to fix this by closing the gaps in a concordant
-	 * way, by propagating arbitrary decisions greedily using the read-read alignments we
+	 * way, propagating arbitrary decisions greedily using the read-read alignments we
 	 * already have.
 	 *
 	 * Remark: since this follows every alignment, it makes 1-mers and 2-mers (on the 
-	 * repeat alphabet) that come from different regions of the genome more similar, and 
+	 * repeat alphabet), that come from different regions of the genome, more similar, and 
 	 * thus it reduces the number of unique 1-mers and 2-mers downstream, shifting the
 	 * burden of unicity to longer k-mers.
 	 *
@@ -5588,7 +5588,10 @@ public class RepeatAlphabet {
 	 * instance that is not already in $alphabet$ is written to $bw$. Every character in
 	 * $alphabet$ that is used in the new translation is marked in $used$.
 	 *
-	 * Remark: ----------> talk also about periodic-periodic and periodic-nonperiodic.....
+	 * Remark: short non-periodic blocks between two periodic blocks with the same period
+	 * are merged with their adjacent blocks (see $leftCharacters_bridge()$). Short non-
+	 * periodic blocks between a periodic and a non-periodic block are merged with their
+	 * adjacent periodic block.
 	 *
 	 * Remark: non-periodic repeats do not change after this procedure completes.
 	 *
@@ -5604,20 +5607,14 @@ public class RepeatAlphabet {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		boolean found, foundPeriodic, foundNonperiodic, isUnique;
-		int i, j, k, p, c;
-		int length, nBlocks, last, last1, last2, lastLeft, lastRight;
-		String[] tokens;
-		Character[] tmpArray;
+		int i, j, c;
+		int length, nBlocks, last, lastLeft;
 		
 		if (read2characters.length()==0) return spacersCursor;
 		if (tmpCharacter==null) tmpCharacter = new Character();
 		if (leftCharacters==null) {
 			leftCharacters = new Character[CAPACITY];
 			for (i=0; i<leftCharacters.length; i++) leftCharacters[i] = new Character();
-		}
-		if (rightCharacters==null) {
-			rightCharacters = new Character[CAPACITY];
-			for (i=0; i<rightCharacters.length; i++) rightCharacters[i] = new Character();
 		}
 		loadBoundaries(read2boundaries);
 		nBlocks=loadBlocks(read2characters);
@@ -5656,7 +5653,7 @@ public class RepeatAlphabet {
 			}
 			length=spacers[spacersCursor].breakpoint>QUANTUM?spacers[spacersCursor].last-spacers[spacersCursor].breakpoint:boundaries[0];
 			leftCharacters_load(false,false,1,length,spacers[spacersCursor].breakpoint<=QUANTUM,1==nBlocks-1);
-			tmpBoolean[0]=true;
+			if (spacers[spacersCursor].breakpoint<=QUANTUM) tmpBoolean[0]=true;
 			i=2;
 		}
 		else i=1;
@@ -5678,97 +5675,79 @@ public class RepeatAlphabet {
 						tmpBoolean[i-1]=true;
 					}
 					i+=2;
-					continue;
 				}
 				else if (isBlockNonperiodic[i-1] || isBlockNonperiodic[i+1]) {
-					---->
+					while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[i-1])) spacersCursor++;
+					if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[i-1]) {
+						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (2): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
+						System.exit(1);
+					}
+					length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
+					if (lastLeft!=-1) {
+						leftCharacters_addLength(length);
+						leftCharacters_setOpen(false,false);
+					}
+					else leftCharacters_load(false,false,i-1,length,i-1==0,false);
+					leftCharacters_clear(used,bw);
+					length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
+					leftCharacters_load(false,false,i+1,length,false,i+1==nBlocks-1);
+					tmpBoolean[i-1]=true; tmpBoolean[i]=true;
+					i+=2;
 				}
 				else {
 					if (samePeriod(intBlocks[i-1],lastInBlock_int[i-1]+1,intBlocks[i+1],lastInBlock_int[i+1]+1,tmpArray1,tmpArray2)) {
 						leftCharacters_bridge(i,nBlocks,readLength,tmpArray1,tmpArray2,tmpArray3);
 						tmpBoolean[i-1]=true; tmpBoolean[i]=true;
 						i+=2;
-						continue;
 					}
 					else {
 						if (lastLeft==-1) leftCharacters_load(false,false,i-1,0,i-1==0,false);
 						leftCharacters_clear(bw);
-						tmpBoolean[i-1]=true; tmpBoolean[i]=true;
+						tmpBoolean[i-1]=true;
 						i+=2;
 					}
 				}
 			}
 			else if (isBlockPeriodic[i-1] && isBlockNonperiodic[i+1]) {
-				length=boundaries[i]-boundaries[i-1];
-				if (lastLeft==-1) leftCharacters_load(false,false,i-1,length,i-1==0,false);
-				else {
-					leftCharacters_addLength(length);
-					leftCharacters_setOpen(false,false);
+				if (isBlockNonperiodic[i-1]) {
+					if (lastLeft!=-1) {
+						leftCharacters_clear(bw);
+						leftCharacters_setOpen(false,false);
+						tmpBoolean[i-1]=true;
+					}
+					i+=3;
 				}
-				leftCharacters_clear(bw);
-				tmpBoolean[i-1]=true; tmpBoolean[i]=true;
-				i+=2;
+				else {
+					length=boundaries[i]-boundaries[i-1];
+					if (lastLeft==-1) leftCharacters_load(false,false,i-1,length,i-1==0,false);
+					else {
+						leftCharacters_addLength(length);
+						leftCharacters_setOpen(false,false);
+					}
+					leftCharacters_clear(bw);
+					tmpBoolean[i-1]=true; tmpBoolean[i]=true;
+					i+=3;
+				}
 			}
 			else if (isBlockNonperiodic[i-1] && isBlockPeriodic[i+1]) {
-				if (lastLeft==-1) leftCharacters_load(false,false,i-1,0,i-1==0,false);
-				leftCharacters_clear(bw);
-				tmpBoolean[i-1]=true;
-				length=boundaries[i]-boundaries[i-1];
-				leftCharacters_load(false,false,i+1,length,false,i+1==nBlocks-1);
-				tmpBoolean[i]=true;
-			}
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			------------> Original code:
-			
-			
-			if ( !isBlockUnique[i] || !isBlockPeriodic[i-1] || !isBlockPeriodic[i+1] || (isBlockNonperiodic[i-1] && isBlockNonperiodic[i+1]) || 
-			     boundaries[i]-boundaries[i-1]>maxSpacerLength || samePeriod(intBlocks[i-1],lastInBlock_int[i-1]+1,intBlocks[i+1],lastInBlock_int[i+1]+1,tmpArray1,tmpArray2)
-			   ) {
-				if (lastLeft!=-1) {
-					leftCharacters_clear(used,bw);
-					tmpBoolean[i-1]=true;
-				}
-				i+=isBlockUnique[i]?2:1;
-				continue;
-			}
-			if (lastLeft==-1) {
-				leftCharacters_load(false,true,i-1,i-1==0?boundaries[i-1]:boundaries[i-1]-boundaries[i-2],i-1==0,false);
-				if (lastLeft==-1) {
+				if (isBlockNonperiodic[i+1]) {
+					if (lastLeft!=-1) {
+						leftCharacters_clear(bw);
+						leftCharacters_setOpen(false,false);
+						tmpBoolean[i-1]=true;
+					}
 					i+=2;
-					continue;
+				}
+				else {
+					if (lastLeft==-1) leftCharacters_load(false,false,i-1,0,i-1==0,false);
+					leftCharacters_clear(bw);
+					length=boundaries[i]-boundaries[i-1];
+					leftCharacters_load(false,false,i+1,length,false,i+1==nBlocks-1);
+					tmpBoolean[i-1]=true; tmpBoolean[i]=true;
+					i+=2;
 				}
 			}
-			lastRight=-1;
-			rightCharacters_load(false,true,i+1,i+1==nBlocks-1?readLength-boundaries[i]:boundaries[i+1]-boundaries[i],false,i+1==nBlocks-1);
-			if (lastRight==-1) {
-				i+=3; lastLeft=-1;
-				continue;
-			}
-			while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[i-1])) spacersCursor++;
-			if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[i-1]) {
-				System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (2): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
-				System.exit(1);
-			}
-			length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
-			leftCharacters_clear(used,bw);
-			tmpBoolean[i-1]=true;
-			length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
-			rightCharacters_addLength(length);
-			tmpArray=rightCharacters; rightCharacters=leftCharacters; leftCharacters=tmpArray; lastLeft=lastRight;
-			tmpBoolean[i]=true;
-			i+=2;
+			else i+=3;
 		}
 		
 		// Last block. Remark: if the block is unique and shrinks, it does not create a
@@ -5784,7 +5763,8 @@ public class RepeatAlphabet {
 				if (lastLeft==-1) leftCharacters_load(false,false,nBlocks-2,length,false,spacers[spacersCursor].breakpoint>=readLength-QUANTUM);
 				else leftCharacters_addLength(length);
 				leftCharacters_clear(used,bw);
-				tmpBoolean[nBlocks-2]=true; tmpBoolean[nBlocks-1]=true;
+				tmpBoolean[nBlocks-2]=true; 
+				if (spacers[spacersCursor].breakpoint>=readLength-QUANTUM) tmpBoolean[nBlocks-1]=true;
 			}
 			else {
 				if (lastLeft!=-1) {
@@ -5808,9 +5788,6 @@ public class RepeatAlphabet {
 		
 		return spacersCursor;
 	}
-	
-	
-	
 	
 	
 	/**
@@ -6097,9 +6074,6 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
-	
-	
 	/**
 	 * Like $fixPeriodicEndpoints_collectCharacterInstances()$, but looks up in the new
 	 * alphabet every existing and new character induced by fixing spacers.
@@ -6109,6 +6083,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray* temporary space, with a number of cells at least equal to the max
 	 * number of elements in a block of the translation.
 	 */
+-------------------------------->		
 	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int[] out, Character tmpCharacter, int[] tmpArray1, int[] tmpArray2) throws IOException {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
