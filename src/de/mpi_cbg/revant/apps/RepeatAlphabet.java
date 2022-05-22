@@ -5923,20 +5923,22 @@ public class RepeatAlphabet {
 	 * characters in a block.
 	 */
 	private static final void leftCharacters_bridge(int intBlockID, int nBlocks, int readLength, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+		final boolean openStart = intBlockID-1==0;
+		final boolean openEnd = intBlockID+1==nBlocks-1;
+		final int length = (intBlockID+1==nBlocks-1?readLength:boundaries[intBlockID+1])-boundaries[intBlockID-1];
 		boolean found, foundOpen, orientation;
 		int i, j, c, p;
 		int last, last1, last2, last3, foundLength, repeat;
-		final int length = (intBlockID+1==nBlocks-1?readLength:boundaries[intBlockID+1])-boundaries[intBlockID-1];
 		Character character;
 		
-		last=lastInBlock_int[intBlockID-1];
+		j=-1; last=lastInBlock_int[intBlockID-1];
 		for (i=0; i<=last; i++) {
 			c=intBlocks[intBlockID-1][i];
 			if (c<=lastUnique || c>lastPeriodic) continue;
 			character=alphabet[c];
-			tmpArray1[i]=character.orientation?character.repeat:-1-character.repeat;
+			tmpArray1[++j]=character.orientation?character.repeat:-1-character.repeat;
 		}
-		last1=i;
+		last1=j;
 		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
 		j=0;
 		for (i=1; i<=last1; i++) {
@@ -5944,14 +5946,14 @@ public class RepeatAlphabet {
 			tmpArray1[++j]=tmpArray1[i];
 		}
 		last1=j;
-		last=lastInBlock_int[intBlockID+1];
+		j=-1; last=lastInBlock_int[intBlockID+1];
 		for (i=0; i<=last; i++) {
 			c=intBlocks[intBlockID+1][i];
 			if (c<=lastUnique || c>lastPeriodic) continue;
 			character=alphabet[c];
-			tmpArray2[i]=character.orientation?character.repeat:-1-character.repeat;
+			tmpArray2[++j]=character.orientation?character.repeat:-1-character.repeat;
 		}
-		last2=i;
+		last2=j;
 		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
 		j=0;
 		for (i=1; i<=last2; i++) {
@@ -5976,36 +5978,29 @@ public class RepeatAlphabet {
 				else {
 					leftCharacters[lastLeft].orientation=true;
 					leftCharacters[lastLeft].repeat=tmpArray3[i];
-				}								
-				if (intBlockID-1==0) {
-					leftCharacters[lastLeft].length=boundaries[intBlockID-1]+length;
-					if (leftCharacters[lastLeft].orientation) leftCharacters[lastLeft].openStart=true;
-					else leftCharacters[lastLeft].openEnd=true;
+				}
+				leftCharacters[lastLeft].length=(intBlockID-1==0?boundaries[intBlockID-1]:boundaries[intBlockID-1]-boundaries[intBlockID-2])+length;
+				if (leftCharacters[lastLeft].orientation) {
+					leftCharacters[lastLeft].openStart=openStart;
+					leftCharacters[lastLeft].openEnd=openEnd;
 				}
 				else {
-					leftCharacters[lastLeft].length=boundaries[intBlockID-1]-boundaries[intBlockID-2]+length;
-					if (leftCharacters[lastLeft].orientation) leftCharacters[lastLeft].openStart=false;
-					else leftCharacters[lastLeft].openEnd=false;
-				}
-				if (intBlockID+1==nBlocks-1) {
-					if (leftCharacters[lastLeft].orientation) leftCharacters[lastLeft].openEnd=true;
-					else leftCharacters[lastLeft].openStart=true;
-				}
-				else {
-					if (leftCharacters[lastLeft].orientation) leftCharacters[lastLeft].openEnd=false;
-					else leftCharacters[lastLeft].openStart=false;
+					leftCharacters[lastLeft].openStart=openEnd;
+					leftCharacters[lastLeft].openEnd=openStart;
 				}
 			}
 		}
 		else {
 			leftCharacters_addLength(length);
-			p=lastLeft; foundOpen=false; foundLength=0;
-			for (i=0; i<=p; i++) {
+			foundOpen=false; foundLength=0;
+			for (i=0; i<=lastLeft; i++) {
 				if (leftCharacters[i].repeat!=UNIQUE && leftCharacters[i].start==-1) {
 					if (leftCharacters[i].openStart || leftCharacters[i].openEnd) foundOpen=true;
 					foundLength=Math.max(foundLength,leftCharacters[i].length);
 				}
 			}
+			leftCharacters_setOpen(false,openEnd);
+			p=lastLeft;
 			for (i=0; i<=last3; i++) {
 				if (tmpArray3[i]<0) { repeat=tmpArray3[i]; orientation=true; }
 				else { repeat=-1-tmpArray3[i]; orientation=false; }
@@ -6026,18 +6021,19 @@ public class RepeatAlphabet {
 					}
 					leftCharacters[lastLeft].repeat=repeat;
 					leftCharacters[lastLeft].start=-1; leftCharacters[lastLeft].end=-1;
-					leftCharacters[lastLeft].length=foundLength+length;
+					leftCharacters[lastLeft].length=foundLength;
 					if (orientation) {
 						leftCharacters[lastLeft].orientation=true;
 						leftCharacters[lastLeft].openStart=foundOpen;
+						leftCharacters[lastLeft].openEnd=openEnd;
 					}
 					else {
 						leftCharacters[lastLeft].orientation=false;
+						leftCharacters[lastLeft].openStart=openEnd;
 						leftCharacters[lastLeft].openEnd=foundOpen;
 					}
 				}
 			}
-			leftCharacters_setOpen(false,intBlockID+1==nBlocks-1);
 		}
 	}
 	
@@ -6051,7 +6047,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray* temporary space, with a number of cells at least equal to the max
 	 * number of elements in a block of the translation.
 	 */
-	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int[] out, Character tmpCharacter, int[] tmpArray1, int[] tmpArray2) throws IOException {
+	public static final int fixPeriodicEndpoints_updateTranslation(int readID, int readLength, int spacersCursor, int maxSpacerLength, String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int[] out, Character tmpCharacter, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) throws IOException {
 		final int CAPACITY = 10;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		boolean isUnique, isBlockPeriodicLeft, isBlockPeriodicRight, isBlockNonperiodicLeft, isBlockNonperiodicRight;
@@ -6102,7 +6098,7 @@ public class RepeatAlphabet {
 				else if (isBlockNonperiodicLeft || isBlockNonperiodicRight) spacersCursor=fixPeriodicEndpoints_updateTranslation_spacer(readID,spacersCursor,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out);
 				else {
 					if (samePeriod(blocks[blockCursor-1],lastInBlock[blockCursor-1]+1,blocks[blockCursor+1],lastInBlock[blockCursor+1]+1,oldAlphabet,lastUnique_old,lastPeriodic_old,tmpArray1,tmpArray2)) {
-						fixPeriodicEndpoints_updateTranslation_bridge(blockCursor);
+						fixPeriodicEndpoints_updateTranslation_bridge(readLength,nBlocks,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,tmpArray1,tmpArray2,tmpArray3);
 					}
 					else spacersCursor=fixPeriodicEndpoints_updateTranslation_spacer(readID,spacersCursor,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out);
 				}
@@ -6216,10 +6212,123 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 *
+	 * Identical to $leftCharacters_bridge()$.
 	 */
-	private static final void fixPeriodicEndpoints_updateTranslation_bridge(int i) {
+	private static final void fixPeriodicEndpoints_updateTranslation_bridge(int readLength, int nBlocks, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+		final boolean openStart = blockCursor-1==0;
+		final boolean openEnd = blockCursor+1==nBlocks-1;
+		final int length = (blockCursor+1==nBlocks-1?readLength:boundaries[blockCursor+1])-boundaries[blockCursor-1];
+		boolean found, foundOpen, orientation;
+		int i, j, c, p;
+		int last, last1, last2, last3, foundLength, repeat;
+		Character character;
 		
+		j=-1; last=lastInBlock[blockCursor-1];
+		for (i=0; i<=last; i++) {
+			c=Integer.parseInt(blocks[blockCursor-1][i]);
+			if (c<0) c=-1-c;
+			if (c<=lastUnique_old || c>lastPeriodic_old) continue;
+			character=oldAlphabet[c];
+			tmpArray1[++j]=character.orientation?character.repeat:-1-character.repeat;
+		}
+		last1=j;
+		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
+		j=0;
+		for (i=1; i<=last1; i++) {
+			if (tmpArray1[i]==tmpArray1[j]) continue;
+			tmpArray1[++j]=tmpArray1[i];
+		}
+		last1=j;
+		j=-1; last=lastInBlock[blockCursor+1];
+		for (i=0; i<=last; i++) {
+			c=Integer.parseInt(blocks[blockCursor+1][i]);
+			if (c<0) c=-1-c;
+			if (c<=lastUnique_old || c>lastPeriodic_old) continue;
+			character=oldAlphabet[c];
+			tmpArray1[++j]=character.orientation?character.repeat:-1-character.repeat;
+		}
+		last2=j;
+		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
+		j=0;
+		for (i=1; i<=last2; i++) {
+			if (tmpArray2[i]==tmpArray2[j]) continue;
+			tmpArray2[++j]=tmpArray2[i];
+		}
+		last2=j;
+		last3=Math.setUnion(tmpArray1,last1,tmpArray2,last2,tmpArray3);
+		if (lastLeft==-1) {
+			for (i=0; i<=last3; i++) {
+				lastLeft++;
+				if (lastLeft==leftCharacters.length) {
+					Character[] newArray = new Character[leftCharacters.length<<1];
+					System.arraycopy(leftCharacters,0,newArray,0,leftCharacters.length);
+					for (j=leftCharacters.length; j<newArray.length; j++) newArray[j] = new Character();
+					leftCharacters=newArray;
+				}
+				if (tmpArray3[i]<0) {
+					leftCharacters[lastLeft].orientation=false;
+					leftCharacters[lastLeft].repeat=-1-tmpArray3[i];
+				}
+				else {
+					leftCharacters[lastLeft].orientation=true;
+					leftCharacters[lastLeft].repeat=tmpArray3[i];
+				}
+				leftCharacters[lastLeft].length=(blockCursor-1==0?boundaries[blockCursor-1]:boundaries[blockCursor-1]-boundaries[blockCursor-2])+length;
+				if (leftCharacters[lastLeft].orientation) {
+					leftCharacters[lastLeft].openStart=openStart;
+					leftCharacters[lastLeft].openEnd=openEnd;
+				}
+				else {
+					leftCharacters[lastLeft].openStart=openEnd;
+					leftCharacters[lastLeft].openEnd=openStart;
+				}
+			}
+		}
+		else {
+			leftCharacters_addLength(length);
+			foundOpen=false; foundLength=0;
+			for (i=0; i<=lastLeft; i++) {
+				if (leftCharacters[i].repeat!=UNIQUE && leftCharacters[i].start==-1) {
+					if (leftCharacters[i].openStart || leftCharacters[i].openEnd) foundOpen=true;
+					foundLength=Math.max(foundLength,leftCharacters[i].length);
+				}
+			}
+			leftCharacters_setOpen(false,openEnd);
+			p=lastLeft;
+			for (i=0; i<=last3; i++) {
+				if (tmpArray3[i]<0) { repeat=tmpArray3[i]; orientation=true; }
+				else { repeat=-1-tmpArray3[i]; orientation=false; }
+				found=false;
+				for (j=0; j<=p; j++) {
+					if (leftCharacters[j].repeat==repeat && leftCharacters[j].orientation==orientation) {
+						found=true;
+						break;
+					}
+				}
+				if (!found) {
+					lastLeft++;
+					if (lastLeft==leftCharacters.length) {
+						Character[] newArray = new Character[leftCharacters.length<<1];
+						System.arraycopy(leftCharacters,0,newArray,0,leftCharacters.length);
+						for (j=leftCharacters.length; j<newArray.length; j++) newArray[j] = new Character();
+						leftCharacters=newArray;
+					}
+					leftCharacters[lastLeft].repeat=repeat;
+					leftCharacters[lastLeft].start=-1; leftCharacters[lastLeft].end=-1;
+					leftCharacters[lastLeft].length=foundLength;
+					if (orientation) {
+						leftCharacters[lastLeft].orientation=true;
+						leftCharacters[lastLeft].openStart=foundOpen;
+						leftCharacters[lastLeft].openEnd=openEnd;
+					}
+					else {
+						leftCharacters[lastLeft].orientation=false;
+						leftCharacters[lastLeft].openStart=openEnd;
+						leftCharacters[lastLeft].openEnd=foundOpen;
+					}
+				}
+			}			
+		}
 	}
 	
 	

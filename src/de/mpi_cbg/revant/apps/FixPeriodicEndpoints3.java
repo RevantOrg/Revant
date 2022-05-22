@@ -32,7 +32,7 @@ public class FixPeriodicEndpoints3 {
 		BufferedWriter bw1, bw2, bw3;
 		RepeatAlphabet.Character tmpCharacter;
 		boolean[] used;
-		int[] histogram, tmpArray1, tmpArray2;
+		int[] histogram, tmpArray1, tmpArray2, tmpArray3;
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
 		
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,2);
@@ -49,7 +49,9 @@ public class FixPeriodicEndpoints3 {
 		histogram = new int[11];  // Arbitrary
 		Math.set(histogram,0,histogram.length-1);
 		tmpCharacter = new RepeatAlphabet.Character();
-		tmpArray1 = new int[100]; tmpArray2 = new int[100];  // Arbitrary
+		tmpArray1 = new int[100];  // Arbitrary
+		tmpArray2 = new int[100];  // Arbitrary 
+		tmpArray3 = new int[100];  // Arbitrary
 		br1 = new BufferedReader(new FileReader(READ_IDS_FILE));
 		br2 = new BufferedReader(new FileReader(READ_LENGTHS_FILE));
 		br3 = new BufferedReader(new FileReader(READ2CHARACTERS_FILE_OLD));
@@ -64,8 +66,9 @@ public class FixPeriodicEndpoints3 {
 			if (tmpArray1.length<nBlocks) {
 				tmpArray1 = new int[nBlocks];
 				tmpArray2 = new int[nBlocks];
+				tmpArray3 = new int[nBlocks];
 			}
-			j=RepeatAlphabet.fixPeriodicEndpoints_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,MAX_SPACER_LENGTH,str3,str4,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,histogram,tmpCharacter,tmpArray1,tmpArray2);
+			j=RepeatAlphabet.fixPeriodicEndpoints_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,MAX_SPACER_LENGTH,str3,str4,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,histogram,tmpCharacter,tmpArray1,tmpArray2,tmpArray3);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine();
 		}
 		br1.close(); br2.close(); br3.close(); br4.close(); bw1.close(); bw2.close(); bw3.close();
