@@ -30,7 +30,6 @@ public class FixPeriodicEndpoints3 {
 		String str1, str2, str3, str4;
 		BufferedReader br1, br2, br3, br4;
 		BufferedWriter bw1, bw2, bw3;
-		RepeatAlphabet.Character tmpCharacter;
 		boolean[] used;
 		int[] histogram, tmpArray1, tmpArray2, tmpArray3;
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
@@ -48,7 +47,6 @@ public class FixPeriodicEndpoints3 {
 		RepeatAlphabet.deserializeSpacers(SPACERS_FILE,N_SPACERS);
 		histogram = new int[11];  // Arbitrary
 		Math.set(histogram,0,histogram.length-1);
-		tmpCharacter = new RepeatAlphabet.Character();
 		tmpArray1 = new int[100];  // Arbitrary
 		tmpArray2 = new int[100];  // Arbitrary 
 		tmpArray3 = new int[100];  // Arbitrary
@@ -68,7 +66,8 @@ public class FixPeriodicEndpoints3 {
 				tmpArray2 = new int[nBlocks];
 				tmpArray3 = new int[nBlocks];
 			}
-			j=RepeatAlphabet.fixPeriodicEndpoints_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,MAX_SPACER_LENGTH,str3,str4,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,histogram,tmpCharacter,tmpArray1,tmpArray2,tmpArray3);
+System.err.println("VITTU> translated="+str3+" boundaries="+str4);			
+			j=RepeatAlphabet.fixPeriodicEndpoints_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,MAX_SPACER_LENGTH,str3,str4,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,histogram,tmpArray1,tmpArray2,tmpArray3);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine();
 		}
 		br1.close(); br2.close(); br3.close(); br4.close(); bw1.close(); bw2.close(); bw3.close();
