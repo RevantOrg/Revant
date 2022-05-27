@@ -66,7 +66,6 @@ public class FixPeriodicEndpoints3 {
 				tmpArray2 = new int[nBlocks];
 				tmpArray3 = new int[nBlocks];
 			}
-System.err.println("VITTU> translated="+str3+" boundaries="+str4);			
 			j=RepeatAlphabet.fixPeriodicEndpoints_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,MAX_SPACER_LENGTH,str3,str4,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,histogram,tmpArray1,tmpArray2,tmpArray3);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine();
 		}
