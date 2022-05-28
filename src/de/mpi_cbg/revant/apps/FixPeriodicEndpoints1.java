@@ -40,8 +40,11 @@ public class FixPeriodicEndpoints1 {
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		maxBlockLength=RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_CHARACTERS_FILE,true,true,TRANSLATED_READS_BOUNDARIES_FILE);
 		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
-		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE);
+		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE);		
 		RepeatAlphabet.assignBreakpoints();
+		
+RepeatAlphabet.printSpacerNeighbors("/Users/ramseysnow/Downloads/SIMULATED-REPBASE/spacers.dot");		
+		
 		lastRead = new int[N_BLOCKS];
 		br1 = new BufferedReader(new FileReader(LAST_READ_FILE));
 		for (i=0; i<N_BLOCKS; i++) lastRead[i]=Integer.parseInt(br1.readLine());
