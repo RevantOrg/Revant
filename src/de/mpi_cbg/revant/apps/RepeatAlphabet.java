@@ -3627,30 +3627,41 @@ public class RepeatAlphabet {
 			type=Alignments.readAlignmentFile_getType(DISTANCE_THRESHOLD);
 			out[0][type]++;
 			// Processing readA
-			readA=Alignments.readA-1; readB=Alignments.readB-1; orientation=Alignments.orientation;
+			readA=Alignments.readA-1; readB=Alignments.readB-1; orientation=Alignments.orientation;			
 			startA=Alignments.startA; endA=Alignments.endA;
-			startB=Alignments.startB; endB=Alignments.endB;
+			startB=Alignments.startB; endB=Alignments.endB;			
 			lengthA=Reads.getReadLength(readA); lengthB=Reads.getReadLength(readB);
+			
+if (readA==24 && endA>=lengthA-100 && startA<=1038) System.err.println("SUFFIX ALIGNMENT: "+str);			
+if (readA==24 && startA<=100 && endA>=3198) System.err.println("PREFIX ALIGNMENT: "+str);	
+
+		
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 1");
 			readAInTranslated=-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
 			if (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]==readA) {
 				overlapsUniqueA=true; straddlesLeftA=false; straddlesRightA=false;
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 2");
 			}
 			else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 3");
 				while (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]<readA) lastFullyContained++;
 				if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
 				}
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 4");
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 				if (translated[lastTranslated]!=readA) {
 					System.err.println("filterAlignments_tight> ERROR: readA not found in translated: "+readA+" :: "+translated[lastTranslated]);
 					System.exit(1);
 				}
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 5");
 				readAInTranslated=lastTranslated;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
 				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
 				if (q==-1) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 6");
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
 				}
@@ -3663,42 +3674,62 @@ public class RepeatAlphabet {
 					 )
 				   ) {
    					bw.write("0\n"); str=br.readLine(); row++;
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 7");
    					continue;
 				}
 			}
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 8");
 			// Processing readB
 			if (readInArray(readB,fullyUnique,nFullyUnique-1,lastFullyUnique)>=0) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 9");
 				if (mode) {
 					if (overlapsUniqueA) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 10");
 						bw.write("1\n");
 						out[1][type]++; out[2][type]++;
 					}
-					else bw.write("0\n");
+					else {
+						bw.write("0\n");
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 11");
+					}
 				}
 				else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 12");
 					bw.write("1\n");
 					out[1][type]++;
 					if (overlapsUniqueA) out[2][type]++;
 				}
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 13");
 				str=br.readLine(); row++;
 				continue;
 			}
 			else if (readInArray(readB,fullyContained,nFullyContained-1,lastFullyContained)>=0) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 14");
 				bw.write("0\n"); str=br.readLine(); row++;
 				continue;
 			}
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 15");
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
 			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
-			if (q==-1) bw.write("0\n");
+			if (q==-1) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 16");
+				bw.write("0\n");
+			}
 			else if (q==0 || q==1) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 17");
 				if (mode) {
 					if (overlapsUniqueA) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 18");
 						bw.write("1\n");
 						out[1][type]++; out[2][type]++;
 					}
-					else bw.write("0\n");
+					else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 19");
+						bw.write("0\n");
+					}
 				}
 				else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 20");
 					bw.write("1\n");
 					out[1][type]++;
 					if (overlapsUniqueA) out[2][type]++;
@@ -3706,110 +3737,170 @@ public class RepeatAlphabet {
 			}
 			else if (q==2) {
 				if (overlapsUniqueA) {
-					if (mode) bw.write("0\n");
+					if (mode) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 21");
+						bw.write("0\n");
+					}
 					else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 22");
 						bw.write("1\n");
 						out[1][type]++;
 					}
 				}
 				else if (straddlesLeftA) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 23");
 					if ( suffixPrefixMode && 
 						 ( (orientation && startB<=DISTANCE_THRESHOLD) || 
 						   (!orientation && endB>=lengthB-DISTANCE_THRESHOLD)
 						 )
 					   ) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 24");
 						if (mode) {
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 25");
 								bw.write("1\n");
 								out[1][type]++;
 							}
-							else bw.write("0\n");
+							else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 26");
+								bw.write("0\n");
+							}
 						}
 						else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 27");
 							bw.write("1\n");
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 28");
+						bw.write("0\n");
+					}
 				}
 				else if (straddlesRightA) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 29");
 					if ( suffixPrefixMode && 
 					     ( (orientation && endB>=lengthB-DISTANCE_THRESHOLD) || 
 					       (!orientation && startB<=DISTANCE_THRESHOLD)
 						 )
 					   ) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 30");
 						if (mode) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 31");
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 32");
 								bw.write("1\n");
 								out[1][type]++;
 							}
-							else bw.write("0\n");
+							else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 33");
+								bw.write("0\n");
+							}
 						}
 						else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 34");
 							bw.write("1\n");
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 35");
+						bw.write("0\n");
+					}
 				}
 				else {
 					if (mode) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 36");
 						if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 37");
 							bw.write("1\n");
 							out[1][type]++;
 						}
-						else bw.write("0\n");
+						else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 38");
+							bw.write("0\n");
+						}
 					}
 					else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 39");
 						bw.write("1\n");
 						out[1][type]++;
 					}
 				}
 			}
 			else if (q==3 || q==5) {
-				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) bw.write("0\n");
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 40");
+				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 41");
+					bw.write("0\n");
+				}
 				else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 42");
 					if ( suffixPrefixMode && 
 					     ( (orientation && startA<=DISTANCE_THRESHOLD) || 
 					       (!orientation && endA>=lengthA-DISTANCE_THRESHOLD)
 						 )
 					   ) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 43");
 						if (mode) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 44");
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 45");
 								bw.write("1\n");
 								out[1][type]++;
 							}
-							else bw.write("0\n");
+							else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 46");
+								bw.write("0\n");
+							}
 						}
 						else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 47");
 							bw.write("1\n");
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 48");
+						bw.write("0\n");
+					}
 				}
 			}
 			else if (q==4 || q==5) {
-				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) bw.write("0\n");
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 49");
+				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 50");
+					bw.write("0\n");
+				}
 				else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 51");
 					if ( suffixPrefixMode && 
 					     ( (orientation && endA>=lengthA-DISTANCE_THRESHOLD) || 
 					       (!orientation && startA<=DISTANCE_THRESHOLD)
 					     )
 					   ) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 52");
 						if (mode) {
 							if (sameFactorization(readAInTranslated,startA,endA,p,startB,endB,orientation)) {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 53");
 								bw.write("1\n");
 								out[1][type]++;
 							}
-							else bw.write("0\n");
+							else {
+								bw.write("0\n");
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 54");
+							}
 						}
 						else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 55");
 							bw.write("1\n");
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
+						bw.write("0\n");
+					}
 				}
 			}
 			str=br.readLine(); row++;
@@ -3823,8 +3914,9 @@ public class RepeatAlphabet {
 	 * boundaries_all, translation_all, blueIntervals, blueIntervals_reads.
 	 *
 	 * @return interval $readID[intervalStart..intervalEnd]$:
-	 * 0: fully belongs to a non-repetitive region;
-	 * 1: straddles a non-repetitive region;
+	 * 0: is fully contained in a non-repetitive region; or, fully contains a non-
+	 *    repetitive region of length $>=minIntersection_nonrepetitive$;
+	 * 1: straddles a non-repetitive region by $>=minIntersection_nonrepetitive$ bps;
 	 * 2: contains a sequence of $>=minBlueIntervalLength$ repeat characters that is 
 	 *    likely to occur <=H times in the genome, where H is the number of haplotypes;
 	 * 3: straddles, but does not fully contain, a sequence in point (2), on the left side
@@ -3845,33 +3937,30 @@ public class RepeatAlphabet {
 		blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
 		if (translation_all[boundariesAllID][0].length==1 && (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1)) {
 			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
+			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) || 
+				 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
 			   ) return 0;
-			else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
-			   		) return 1;
+			else if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) return 1;
 		}
 		for (i=1; i<nBlocks-1; i++) {
 			blockStart=boundaries_all[boundariesAllID][i-1];
 			blockEnd=boundaries_all[boundariesAllID][i];
 			if (translation_all[boundariesAllID][i].length==1 && (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1)) {
 				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
+				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+					 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
 				   ) return 0;
-				else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-				      	   Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
-				   		) return 1;
+				else if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) return 1;
 			}
 		}
 		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
 		blockEnd=readLength-1;
 		if (translation_all[boundariesAllID][nBlocks-1].length==1 && (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1)) {
 			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)
+			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)||
+				 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
 			   ) return 0;
-			else if ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-			           Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
-			        ) return 1;
+			else if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) return 1;
 		}
 		
 		// Checking the repetitive blocks of the read, if any.
