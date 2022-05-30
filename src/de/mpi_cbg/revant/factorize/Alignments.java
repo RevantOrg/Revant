@@ -762,5 +762,30 @@ public class Alignments {
 		bw.write("\n");
 		br.close(); bw.close();
 	}
+	
+	
+	/**
+	 * Consider the global variables set by $readAlignmentFile()$. The procedure projects
+	 * on readB the interval $[a..b] \intersection [startA..endA]$ on readA.
+	 *
+	 * @return FALSE if the intersection is empty.
+	 */
+	public static final boolean projectIntersection(int a, int b, int[] out) {
+		final int fromA = a>startA?a:startA;
+		final int toA = b<endA?b:endA;
+		final double ratio = ((double)(endB-startB+1))/(endA-startA+1);
+		
+		if (toA<fromA) return false;
+		if (orientation) {
+			out[0]=startB+(int)(ratio*(fromA-startA));
+			out[1]=endB-(int)(ratio*(endA-toA));
+		}
+		else {
+			out[0]=startB+(int)(ratio*(endA-toA));
+			out[1]=endB-(int)(ratio*(fromA-startA));
+		}
+		return true;
+	}
+
 
 }

@@ -22,10 +22,14 @@ public class FixPeriodicEndpoints1 {
 		final String ALPHABET_FILE = args[4];
 		final String TRANSLATED_READS_CHARACTERS_FILE = args[5];
 		final String TRANSLATED_READS_BOUNDARIES_FILE = args[6];
-		final String READ_READ_ALIGNMENTS_FILE = args[7];
-		final int N_BLOCKS = Integer.parseInt(args[8]);  // Of the alignments file
-		final String LAST_READ_FILE = args[9];  // Last block included
-		final String OUTPUT_PREFIX = args[10];
+		final String FULLY_UNIQUE_FILE = args[7];
+		final int N_FULLY_UNIQUE = Integer.parseInt(args[8]);
+		final String FULLY_CONTAINED_FILE = args[9];
+		final int N_FULLY_CONTAINED = Integer.parseInt(args[10]);
+		final String READ_READ_ALIGNMENTS_FILE = args[11];
+		final int N_BLOCKS = Integer.parseInt(args[12]);  // Of the alignments file
+		final String LAST_READ_FILE = args[13];  // Last block included
+		final String OUTPUT_PREFIX = args[14];
 		
 		int i, j;
 		int maxBlockLength;
@@ -33,15 +37,17 @@ public class FixPeriodicEndpoints1 {
 		BufferedReader br1, br2;
 		BufferedWriter bw1, bw2;
 		int[] lastRead;
+		int[] tmpArray = new int[2];
 		
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
 		Reads.loadReadIDs(READ_IDS_FILE,N_READS);
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		maxBlockLength=RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_CHARACTERS_FILE,true,true,TRANSLATED_READS_BOUNDARIES_FILE);
+		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
-		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE);		
-		RepeatAlphabet.assignBreakpoints();
+		i=RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,tmpArray);		
+		RepeatAlphabet.assignBreakpoints(i);
 		
 RepeatAlphabet.printSpacerNeighbors("/Users/ramseysnow/Downloads/SIMULATED-REPBASE/spacers.dot");		
 		
