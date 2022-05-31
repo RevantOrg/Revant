@@ -83,7 +83,7 @@ public class RepeatAlphabet {
 	 * Data structures for fixing inaccurate periodic endpoints.
 	 */
 	private static Spacer[] spacers;
-	public static int lastSpacer, nRigidSpacers;
+	public static int lastSpacer, nRigidSpacers, nBridgingSpacers;
 	private static double[][] spacerNeighbors;
 	private static int[] lastSpacerNeighbor;
 	
@@ -5264,16 +5264,17 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 	 * Remark: $spacerNeighbors[i]$ is sorted by decreasing alignment similarity for every
 	 * $i$. The second integer is infinity when projecting to a rigid spacer.
 	 *
-	 * @return the number of spacers whose $breakpoint$ field has already been decided.
+	 * @return the number of spacers whose $breakpoint$ field has already been assigned.
 	 */
-	public static final int loadSpacerNeighbors(String alignmentsFile, int[] tmpArray) throws IOException {
+	public static final int loadSpacerNeighbors(String alignmentsFile, int minAlignmentLength_readRepeat, int[] tmpArray) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int MIN_INTERSECTION = (3*IDENTITY_THRESHOLD)>>1;  // Arbitrary
+		final int PERIODIC_CONTEXT = minAlignmentLength_readRepeat>>1;  // Arbitrary
 		final int CAPACITY = 6;  // Arbitrary, multiple of 3.
 		boolean readB_fullyUnique, readB_fullyContained;
 		int i, j, k, p;
-		int firstSpacer, readA, readB, nEdges, row, max, last, fromB, toB, readA_length, readA_translatedIndex, readB_translatedIndex;
-		int nFlagged, nSingletonSpacers_rigid, nSingletonSpacers_nonRigid_all, nSingletonSpacers_nonRigid_flagged;
+		int firstSpacer, readA, readB, nEdges, row, max, last, fromA, toA, fromB, toB, readA_length, readA_translatedIndex, readB_translatedIndex;
+		int nSingletonSpacers_rigid, nSingletonSpacers_nonRigid_all, nSingletonSpacers_nonRigid_bridging;
 		String str;
 		BufferedReader br;
 		Spacer tmpSpacer = new Spacer();
@@ -5343,7 +5344,20 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 						spacers[i].breakpoint=Math.POSITIVE_INFINITY;
 					}
 					else {
-						Alignments.projectIntersection(spacers[i].blockID<=1?0:boundaries_all[readA_translatedIndex][spacers[i].blockID-2],spacers[i].blockID>=translation_all[readA_translatedIndex].length-2?readA_length-1:boundaries_all[readA_translatedIndex][spacers[i].blockID+1],tmpArray);
+						if (spacers[i].blockID==0) fromA=0;
+						else {
+							fromA=boundaries_all[readA_translatedIndex][spacers[i].blockID-1]-PERIODIC_CONTEXT;
+							if (spacers[i].blockID>=2 && fromA<boundaries_all[readA_translatedIndex][spacers[i].blockID-2]) fromA=boundaries_all[readA_translatedIndex][spacers[i].blockID-2];
+							else if (spacers[i].blockID==1 && fromA<0) fromA=0;
+						}
+						last=translation_all[readA_translatedIndex].length-1;
+						if (spacers[i].blockID==last) toA=readA_length-1;
+						else {
+							toA=boundaries_all[readA_translatedIndex][spacers[i].blockID]+PERIODIC_CONTEXT;
+							if (spacers[i].blockID<last-1 && toA>boundaries_all[readA_translatedIndex][spacers[i].blockID+1]) toA=boundaries_all[readA_translatedIndex][spacers[i].blockID+1];
+							else if (spacers[i].blockID==last-1 && toA>readA_length-1) toA=readA_length-1;
+						}	
+						Alignments.projectIntersection(fromA,toA,tmpArray);
 						fromB=tmpArray[0]; toB=tmpArray[1];
 						if (toB<=boundaries_all[readB_translatedIndex][0]+IDENTITY_THRESHOLD && isBlockPeriodic(readB_translatedIndex,0)) spacers[i].breakpoint=Math.POSITIVE_INFINITY;
 						else {
@@ -5359,6 +5373,28 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 							}
 							if (fromB>=boundaries_all[readB_translatedIndex][last]-IDENTITY_THRESHOLD && isBlockPeriodic(readB_translatedIndex,last+1)) spacers[i].breakpoint=Math.POSITIVE_INFINITY;
 						}
+						
+						
+						
+						Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray);
+						fromB=tmpArray[0]; toB=tmpArray[1];
+						if (toB<=boundaries_all[readB_translatedIndex][0]+IDENTITY_THRESHOLD && !isBlockPeriodic(readB_translatedIndex,0)) spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
+						else {
+							last=translation_all[readB_translatedIndex].length-2;
+							for (j=1; j<=last; j++) {
+								if ( ( Intervals.isApproximatelyContained(fromB,toB,boundaries_all[readB_translatedIndex][j-1],boundaries_all[readB_translatedIndex][j]) ||
+									   Intervals.areApproximatelyIdentical(fromB,toB,boundaries_all[readB_translatedIndex][j-1],boundaries_all[readB_translatedIndex][j])
+									 ) && !isBlockPeriodic(readB_translatedIndex,j)
+								   ) {
+								   	spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
+									break;
+								}
+							}
+							if (fromB>=boundaries_all[readB_translatedIndex][last]-IDENTITY_THRESHOLD && !isBlockPeriodic(readB_translatedIndex,last+1)) spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
+						}
+						
+						
+						
 					}
 				}
 			}
@@ -5403,22 +5439,22 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 			lastSpacerNeighbor[i]=k;
 		}
 		
-		// Computing statistics
-		nFlagged=0; nSingletonSpacers_rigid=0; nSingletonSpacers_nonRigid_all=0; nSingletonSpacers_nonRigid_flagged=0;
+		// Initializing the $breakpoint$ field and computing statistics.
+		nBridgingSpacers=0; nSingletonSpacers_rigid=0; nSingletonSpacers_nonRigid_all=0; nSingletonSpacers_nonRigid_bridging=0;
 		for (i=0; i<=lastSpacer; i++) {
-			if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nFlagged++;
+			if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nBridgingSpacers++;
 			if (lastSpacerNeighbor[i]>=0) continue;
 			if (spacers[i].isRigid()) nSingletonSpacers_rigid++;
 			else {
 				nSingletonSpacers_nonRigid_all++;
-				if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nSingletonSpacers_nonRigid_flagged++;
+				if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nSingletonSpacers_nonRigid_bridging++;
 			}
 		}
 		System.err.println("Total singleton spacers: "+(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all)+" ("+((100.0*(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all))/(lastSpacer+1))+"%)");
 		System.err.println("Rigid singleton spacers: "+nSingletonSpacers_rigid+" ("+((100.0*nSingletonSpacers_rigid)/(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all))+"%)");
 		System.err.println("Non-rigid singleton spacers: "+nSingletonSpacers_nonRigid_all+" ("+((100.0*nSingletonSpacers_nonRigid_all)/(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all))+"%)");
-		System.err.println("Non-rigid singleton spacers that align to a periodic block: "+nSingletonSpacers_nonRigid_flagged+" ("+((100.0*nSingletonSpacers_nonRigid_flagged)/nSingletonSpacers_nonRigid_all)+"%)");
-		return nFlagged;
+		System.err.println("Non-rigid singleton spacers that are bridging: "+nSingletonSpacers_nonRigid_bridging+" ("+((100.0*nSingletonSpacers_nonRigid_bridging)/nSingletonSpacers_nonRigid_all)+"%)");
+		return nBridgingSpacers;
 	}
 	
 	
@@ -5708,14 +5744,42 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 	 * @param nAlreadyAssigned number of spacers whose $breakpoint$ field has already been 
 	 * decided by $loadSpacerNeighbors()$.
 	 */
-	public static final void assignBreakpoints(int nAlreadyAssigned) throws IOException {
+	public static final void assignBreakpoints() throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean orientation, propagate;
 		int i, j;
-		int top, currentSpacer, neighbor, offset, breakpoint, readLength, nAssigned;
+		int top, currentSpacer, neighbor, offset, breakpoint, readLength, nAssigned, nAlreadyAssigned;
+		
+		// Propagating from bridging spacers
+		if (stack==null || stack.length<lastSpacer+1) stack = new int[lastSpacer+1];
+		nAlreadyAssigned=0;
+		if (nBridgingSpacers!=0) {
+			for (i=0; i<=lastSpacer; i++) {
+				if (spacers[i].breakpoint!=Math.POSITIVE_INFINITY) continue;
+				top=0; stack[0]=i;
+				while (top>=0) {
+					currentSpacer=stack[top--];
+					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
+						neighbor=(int)spacerNeighbors[i][j];
+						if (neighbor<0) neighbor=-1-neighbor;
+						if (spacers[neighbor].breakpoint==Math.POSITIVE_INFINITY-1) continue;
+						spacers[neighbor].breakpoint=Math.POSITIVE_INFINITY-1;
+						stack[++top]=neighbor;
+					}
+				}
+			}
+			nBridgingSpacers=0;
+			for (i=0; i<=lastSpacer; i++) {
+				if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-1) {
+					spacers[i].breakpoint=Math.POSITIVE_INFINITY;
+					nBridgingSpacers++;
+				}
+				else if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nBridgingSpacers++;
+			}
+			nAlreadyAssigned=nBridgingSpacers;
+		}
 		
 		// Propagating from rigid spacers
-		if (stack==null || stack.length<lastSpacer+1) stack = new int[lastSpacer+1];
 		nAssigned=0;
 		if (nRigidSpacers!=0) {
 			for (i=0; i<=lastSpacer; i++) {
