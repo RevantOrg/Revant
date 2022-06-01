@@ -83,7 +83,7 @@ public class RepeatAlphabet {
 	 * Data structures for fixing inaccurate periodic endpoints.
 	 */
 	private static Spacer[] spacers;
-	public static int lastSpacer, nRigidSpacers, nBridgingSpacers;
+	public static int lastSpacer, nRigidSpacers, nBridgingSpacers, nInactiveSpacers;
 	private static double[][] spacerNeighbors;
 	private static int[] lastSpacerNeighbor;
 	
@@ -5257,7 +5257,18 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 	 * get the projection of $x.first$ on $y$'s read (might be negative). The entry in 
 	 * $spacerNeighbors[y]$ for the same edge might have a different absolute value.
 	 *
-	 * Remark: the procedure initializes field $breakpoint$ of every spacer.
+	 * Remark: the procedure initializes the field $breakpoint$ of every spacer, and marks
+	 * bridging and inactive spacers. A spacer is \emph{bridging} if it (and some context
+	 * to the left and right) aligns to a string that is fully contained inside a 
+	 * periodic block of another read, i.e. if its two breakpoints should be deleted. A 
+	 * spacer is \emph{inactive} if it aligns to a string that is fully contained inside
+	 * a non-periodic repeat in another read, i.e. if its two breakpoints are likely
+	 * correct and should not be edited.
+	 *
+	 * Remark: some inactive spacers could be detected by just looking at the original
+	 * version of the read translation file (before rare characters got removed). However,
+	 * looking at all read-read alignments is needed anyway for spacers shorter than 
+	 * $minAlignmentLength$, and for spacers where a non-periodic alignment never occured.
 	 *
 	 * Remark: the procedure is sequential just for simplicity.
 	 *
@@ -5373,28 +5384,25 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 							}
 							if (fromB>=boundaries_all[readB_translatedIndex][last]-IDENTITY_THRESHOLD && isBlockPeriodic(readB_translatedIndex,last+1)) spacers[i].breakpoint=Math.POSITIVE_INFINITY;
 						}
-						
-						
-						
-						Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray);
-						fromB=tmpArray[0]; toB=tmpArray[1];
-						if (toB<=boundaries_all[readB_translatedIndex][0]+IDENTITY_THRESHOLD && !isBlockPeriodic(readB_translatedIndex,0)) spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
-						else {
-							last=translation_all[readB_translatedIndex].length-2;
-							for (j=1; j<=last; j++) {
-								if ( ( Intervals.isApproximatelyContained(fromB,toB,boundaries_all[readB_translatedIndex][j-1],boundaries_all[readB_translatedIndex][j]) ||
-									   Intervals.areApproximatelyIdentical(fromB,toB,boundaries_all[readB_translatedIndex][j-1],boundaries_all[readB_translatedIndex][j])
-									 ) && !isBlockPeriodic(readB_translatedIndex,j)
-								   ) {
-								   	spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
-									break;
+						if (spacers[i].breakpoint==-1) {  
+							// Not marking as nonperiodic if already marked as periodic
+							Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray);
+							fromB=tmpArray[0]; toB=tmpArray[1];
+							if (toB<=boundaries_all[readB_translatedIndex][0]+IDENTITY_THRESHOLD && !isBlockPeriodic(readB_translatedIndex,0) && isBlockNonperiodic(readB_translatedIndex,0)) spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
+							else {
+								last=translation_all[readB_translatedIndex].length-2;
+								for (j=1; j<=last; j++) {
+									if ( ( Intervals.isApproximatelyContained(fromB,toB,boundaries_all[readB_translatedIndex][j-1],boundaries_all[readB_translatedIndex][j]) ||
+										   Intervals.areApproximatelyIdentical(fromB,toB,boundaries_all[readB_translatedIndex][j-1],boundaries_all[readB_translatedIndex][j])
+										 ) && !isBlockPeriodic(readB_translatedIndex,j) && isBlockNonperiodic(readB_translatedIndex,j)
+									   ) {
+									   	spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
+										break;
+									}
 								}
+								if (fromB>=boundaries_all[readB_translatedIndex][last]-IDENTITY_THRESHOLD && !isBlockPeriodic(readB_translatedIndex,last+1) && isBlockNonperiodic(readB_translatedIndex,last+1)) spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
 							}
-							if (fromB>=boundaries_all[readB_translatedIndex][last]-IDENTITY_THRESHOLD && !isBlockPeriodic(readB_translatedIndex,last+1)) spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
 						}
-						
-						
-						
 					}
 				}
 			}
@@ -5440,9 +5448,11 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 		}
 		
 		// Initializing the $breakpoint$ field and computing statistics.
-		nBridgingSpacers=0; nSingletonSpacers_rigid=0; nSingletonSpacers_nonRigid_all=0; nSingletonSpacers_nonRigid_bridging=0;
+		nBridgingSpacers=0; nInactiveSpacers=0;
+		nSingletonSpacers_rigid=0; nSingletonSpacers_nonRigid_all=0; nSingletonSpacers_nonRigid_bridging=0;
 		for (i=0; i<=lastSpacer; i++) {
 			if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nBridgingSpacers++;
+			if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-1) nInactiveSpacers++;
 			if (lastSpacerNeighbor[i]>=0) continue;
 			if (spacers[i].isRigid()) nSingletonSpacers_rigid++;
 			else {
@@ -5739,6 +5749,13 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 	 * Doing a global alignment of all the reads that have overlapping spacers is
 	 * impractical.
 	 *
+	 * Remark: before propagating normal spacers, the procedure propagates bridging
+	 * spacers and inactive spacers. This is because, if a spacer is bridging (i.e. fully
+	 * belonging to a periodic repeat), it is likely that every other spacer that aligns 
+	 * to it is bridging. And if a spacer is inactive, it is likely that every spacer that
+	 * aligns to it has both breakpoints at approx. the same positions and is inactive as
+	 * well.
+	 *
 	 * Remark: the procedure assumes that $Reads.readLengths$ has already been loaded.
 	 *
 	 * @param nAlreadyAssigned number of spacers whose $breakpoint$ field has already been 
@@ -5777,6 +5794,33 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 				else if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nBridgingSpacers++;
 			}
 			nAlreadyAssigned=nBridgingSpacers;
+		}
+		
+		// Propagating from inactive spacers
+		if (nInactiveSpacers!=0) {
+			for (i=0; i<=lastSpacer; i++) {
+				if (spacers[i].breakpoint!=Math.POSITIVE_INFINITY-1) continue;
+				top=0; stack[0]=i;
+				while (top>=0) {
+					currentSpacer=stack[top--];
+					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
+						neighbor=(int)spacerNeighbors[i][j];
+						if (neighbor<0) neighbor=-1-neighbor;
+						if (spacers[neighbor].breakpoint==Math.POSITIVE_INFINITY-2 || spacers[neighbor].breakpoint==Math.POSITIVE_INFINITY) continue;
+						spacers[neighbor].breakpoint=Math.POSITIVE_INFINITY-2;
+						stack[++top]=neighbor;
+					}
+				}
+			}
+			nInactiveSpacers=0;
+			for (i=0; i<=lastSpacer; i++) {
+				if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-2) {
+					spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
+					nInactiveSpacers++;
+				}
+				else if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-1) nInactiveSpacers++;
+			}
+			nAlreadyAssigned+=nInactiveSpacers;
 		}
 		
 		// Propagating from rigid spacers
