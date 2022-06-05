@@ -5557,7 +5557,7 @@ if (fabio) System.err.println("loadSpacerNeighbors> 13");
 		final Spacer spacerA = spacers[spacerAID];
 		final Spacer spacerB = spacers[spacerBID];
 		
-boolean fabio = (spacerA.read==1437 && spacerB.read==3) || (spacerA.read==3 && spacerB.read==1437);
+boolean fabio = (spacerA.read==710 && spacerB.read==97) || (spacerA.read==97 && spacerB.read==710);
 if (fabio) System.err.println("loadSpacerNeighbors_impl> 1  trying an edge between "+spacerA+" and "+spacerB);
 		
 		
@@ -5875,8 +5875,17 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 			nAlreadyAssigned+=nInactiveSpacers;
 		}
 		
-		// Propagating from rigid spacers
+		// Deactivating every spacer with no neighbor
 		nAssigned=0;
+		for (i=0; i<=lastSpacer; i++) {
+			if (spacers[i].breakpoint!=-1) continue;
+			if (lastSpacerNeighbor[i]==-1) {
+				spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
+				nAssigned++;
+			}
+		}
+		
+		// Propagating from rigid spacers
 		if (nRigidSpacers!=0) {
 			for (i=0; i<=lastSpacer; i++) {
 				if (!spacers[i].isRigid() || spacers[i].breakpoint!=-1) continue;
