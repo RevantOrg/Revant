@@ -5263,7 +5263,10 @@ if (readA==166 && readB==276) System.err.println("filterAlignments_tight> 56");
 	 * periodic block of another read, i.e. if its two breakpoints should be deleted. A 
 	 * spacer is \emph{inactive} if it aligns to a string that is fully contained inside
 	 * a non-periodic repeat in another read, i.e. if its two breakpoints are likely
-	 * correct and should not be edited.
+	 * correct and should not be edited. Note that, given the two breakpoints of a spacer,
+	 * there are just 3 possible operations: delete both (bridging), keep both (inactive),
+	 * and merge them into one (active spacer). We don't consider a fourth operation of
+	 * keeping both breakpoints but changing their position.
 	 *
 	 * Remark: some inactive spacers could be detected by just looking at the original
 	 * version of the read translation file (before rare characters got removed). However,
@@ -5776,18 +5779,18 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
-					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
-						neighbor=(int)spacerNeighbors[i][j];
+					for (j=0; j<=lastSpacerNeighbor[currentSpacer]; j+=2) {
+						neighbor=(int)spacerNeighbors[currentSpacer][j];
 						if (neighbor<0) neighbor=-1-neighbor;
-						if (spacers[neighbor].breakpoint==Math.POSITIVE_INFINITY-1) continue;
-						spacers[neighbor].breakpoint=Math.POSITIVE_INFINITY-1;
+						if (spacers[neighbor].breakpoint==Math.POSITIVE_INFINITY-2) continue;
+						spacers[neighbor].breakpoint=Math.POSITIVE_INFINITY-2;
 						stack[++top]=neighbor;
 					}
 				}
 			}
 			nBridgingSpacers=0;
 			for (i=0; i<=lastSpacer; i++) {
-				if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-1) {
+				if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-2) {
 					spacers[i].breakpoint=Math.POSITIVE_INFINITY;
 					nBridgingSpacers++;
 				}
@@ -5803,8 +5806,8 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
-					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
-						neighbor=(int)spacerNeighbors[i][j];
+					for (j=0; j<=lastSpacerNeighbor[currentSpacer]; j+=2) {
+						neighbor=(int)spacerNeighbors[currentSpacer][j];
 						if (neighbor<0) neighbor=-1-neighbor;
 						if (spacers[neighbor].breakpoint==Math.POSITIVE_INFINITY-2 || spacers[neighbor].breakpoint==Math.POSITIVE_INFINITY) continue;
 						spacers[neighbor].breakpoint=Math.POSITIVE_INFINITY-2;
@@ -5828,24 +5831,19 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 		if (nRigidSpacers!=0) {
 			for (i=0; i<=lastSpacer; i++) {
 				if (!spacers[i].isRigid() || spacers[i].breakpoint!=-1) continue;
-				spacers[i].setBreakpoint(Reads.getReadLength(spacers[i].read)); nAssigned++;
-boolean fabio = spacers[i].read==1379 && spacers[i].first==1546;
-if (fabio) System.err.println("assignBreakpoints> traversed spacer "+spacers[i]+" lastSpacerNeighbor="+lastSpacerNeighbor[i]);
+				spacers[i].setBreakpoint(); nAssigned++;
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
-					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
-						neighbor=(int)spacerNeighbors[i][j];
+					for (j=0; j<=lastSpacerNeighbor[currentSpacer]; j+=2) {
+						neighbor=(int)spacerNeighbors[currentSpacer][j];
 						if (neighbor<0) {
 							neighbor=-1-neighbor;
 							orientation=false;
 						}
 						else orientation=true;
-						if (spacers[neighbor].isRigid() || spacers[neighbor].breakpoint!=-1) continue;
-
-if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" tries to propagate to spacer "+spacers[neighbor]);
-						
-						offset=(int)spacerNeighbors[i][j+1];
+						if (spacers[neighbor].isRigid() || spacers[neighbor].breakpoint!=-1) continue;						
+						offset=(int)spacerNeighbors[currentSpacer][j+1];
 						breakpoint=spacers[neighbor].first+offset+(orientation?spacers[currentSpacer].breakpoint-spacers[currentSpacer].first:spacers[currentSpacer].last-spacers[currentSpacer].breakpoint);
 						if (breakpoint>=spacers[neighbor].first-IDENTITY_THRESHOLD && breakpoint<=spacers[neighbor].last+IDENTITY_THRESHOLD) {
 							breakpoint=Math.max(breakpoint,spacers[neighbor].first);
@@ -5853,39 +5851,31 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" tries to
 							spacers[neighbor].breakpoint=breakpoint;
 							stack[++top]=neighbor;
 							nAssigned++;
-
-if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagates successfully to spacer "+spacers[neighbor]);
-// if (spacers[neighbor].read==1464 && spacers[neighbor].first==16147) System.err.println("assignBreakpoints> spacer "+spacers[neighbor]+" inherits breakpoint from spacer "+spacers[currentSpacer]+" which descends from "+spacers[i]);
-							
 						}
 					}
 				}
 			}
 		}
 		
-		// Propagating from arbitrary non-rigid spacers
+		// Propagating from non-rigid spacers that are strictly inside a read
 		if (nAssigned+nAlreadyAssigned<lastSpacer+1) {
 			for (i=0; i<=lastSpacer; i++) {
 				if (spacers[i].breakpoint!=-1) continue;
 				readLength=Reads.getReadLength(spacers[i].read);
-				propagate=spacers[i].setBreakpoint(readLength); 
-				nAssigned++;
-
-// if (spacers[i].read==1464 && spacers[i].first==16147) System.err.println("assignBreakpoints> spacer "+spacers[i]+" gets a breakpoint autonomously");
-				
-				if (!propagate) continue;
+				if (spacers[i].first==0 || spacers[i].last==readLength-1) continue;
+				spacers[i].setBreakpoint(); nAssigned++;
 				top=0; stack[0]=i;
 				while (top>=0) {
 					currentSpacer=stack[top--];
-					for (j=0; j<=lastSpacerNeighbor[i]; j+=2) {
-						neighbor=(int)spacerNeighbors[i][j];
+					for (j=0; j<=lastSpacerNeighbor[currentSpacer]; j+=2) {
+						neighbor=(int)spacerNeighbors[currentSpacer][j];
 						if (neighbor<0) {
 							neighbor=-1-neighbor;
 							orientation=false;
 						}
 						else orientation=true;
 						if (spacers[neighbor].breakpoint!=-1) continue;
-						offset=(int)spacerNeighbors[i][j+1];
+						offset=(int)spacerNeighbors[currentSpacer][j+1];
 						breakpoint=spacers[neighbor].first+offset+(orientation?spacers[currentSpacer].breakpoint-spacers[currentSpacer].first:spacers[currentSpacer].last-spacers[currentSpacer].breakpoint);
 						if (breakpoint>=spacers[neighbor].first-IDENTITY_THRESHOLD && breakpoint<=spacers[neighbor].last+IDENTITY_THRESHOLD) {
 							breakpoint=Math.max(breakpoint,spacers[neighbor].first);
@@ -5893,9 +5883,36 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 							spacers[neighbor].breakpoint=breakpoint;
 							stack[++top]=neighbor;
 							nAssigned++;
-							
-// if (spacers[neighbor].read==1464 && spacers[neighbor].first==16147) System.err.println("assignBreakpoints> spacer "+spacers[neighbor]+" inherits breakpoint from spacer "+currentSpacer+" which descends from "+spacers[i]);
-							
+						}
+					}
+				}
+			}
+		}
+		
+		// Propagating from the remaining non-rigid spacers
+		if (nAssigned+nAlreadyAssigned<lastSpacer+1) {
+			for (i=0; i<=lastSpacer; i++) {
+				if (spacers[i].breakpoint!=-1) continue;
+				spacers[i].setBreakpoint(); nAssigned++;
+				top=0; stack[0]=i;
+				while (top>=0) {
+					currentSpacer=stack[top--];
+					for (j=0; j<=lastSpacerNeighbor[currentSpacer]; j+=2) {
+						neighbor=(int)spacerNeighbors[currentSpacer][j];
+						if (neighbor<0) {
+							neighbor=-1-neighbor;
+							orientation=false;
+						}
+						else orientation=true;
+						if (spacers[neighbor].breakpoint!=-1) continue;
+						offset=(int)spacerNeighbors[currentSpacer][j+1];
+						breakpoint=spacers[neighbor].first+offset+(orientation?spacers[currentSpacer].breakpoint-spacers[currentSpacer].first:spacers[currentSpacer].last-spacers[currentSpacer].breakpoint);
+						if (breakpoint>=spacers[neighbor].first-IDENTITY_THRESHOLD && breakpoint<=spacers[neighbor].last+IDENTITY_THRESHOLD) {
+							breakpoint=Math.max(breakpoint,spacers[neighbor].first);
+							breakpoint=Math.min(breakpoint,spacers[neighbor].last);
+							spacers[neighbor].breakpoint=breakpoint;
+							stack[++top]=neighbor;
+							nAssigned++;
 						}
 					}
 				}
@@ -6026,6 +6043,7 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 				leftCharacters_load(false,1,length,true,1==nBlocks-1);
 				tmpBoolean[0]=true;
 			}
+			else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) { /* NOP */ }
 			else {
 				length=spacers[spacersCursor].breakpoint>QUANTUM?spacers[spacersCursor].last-spacers[spacersCursor].breakpoint:boundaries[0];
 				leftCharacters_load(false,1,length,spacers[spacersCursor].breakpoint<=QUANTUM,1==nBlocks-1);
@@ -6039,6 +6057,7 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 		while (i<=nBlocks-2) {
 			if (!isBlockUnique[i] || boundaries[i]-boundaries[i-1]>maxSpacerLength) {
 				if (lastLeft!=-1) {
+					leftCharacters_setOpen(false,false);
 					leftCharacters_clear(used,bw,QUANTUM);
 					tmpBoolean[i-1]=true;
 				}
@@ -6048,6 +6067,7 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 			if (isBlockPeriodic[i-1] && isBlockPeriodic[i+1]) {
 				if (isBlockNonperiodic[i-1] && isBlockNonperiodic[i+1]) {
 					if (lastLeft!=-1) {
+						leftCharacters_setOpen(false,false);
 						leftCharacters_clear(used,bw,QUANTUM);
 						tmpBoolean[i-1]=true;
 					}
@@ -6059,16 +6079,25 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (2): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
 						System.exit(1);
 					}
-					length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
-					if (lastLeft!=-1) {
-						leftCharacters_addLength(length);
-						leftCharacters_setOpen(false,false);
+					if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
+						if (lastLeft!=-1) {
+							leftCharacters_setOpen(false,false);
+							leftCharacters_clear(used,bw,QUANTUM);
+							tmpBoolean[i-1]=true;
+						}
 					}
-					else leftCharacters_load(false,i-1,length,i-1==0,false);
-					leftCharacters_clear(used,bw,QUANTUM);
-					length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
-					leftCharacters_load(false,i+1,length,false,i+1==nBlocks-1);
-					tmpBoolean[i-1]=true; tmpBoolean[i]=true;
+					else {
+						length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
+						if (lastLeft!=-1) {
+							leftCharacters_addLength(length);
+							leftCharacters_setOpen(false,false);
+						}
+						else leftCharacters_load(false,i-1,length,i-1==0,false);
+						leftCharacters_clear(used,bw,QUANTUM);
+						length=spacers[spacersCursor].last-spacers[spacersCursor].breakpoint;
+						leftCharacters_load(false,i+1,length,false,i+1==nBlocks-1);
+						tmpBoolean[i-1]=true; tmpBoolean[i]=true;
+					}
 					i+=2;
 				}
 				else {
@@ -6088,6 +6117,14 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 							tmpBoolean[i-1]=true; tmpBoolean[i]=true;
 							i+=2;
 						}
+						else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
+							if (lastLeft!=-1) {
+								leftCharacters_setOpen(false,false);
+								leftCharacters_clear(used,bw,QUANTUM);
+								tmpBoolean[i-1]=true;
+							}
+							i+=2;
+						}
 						else {
 							length=spacers[spacersCursor].breakpoint-spacers[spacersCursor].first;
 							if (lastLeft!=-1) leftCharacters_addLength(length);
@@ -6104,8 +6141,8 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 			else if (isBlockPeriodic[i-1]) {
 				if (isBlockNonperiodic[i-1]) {
 					if (lastLeft!=-1) {
-						leftCharacters_clear(used,bw,QUANTUM);
 						leftCharacters_setOpen(false,false);
+						leftCharacters_clear(used,bw,QUANTUM);
 						tmpBoolean[i-1]=true;
 					}
 					i+=2;
@@ -6125,8 +6162,8 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 			else if (isBlockPeriodic[i+1]) {
 				if (isBlockNonperiodic[i+1]) {
 					if (lastLeft!=-1) {
-						leftCharacters_clear(used,bw,QUANTUM);
 						leftCharacters_setOpen(false,false);
+						leftCharacters_clear(used,bw,QUANTUM);
 						tmpBoolean[i-1]=true;
 					}
 					i+=2;
@@ -6159,6 +6196,13 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 					leftCharacters_clear(used,bw,QUANTUM);
 					tmpBoolean[nBlocks-2]=true; tmpBoolean[nBlocks-1]=true;
 				}
+				else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
+					if (lastLeft!=-1) {
+						leftCharacters_setOpen(false,false);
+						leftCharacters_clear(used,bw,QUANTUM);
+						tmpBoolean[nBlocks-2]=true;
+					}
+				}
 				else {
 					length=spacers[spacersCursor].breakpoint<readLength-QUANTUM?spacers[spacersCursor].breakpoint-spacers[spacersCursor].first:readLength-boundaries[nBlocks-2];
 					if (lastLeft==-1) leftCharacters_load(false,nBlocks-2,length,false,spacers[spacersCursor].breakpoint>=readLength-QUANTUM);
@@ -6170,6 +6214,7 @@ if (fabio) System.err.println("assignBreakpoints> spacer "+spacers[i]+" propagat
 			}
 			else {
 				if (lastLeft!=-1) {
+					leftCharacters_setOpen(false,false);
 					leftCharacters_clear(used,bw,QUANTUM);
 					tmpBoolean[nBlocks-2]=true;
 				}
@@ -6595,6 +6640,10 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 			fixPeriodicEndpoints_updateTranslation_bridge(readLength,nBlocks,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,tmpArray1,tmpArray2,tmpArray3);
 			return spacersCursor;
 		}
+		else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
+			fixPeriodicEndpoints_updateTranslation_noSpacer(2,readID,readLength,nBlocks,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out);
+			return spacersCursor;
+		}
 		if (currentBoundary!=-1) {
 			read2characters_new.write(SEPARATOR_MAJOR+"");
 			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
@@ -6814,6 +6863,12 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 				leftCharacters_load_prime(true,1,(nBlocks==2?readLength:boundaries[1])-boundaries[0],true,nBlocks==2,oldAlphabet,lastUnique_old,lastPeriodic_old);
 				leftCharacters_addLength(length);
 			}
+			else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
+				// The first block is an inactive spacer
+				writeBlock(0,boundaries[0],true,false,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				currentBoundary=boundaries[blockCursor];
+				lastLeft=-1;
+			}
 			else {
 				if (spacers[spacersCursor].breakpoint>quantum) {
 					tmpCharacter.repeat=UNIQUE; tmpCharacter.orientation=true;
@@ -6873,6 +6928,14 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 			if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY) {
 				writeBlock(0,readLength,true,true,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 				fullyContained_new.write(readID+"\n");
+			}
+			else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
+				// The second block is an inactive spacer
+				writeBlock(0,boundaries[0],true,false,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				read2characters_new.write(SEPARATOR_MAJOR+"");
+				read2boundaries_new.write(boundaries[0]+"");
+				nBoundariesWritten++;
+				writeBlock(1,readLength-boundaries[0],false,true,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 			}
 			else {
 				if (readLength-spacers[spacersCursor].breakpoint<quantum) {
@@ -6953,6 +7016,15 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 				}
 				else leftCharacters_load_prime(false,nBlocks-2,length,false,true,oldAlphabet,lastUnique_old,lastPeriodic_old);
 				leftCharacters_clear_prime(newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,quantum);
+			}
+			else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
+				// The last block is an inactive spacer
+				if (lastLeft!=-1) leftCharacters_clear_prime(newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,quantum);
+				else writeBlock(nBlocks-2,boundaries[nBlocks-2]-boundaries[nBlocks-3],false,false,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
+				read2characters_new.write(SEPARATOR_MAJOR+"");
+				read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+boundaries[nBlocks-2]);
+				nBoundariesWritten++;
+				writeBlock(nBlocks-1,readLength-boundaries[nBlocks-2],false,true,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
 			}
 			else {
 				if (readLength-spacers[spacersCursor].breakpoint>quantum) {
@@ -7214,18 +7286,11 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 		
 		public boolean isRigid() { return rigidLeft||rigidRight; }
 		
-		/**
-		 * @param readLength of $read$;
-		 * @return TRUE iff the breakpoint value should be propagated (breakpoints that
-		 * are not an adjacency between two distinct repeats should not be propagated).
-		 */
-		public boolean setBreakpoint(int readLength) {
-			if (first==last) { breakpoint=first; return true; }
-			else if (rigidLeft) { breakpoint=first; return true; }
-			else if (rigidRight) { breakpoint=last; return true; }
-			else if (first==0) { breakpoint=first; return false; }
-			else if (last==readLength-1) { breakpoint=last; return false; }
-			else { breakpoint=(first+last)>>1; return true; }  // Arbitrary
+		public void setBreakpoint() {
+			if (first==last) breakpoint=first;
+			else if (rigidLeft) breakpoint=first;
+			else if (rigidRight) breakpoint=last;
+			else breakpoint=(first+last)>>1;  // Arbitrary
 		}
 		
 		/**
