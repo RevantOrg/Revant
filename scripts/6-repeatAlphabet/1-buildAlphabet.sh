@@ -19,7 +19,7 @@ MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are disc
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_SPACER_LENGTH="600"  # 0=assume that the endpoints of periodic repeats are accurate
 N_THREADS="4"
-DELETE_TMP_FILES="1"
+DELETE_TMP_FILES="0"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
