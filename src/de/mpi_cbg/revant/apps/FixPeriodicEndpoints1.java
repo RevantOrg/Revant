@@ -38,16 +38,19 @@ public class FixPeriodicEndpoints1 {
 		BufferedReader br1, br2;
 		BufferedWriter bw1, bw2;
 		int[] lastRead;
-		int[] tmpArray = new int[2];
+		int[] tmpArray1, tmpArray2, tmpArray3;
 		
 		Reads.nReads=N_READS;
 		Reads.maxReadLength=Reads.loadReadLengths(READ_LENGTHS_FILE);
 		Reads.loadReadIDs(READ_IDS_FILE,N_READS);
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		maxBlockLength=RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_CHARACTERS_FILE,true,true,TRANSLATED_READS_BOUNDARIES_FILE);
+		tmpArray1 = new int[maxBlockLength];
+		tmpArray2 = new int[maxBlockLength];
+		tmpArray3 = new int[maxBlockLength];
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
-		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,tmpArray);		
+		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,tmpArray1,tmpArray2,tmpArray3);
 		RepeatAlphabet.assignBreakpoints();
 		
 RepeatAlphabet.printSpacerNeighbors("/Users/ramseysnow/Downloads/SIMULATED-REPBASE/spacers.dot");		
