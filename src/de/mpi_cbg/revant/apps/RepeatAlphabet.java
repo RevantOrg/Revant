@@ -5452,8 +5452,10 @@ if (fabio) System.err.println("loadSpacerNeighbors> 0  considering spacer "+i+"t
 							}
 						}
 					}
-					if (spacers[i].breakpoint==-1) {  
-						// Marking as nonperiodic only if not already marked as periodic
+					if (spacers[i].breakpoint==-1 && !readB_fullyContained) { 
+						// Marking as nonperiodic only if not already marked as periodic.
+						// Remark: we assume that $readB_fullyContained$ means that readB
+						// is fully periodic, for simplicity.
 						Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray1);
 						fromB=tmpArray1[0]; toB=tmpArray1[1];
 						if (toB<=boundaries_all[readB_translatedIndex][0]+IDENTITY_THRESHOLD && !isBlockPeriodic(readB_translatedIndex,0) && isBlockNonperiodic(readB_translatedIndex,0)) spacers[i].breakpoint=Math.POSITIVE_INFINITY-1;
@@ -5514,7 +5516,7 @@ if (fabio) System.err.println("loadSpacerNeighbors> 0  considering spacer "+i+"t
 			lastSpacerNeighbor[i]=k;
 		}
 		
-		// Initializing the $breakpoint$ field and computing statistics.
+		// Computing statistics
 		nBridgingSpacers=0; nInactiveSpacers=0;
 		nSingletonSpacers_rigid=0; nSingletonSpacers_nonRigid_all=0; nSingletonSpacers_nonRigid_bridging=0;
 		for (i=0; i<=lastSpacer; i++) {
@@ -5564,6 +5566,7 @@ if (fabio) System.err.println("loadSpacerNeighbors> 0  considering spacer "+i+"t
 		
 		for (i=0; i<=lastPrime; i++) {
 			c=translation_all[readID][blockID][i];
+			if (c==lastAlphabet+1) continue;
 			if (sameOrientation) c=alphabet[c].orientation?alphabet[c].repeat:-1-alphabet[c].repeat;
 			else c=alphabet[c].orientation?-1-alphabet[c].repeat:alphabet[c].repeat;
 			if (Arrays.binarySearch(repeatIDs,0,last+1,c)>=0) return true;
@@ -6962,7 +6965,7 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 			else if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
 				// The first block is an inactive spacer
 				writeBlock(0,boundaries[0],true,false,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new);
-				currentBoundary=boundaries[blockCursor];
+				currentBoundary=boundaries[0];
 				lastLeft=-1;
 			}
 			else {
