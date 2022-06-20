@@ -17,7 +17,7 @@ N_HAPLOTYPES="1"
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_K="8"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
 N_THREADS="4"
-DELETE_TMP_FILES="1"
+DELETE_TMP_FILES="0"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
