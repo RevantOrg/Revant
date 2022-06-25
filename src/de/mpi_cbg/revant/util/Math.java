@@ -935,5 +935,17 @@ public class Math {
 	}
 	
 	
+	/**
+	 * Reverses $array[first..last]$ (endpoints included).
+	 */
+	public static final void reverse(int[] array, int first, int last) {
+		int a = first;
+		int b = last;
+		final int mid = (last-first+1)>>1;
+		for (int i=0; i<mid; i++) {
+			array[a]^=array[b]; array[b]^=array[a]; array[a]^=array[b];
+			a++; b--;
+		}
+	}
 
 }

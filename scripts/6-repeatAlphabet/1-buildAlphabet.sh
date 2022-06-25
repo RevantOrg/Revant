@@ -18,8 +18,8 @@ MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discar
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_SPACER_LENGTH="600"  # 0=assume that the endpoints of periodic repeats are accurate
-N_THREADS="1"
-DELETE_TMP_FILES="0"
+N_THREADS="4"
+DELETE_TMP_FILES="1"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -193,7 +193,7 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${READ_READ_ALIGNMENTS_FILE} ${TMPFILE_PATH}-spacers-1- ${LAST_READA_FILE}
 	fi
 	echo "Read-read alignments filtered and split in ${N_THREADS} parts"
-	# Splitting read translations based on read-read alignments. This is necesary, since
+	# Splitting read translations based on read-read alignments. This is necessary, since
 	# the previous translated file chunks were split by balancing read-repeat alignments,
 	# rather than read-read alignments.
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-1-1- ${TMPFILE_PATH}-spacers-1-2-
