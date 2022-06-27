@@ -18,6 +18,7 @@ MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discar
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_SPACER_LENGTH="600"  # 0=assume that the endpoints of periodic repeats are accurate
+WOBBLE_LENGTH="100"  # 0=do not wobble.
 N_THREADS="4"
 DELETE_TMP_FILES="1"
 # REVANT
@@ -261,6 +262,40 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 fi
 echo "Periodic endpoints fixed"
+
+
+
+echo "Wobbling..."
+if [ ${WOBBLE_LENGTH} -ne 0 ]; then
+	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+		WOBBLE_PREFIX="${TMPFILE_PATH}-spacers-9"
+	else
+		# Splitting read translations based on read-read alignments. This is necessary,
+		# since the previous translated file chunks were split by balancing read-repeat
+		# alignments, rather than read-read alignments.
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-wobble-1- ${TMPFILE_PATH}-wobble-2-
+		WOBBLE_PREFIX="${TMPFILE_PATH}-wobble-1"
+	fi
+	function wobbleThread() {
+		local WOBBLE_FILE_ID=$1
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${TMPFILE_PATH}-wobble-3-${THREAD}.txt
+	}
+	if [ -e ${WOBBLE_PREFIX}-${N_THREADS}.txt ]; then
+		TO=${N_THREADS}
+	else
+		TO=$(( ${N_THREADS} - 1 ))
+	fi
+	for THREAD in $(seq 0 ${TO}); do
+		wobbleThread ${THREAD} &
+	done
+	wait
+	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prewobble
+	for THREAD in $(seq 0 ${TO}); do
+		cat ${TMPFILE_PATH}-wobble-3-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+	done
+fi
+echo "Wobbling completed"
+
 
 
 

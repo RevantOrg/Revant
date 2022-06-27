@@ -20,7 +20,7 @@ TIGHT_MODE="0"
 LOW_QUALITY_TYPE="1"  # 1=replacement, 0=insertion.
 LOW_QUALITY_LENGTH_TOLERANCE="200"  # bps
 MIN_K="2"  # One plus the min length of a context used for disambiguation
-MAX_K="6"  # One plus the max length of a context used for disambiguation
+MAX_K="4"  # One plus the max length of a context used for disambiguation
 N_THREADS="4"
 DELETE_TMP_FILES="1"
 # REVANT
