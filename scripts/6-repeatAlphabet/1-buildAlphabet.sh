@@ -16,11 +16,11 @@ BROKEN_READS=$2  # 1=TRUE
 KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic
 MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
-HAPLOTYPE_COVERAGE="30"  # Of one haplotype
+HAPLOTYPE_COVERAGE="2"     #"30"  # Of one haplotype
 MAX_SPACER_LENGTH="600"  # 0=assume that the endpoints of periodic repeats are accurate
-WOBBLE_LENGTH="100"  # 0=do not wobble.
-N_THREADS="4"
-DELETE_TMP_FILES="1"
+WOBBLE_LENGTH="200"  # 0=do not wobble.
+N_THREADS="1"
+DELETE_TMP_FILES="0"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
@@ -107,6 +107,11 @@ for THREAD in $(seq 0 ${TO}); do
 done
 ALPHABET_SIZE=$( wc -l < ${ALPHABET_FILE} )
 ALPHABET_SIZE=$(( ${ALPHABET_SIZE} - 1 ))
+
+
+
+cp ${ALPHABET_FILE} ${ALPHABET_FILE}-step1
+
 
 echo "Translating reads..."
 function translationThread() {

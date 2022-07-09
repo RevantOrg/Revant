@@ -14,9 +14,9 @@
 #
 INPUT_DIR=$1
 N_HAPLOTYPES="1"
-HAPLOTYPE_COVERAGE="30"  # Of one haplotype
+HAPLOTYPE_COVERAGE="30"                #"30"  # Of one haplotype
 MAX_K="8"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
-N_THREADS="4"
+N_THREADS="1"
 DELETE_TMP_FILES="0"
 # REVANT
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
@@ -35,7 +35,7 @@ ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 TANDEMS_FILE="${INPUT_DIR}/tandems.txt"
 REPEAT_LENGTHS_FILE="${INPUT_DIR}/repeats-lengths.txt"
 N_REPEATS=$(wc -l < ${REPEAT_LENGTHS_FILE})
-MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
+MIN_FREQUENCY_UNIQUE=1    # <------------------ $(( ${HAPLOTYPE_COVERAGE} / 2 ))
 MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + ${HAPLOTYPE_COVERAGE}/2 ))
 # Endblocks are allowed if they match just one character, since they are the only way to
 # detect e.g. a transposon that is longer than every read and that occurs just once in
@@ -43,7 +43,7 @@ MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + ${HAPLOTYPE_COV
 # We could allow, in a k-mer, just unique characters shorter than the min length needed
 # for them to be a unique address to the genome (the alignment filtering procedures
 # downstream ignore k-mers with long non-repetitive characters).
-UNIQUE_MODE="1"; MULTI_MODE="0"             #"1"
+UNIQUE_MODE="1"; MULTI_MODE="0"
 MAX_HISTOGRAM_COUNT="10000"  # Arbitrary
 rm -f ${TMPFILE_PATH}*
 rm -f ${INPUT_DIR}/unique-*

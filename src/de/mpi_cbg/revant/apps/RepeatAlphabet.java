@@ -619,7 +619,7 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Ensures that the reverse-complement of every character in the alphabet, is also in
-	 * the alphabet. Reverse-complement pairs have symmetrical open status.
+	 * the alphabet.
 	 *
 	 * Remark: the reverse-complement of a character might be implied by a character that
 	 * is already in the alphabet: in this case the new character is not added. Or it
@@ -647,7 +647,7 @@ public class RepeatAlphabet {
 		for (i=lastUnique+1; i<=lastPeriodic; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			repeat=alphabet[i].repeat;
-			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
+			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;		
 			if (repeat!=alphabet[from].repeat) {
 				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
 				from=i; newFrom=k+1;
@@ -667,7 +667,7 @@ public class RepeatAlphabet {
 				for (j=i+1; j<=lastPeriodic; j++) {
 					if (alphabet[j].repeat!=repeat) break;
 					if (!alphabet[j].orientation) {
-						if (alphabet[j].length==length && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						if (alphabet[j].length==length && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd) {
 							found=j;
 							break;
 						}
@@ -682,7 +682,7 @@ public class RepeatAlphabet {
 							System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
 							newAlphabet=newArray;
 						}
-						newAlphabet[k] = new Character(repeat,false,-1,-1,length,openEnd,openStart);
+						newAlphabet[k] = new Character(repeat,false,-1,-1,length,openStart,openEnd);
 						nAdded++;
 					}
 				}
@@ -693,7 +693,7 @@ public class RepeatAlphabet {
 				for (j=i-1; j>lastUnique; j--) {
 					if (alphabet[j].repeat!=repeat) break;
 					if (alphabet[j].orientation) {
-						if (alphabet[j].length==length && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						if (alphabet[j].length==length && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd) {
 							found=j;
 							break;
 						}
@@ -707,7 +707,7 @@ public class RepeatAlphabet {
 						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
 						newAlphabet=newArray;
 					}
-					newAlphabet[k] = new Character(repeat,true,-1,-1,length,openEnd,openStart);
+					newAlphabet[k] = new Character(repeat,true,-1,-1,length,openStart,openEnd);
 					nAdded++;
 				}
 			}
@@ -720,7 +720,7 @@ public class RepeatAlphabet {
 		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
 			if (i%1000==0) System.err.println("Processed "+i+" characters");
 			repeat=alphabet[i].repeat;
-			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;
+			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;			
 			if (repeat!=alphabet[from].repeat) {
 				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
 				from=i; newFrom=k+1;
@@ -734,20 +734,20 @@ public class RepeatAlphabet {
 			newAlphabet[k]=alphabet[i];
 			if (alphabet[i].flag==1) continue;
 			tmpCharacter.copyFrom(alphabet[i]); tmpCharacter.reverseComplement();
-			start=alphabet[i].start; end=alphabet[i].end;
+			start=alphabet[i].start; end=alphabet[i].end;		
 			if (alphabet[i].orientation) {
 				found=-1; foundImplied=false;
 				for (j=i+1; j<=lastAlphabet; j++) {
 					if (alphabet[j].repeat!=repeat) break;
 					if (!alphabet[j].orientation) {
-						if (alphabet[j].start==start && alphabet[j].end==end && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						if (alphabet[j].start==start && alphabet[j].end==end && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd) {
 							found=j;
 							break;
 						}
 						if (alphabet[j].implies(tmpCharacter)) foundImplied=true;
 					}
-				}
-				if (found==-1) {
+				}				
+				if (found==-1) {	
 					if (!foundImplied) {
 						k++;
 						if (k==newAlphabet.length) {
@@ -755,7 +755,7 @@ public class RepeatAlphabet {
 							System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
 							newAlphabet=newArray;
 						}
-						newAlphabet[k] = new Character(repeat,false,start,end,0,openEnd,openStart);
+						newAlphabet[k] = new Character(repeat,false,start,end,0,openStart,openEnd);
 						nAdded++;
 					}
 				}
@@ -766,7 +766,7 @@ public class RepeatAlphabet {
 				for (j=i-1; j>lastUnique; j--) {
 					if (alphabet[j].repeat!=repeat) break;
 					if (alphabet[j].orientation) {
-						if (alphabet[j].start==start && alphabet[j].end==end && alphabet[j].openStart==openEnd && alphabet[j].openEnd==openStart) {
+						if (alphabet[j].start==start && alphabet[j].end==end && alphabet[j].openStart==openStart && alphabet[j].openEnd==openEnd) {
 							found=j;
 							break;
 						}
@@ -780,7 +780,7 @@ public class RepeatAlphabet {
 						System.arraycopy(newAlphabet,0,newArray,0,newAlphabet.length);
 						newAlphabet=newArray;
 					}
-					newAlphabet[k] = new Character(repeat,true,start,end,0,openEnd,openStart);
+					newAlphabet[k] = new Character(repeat,true,start,end,0,openStart,openEnd);
 					nAdded++;
 				}
 			}
@@ -2044,6 +2044,8 @@ public class RepeatAlphabet {
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
+
+if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 1");
 		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
@@ -2067,10 +2069,19 @@ public class RepeatAlphabet {
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
+				
+if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 2 considering window starting at block "+i+" isValidWindow? "+isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength));
+				
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;			
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
+				
+if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 2  nKmers="+nKmers);				
+				
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
+				
+if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 3");				
+				
 				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
@@ -2114,24 +2125,43 @@ public class RepeatAlphabet {
 		int i;
 		int start, end;
 		
+if (k==2) System.err.println("isValidWindow> 1");
 		if (uniqueMode==1) {
-			if (isBlockUnique[first] || isBlockUnique[first+k-1]) return false;
+if (k==2) System.err.println("isValidWindow> 3");
+			if (isBlockUnique[first] || isBlockUnique[first+k-1]) {
+if (k==2) System.err.println("isValidWindow> 4  first="+first+" last="+(first+k-1)+" isBlockUnique[first]="+isBlockUnique[first]+" isBlockUnique[last]="+isBlockUnique[first+k-1]);
+				return false;
+			}
 		}
 		else if (uniqueMode==2) {
+if (k==2) System.err.println("isValidWindow> 5");
 			for (i=0; i<=k-1; i++) {
-				if (isBlockUnique[first+i]) return false;
+				if (isBlockUnique[first+i]) {
+if (k==2) System.err.println("isValidWindow> 6");
+					return false;
+				}
 			}
 		}
+if (k==2) System.err.println("isValidWindow> 7");
 		if (multiMode==1) {
-			if ((first==0 && lastInBlock_int[first]>0) || (first+k-1==nBlocks-1 && lastInBlock_int[first+k-1]>0)) return false;
+if (k==2) System.err.println("isValidWindow> 8");
+			if ((first==0 && lastInBlock_int[first]>0) || (first+k-1==nBlocks-1 && lastInBlock_int[first+k-1]>0)) {
+if (k==2) System.err.println("isValidWindow> 9");
+				return false;
+			}
 		}
 		else if (multiMode==2) {
+if (k==2) System.err.println("isValidWindow> 10");
 			for (i=0; i<=k-1; i++) {
-				if (lastInBlock_int[first+i]>0) return false;
+				if (lastInBlock_int[first+i]>0) {
+if (k==2) System.err.println("isValidWindow> 11");
+					return false;
+				}
 			}
 		}
+if (k==2) System.err.println("isValidWindow> 12");
 		
-		// Avoiding short blocks
+		// Avoiding the whole window if it contains a short block
 		if (nBlocks>1) {
 			if (first==0) { start=0; end=boundaries[0]; }
 			else if (first==nBlocks-1) { start=boundaries[nBlocks-2]; end=readLength-1; }
@@ -2145,7 +2175,8 @@ public class RepeatAlphabet {
 				if (boundaries[i]-boundaries[i-1]<MIN_BLOCK_LENGTH) return false;
 			}
 		}
-		else { /* NOP: a single block is assumed to be long. */ }
+		else { /* NOP: the only block of the read is assumed to be long. */ }
+if (k==2) System.err.println("isValidWindow> 13");		
 		
 		return true;
 	}
@@ -2204,7 +2235,7 @@ public class RepeatAlphabet {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
 				key.set(tmpArray2,0,k,true); 
-				key.canonize(k,tmpArray3);
+				key.canonize(k,tmpArray3);				
 				if (newKmers!=null) {
 					value=newKmers.get(key);
 					if (value==null) {
@@ -3864,7 +3895,7 @@ if (p<0) System.err.println("filterAlignments_tight> ERROR: readB="+readB+" not 
 			}
 		}
 		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
-		blockEnd=readLength-1;
+		blockEnd=readLength-1;		
 		if (translation_all[boundariesAllID][nBlocks-1].length==1 && (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1)) {
 			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)||
@@ -7817,7 +7848,15 @@ if (tmpArray2[j]==fabio) System.err.println("VITTU> 5  read2characters="+read2ch
 		public int repeat;
 		public boolean orientation;
 		public int start, end;
-		public boolean openStart, openEnd;  // The repeat might continue after start/end
+		
+		/**
+		 * Tell whether the repeat might continue after its start/end.
+		 *
+		 * Remark: these flags refer to the positions written in $start,end$, so they do
+		 * not need to be reversed when reverse-complementing the character.
+		 */
+		public boolean openStart, openEnd;
+		
 		public int length;  // >0: unique or periodic; 0: repetitive non-periodic.
 		
 		public int flag;  // Temporary space
@@ -8024,8 +8063,6 @@ if (tmpArray2[j]==fabio) System.err.println("VITTU> 5  read2characters="+read2ch
 		public final void reverseComplement() {
 			if (repeat==UNIQUE) return;
 			orientation=!orientation;
-			final boolean tmpBoolean = openStart;
-			openStart=openEnd; openEnd=tmpBoolean;
 		}
 	}
 	
