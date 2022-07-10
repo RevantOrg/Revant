@@ -1794,7 +1794,7 @@ public class RepeatAlphabet {
 		old2new = new int[lastAlphabet-lastUnique];
 		Math.set(old2new,old2new.length-1,-1);
 		if (keepPeriodic) {
-			for (i=lastUnique+1; i<=lastPeriodic; i++) old2new[i-lastUnique+1]=i-lastUnique+1;
+			for (i=lastUnique+1; i<=lastPeriodic; i++) old2new[i-lastUnique-1]=i-lastUnique-1;
 			j=lastPeriodic; lastPeriodicPrime=lastPeriodic; 
 		}
 		else { j=lastUnique; lastPeriodicPrime=-1; }
@@ -2125,41 +2125,22 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 		int i;
 		int start, end;
 		
-if (k==2) System.err.println("isValidWindow> 1");
 		if (uniqueMode==1) {
-if (k==2) System.err.println("isValidWindow> 3");
-			if (isBlockUnique[first] || isBlockUnique[first+k-1]) {
-if (k==2) System.err.println("isValidWindow> 4  first="+first+" last="+(first+k-1)+" isBlockUnique[first]="+isBlockUnique[first]+" isBlockUnique[last]="+isBlockUnique[first+k-1]);
-				return false;
-			}
+			if (isBlockUnique[first] || isBlockUnique[first+k-1]) return false;
 		}
 		else if (uniqueMode==2) {
-if (k==2) System.err.println("isValidWindow> 5");
 			for (i=0; i<=k-1; i++) {
-				if (isBlockUnique[first+i]) {
-if (k==2) System.err.println("isValidWindow> 6");
-					return false;
-				}
+				if (isBlockUnique[first+i]) return false;
 			}
 		}
-if (k==2) System.err.println("isValidWindow> 7");
 		if (multiMode==1) {
-if (k==2) System.err.println("isValidWindow> 8");
-			if ((first==0 && lastInBlock_int[first]>0) || (first+k-1==nBlocks-1 && lastInBlock_int[first+k-1]>0)) {
-if (k==2) System.err.println("isValidWindow> 9");
-				return false;
-			}
+			if ((first==0 && lastInBlock_int[first]>0) || (first+k-1==nBlocks-1 && lastInBlock_int[first+k-1]>0)) return false;
 		}
 		else if (multiMode==2) {
-if (k==2) System.err.println("isValidWindow> 10");
 			for (i=0; i<=k-1; i++) {
-				if (lastInBlock_int[first+i]>0) {
-if (k==2) System.err.println("isValidWindow> 11");
-					return false;
-				}
+				if (lastInBlock_int[first+i]>0) return false;
 			}
 		}
-if (k==2) System.err.println("isValidWindow> 12");
 		
 		// Avoiding the whole window if it contains a short block
 		if (nBlocks>1) {
@@ -2176,7 +2157,6 @@ if (k==2) System.err.println("isValidWindow> 12");
 			}
 		}
 		else { /* NOP: the only block of the read is assumed to be long. */ }
-if (k==2) System.err.println("isValidWindow> 13");		
 		
 		return true;
 	}
@@ -3670,7 +3650,7 @@ if (k==2) System.err.println("isValidWindow> 13");
 			else {
 				while (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]<readA) lastFullyContained++;
 				if (lastFullyContained<nFullyContained && fullyContained[lastFullyContained]==readA) {
-					bw.write("0\n"); str=br.readLine(); row++;
+					bw.write("0\n"); str=br.readLine(); row++;					
 					continue;
 				}
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
@@ -3693,6 +3673,9 @@ if (k==2) System.err.println("isValidWindow> 13");
 					   )
 					 )
 				   ) {
+
+if (containsTwoBlocks(lastTranslated,startA,endA,lengthA)) System.err.println("filterAlignments_tight> 1  discarding the following alignment because of readA: "+str);
+
    					bw.write("0\n"); str=br.readLine(); row++;
    					continue;
 				}
@@ -3719,7 +3702,6 @@ if (k==2) System.err.println("isValidWindow> 13");
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-if (p<0) System.err.println("filterAlignments_tight> ERROR: readB="+readB+" not found in translated, not found in fullyUnique, not found in fullyContained.");
 			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
 			if (q==-1) bw.write("0\n");
 			else if (q==0 || q==1) {
@@ -3762,7 +3744,10 @@ if (p<0) System.err.println("filterAlignments_tight> ERROR: readB="+readB+" not 
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 2  discarding the following alignment because of readB: "+str);
+						bw.write("0\n");
+					}
 				}
 				else if (straddlesRightA) {
 					if ( suffixPrefixMode && 
@@ -3782,7 +3767,10 @@ if (p<0) System.err.println("filterAlignments_tight> ERROR: readB="+readB+" not 
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 3  discarding the following alignment because of readB: "+str);
+						bw.write("0\n");
+					}
 				}
 				else {
 					if (mode) {
@@ -3818,11 +3806,17 @@ if (p<0) System.err.println("filterAlignments_tight> ERROR: readB="+readB+" not 
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 4  discarding the following alignment because of readB: "+str);
+						bw.write("0\n");
+					}
 				}
 			}
 			else if (q==4 || q==5) {
-				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) bw.write("0\n");
+				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) {
+if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 5  discarding the following alignment because of readB: "+str);
+					bw.write("0\n");
+				}
 				else {
 					if ( suffixPrefixMode && 
 					     ( (orientation && endA>=lengthA-DISTANCE_THRESHOLD) || 
@@ -3841,7 +3835,10 @@ if (p<0) System.err.println("filterAlignments_tight> ERROR: readB="+readB+" not 
 							out[1][type]++;
 						}
 					}
-					else bw.write("0\n");
+					else {
+if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 6  discarding the following alignment because of readB: "+str);
+						bw.write("0\n");
+					}
 				}
 			}
 			str=br.readLine(); row++;
@@ -3929,6 +3926,60 @@ if (p<0) System.err.println("filterAlignments_tight> ERROR: readB="+readB+" not 
 		
 		return -1;
 	}
+	
+	
+	
+	
+	/**
+	 * @return TRUE iff the specified interval contains at least 2 non-unique blocks.
+	 */
+	public static final boolean containsTwoBlocks(int boundariesAllID, int intervalStart, int intervalEnd, int readLength) {
+		boolean isUnique;
+		int i, c;
+		int nContained, blockStart, blockEnd;
+		final int nBlocks = boundaries_all[boundariesAllID].length+1;
+		
+		c=translation_all[boundariesAllID][0][0];
+		isUnique=translation_all[boundariesAllID][0].length==1 && (c<=lastUnique || c==lastAlphabet+1);
+		blockStart=0;
+		blockEnd=boundaries_all[boundariesAllID][0];
+		if ( !isUnique &&
+			 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && 
+			 !Intervals.areApproximatelyIdentical(blockStart,blockEnd,intervalStart,intervalEnd) 
+		   ) {
+			   nContained=1;
+System.err.println("containsTwoBlocks> block 0 is not unique and fully contained in ["+intervalStart+".."+intervalEnd+"]");
+		   }
+		else nContained=0;
+		for (i=1; i<nBlocks-1; i++) {
+			c=translation_all[boundariesAllID][i][0];
+			isUnique=translation_all[boundariesAllID][i].length==1 && (c<=lastUnique || c==lastAlphabet+1);
+			blockStart=boundaries_all[boundariesAllID][i-1];
+			blockEnd=boundaries_all[boundariesAllID][i];
+			if ( !isUnique &&
+				 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && 
+				 !Intervals.areApproximatelyIdentical(blockStart,blockEnd,intervalStart,intervalEnd) 
+			   ) {
+				   nContained++;
+System.err.println("containsTwoBlocks> block "+i+" is not unique and fully contained in ["+intervalStart+".."+intervalEnd+"]");
+			   }
+		}
+		c=translation_all[boundariesAllID][nBlocks-1][0];
+		isUnique=translation_all[boundariesAllID][nBlocks-1].length==1 && (c<=lastUnique || c==lastAlphabet+1);
+		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
+		blockEnd=readLength-1;
+		if ( !isUnique &&
+			 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && 
+			 !Intervals.areApproximatelyIdentical(blockStart,blockEnd,intervalStart,intervalEnd) 
+		   ) {
+			   nContained++;
+System.err.println("containsTwoBlocks> the last block is not unique and fully contained in ["+intervalStart+".."+intervalEnd+"]");
+		   }
+		return nContained>=2;
+	}
+	
+	
+	
 	
 	
 	/**
@@ -6548,7 +6599,7 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 		if (nBlocks==1) return spacersCursor;
 		else if (nBlocks==2) return fixPeriodicEndpoints_updateTranslation_secondBlock(readID,readLength,spacersCursor,maxSpacerLength,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new,read2boundaries_new,fullyContained_new,out,tmpArray1);
 
-final int fabio=2;
+final int fabio=41;
 if (readID==fabio) System.err.println("Old translation of read "+readID+": "+read2characters_old+"  boundaries: "+read2boundaries_old);
 		
 		// Intermediate blocks
@@ -6774,7 +6825,7 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 			if (c<0) c=-1-c;
 			if (c<=lastUnique_old || c>lastPeriodic_old) continue;
 			character=oldAlphabet[c];
-			tmpArray1[++j]=character.orientation?character.repeat:-1-character.repeat;
+			tmpArray2[++j]=character.orientation?character.repeat:-1-character.repeat;
 		}
 		last2=j;
 		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
