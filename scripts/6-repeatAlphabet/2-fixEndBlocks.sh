@@ -15,7 +15,7 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
-HAPLOTYPE_COVERAGE="2"         #"30"  # Of one haplotype
+HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 TIGHT_MODE="0"
 LOW_QUALITY_TYPE="1"  # 1=replacement, 0=insertion.
 LOW_QUALITY_LENGTH_TOLERANCE="200"  # bps
@@ -39,7 +39,7 @@ READS_BOUNDARIES_FILE="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
-UNIQUE_MODE="1"; MULTI_MODE="0"  # Endblocks are forbidden
+UNIQUE_MODE="1"; MULTI_MODE="1"  # Endblocks are forbidden
 rm -f ${TMPFILE_PATH}*
 
 function kmersThread() {

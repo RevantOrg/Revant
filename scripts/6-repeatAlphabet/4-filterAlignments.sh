@@ -12,7 +12,7 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
-MAX_SPACER_LENGTH="600"  # Same as in $1-buildAlphabet.sh$.
+MAX_SPACER_LENGTH="0"  # Same as in $1-buildAlphabet.sh$.
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 MIN_ALIGNMENT_LENGTH_READ_READ="500"
 MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"
@@ -23,8 +23,10 @@ SUFFIX_PREFIX_MODE="0"  # 1=in tight mode, keep suffix-prefix alignments that co
 # repeats on the other read.
 BOTH_READS_TANDEM="0"  # Discards an alignment affected by tandems in both reads (1) or
 # in a single read (0).
-MIN_UNIQUE_INTERVAL_LENGTH="1"  # Unique intervals shorter than this are not considered
-# trustworthy. Leaving it to one works best in practice.
+MIN_BLUE_INTERVAL_LENGTH="1"  # Blue intervals with fewer blocks than this are not
+# considered trustworthy. Leaving it to one works best in practice.
+MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than this n. of
+# bps are not considered trustworthy addresses on the genome.
 N_THREADS="1"
 DELETE_TMP_FILES="1"
 # REVANT
@@ -76,7 +78,7 @@ ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 
 function filterThread() {
 	local ALIGNMENTS_FILE_ID=$1
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${UNIQUE_INTERVALS_FILE} ${TANDEM_INTERVALS_FILE} ${FILTERING_MODE} ${SUFFIX_PREFIX_MODE} ${BOTH_READS_TANDEM} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${MIN_UNIQUE_INTERVAL_LENGTH}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${UNIQUE_INTERVALS_FILE} ${TANDEM_INTERVALS_FILE} ${FILTERING_MODE} ${SUFFIX_PREFIX_MODE} ${BOTH_READS_TANDEM} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${MIN_BLUE_INTERVAL_LENGTH} ${MIN_INTERSECTION_NONREPETITIVE}
 	if [ ${BROKEN_READS} -eq 1 ]; then
 		NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
 		OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"

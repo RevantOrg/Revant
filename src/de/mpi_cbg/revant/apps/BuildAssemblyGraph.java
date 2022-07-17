@@ -12,7 +12,7 @@ import de.mpi_cbg.revant.util.Math;
  * This should help checking whether the filtering induces a visible decrease in
  * complexity while at the same time preserving linearity.
  */
-public class BuildAssemblyGraph {	
+public class BuildAssemblyGraph {
 	/**
 	 * Simplistic encoding of an assembly graph. Every read is a node, every alignment is
 	 * an edge.

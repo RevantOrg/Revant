@@ -1675,11 +1675,29 @@ public class RepeatAlphabet {
 		first=-1;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]==-1) isUnique=true;
-			else if (lastInBlock[i]>0) isUnique=false;
 			else {
 				j=Integer.parseInt(blocks[i][0]);
 				if (j<0) j=-1-j;
 				isUnique=j<=lastUnique||j==lastAlphabet+1;
+
+
+				
+if (isUnique && lastInBlock[i]>0) {
+	boolean fabio = false;
+	for (int x=0; x<=lastInBlock[i]; x++) {
+		int y = Integer.parseInt(blocks[i][x]);
+		if (y<0) y=-1-y;
+		if (y>lastUnique && y!=lastAlphabet+1) {
+			fabio=true;
+			break;
+		}
+	}
+	if (fabio) System.err.println("VITTU> a unique character mixed with non-unique characters in the same block?!  cleanTranslatedRead_collectCharacterInstances()");
+}
+
+
+				
+				
 			}
 			if (!isUnique) {
 				if (first!=-1) {
@@ -1885,11 +1903,27 @@ public class RepeatAlphabet {
 		first=-1; nAppendedBlocks=0;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]==-1) isUnique=true;
-			else if (lastInBlock[i]>0) isUnique=false;
 			else {
 				j=Integer.parseInt(blocks[i][0]);
 				if (j<0) j=-1-j;
 				isUnique=j<=lastUnique_old||j==lastAlphabet_old+1;
+				
+				
+if (isUnique && lastInBlock[i]>0) {
+	boolean fabio = false;
+	for (int x=0; x<=lastInBlock[i]; x++) {
+		int y = Integer.parseInt(blocks[i][x]);
+		if (y<0) y=-1-y;
+		if (y>lastUnique && y!=lastAlphabet+1) {
+			fabio=true;
+			break;
+		}
+	}
+	if (fabio) System.err.println("VITTU> a unique character mixed with non-unique characters in the same block?!  cleanTranslatedRead_updateTranslation()");
+}
+
+
+				
 			}
 			if (!isUnique) {
 				if (first!=-1) {
@@ -1996,10 +2030,6 @@ public class RepeatAlphabet {
 	 * $oldKmers$, and if so it appends a (position,length,nHaplotypes) tuple to 
 	 * $avoidedIntervals$ ($nHaplotypes$ is decided according to $haplotypeCoverage$).
 	 * The new value of $lastAvoidedInterval$ is returned in output.
-	 *
-	 * Remark: in the latter case above, 1-mers in $oldKmers$ are not used if they occur
-	 * in an endblock of the read, or in a block with multiple characters (for $k>1$ we do
-	 * not do this, since we assume that longer contexts are enough to disambiguate).
      *
 	 * Remark: 1-mers collected by this procedure might have a different (and even 
 	 * smaller) count than the one produced by the $getCharacterHistogram()$ pipeline, 
@@ -2016,13 +2046,17 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 * 
+	 * @param oneMerMode TRUE=if $newKmers$ is null, 1-mers in $oldKmers$ are not used if
+	 * they occur in an endblock of the read, or in a block with multiple characters (for 
+	 * $k>1$ we do not do this, since we assume that longer contexts are enough to 
+	 * disambiguate);
 	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, boolean oneMerMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
 		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
@@ -2058,7 +2092,7 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-				if (nHaplotypes!=-1 && (k>1?true:i>0&&i<nBlocks-1&&lastInBlock_int[i]==0)) { 
+				if (nHaplotypes!=-1 && (k>1 || (oneMerMode?i>0&&i<nBlocks-1&&lastInBlock_int[i]==0:true))) { 
 					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
 				}
 			}
@@ -2116,8 +2150,9 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 	 * 2: are not allowed;
 	 * @param multiMode blocks with multiple characters:
 	 * 0: are allowed; 
-	 * 1: are not allowed if they are the first/last one (endblocks are more likely to
-	 *    match several characters because they contain just a fraction of a character);
+	 * 1: are not allowed if they are the first/last one of the read (endblocks are more
+	 *    likely to match several characters because they contain just a fraction of a 
+	 *    character);
 	 * 2: are not allowed.
 	 */
 	private static final boolean isValidWindow(int first, int k, int nBlocks, int uniqueMode, int multiMode, int readLength) {
@@ -3349,6 +3384,12 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 	 * (since an interval that occurs once in X haplotypes might be contained in an 
 	 * interval that occurs once in < X haplotypes). We don't do this for simplicity.
 	 *
+	 * Remark: the procedure filters out some alignments even when the less stringent 
+	 * settings possible are used. Specifically, it always removes alignments that are 
+	 * fully inside a repeat in both reads (or in just one read for the $_tight$ version),
+	 * and alignments such that all their contained k-mers (k>1) start or end with a 
+	 * unique block that is too short to be considered a unique signature.
+	 *
 	 * Remark: the procedure does not need $alphabet$, but it needs the following arrays: 
 	 * isBlockUnique_all | fullyUnique, fullyContained, boundaries_all, blueIntervals, 
 	 * blueIntervals_reads. 
@@ -3640,7 +3681,8 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 			// Processing readA
 			readA=Alignments.readA-1; readB=Alignments.readB-1; orientation=Alignments.orientation;			
 			startA=Alignments.startA; endA=Alignments.endA;
-			startB=Alignments.startB; endB=Alignments.endB;			
+			startB=Alignments.startB; endB=Alignments.endB;
+if (readA==607 && readB==74 && startA==0 && startB==0 && Math.abs(endA,18322)<=100 && Math.abs(endB,18325)<=100) System.err.println("filterAlignments_tight> "+str);
 			lengthA=Reads.getReadLength(readA); lengthB=Reads.getReadLength(readB);
 			readAInTranslated=-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
@@ -3851,6 +3893,7 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 	 * The dual of $inRedRegion()$. The procedure needs the following arrays: 
 	 * boundaries_all, translation_all, blueIntervals, blueIntervals_reads.
 	 *
+	 * @param minBlueIntervalLength in blocks, not characters;
 	 * @return interval $readID[intervalStart..intervalEnd]$:
 	 * 0: is fully contained in a non-repetitive region; or, fully contains a non-
 	 *    repetitive region of length $>=minIntersection_nonrepetitive$;
@@ -3867,80 +3910,133 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength) {
 		boolean straddlesLeft, straddlesRight;
 		int i, j;
-		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
+		int start, end, blockStart, blockEnd, firstBlock, lastBlock, intersectionLength;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
 		final int nBytes = Math.ceil(nBlocks,8);
 		
+
+boolean fabio = (readID==607 && intervalStart==0 && Math.abs(intervalEnd,18322)<=100) || (readID==74 && intervalStart==0 && Math.abs(intervalEnd,18325)<=100);
+if (fabio) System.err.println("inBlueRegion> 1  "+readID+"["+intervalStart+".."+intervalEnd+"]");		
+		
+		
 		// Checking the nonrepetitive blocks of the read, if any.
 		blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
-		if (translation_all[boundariesAllID][0].length==1 && (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1)) {
+		if (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1) {
+if (fabio) System.err.println("inBlueRegion> 2");
+			intersectionLength=Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd);
 			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) || 
-				 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
-			   ) return 0;
-			else if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) return 1;
-		}
-		for (i=1; i<nBlocks-1; i++) {
-			blockStart=boundaries_all[boundariesAllID][i-1];
-			blockEnd=boundaries_all[boundariesAllID][i];
-			if (translation_all[boundariesAllID][i].length==1 && (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1)) {
-				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-					 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
-				   ) return 0;
-				else if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) return 1;
+				 (Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && intersectionLength>=minIntersection_nonrepetitive)
+			   ) {
+if (fabio) System.err.println("inBlueRegion> 3");				   
+				   return 0;
+			   }
+			else if (intersectionLength>=minIntersection_nonrepetitive) {
+if (fabio) System.err.println("inBlueRegion> 4");
+				return 1;
 			}
 		}
+		for (i=1; i<nBlocks-1; i++) {
+if (fabio) System.err.println("inBlueRegion> 5");
+			blockStart=boundaries_all[boundariesAllID][i-1];
+			blockEnd=boundaries_all[boundariesAllID][i];
+			if (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1) {
+if (fabio) System.err.println("inBlueRegion> 6");
+				intersectionLength=Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd);
+				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+					 (Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && intersectionLength>=minIntersection_nonrepetitive)
+				   ) {
+if (fabio) System.err.println("inBlueRegion> 7");
+					   return 0;
+				   }
+				else if (intersectionLength>=minIntersection_nonrepetitive) {
+if (fabio) System.err.println("inBlueRegion> 8");
+					return 1;
+				}
+			}
+		}
+if (fabio) System.err.println("inBlueRegion> 9");
 		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
 		blockEnd=readLength-1;		
-		if (translation_all[boundariesAllID][nBlocks-1].length==1 && (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1)) {
+		if (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1) {
+if (fabio) System.err.println("inBlueRegion> 10");
+			intersectionLength=Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd);
 			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)||
-				 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
-			   ) return 0;
-			else if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) return 1;
+				 (Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && intersectionLength>=minIntersection_nonrepetitive)
+			   ) {
+if (fabio) System.err.println("inBlueRegion> 11");
+				   return 0;
+			   }
+			else if (intersectionLength>=minIntersection_nonrepetitive) {
+if (fabio) System.err.println("inBlueRegion> 12");
+				return 1;
+			}
 		}
+if (fabio) System.err.println("inBlueRegion> 13");
 		
 		// Checking the repetitive blocks of the read, if any.
 		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
 		if (blueIntervalsID!=-1) {
+if (fabio) System.err.println("inBlueRegion> 14");
 			straddlesLeft=false; straddlesRight=false;
 			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
+if (fabio) System.err.println("inBlueRegion> 15");
 				if (blueIntervals[blueIntervalsID][i+1]<minBlueIntervalLength) continue;
+if (fabio) System.err.println("inBlueRegion> 16");
 				firstBlock=blueIntervals[blueIntervalsID][i];
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
 				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
-				   ) return 2;
-				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) straddlesRight=true;
-				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) straddlesLeft=true;
+				   ) {
+if (fabio) System.err.println("inBlueRegion> 17");
+					   return 2;
+				   }
+				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) {
+if (fabio) System.err.println("inBlueRegion> 18");
+					straddlesRight=true;
+				}
+				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) {
+if (fabio) System.err.println("inBlueRegion> 19");
+					straddlesLeft=true;
+				}
 			}
+if (fabio) System.err.println("inBlueRegion> 20");
 			if (straddlesLeft) {
-				if (straddlesRight) return 5;
-				else return 3;
+				if (straddlesRight) {
+if (fabio) System.err.println("inBlueRegion> 21");
+					return 5;
+				}
+				else {
+if (fabio) System.err.println("inBlueRegion> 22");
+					return 3;
+				}
 			}
-			else if (straddlesRight) return 4;
+			else if (straddlesRight) {
+if (fabio) System.err.println("inBlueRegion> 23");
+				return 4;
+			}
 		}
+if (fabio) System.err.println("inBlueRegion> 24");
 		
 		return -1;
 	}
 	
 	
-	
-	
 	/**
 	 * @return TRUE iff the specified interval contains at least 2 non-unique blocks.
 	 */
-	public static final boolean containsTwoBlocks(int boundariesAllID, int intervalStart, int intervalEnd, int readLength) {
+	private static final boolean containsTwoBlocks(int boundariesAllID, int intervalStart, int intervalEnd, int readLength) {
 		boolean isUnique;
 		int i, c;
 		int nContained, blockStart, blockEnd;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
 		
 		c=translation_all[boundariesAllID][0][0];
-		isUnique=translation_all[boundariesAllID][0].length==1 && (c<=lastUnique || c==lastAlphabet+1);
+		isUnique=c<=lastUnique||c==lastAlphabet+1;
 		blockStart=0;
 		blockEnd=boundaries_all[boundariesAllID][0];
 		if ( !isUnique &&
@@ -3953,7 +4049,7 @@ System.err.println("containsTwoBlocks> block 0 is not unique and fully contained
 		else nContained=0;
 		for (i=1; i<nBlocks-1; i++) {
 			c=translation_all[boundariesAllID][i][0];
-			isUnique=translation_all[boundariesAllID][i].length==1 && (c<=lastUnique || c==lastAlphabet+1);
+			isUnique=c<=lastUnique||c==lastAlphabet+1;
 			blockStart=boundaries_all[boundariesAllID][i-1];
 			blockEnd=boundaries_all[boundariesAllID][i];
 			if ( !isUnique &&
@@ -3965,7 +4061,7 @@ System.err.println("containsTwoBlocks> block "+i+" is not unique and fully conta
 			   }
 		}
 		c=translation_all[boundariesAllID][nBlocks-1][0];
-		isUnique=translation_all[boundariesAllID][nBlocks-1].length==1 && (c<=lastUnique || c==lastAlphabet+1);
+		isUnique=c<=lastUnique||c==lastAlphabet+1;
 		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
 		blockEnd=readLength-1;
 		if ( !isUnique &&
@@ -3977,9 +4073,6 @@ System.err.println("containsTwoBlocks> the last block is not unique and fully co
 		   }
 		return nContained>=2;
 	}
-	
-	
-	
 	
 	
 	/**
@@ -6604,12 +6697,9 @@ if (readID==fabio) System.err.println("Old translation of read "+readID+": "+rea
 		
 		// Intermediate blocks
 		while (blockCursor<=nBlocks-2) {
-			if (lastInBlock[blockCursor]>0) { isUnique=false; p=-1; }
-			else {
-				p=Integer.parseInt(blocks[blockCursor][0]);
-				if (p<0) p=-1-p;
-				isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
-			}
+			p=Integer.parseInt(blocks[blockCursor][0]);
+			if (p<0) p=-1-p;
+			isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
 			isBlockPeriodicLeft=false; isBlockNonperiodicLeft=false;
 			for (i=0; i<=lastInBlock[blockCursor-1]; i++) {
 				c=Integer.parseInt(blocks[blockCursor-1][i]);
@@ -6932,12 +7022,9 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 		}
 		
 		// Multiple blocks
-		if (lastInBlock[0]>0) isUnique=false;
-		else {
-			p=Integer.parseInt(blocks[0][0]);
-			if (p<0) p=-1-p;
-			isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
-		}
+		p=Integer.parseInt(blocks[0][0]);
+		if (p<0) p=-1-p;
+		isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
 		foundPeriodic=false; foundNonperiodic=false;
 		for (i=0; i<=lastInBlock[1]; i++) {
 			c=Integer.parseInt(blocks[1][i]);
@@ -6999,12 +7086,9 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 		boolean isUnique, foundPeriodic, foundNonperiodic;
 		int i, c, p;
 
-		if (lastInBlock[1]>0) isUnique=false;
-		else {
-			p=Integer.parseInt(blocks[1][0]);
-			if (p<0) p=-1-p;
-			isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
-		}
+		p=Integer.parseInt(blocks[1][0]);
+		if (p<0) p=-1-p;
+		isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
 		foundPeriodic=false; foundNonperiodic=false;
 		for (i=0; i<=lastInBlock[0]; i++) {
 			c=Integer.parseInt(blocks[0][i]);
@@ -7087,12 +7171,9 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 			read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
 			nBoundariesWritten++;
 		}
-		if (lastInBlock[nBlocks-1]>0) isUnique=false;
-		else {
-			p=Integer.parseInt(blocks[nBlocks-1][0]);
-			if (p<0) p=-1-p;
-			isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
-		}
+		p=Integer.parseInt(blocks[nBlocks-1][0]);
+		if (p<0) p=-1-p;
+		isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
 		foundPeriodic=false; foundNonperiodic=false;
 		for (i=0; i<=lastInBlock[nBlocks-2]; i++) {
 			c=Integer.parseInt(blocks[nBlocks-2][i]);
@@ -7383,6 +7464,10 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 	 * periodic blocks, \emph{wobble}, i.e. they contain, in addition to their original
 	 * characters in $alphabet$, other similar characters whose length is $<=wobbleLength$
 	 * bps away from the original. Reads with just one block are not altered.
+	 *
+	 * Remark: this procedure might put multiple unique characters inside a block that
+	 * contains a single unique character. Thus, throughout the code, no test for the
+	 * unicity of a block must require a block to contain a single character.
 	 *
 	 * @param read2characters row of the translated reads file;
 	 * @param output array; the procedure cumulates to $out[0]$ the number of blocks to 

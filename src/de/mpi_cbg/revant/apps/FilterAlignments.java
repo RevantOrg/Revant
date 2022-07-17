@@ -47,8 +47,11 @@ public class FilterAlignments {
 	 * @param args 
 	 * 14: discards alignments thar are not trustworthy in terms of tandems on both reads 
 	 *     (1) or on just one read (0);
-	 * 20: only unique intervals with at least this number of blocks are considered
-	*      trustworthy.
+	 * 20: only blue intervals with at least this number of \emph{blocks} are considered
+	 *     trustworthy addresses on the genome;
+	 * 21: non-repetitive regions shorter than this are not considered trustworthy 
+	 *     addresses on the genome (e.g. they might be occurrences of repeats that never
+	 *     got aligned to the repeat database because of heuristics of the aligner).
 	 */
 	public static void main(String[] args) throws IOException {
 		final String ALIGNMENTS_FILE = args[0];
@@ -72,10 +75,8 @@ public class FilterAlignments {
 		final int MIN_ALIGNMENT_LENGTH_READ_READ = Integer.parseInt(args[18]);
 		final int MIN_ALIGNMENT_LENGTH_READ_REPEAT = Integer.parseInt(args[19]);
 		final int MIN_BLUE_INTERVAL_LENGTH = Integer.parseInt(args[20]);
+		final int MIN_INTERSECTION_NONREPETITIVE = Integer.parseInt(args[21]);
 		
-		// Non-repetitive regions shorter than this might be occurrences of repeats that 
-		// were not aligned to the repeat database because of heuristics of the aligner.
-		final int MIN_INTERSECTION_NONREPETITIVE = MIN_ALIGNMENT_LENGTH_READ_REPEAT+IO.quantum;
 		// The constant below is arbitrary, should be defined in a more principled way.
 		final int MIN_INTERSECTION_REPETITIVE = Math.max(MIN_ALIGNMENT_LENGTH_READ_READ>>2,IO.quantum*3);
 		long[][] stats, tandemStats;

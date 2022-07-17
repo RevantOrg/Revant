@@ -16,8 +16,8 @@ BROKEN_READS=$2  # 1=TRUE
 KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic
 MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
-HAPLOTYPE_COVERAGE="2"     #"30"  # Of one haplotype
-MAX_SPACER_LENGTH="600"  # 0=assume that the endpoints of periodic repeats are accurate
+HAPLOTYPE_COVERAGE="30"  # Of one haplotype
+MAX_SPACER_LENGTH="10000"  # 0=assume that the endpoints of periodic repeats are accurate
 WOBBLE_LENGTH="200"  # 0=do not wobble.
 N_THREADS="1"
 DELETE_TMP_FILES="0"
@@ -181,8 +181,8 @@ done
 
 
 
-echo "Fixing periodic endpoints..."
 if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+	echo "Fixing periodic endpoints..."
 	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 	echo "Splitting the alignments file..."
 	LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
@@ -265,13 +265,14 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	done
 	sort --parallel=${N_THREADS} -n ${TMPFILE_PATH}-spacers-12.txt > ${FULLY_CONTAINED_FILE}
 	mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
+	echo "Periodic endpoints fixed"
 fi
-echo "Periodic endpoints fixed"
 
 
 
-echo "Wobbling..."
+
 if [ ${WOBBLE_LENGTH} -ne 0 ]; then
+	echo "Wobbling..."
 	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		WOBBLE_PREFIX="${TMPFILE_PATH}-spacers-9"
 	else
@@ -298,9 +299,8 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	for THREAD in $(seq 0 ${TO}); do
 		cat ${TMPFILE_PATH}-wobble-3-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 	done
+	echo "Wobbling completed"
 fi
-echo "Wobbling completed"
-
 
 
 

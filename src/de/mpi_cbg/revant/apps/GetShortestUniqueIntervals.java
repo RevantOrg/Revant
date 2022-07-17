@@ -25,10 +25,11 @@ public class GetShortestUniqueIntervals {
 		final String ALPHABET_FILE = args[4];
 		final int UNIQUE_MODE = Integer.parseInt(args[5]);  // See $RepeatAlphabet.isValidWindow()$
 		final int MULTI_MODE = Integer.parseInt(args[6]);
-		final String UNIQUE_KMERS_FILE = args[7];
-		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[8]);
-		final String OLD_INTERVALS_FILE = args[9];  // NULL to discard it
-		final String NEW_INTERVALS_FILE = args[10];  // Output
+		final boolean ONEMER_MODE = Integer.parseInt(args[7])==1;
+		final String UNIQUE_KMERS_FILE = args[8];
+		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[9]);
+		final String OLD_INTERVALS_FILE = args[10];  // NULL to discard it
+		final String NEW_INTERVALS_FILE = args[11];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -90,7 +91,7 @@ public class GetShortestUniqueIntervals {
 			else lastUniqueInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,readLength,RepeatAlphabet.boundaries,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,ONEMER_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,readLength,RepeatAlphabet.boundaries,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {
