@@ -2047,9 +2047,9 @@ if (isUnique && lastInBlock[i]>0) {
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 * 
 	 * @param oneMerMode TRUE=if $newKmers$ is null, 1-mers in $oldKmers$ are not used if
-	 * they occur in an endblock of the read, or in a block with multiple characters (for 
-	 * $k>1$ we do not do this, since we assume that longer contexts are enough to 
-	 * disambiguate);
+	 * they occur in a block with multiple characters; 1-mers that occur in an endblock of
+	 * the read are never used, regardless of $oneMerMode$; for $k>1$ we do none of these
+	 * filters, since we assume that longer contexts are enough to disambiguate;
 	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
@@ -2079,20 +2079,26 @@ if (isUnique && lastInBlock[i]>0) {
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 
-if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 1");
+boolean fabio = (k==1 && str.equalsIgnoreCase("-27:3899:5:2178,2179,2180,2181:4:99,100,101,102,103,2587,2588,2589,2590,2591:3:3114,4116:-18"));
+if (fabio) System.err.println("getKmers> 1  str="+str);
 		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
+if (fabio) System.err.println("getKmers> 2  block "+i);
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
+if (fabio) System.err.println("getKmers> 3");
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
+if (fabio) System.err.println("getKmers> 4");
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
+if (fabio) System.err.println("getKmers> 5");
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-				if (nHaplotypes!=-1 && (k>1 || (oneMerMode?i>0&&i<nBlocks-1&&lastInBlock_int[i]==0:true))) { 
+if (fabio) System.err.println("getKmers> 6  nHaplotypes="+nHaplotypes);
+				if (nHaplotypes!=-1 && (k>1 || (i>0 && i<nBlocks-1 && (oneMerMode?lastInBlock_int[i]==0:true)))) { 
 					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
 				}
 			}
@@ -2102,20 +2108,11 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
-				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-				
-if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 2 considering window starting at block "+i+" isValidWindow? "+isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength));
-				
+				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;			
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;			
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
-				
-if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 2  nKmers="+nKmers);				
-				
-				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-				
-if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.println("getKmers> 3");				
-				
+				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
 				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
@@ -2244,13 +2241,23 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 		int top1, top2, row, column, lastChild, length;
 		Kmer value, newKey;
 		
+if (k==1) {
+	System.err.println("getKmers_impl> 1  first="+first);
+	for (int x=first; x<=first+k-1; x++) {
+		System.err.print(x+": ");
+		for (int y=0; y<=lastInBlock_int[x]; y++) System.err.print(intBlocks[x][y]+",");
+		System.err.println();
+	}
+}
 		top1=-1; top2=-1;
 		tmpArray1[++top1]=-1; tmpArray1[++top1]=-1; tmpArray1[++top1]=first-1;
 		while (top1>=0) {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
 				key.set(tmpArray2,0,k,true); 
+if (k==1) System.err.println("getKmers_impl> 1.1  key="+key);
 				key.canonize(k,tmpArray3);				
+if (k==1) System.err.println("getKmers_impl> 1.2  canonized key="+key);
 				if (newKmers!=null) {
 					value=newKmers.get(key);
 					if (value==null) {
@@ -2258,11 +2265,13 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 						newKey.set(key.sequence,0,k,true); 
 						newKey.count=1;
 						newKmers.put(newKey,newKey);
+if (k==1) System.err.println("getKmers_impl> 2  enumerated kmer "+newKey);
 					}
 					else value.count++;
 				}
 				else {
 					value=oldKmers.get(key);
+if (k==1) System.err.println("getKmers_impl> 3  value="+value+" key="+key);
 					if (value!=null) return (int)(value.count/haplotypeCoverage);
 				}
 			}
@@ -3513,11 +3522,10 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 		if (cell!=0) {
 			mask=1; blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
 			if ( (cell&mask)!=0 && 
+				 Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive &&
 				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-				      Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
-				   )
+				   !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
 				 )
 			   ) return -1;
 			mask<<=1;
@@ -3526,12 +3534,11 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 				blockStart=boundaries_all[boundariesAllID][j-1];
 				blockEnd=boundaries_all[boundariesAllID][j];
 				if ( (cell&mask)!=0 && 
+					 Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive &&
 					 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) || 
 					   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-					   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
-					   )
-					 ) 
+					   !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
+					 )
 				   ) return -1;
 				mask<<=1;
 			}
@@ -3545,11 +3552,10 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 				blockStart=boundaries_all[boundariesAllID][(i<<3)+j-1];
 				blockEnd=boundaries_all[boundariesAllID][(i<<3)+j];
 				if ( (cell&mask)!=0 && 
+					 Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive &&
 					 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 					   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-					   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-						  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
-					   )
+					   !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
 					 )
 				   ) return -1;
 				mask<<=1;
@@ -3560,12 +3566,11 @@ if (k==2 && str.equalsIgnoreCase("1521,1522:40,40,43,736,737,738")) System.err.p
 			mask=1<<((nBlocks%8)-1);
 			blockStart=boundaries_all[boundariesAllID][nBlocks-2];
 			blockEnd=readLength-1;
-			if ( (cell&mask)!=0 && 
+			if ( (cell&mask)!=0 &&
+				 Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive &&
 				 ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				   Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-				   ( !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) &&
-					  Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive
-				   )
+				   !Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
 				 )
 			   ) return -1;
 		}
@@ -3895,8 +3900,9 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 	 *
 	 * @param minBlueIntervalLength in blocks, not characters;
 	 * @return interval $readID[intervalStart..intervalEnd]$:
-	 * 0: is fully contained in a non-repetitive region; or, fully contains a non-
-	 *    repetitive region of length $>=minIntersection_nonrepetitive$;
+	 * 0: is fully contained in a non-repetitive region, or fully contains a non-
+	 *    repetitive region, and the overlap with the non-repetitive region has length 
+	 *    $>=minIntersection_nonrepetitive$;
 	 * 1: straddles a non-repetitive region by $>=minIntersection_nonrepetitive$ bps;
 	 * 2: contains a sequence of $>=minBlueIntervalLength$ repeat characters that is 
 	 *    likely to occur <=H times in the genome, where H is the number of haplotypes;
@@ -3910,12 +3916,12 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength) {
 		boolean straddlesLeft, straddlesRight;
 		int i, j;
-		int start, end, blockStart, blockEnd, firstBlock, lastBlock, intersectionLength;
+		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
 		final int nBytes = Math.ceil(nBlocks,8);
 		
 
-boolean fabio = (readID==607 && intervalStart==0 && Math.abs(intervalEnd,18322)<=100) || (readID==74 && intervalStart==0 && Math.abs(intervalEnd,18325)<=100);
+boolean fabio = (readID==32 && intervalStart==0 && Math.abs(intervalEnd,1007)<=100) || (readID==786 && Math.abs(intervalStart,10038)<=100 && Math.abs(intervalEnd,11068)<=100);
 if (fabio) System.err.println("inBlueRegion> 1  "+readID+"["+intervalStart+".."+intervalEnd+"]");		
 		
 		
@@ -3923,17 +3929,18 @@ if (fabio) System.err.println("inBlueRegion> 1  "+readID+"["+intervalStart+".."+
 		blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
 		if (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1) {
 if (fabio) System.err.println("inBlueRegion> 2");
-			intersectionLength=Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd);
-			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) || 
-				 (Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && intersectionLength>=minIntersection_nonrepetitive)
-			   ) {
-if (fabio) System.err.println("inBlueRegion> 3");				   
-				   return 0;
-			   }
-			else if (intersectionLength>=minIntersection_nonrepetitive) {
-if (fabio) System.err.println("inBlueRegion> 4");
-				return 1;
+			if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) {
+				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) || 
+					 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
+				   ) {
+	if (fabio) System.err.println("inBlueRegion> 3");
+					   return 0;
+				   }
+				else {
+	if (fabio) System.err.println("inBlueRegion> 4");
+					return 1;
+				}
 			}
 		}
 		for (i=1; i<nBlocks-1; i++) {
@@ -3942,17 +3949,18 @@ if (fabio) System.err.println("inBlueRegion> 5");
 			blockEnd=boundaries_all[boundariesAllID][i];
 			if (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1) {
 if (fabio) System.err.println("inBlueRegion> 6");
-				intersectionLength=Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd);
-				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
-					 (Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && intersectionLength>=minIntersection_nonrepetitive)
-				   ) {
-if (fabio) System.err.println("inBlueRegion> 7");
-					   return 0;
-				   }
-				else if (intersectionLength>=minIntersection_nonrepetitive) {
-if (fabio) System.err.println("inBlueRegion> 8");
-					return 1;
+				if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) {
+					if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+					     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+						 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
+					   ) {
+	if (fabio) System.err.println("inBlueRegion> 7");
+						   return 0;
+					   }
+					else {
+	if (fabio) System.err.println("inBlueRegion> 8");
+						return 1;
+					}
 				}
 			}
 		}
@@ -3961,17 +3969,18 @@ if (fabio) System.err.println("inBlueRegion> 9");
 		blockEnd=readLength-1;		
 		if (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1) {
 if (fabio) System.err.println("inBlueRegion> 10");
-			intersectionLength=Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd);
-			if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
-			     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd)||
-				 (Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && intersectionLength>=minIntersection_nonrepetitive)
-			   ) {
-if (fabio) System.err.println("inBlueRegion> 11");
-				   return 0;
-			   }
-			else if (intersectionLength>=minIntersection_nonrepetitive) {
-if (fabio) System.err.println("inBlueRegion> 12");
-				return 1;
+			if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) {
+				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
+				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
+					 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
+				   ) {
+	if (fabio) System.err.println("inBlueRegion> 11");
+					   return 0;
+				   }
+				else {
+	if (fabio) System.err.println("inBlueRegion> 12");
+					return 1;
+				}
 			}
 		}
 if (fabio) System.err.println("inBlueRegion> 13");
