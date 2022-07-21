@@ -43,7 +43,7 @@ MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + ${HAPLOTYPE_COV
 # We could allow, in a k-mer, just unique characters shorter than the min length needed
 # for them to be a unique address to the genome (the alignment filtering procedures
 # downstream ignore k-mers with long non-repetitive characters).
-UNIQUE_MODE="1"; MULTI_MODE="0"; ONEMER_MODE="0"
+UNIQUE_MODE="1"; MULTI_MODE="0"; ONEMER_MODE="2"
 MAX_HISTOGRAM_COUNT="10000"  # Arbitrary
 rm -f ${TMPFILE_PATH}*
 rm -f ${INPUT_DIR}/unique-*

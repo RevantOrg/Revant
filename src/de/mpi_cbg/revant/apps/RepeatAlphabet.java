@@ -2046,17 +2046,18 @@ if (isUnique && lastInBlock[i]>0) {
 	 *
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 * 
-	 * @param oneMerMode TRUE=if $newKmers$ is null, 1-mers in $oldKmers$ are not used if
-	 * they occur in a block with multiple characters; 1-mers that occur in an endblock of
-	 * the read are never used, regardless of $oneMerMode$; for $k>1$ we do none of these
-	 * filters, since we assume that longer contexts are enough to disambiguate;
+	 * @param oneMerMode if $newKmers$ is null: 1=1-mers in $oldKmers$ are not used if
+	 * they occur in a block with multiple characters; 0=1-mers in $oldKmers$ are always 
+	 * used; 2=1-mers $oldKmers$ are treated like (0) in internal blocks, and like (1) in
+	 * the endblocks of the read; for $k>1$ we do none of these filters, since we assume 
+	 * that contexts longer than one are enough to disambiguate;
 	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, boolean oneMerMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, int oneMerMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
 		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
@@ -2079,7 +2080,7 @@ if (isUnique && lastInBlock[i]>0) {
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
 
-boolean fabio = (k==1 && str.equalsIgnoreCase("-27:3899:5:2178,2179,2180,2181:4:99,100,101,102,103,2587,2588,2589,2590,2591:3:3114,4116:-18"));
+boolean fabio = (k==1 && str.equalsIgnoreCase("2716:7:2591,3015:2940:2451,2567,2735,2749,2845,3051:2921:2596:2933:2452,2736,2750,2846,3052:2915:2601:2501:-1150,-600,-538"));
 if (fabio) System.err.println("getKmers> 1  str="+str);
 		
 		// Processing every k-mer in the read
@@ -2098,9 +2099,16 @@ if (fabio) System.err.println("getKmers> 4");
 if (fabio) System.err.println("getKmers> 5");
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 if (fabio) System.err.println("getKmers> 6  nHaplotypes="+nHaplotypes);
-				if (nHaplotypes!=-1 && (k>1 || (i>0 && i<nBlocks-1 && (oneMerMode?lastInBlock_int[i]==0:true)))) { 
-					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
-				}
+				if ( nHaplotypes!=-1 && 
+					 ( k>1 ||
+				       ( oneMerMode==0 ||
+					     (oneMerMode==1 && lastInBlock_int[i]==0) ||
+					     ( oneMerMode==2 && 
+						   ((i>0 && i<nBlocks-1) || lastInBlock_int[i]==0)
+					     ) 
+				       )
+					 ) 
+				   ) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
 			}
 		}
 		else {
@@ -4051,10 +4059,7 @@ if (fabio) System.err.println("inBlueRegion> 24");
 		if ( !isUnique &&
 			 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && 
 			 !Intervals.areApproximatelyIdentical(blockStart,blockEnd,intervalStart,intervalEnd) 
-		   ) {
-			   nContained=1;
-System.err.println("containsTwoBlocks> block 0 is not unique and fully contained in ["+intervalStart+".."+intervalEnd+"]");
-		   }
+		   ) nContained=1;
 		else nContained=0;
 		for (i=1; i<nBlocks-1; i++) {
 			c=translation_all[boundariesAllID][i][0];
@@ -4064,10 +4069,7 @@ System.err.println("containsTwoBlocks> block 0 is not unique and fully contained
 			if ( !isUnique &&
 				 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && 
 				 !Intervals.areApproximatelyIdentical(blockStart,blockEnd,intervalStart,intervalEnd) 
-			   ) {
-				   nContained++;
-System.err.println("containsTwoBlocks> block "+i+" is not unique and fully contained in ["+intervalStart+".."+intervalEnd+"]");
-			   }
+			   ) nContained++;
 		}
 		c=translation_all[boundariesAllID][nBlocks-1][0];
 		isUnique=c<=lastUnique||c==lastAlphabet+1;
@@ -4076,10 +4078,7 @@ System.err.println("containsTwoBlocks> block "+i+" is not unique and fully conta
 		if ( !isUnique &&
 			 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd) && 
 			 !Intervals.areApproximatelyIdentical(blockStart,blockEnd,intervalStart,intervalEnd) 
-		   ) {
-			   nContained++;
-System.err.println("containsTwoBlocks> the last block is not unique and fully contained in ["+intervalStart+".."+intervalEnd+"]");
-		   }
+		   ) nContained++;
 		return nContained>=2;
 	}
 	
@@ -7474,9 +7473,14 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 	 * characters in $alphabet$, other similar characters whose length is $<=wobbleLength$
 	 * bps away from the original. Reads with just one block are not altered.
 	 *
+	 * Remark: wobbling is designed to increase the number of edges in a highly 
+	 * disconnected overlap graph. However, such increase in frequency may make some 
+	 * k-mers become repeats rather than unique addresses on the genome, and this might 
+	 * \emph{remove} some edges from the overlap graph.
+	 *
 	 * Remark: this procedure might put multiple unique characters inside a block that
 	 * contains a single unique character. Thus, throughout the code, no test for the
-	 * unicity of a block must require a block to contain a single character.
+	 * non-repetitiveness of a block must require a block to contain a single character.
 	 *
 	 * @param read2characters row of the translated reads file;
 	 * @param output array; the procedure cumulates to $out[0]$ the number of blocks to 

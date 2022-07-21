@@ -25,7 +25,7 @@ public class GetShortestUniqueIntervals {
 		final String ALPHABET_FILE = args[4];
 		final int UNIQUE_MODE = Integer.parseInt(args[5]);  // See $RepeatAlphabet.isValidWindow()$
 		final int MULTI_MODE = Integer.parseInt(args[6]);
-		final boolean ONEMER_MODE = Integer.parseInt(args[7])==1;
+		final int ONEMER_MODE = Integer.parseInt(args[7]);
 		final String UNIQUE_KMERS_FILE = args[8];
 		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[9]);
 		final String OLD_INTERVALS_FILE = args[10];  // NULL to discard it
