@@ -18,7 +18,12 @@ MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discar
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_SPACER_LENGTH="10000"  # 0=assume that the endpoints of periodic repeats are accurate
-WOBBLE_LENGTH="200"  # 0=do not wobble.
+WOBBLE_LENGTH="100"  # 0=do not wobble.
+# Good settings for mostly periodic genome: MAX_SPACER_LENGTH="10000"; WOBBLE_LENGTH="100"
+# Good settings for a mostly nonperiodic genome: MAX_SPACER_LENGTH="0"; WOBBLE_LENGTH="0"
+# WOBBLE_LENGTH values have to be chosen experimentally. Smaller values might strike a
+# better balance between increasing frequency and not making truly unique k-mers too
+# frequent as to be classified as repeats.
 N_THREADS="1"
 DELETE_TMP_FILES="0"
 # REVANT

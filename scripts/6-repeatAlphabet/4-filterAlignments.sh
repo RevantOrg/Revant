@@ -27,6 +27,8 @@ MIN_BLUE_INTERVAL_LENGTH="1"  # Blue intervals with fewer blocks than this are n
 # considered trustworthy. Leaving it to one works best in practice.
 MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than this n. of
 # bps are not considered trustworthy addresses on the genome.
+# Good settings for a mostly periodic genome: MIN_INTERSECTION_NONREPETITIVE="100000"
+# Good settings for a mostly nonperiodic genome: MIN_INTERSECTION_NONREPETITIVE="500"
 N_THREADS="1"
 DELETE_TMP_FILES="1"
 # REVANT

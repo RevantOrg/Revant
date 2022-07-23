@@ -1679,25 +1679,6 @@ public class RepeatAlphabet {
 				j=Integer.parseInt(blocks[i][0]);
 				if (j<0) j=-1-j;
 				isUnique=j<=lastUnique||j==lastAlphabet+1;
-
-
-				
-if (isUnique && lastInBlock[i]>0) {
-	boolean fabio = false;
-	for (int x=0; x<=lastInBlock[i]; x++) {
-		int y = Integer.parseInt(blocks[i][x]);
-		if (y<0) y=-1-y;
-		if (y>lastUnique && y!=lastAlphabet+1) {
-			fabio=true;
-			break;
-		}
-	}
-	if (fabio) System.err.println("VITTU> a unique character mixed with non-unique characters in the same block?!  cleanTranslatedRead_collectCharacterInstances()");
-}
-
-
-				
-				
 			}
 			if (!isUnique) {
 				if (first!=-1) {
@@ -1907,23 +1888,6 @@ if (isUnique && lastInBlock[i]>0) {
 				j=Integer.parseInt(blocks[i][0]);
 				if (j<0) j=-1-j;
 				isUnique=j<=lastUnique_old||j==lastAlphabet_old+1;
-				
-				
-if (isUnique && lastInBlock[i]>0) {
-	boolean fabio = false;
-	for (int x=0; x<=lastInBlock[i]; x++) {
-		int y = Integer.parseInt(blocks[i][x]);
-		if (y<0) y=-1-y;
-		if (y>lastUnique && y!=lastAlphabet+1) {
-			fabio=true;
-			break;
-		}
-	}
-	if (fabio) System.err.println("VITTU> a unique character mixed with non-unique characters in the same block?!  cleanTranslatedRead_updateTranslation()");
-}
-
-
-				
 			}
 			if (!isUnique) {
 				if (first!=-1) {
@@ -2018,6 +1982,25 @@ if (isUnique && lastInBlock[i]>0) {
 	// ------------------------------ K-MER PROCEDURES -----------------------------------
 	
 	/**
+	 * Tells whether a one-mer that is marked as unique based just on frequency, should be 
+	 * used to mark a read block as a unique address on the genome. M=multiple characters 
+	 * occur in the read block; E=the block is the first/last one of the read; 
+	 * oneMerFilter=selection criterion.
+     *
+	 * M  E   oneMerFilter
+	 *        0  1  2  3
+	 * 0  0	  1  1  1  1
+     * 0  1   1  1  1  0
+	 * 1  0   1  0  1  1
+	 * 1  1   1  0  0  0
+	 */
+	private static final boolean[][][] ONEMER_TABLE = new boolean[][][] {
+		{ {true,true,true,true}, {true,true,true,false} },
+		{ {true,false,true,true}, {true,false,false,false} }
+	};
+	
+	
+	/**
 	 * If $newKmers$ is not null, the procedure uses every length-k window that satisfies 
 	 * the conditions in $uniqueMode,multiMode$ (see procedure $isValidWindow()$ for 
 	 * details) to add a k-mer to $newKmers$. If a block contains multiple characters, 
@@ -2031,11 +2014,11 @@ if (isUnique && lastInBlock[i]>0) {
 	 * $avoidedIntervals$ ($nHaplotypes$ is decided according to $haplotypeCoverage$).
 	 * The new value of $lastAvoidedInterval$ is returned in output.
      *
-	 * Remark: 1-mers collected by this procedure might have a different (and even 
+	 * Remark: one-mers collected by this procedure might have a different (and even 
 	 * smaller) count than the one produced by the $getCharacterHistogram()$ pipeline, 
-	 * because of the constraints and of canonization. E.g. a 1-mer might be rare in this 
-	 * procedure but frequent in $getCharacterHistogram()$, if the latter counted all the
-	 * occurrences of the character but the former counts just closed occurrences.
+	 * because of the constraints and of canonization. E.g. a one-mer might be rare in 
+	 * this procedure but frequent in $getCharacterHistogram()$, if the latter counted all
+	 * the occurrences of the character but the former counts just closed occurrences.
 	 *
 	 * Remark: often several characters map to the same block in practice, and most of 
 	 * the k-mers (k>=2) that result from this are rare.
@@ -2046,18 +2029,19 @@ if (isUnique && lastInBlock[i]>0) {
 	 *
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 * 
-	 * @param oneMerMode if $newKmers$ is null: 1=1-mers in $oldKmers$ are not used if
-	 * they occur in a block with multiple characters; 0=1-mers in $oldKmers$ are always 
-	 * used; 2=1-mers $oldKmers$ are treated like (0) in internal blocks, and like (1) in
-	 * the endblocks of the read; for $k>1$ we do none of these filters, since we assume 
-	 * that contexts longer than one are enough to disambiguate;
+	 * @param oneMerFilter if $newKmers$ is null, use the criterion specified in 
+	 * $ONEMER_TABLE[][][oneMerFilter]$ to decide whether a one-mer should be considered a 
+	 * unique address on the genome (for $k>1$ we run no filter, since we assume that 
+	 * contexts longer than one are enough to disambiguate; alternatively, one could try 
+	 * to avoid unique k-mer occurrences that cover the first/last block of a read, as 
+	 * well, but this is likely overengineering);
 	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, int oneMerMode, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, int oneMerFilter, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
 		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
@@ -2079,36 +2063,21 @@ if (isUnique && lastInBlock[i]>0) {
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
-
-boolean fabio = (k==1 && str.equalsIgnoreCase("2716:7:2591,3015:2940:2451,2567,2735,2749,2845,3051:2921:2596:2933:2452,2736,2750,2846,3052:2915:2601:2501:-1150,-600,-538"));
-if (fabio) System.err.println("getKmers> 1  str="+str);
 		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
-if (fabio) System.err.println("getKmers> 2  block "+i);
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-if (fabio) System.err.println("getKmers> 3");
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
-if (fabio) System.err.println("getKmers> 4");
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-if (fabio) System.err.println("getKmers> 5");
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-if (fabio) System.err.println("getKmers> 6  nHaplotypes="+nHaplotypes);
-				if ( nHaplotypes!=-1 && 
-					 ( k>1 ||
-				       ( oneMerMode==0 ||
-					     (oneMerMode==1 && lastInBlock_int[i]==0) ||
-					     ( oneMerMode==2 && 
-						   ((i>0 && i<nBlocks-1) || lastInBlock_int[i]==0)
-					     ) 
-				       )
-					 ) 
-				   ) { avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; }
+				if (nHaplotypes!=-1 && (k>1 || ONEMER_TABLE[lastInBlock_int[i]>0?1:0][i==0||i==nBlocks-1?1:0][oneMerFilter])) { 
+					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
+				}
 			}
 		}
 		else {
@@ -2154,10 +2123,13 @@ if (fabio) System.err.println("getKmers> 6  nHaplotypes="+nHaplotypes);
 	 * 1: are allowed everywhere, except in the first and last block of the window;
 	 * 2: are not allowed;
 	 * @param multiMode blocks with multiple characters:
-	 * 0: are allowed; 
-	 * 1: are not allowed if they are the first/last one of the read (endblocks are more
+	 * 0: are allowed;
+	 * 1: are not allowed iff they are the first/last one of the read; endblocks are more
 	 *    likely to match several characters because they contain just a fraction of a 
-	 *    character);
+	 *    character; allowing an endblock if it matches just one character is useful, 
+	 *    since it might be the only way to detect e.g. a transposon that is longer than 
+	 *    every read and that occurs just once in the genome, or an extremely long 
+	 *    satellite that occurs just once in the genome.
 	 * 2: are not allowed.
 	 */
 	private static final boolean isValidWindow(int first, int k, int nBlocks, int uniqueMode, int multiMode, int readLength) {
@@ -2249,23 +2221,13 @@ if (fabio) System.err.println("getKmers> 6  nHaplotypes="+nHaplotypes);
 		int top1, top2, row, column, lastChild, length;
 		Kmer value, newKey;
 		
-if (k==1) {
-	System.err.println("getKmers_impl> 1  first="+first);
-	for (int x=first; x<=first+k-1; x++) {
-		System.err.print(x+": ");
-		for (int y=0; y<=lastInBlock_int[x]; y++) System.err.print(intBlocks[x][y]+",");
-		System.err.println();
-	}
-}
 		top1=-1; top2=-1;
 		tmpArray1[++top1]=-1; tmpArray1[++top1]=-1; tmpArray1[++top1]=first-1;
 		while (top1>=0) {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
 				key.set(tmpArray2,0,k,true); 
-if (k==1) System.err.println("getKmers_impl> 1.1  key="+key);
 				key.canonize(k,tmpArray3);				
-if (k==1) System.err.println("getKmers_impl> 1.2  canonized key="+key);
 				if (newKmers!=null) {
 					value=newKmers.get(key);
 					if (value==null) {
@@ -2273,13 +2235,11 @@ if (k==1) System.err.println("getKmers_impl> 1.2  canonized key="+key);
 						newKey.set(key.sequence,0,k,true); 
 						newKey.count=1;
 						newKmers.put(newKey,newKey);
-if (k==1) System.err.println("getKmers_impl> 2  enumerated kmer "+newKey);
 					}
 					else value.count++;
 				}
 				else {
 					value=oldKmers.get(key);
-if (k==1) System.err.println("getKmers_impl> 3  value="+value+" key="+key);
 					if (value!=null) return (int)(value.count/haplotypeCoverage);
 				}
 			}
@@ -3695,7 +3655,6 @@ if (k==1) System.err.println("getKmers_impl> 3  value="+value+" key="+key);
 			readA=Alignments.readA-1; readB=Alignments.readB-1; orientation=Alignments.orientation;			
 			startA=Alignments.startA; endA=Alignments.endA;
 			startB=Alignments.startB; endB=Alignments.endB;
-if (readA==607 && readB==74 && startA==0 && startB==0 && Math.abs(endA,18322)<=100 && Math.abs(endB,18325)<=100) System.err.println("filterAlignments_tight> "+str);
 			lengthA=Reads.getReadLength(readA); lengthB=Reads.getReadLength(readB);
 			readAInTranslated=-1;
 			while (lastFullyUnique<nFullyUnique && fullyUnique[lastFullyUnique]<readA) lastFullyUnique++;
@@ -3728,9 +3687,6 @@ if (readA==607 && readB==74 && startA==0 && startB==0 && Math.abs(endA,18322)<=1
 					   )
 					 )
 				   ) {
-
-if (containsTwoBlocks(lastTranslated,startA,endA,lengthA)) System.err.println("filterAlignments_tight> 1  discarding the following alignment because of readA: "+str);
-
    					bw.write("0\n"); str=br.readLine(); row++;
    					continue;
 				}
@@ -3799,10 +3755,7 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA)) System.err.println("f
 							out[1][type]++;
 						}
 					}
-					else {
-if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 2  discarding the following alignment because of readB: "+str);
-						bw.write("0\n");
-					}
+					else bw.write("0\n");
 				}
 				else if (straddlesRightA) {
 					if ( suffixPrefixMode && 
@@ -3822,10 +3775,7 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 							out[1][type]++;
 						}
 					}
-					else {
-if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 3  discarding the following alignment because of readB: "+str);
-						bw.write("0\n");
-					}
+					else bw.write("0\n");
 				}
 				else {
 					if (mode) {
@@ -3861,17 +3811,11 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 							out[1][type]++;
 						}
 					}
-					else {
-if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 4  discarding the following alignment because of readB: "+str);
-						bw.write("0\n");
-					}
+					else bw.write("0\n");
 				}
 			}
 			else if (q==4 || q==5) {
-				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) {
-if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 5  discarding the following alignment because of readB: "+str);
-					bw.write("0\n");
-				}
+				if (overlapsUniqueA || straddlesLeftA || straddlesRightA) bw.write("0\n");
 				else {
 					if ( suffixPrefixMode && 
 					     ( (orientation && endA>=lengthA-DISTANCE_THRESHOLD) || 
@@ -3890,10 +3834,7 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 							out[1][type]++;
 						}
 					}
-					else {
-if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p,startB,endB,lengthB)) System.err.println("filterAlignments_tight> 6  discarding the following alignment because of readB: "+str);
-						bw.write("0\n");
-					}
+					else bw.write("0\n");
 				}
 			}
 			str=br.readLine(); row++;
@@ -3928,116 +3869,64 @@ if (containsTwoBlocks(lastTranslated,startA,endA,lengthA) && containsTwoBlocks(p
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
 		final int nBytes = Math.ceil(nBlocks,8);
 		
-
-boolean fabio = (readID==32 && intervalStart==0 && Math.abs(intervalEnd,1007)<=100) || (readID==786 && Math.abs(intervalStart,10038)<=100 && Math.abs(intervalEnd,11068)<=100);
-if (fabio) System.err.println("inBlueRegion> 1  "+readID+"["+intervalStart+".."+intervalEnd+"]");		
-		
-		
 		// Checking the nonrepetitive blocks of the read, if any.
 		blockStart=0; blockEnd=boundaries_all[boundariesAllID][0];
 		if (translation_all[boundariesAllID][0][0]<=lastUnique || translation_all[boundariesAllID][0][0]==lastAlphabet+1) {
-if (fabio) System.err.println("inBlueRegion> 2");
 			if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) {
 				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) || 
 					 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
-				   ) {
-	if (fabio) System.err.println("inBlueRegion> 3");
-					   return 0;
-				   }
-				else {
-	if (fabio) System.err.println("inBlueRegion> 4");
-					return 1;
-				}
+				   ) return 0;
+				else return 1;
 			}
 		}
 		for (i=1; i<nBlocks-1; i++) {
-if (fabio) System.err.println("inBlueRegion> 5");
 			blockStart=boundaries_all[boundariesAllID][i-1];
 			blockEnd=boundaries_all[boundariesAllID][i];
 			if (translation_all[boundariesAllID][i][0]<=lastUnique || translation_all[boundariesAllID][i][0]==lastAlphabet+1) {
-if (fabio) System.err.println("inBlueRegion> 6");
 				if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) {
 					if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 					     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
 						 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
-					   ) {
-	if (fabio) System.err.println("inBlueRegion> 7");
-						   return 0;
-					   }
-					else {
-	if (fabio) System.err.println("inBlueRegion> 8");
-						return 1;
-					}
+					   ) return 0;
+					else return 1;
 				}
 			}
 		}
-if (fabio) System.err.println("inBlueRegion> 9");
 		blockStart=boundaries_all[boundariesAllID][nBlocks-2];
 		blockEnd=readLength-1;		
 		if (translation_all[boundariesAllID][nBlocks-1][0]<=lastUnique || translation_all[boundariesAllID][nBlocks-1][0]==lastAlphabet+1) {
-if (fabio) System.err.println("inBlueRegion> 10");
 			if (Intervals.intersectionLength(intervalStart,intervalEnd,blockStart,blockEnd)>=minIntersection_nonrepetitive) {
 				if ( Intervals.areApproximatelyIdentical(intervalStart,intervalEnd,blockStart,blockEnd) ||
 				     Intervals.isApproximatelyContained(intervalStart,intervalEnd,blockStart,blockEnd) ||
 					 Intervals.isApproximatelyContained(blockStart,blockEnd,intervalStart,intervalEnd)
-				   ) {
-	if (fabio) System.err.println("inBlueRegion> 11");
-					   return 0;
-				   }
-				else {
-	if (fabio) System.err.println("inBlueRegion> 12");
-					return 1;
-				}
+				   ) return 0;
+				else return 1;
 			}
 		}
-if (fabio) System.err.println("inBlueRegion> 13");
 		
 		// Checking the repetitive blocks of the read, if any.
 		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
 		if (blueIntervalsID!=-1) {
-if (fabio) System.err.println("inBlueRegion> 14");
 			straddlesLeft=false; straddlesRight=false;
 			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
-if (fabio) System.err.println("inBlueRegion> 15");
 				if (blueIntervals[blueIntervalsID][i+1]<minBlueIntervalLength) continue;
-if (fabio) System.err.println("inBlueRegion> 16");
 				firstBlock=blueIntervals[blueIntervalsID][i];
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
 				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
-				   ) {
-if (fabio) System.err.println("inBlueRegion> 17");
-					   return 2;
-				   }
-				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) {
-if (fabio) System.err.println("inBlueRegion> 18");
-					straddlesRight=true;
-				}
-				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) {
-if (fabio) System.err.println("inBlueRegion> 19");
-					straddlesLeft=true;
-				}
+				   ) return 2;
+				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) straddlesRight=true;
+				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) straddlesLeft=true;
 			}
-if (fabio) System.err.println("inBlueRegion> 20");
 			if (straddlesLeft) {
-				if (straddlesRight) {
-if (fabio) System.err.println("inBlueRegion> 21");
-					return 5;
-				}
-				else {
-if (fabio) System.err.println("inBlueRegion> 22");
-					return 3;
-				}
+				if (straddlesRight) return 5;
+				else return 3;
 			}
-			else if (straddlesRight) {
-if (fabio) System.err.println("inBlueRegion> 23");
-				return 4;
-			}
+			else if (straddlesRight) return 4;
 		}
-if (fabio) System.err.println("inBlueRegion> 24");
 		
 		return -1;
 	}
@@ -5118,15 +5007,15 @@ if (fabio) System.err.println("inBlueRegion> 24");
 	 * between pairs of occurrences of periodic repeats, and between pairs of occurrences
 	 * of a periodic and a non-periodic repeat, which are in reality consecutive in the 
 	 * genome. We observed gaps of length <=500 bps (and even reaching some kbps) with 
-	 * daligner on pbsv-simulated CLR reads from a simulated, fully-repetitive genome. The 
-	 * position and length of such gaps is not concordant across reads, and this breaks 
-	 * down our entire approach based on unique k-mers on the repeat alphabet.
-	 * Specifically, the approach does not break down because every such configuration is
-	 * considered a unique signature and the overlap graph is too complex, but because no
-	 * such configuration is considered a signature since it is too rare, and the overlap
-	 * graph is too fragmented. We try to fix this by closing the gaps in a concordant
-	 * way, propagating arbitrary decisions greedily using the read-read alignments we
-	 * already have.
+	 * daligner on pbsim-simulated CLR reads from a simulated, fully-repetitive genome.
+	 * The position and length of such gaps is not concordant across reads, and this
+	 * breaks down our entire approach based on unique k-mers on the repeat alphabet.
+	 * The approach breaks down in different ways: since several such gaps are considered
+	 * unique signatures, the overlap graph becomes too complex. If we ask not to use any 
+	 * non-repetitive block, then very few k-mers are considered a signature, since they 
+	 * are too rare, and the overlap graph becomes too fragmented. We try to fix this by 
+	 * closing the gaps in a concordant way across reads, propagating arbitrary decisions
+	 * greedily using the read-read alignments that we already have.
 	 *
 	 * Remark: since this follows every alignment, it makes 1-mers and 2-mers (on the 
 	 * repeat alphabet), that come from different regions of the genome, more similar, and 
@@ -5469,41 +5358,29 @@ if (fabio) System.err.println("inBlueRegion> 24");
 			if (!readB_fullyUnique && !readB_fullyContained) readB_translatedIndex=Arrays.binarySearch(translated,readB);
 			else readB_translatedIndex=-1;
 			for (i=firstSpacer; i<=lastSpacer; i++) {
-final boolean fabio = i==1172 && readB==3;		
-if (fabio) System.err.println("loadSpacerNeighbors> -1");		
 				if (spacers[i].read!=readA) break;
-if (fabio) System.err.println("loadSpacerNeighbors> -2");
 				if ( (spacers[i].first==spacers[i].last && spacers[i].first>Alignments.startA+IDENTITY_THRESHOLD && spacers[i].first<Alignments.endA-IDENTITY_THRESHOLD) ||
 					 ( spacers[i].first!=spacers[i].last &&
 					   Intervals.isApproximatelyContained(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA) &&
 					   !Intervals.areApproximatelyIdentical(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA)
 					 )
 				   ) {
-if (fabio) System.err.println("loadSpacerNeighbors> -3");
 					p=readHasSpacer(readB,firstSpacer,tmpSpacer);
-if (fabio) System.err.println("loadSpacerNeighbors> -4  p="+p);
 					if (p>=0) {
-if (fabio) System.err.println("loadSpacerNeighbors> -5");
 						for (j=p; j<=lastSpacer; j++) {
-if (fabio) System.err.println("loadSpacerNeighbors> -6  "+spacers[j]);
 							if (spacers[j].read!=readB) break;
-if (fabio) System.err.println("loadSpacerNeighbors> -7");
 							if ( (spacers[j].first==spacers[j].last && spacers[j].first>Alignments.startB+IDENTITY_THRESHOLD && spacers[j].first<Alignments.endB-IDENTITY_THRESHOLD) ||
 								 ( spacers[j].first!=spacers[j].last &&
 								   Intervals.isApproximatelyContained(spacers[j].first,spacers[j].last,Alignments.startB,Alignments.endB) &&
 								   !Intervals.areApproximatelyIdentical(spacers[j].first,spacers[j].last,Alignments.startB,Alignments.endB)
 								 )
-							   ) {
-if (fabio) System.err.println("loadSpacerNeighbors> -8");
-								   nEdges+=loadSpacerNeighbors_impl(i,j,MIN_INTERSECTION,IDENTITY_THRESHOLD)?1:0;
-							   }
+							   ) nEdges+=loadSpacerNeighbors_impl(i,j,MIN_INTERSECTION,IDENTITY_THRESHOLD)?1:0;
 						}
 					}
 				}
 				
 				// Initializing the $breakpoint$ field.				
 				if (readB_fullyUnique) continue;			
-if (fabio) System.err.println("loadSpacerNeighbors> 0  considering spacer "+i+"th: "+spacers[i]);				
 				if ( spacers[i].first!=spacers[i].last && !spacers[i].isRigid() &&
 					 Intervals.isApproximatelyContained(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA) &&
 					 !Intervals.areApproximatelyIdentical(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA)
@@ -5690,14 +5567,9 @@ if (fabio) System.err.println("loadSpacerNeighbors> 0  considering spacer "+i+"t
 		final Spacer spacerA = spacers[spacerAID];
 		final Spacer spacerB = spacers[spacerBID];
 		
-boolean fabio = (spacerA.read==710 && spacerB.read==97) || (spacerA.read==97 && spacerB.read==710);
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 1  trying an edge between "+spacerA+" and "+spacerB);
-		
-		
 		// Evaluating conditions
 		rigidA=spacerA.isRigid(); rigidB=spacerB.isRigid();
 		if (rigidA && rigidB) return false;
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 2");
 		if (rigidA) {
 			ratio=((double)(Alignments.endB-Alignments.startB+1))/(Alignments.endA-Alignments.startA+1);
 			if (spacerA.first==spacerA.last || spacerA.rigidLeft) {
@@ -5705,14 +5577,12 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 2");
 				else startB=Alignments.endB-(int)((spacerA.first-Alignments.startA)*ratio);
 				addEdge=startB>=spacerB.first-identityThreshold && startB<=spacerB.last+identityThreshold;
 				offsetAB=startB-spacerB.first; offsetBA=Math.POSITIVE_INFINITY;
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 3.1  addEdge="+addEdge+" startB="+startB);
 			}
 			else {
 				if (Alignments.orientation) endB=Alignments.startB+(int)((spacerA.last-Alignments.startA)*ratio);
 				else endB=Alignments.endB-(int)((spacerA.last-Alignments.startA)*ratio);
 				addEdge=endB>=spacerB.first-identityThreshold && endB<=spacerB.last+identityThreshold;
 				offsetAB=endB-spacerB.first; offsetBA=Math.POSITIVE_INFINITY;
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 3.2  addEdge="+addEdge+" endB="+endB);
 			}
 		}
 		else if (rigidB) {
@@ -5722,47 +5592,38 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 3.2  addEdge="+addEdge+
 				else startA=Alignments.endA-(int)((spacerB.first-Alignments.startB)*ratio);
 				addEdge=startA>=spacerA.first-identityThreshold && startA<=spacerA.last+identityThreshold;
 				offsetBA=startA-spacerA.first; offsetAB=Math.POSITIVE_INFINITY;
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 4.1  addEdge="+addEdge+" startA="+startA);
 			}
 			else {
 				if (Alignments.orientation) endA=Alignments.startA+(int)((spacerB.last-Alignments.startB)*ratio);
 				else endA=Alignments.endA-(int)((spacerB.last-Alignments.startB)*ratio);
 				addEdge=endA>=spacerA.first-identityThreshold && endA<=spacerA.last+identityThreshold;
 				offsetBA=endA-spacerA.first; offsetAB=Math.POSITIVE_INFINITY;
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 4.2  addEdge="+addEdge+" endA="+endA);
 			}
 		}
 		else {
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 5");
 			addEdge=false;
 			ratio=((double)(Alignments.endB-Alignments.startB+1))/(Alignments.endA-Alignments.startA+1);
 			if (Alignments.orientation) {
 				startB=Alignments.startB+(int)((spacerA.first-Alignments.startA)*ratio);
 				endB=Alignments.startB+(int)((spacerA.last-Alignments.startA)*ratio);
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 6  startB="+startB+" endB="+endB);
 			}
 			else {
 				startB=Alignments.endB-(int)((spacerA.last-Alignments.startA)*ratio);
 				endB=Alignments.endB-(int)((spacerA.first-Alignments.startA)*ratio);
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 7  startB="+startB+" endB="+endB);
 			}
 			if (Intervals.intersectionLength(startB,endB,spacerB.first,spacerB.last)>=minIntersection) addEdge=true;
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 8  addEdge="+addEdge);
 			offsetAB=startB-spacerB.first;
 			ratio=((double)(Alignments.endA-Alignments.startA+1))/(Alignments.endB-Alignments.startB+1);
 			if (Alignments.orientation) {
 				startA=Alignments.startA+(int)((spacerB.first-Alignments.startB)*ratio);
 				endA=Alignments.startA+(int)((spacerB.last-Alignments.startB)*ratio);
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 9  startA="+startA+" endA="+endA);
 			}
 			else {
 				startA=Alignments.endA-(int)((spacerB.last-Alignments.startB)*ratio);
 				endA=Alignments.endA-(int)((spacerB.first-Alignments.startB)*ratio);
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 10  startA="+startA+" endA="+endA);
 			}
 			if (Intervals.intersectionLength(startA,endA,spacerA.first,spacerA.last)>=minIntersection) addEdge=true;
 			offsetBA=startA-spacerA.first;
-if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 		}
 		if (!addEdge) return false;
 		
@@ -6699,9 +6560,6 @@ if (fabio) System.err.println("loadSpacerNeighbors_impl> 11  addEdge="+addEdge);
 		spacersCursor=fixPeriodicEndpoints_updateTranslation_firstBlock(nBlocks,readID,readLength,maxSpacerLength,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,spacersCursor,QUANTUM,read2characters_new,read2boundaries_new,out,tmpArray1);
 		if (nBlocks==1) return spacersCursor;
 		else if (nBlocks==2) return fixPeriodicEndpoints_updateTranslation_secondBlock(readID,readLength,spacersCursor,maxSpacerLength,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,read2characters_new,read2boundaries_new,fullyContained_new,out,tmpArray1);
-
-final int fabio=41;
-if (readID==fabio) System.err.println("Old translation of read "+readID+": "+read2characters_old+"  boundaries: "+read2boundaries_old);
 		
 		// Intermediate blocks
 		while (blockCursor<=nBlocks-2) {
@@ -6722,29 +6580,14 @@ if (readID==fabio) System.err.println("Old translation of read "+readID+": "+rea
 				if (c>lastUnique_old && c<=lastPeriodic_old) isBlockPeriodicRight=true;
 				else isBlockNonperiodicRight=true;
 			}
-			if (!isUnique || boundaries[blockCursor]-boundaries[blockCursor-1]>maxSpacerLength) {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1  blockCursor="+blockCursor+" isBlockPeriodicRight="+isBlockPeriodicRight+" isUnique="+isUnique);
-				fixPeriodicEndpoints_updateTranslation_noSpacer((isUnique||isBlockPeriodicRight)?2:1,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
-			}
+			if (!isUnique || boundaries[blockCursor]-boundaries[blockCursor-1]>maxSpacerLength) fixPeriodicEndpoints_updateTranslation_noSpacer((isUnique||isBlockPeriodicRight)?2:1,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
 			else if (isBlockPeriodicLeft && isBlockPeriodicRight) {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 2  blockCursor="+blockCursor);
-				if (isBlockNonperiodicLeft && isBlockNonperiodicRight) {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 3  blockCursor="+blockCursor);
-					fixPeriodicEndpoints_updateTranslation_noSpacer(2,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
-				}
-				else {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 4  blockCursor="+blockCursor);
-					spacersCursor=fixPeriodicEndpoints_updateTranslation_spacer(readID,readLength,spacersCursor,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,tmpArray1,tmpArray2,tmpArray3,out);
-				}
+				if (isBlockNonperiodicLeft && isBlockNonperiodicRight) fixPeriodicEndpoints_updateTranslation_noSpacer(2,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
+				else spacersCursor=fixPeriodicEndpoints_updateTranslation_spacer(readID,readLength,spacersCursor,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,tmpArray1,tmpArray2,tmpArray3,out);
 			}
 			else if (isBlockPeriodicLeft && isBlockNonperiodicRight) {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 8  blockCursor="+blockCursor);
-				if (isBlockNonperiodicLeft) {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 9  blockCursor="+blockCursor);
-					fixPeriodicEndpoints_updateTranslation_noSpacer(1,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
-				}
+				if (isBlockNonperiodicLeft) fixPeriodicEndpoints_updateTranslation_noSpacer(1,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
 				else {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 10  blockCursor="+blockCursor);
 					while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[blockCursor-1])) spacersCursor++;
 					if (spacersCursor>lastSpacer || spacers[spacersCursor].first>boundaries[blockCursor-1]) {
 						System.err.println("fixPeriodicEndpoints_updateTranslation> ERROR: spacer not found: "+readID+"["+boundaries[blockCursor-1]+".."+boundaries[blockCursor]+"]");
@@ -6769,13 +6612,8 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 				}
 			}
 			else if (isBlockPeriodicRight && isBlockNonperiodicLeft) {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 11  blockCursor="+blockCursor);
-				if (isBlockNonperiodicRight) {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 12  blockCursor="+blockCursor);
-					fixPeriodicEndpoints_updateTranslation_noSpacer(2,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
-				}
+				if (isBlockNonperiodicRight) fixPeriodicEndpoints_updateTranslation_noSpacer(2,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
 				else {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 13  blockCursor="+blockCursor);
 					while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[blockCursor-1])) spacersCursor++;
 					if (spacersCursor>lastSpacer || spacers[spacersCursor].first>boundaries[blockCursor-1]) {
 						System.err.println("fixPeriodicEndpoints_updateTranslation> ERROR: spacer not found: "+readID+"["+boundaries[blockCursor-1]+".."+boundaries[blockCursor]+"]");
@@ -6788,10 +6626,8 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 							read2boundaries_new.write((nBoundariesWritten>0?SEPARATOR_MINOR+"":"")+currentBoundary);
 							nBoundariesWritten++;
 						}
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 15  blockCursor="+blockCursor);
 						length=blockCursor-1==0?boundaries[blockCursor-1]:boundaries[blockCursor-1]-boundaries[blockCursor-2];
 						writeBlock(blockCursor-1,length,blockCursor-1==0,false,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,tmpArray1);
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 16  blockCursor="+blockCursor);
 						currentBoundary=boundaries[blockCursor-1];
 						length=(blockCursor+1==nBlocks-1?readLength:boundaries[blockCursor+1])-boundaries[blockCursor];
 						leftCharacters_load_prime(true,blockCursor+1,length,false,blockCursor+1==nBlocks-1,oldAlphabet,lastUnique_old,lastPeriodic_old);
@@ -6800,10 +6636,7 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 					}
 				}
 			}
-			else {
-if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 17  blockCursor="+blockCursor);
-				fixPeriodicEndpoints_updateTranslation_noSpacer(2,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
-			}
+			else fixPeriodicEndpoints_updateTranslation_noSpacer(2,readID,readLength,nBlocks,QUANTUM,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,read2boundaries_new,out,tmpArray1);
 		}
 		
 		// Last block
@@ -7473,10 +7306,11 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 	 * characters in $alphabet$, other similar characters whose length is $<=wobbleLength$
 	 * bps away from the original. Reads with just one block are not altered.
 	 *
-	 * Remark: wobbling is designed to increase the number of edges in a highly 
-	 * disconnected overlap graph. However, such increase in frequency may make some 
-	 * k-mers become repeats rather than unique addresses on the genome, and this might 
-	 * \emph{remove} some edges from the overlap graph.
+	 * Remark: wobbling is designed to increase the number of edges in a highly
+	 * disconnected overlap graph where the endpoints of repeat occurrences are uncertain.
+	 * However, such increase in frequency may make some k-mers be classified as repeats 
+	 * rather than as unique addresses on the genome, and this might \emph{remove} some
+	 * edges from the overlap graph.
 	 *
 	 * Remark: this procedure might put multiple unique characters inside a block that
 	 * contains a single unique character. Thus, throughout the code, no test for the
@@ -7527,34 +7361,20 @@ if (readID==fabio) System.err.println("fixPeriodicEndpoints_updateTranslation> 1
 		}
 		if (tmpArray1[nBlocks-1]==1 && tmpArray1[nBlocks-2]==0) tmpArray1[nBlocks-2]=2;
 		
-
-int fabio = 376;		
-		
 		// Wobbling blocks
 		for (i=0; i<nBlocks; i++) {
 			if (i>0) bw.write(SEPARATOR_MAJOR+"");
 			if (tmpArray1[i]==0) {
 				bw.write(blocks[i][0]+"");
-if (Integer.parseInt(blocks[i][0])==fabio) System.err.println("VITTU> 1  read2characters="+read2characters+"  blocks["+i+"][0]="+blocks[i][0]);				
-				for (j=1; j<=lastInBlock[i]; j++) {
-					bw.write(SEPARATOR_MINOR+""+blocks[i][j]);
-if (Integer.parseInt(blocks[i][j])==fabio) System.err.println("VITTU> 2  read2characters="+read2characters+"  blocks["+i+"]["+j+"]="+blocks[i][j]);
-				}
+				for (j=1; j<=lastInBlock[i]; j++) bw.write(SEPARATOR_MINOR+""+blocks[i][j]);
 			}
 			else {
 				last=-1;
-				for (j=0; j<=lastInBlock[i]; j++) {
-					last=wobble_impl(Integer.parseInt(blocks[i][j]),wobbleLength,tmpArray2,last);
-if (Integer.parseInt(blocks[i][j])==fabio) System.err.println("VITTU> 3  read2characters="+read2characters+"  blocks["+i+"]["+j+"]="+blocks[i][j]);	
-				}
+				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),wobbleLength,tmpArray2,last);
 				if (last>0) Arrays.sort(tmpArray2,0,last+1);
 				j=0; bw.write(tmpArray2[0]+"");
-if (tmpArray2[0]==fabio) System.err.println("VITTU> 4  read2characters="+read2characters+"  tmpArray2[0]="+tmpArray2[0]);	
 				for (j=1; j<=last; j++) {
-					if (tmpArray2[j]!=tmpArray2[j-1]) {
-						bw.write(SEPARATOR_MINOR+""+tmpArray2[j]);
-if (tmpArray2[j]==fabio) System.err.println("VITTU> 5  read2characters="+read2characters+"  tmpArray2["+j+"]="+tmpArray2[j]);	
-					}
+					if (tmpArray2[j]!=tmpArray2[j-1]) bw.write(SEPARATOR_MINOR+""+tmpArray2[j]);
 				}
 				out[0]++;
 			}
