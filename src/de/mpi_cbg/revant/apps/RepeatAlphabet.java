@@ -7300,6 +7300,239 @@ public class RepeatAlphabet {
 	}
 	
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	/**
+	 * Sets $out[i]=true$ iff $alphabet[i]$ is a non-periodic character that has to be
+	 * wobbled (every periodic character must be wobbled, so marking those is not needed).
+	 */
+	public static final void wobble_markAlphabet(String read2characters, boolean[] out, int[] tmpArray) throws IOException {
+		int i, j, k, c;
+		int last, nBlocks, nPeriodicBlocks;
+		
+		// Marking blocks to be wobbled
+		if (read2characters.length()==0) return;
+		nBlocks=loadBlocks(read2characters);
+		if (nBlocks==1) return;
+		Math.set(tmpArray,nBlocks-1,0);
+		nPeriodicBlocks=0;
+		for (i=0; i<nBlocks; i++) {
+			last=lastInBlock[i];
+			for (j=0; j<=last; j++) {
+				c=Integer.parseInt(blocks[i][j]);
+				if (c<0) c=-1-c;
+				if (c>lastUnique && c<=lastPeriodic) {
+					tmpArray[i]=1;
+					nPeriodicBlocks++;
+					break;
+				}
+			}
+		}
+		if (nPeriodicBlocks==0) return;
+		if (tmpArray[0]==1 && tmpArray[1]==0) tmpArray[1]=2;
+		for (i=1; i<nBlocks-1; i++) {
+			if (tmpArray[i]!=1) continue;
+			if (tmpArray[i-1]==0) tmpArray[i-1]=2;
+			if (tmpArray[i+1]==0) tmpArray[i+1]=2;
+		}
+		if (tmpArray[nBlocks-1]==1 && tmpArray[nBlocks-2]==0) tmpArray[nBlocks-2]=2;
+		
+		// Marking every non-periodic character as to be wobbled.
+		for (i=0; i<nBlocks; i++) {
+			if (tmpArray[i]==1) {
+				for (j=0; j<=lastInBlock[i]; j++) {
+					c=Integer.parseInt(blocks[i][j]);
+					if (c>=0 && c>lastPeriodic) out[c]=true;
+				}
+			}
+			else if (tmpArray[i]==2) {
+				last=-1;
+				for (j=0; j<=lastInBlock[i]; j++) {
+					c=Integer.parseInt(blocks[i][j]);
+					if (c<0) {  // Must be a unique character
+						c=-1-c;
+						if (IO.CONSISTENCY_CHECKS && c>lastUnique) {
+							System.err.println("wobble_markAlphabet> ERROR: negative character is not unique: "+(-1-c)+" lastUnique="+lastUnique);
+							System.exit(1);
+						}
+						for (k=c; k<=lastUnique; k++) out[k]=true;
+					}
+					else out[c]=true;
+				}
+			}
+		}
+	}
+
+	
+	
+	/**
+	 * ----------> need to close new alphabet by RC, and to build old2new map after this...
+	 *
+	 * @param nFlags number of TRUE elements in $flags$, excluding periodic characters;
+	 * @param out output array: contains the values of $lastUnique,lastPeriodic,
+	 * lastAlphabet$ for the new alphabet;
+	 * @return the new alphabet that results from wobbling the characters of the current 
+	 * alphabet that are marked in $flags$; the new alphabet might not be sorted and might
+	 * contain duplicates.
+	 */
+	public static final Character[] wobble_extendAlphabet(boolean[] flags, int nFlags, int quantum_wobble, int quantum_alphabet, int[] out) throws IOException {
+		final int MAX_NEWCHARS_PER_CHAR = ((quantum_wobble<<1)/quantum_alphabet)*((quantum_wobble<<1)/quantum_alphabet);
+		int i;
+		int lastUnique_new, lastPeriodic_new, lastAlphabet_new;
+		Character tmpCharacter;
+		Character[] alphabet_new;
+		
+		tmpCharacter = new Character();
+		alphabet_new = new Character[lastAlphabet+(nFlags+lastPeriodic-lastUnique)*MAX_NEWCHARS_PER_CHAR];
+		lastUnique_new=-1;
+		for (i=0; i<=lastUnique; i++) {
+			alphabet_new[++lastUnique_new]=alphabet[i];
+			if (flags[i]) lastUnique_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,alphabet_new,lastUnique_new,tmpCharacter);
+		}
+		lastPeriodic_new=lastUnique_new;
+		for (i=lastUnique+1; i<=lastPeriodic; i++) {
+			alphabet_new[++lastPeriodic_new]=alphabet[i];
+			lastPeriodic_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,alphabet_new,lastPeriodic_new,tmpCharacter);
+		}
+		lastAlphabet_new=lastPeriodic_new;
+		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
+			alphabet_new[++lastAlphabet_new]=alphabet[i];
+			if (flags[i]) lastAlphabet_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,alphabet_new,lastAlphabet_new,tmpCharacter);
+		}
+		out[0]=lastUnique_new; out[1]=lastPeriodic_new; out[2]=lastAlphabet_new;
+		return alphabet_new;
+	}
+	
+	
+	/**
+	 * Adds to $alphabet_new[lastCharacter_new+1..]$ every character that is produced by
+	 * wobbling $alphabet[c]$ and that is not already in $alphabet$.
+	 *
+	 * Remark: running this procedure with different values of $c$ might introduce 
+	 * duplicates in $alphabet_new$.
+	 *
+	 * @param alphabet_new assumed to be large enough;
+	 * @return the new value of $lastCharacter_new$ after the procedure completes.
+	 */
+	private static final int wobble_extendAlphabet_impl(int c, int quantum_wobble, int quantum_alphabet, Character[] alphabet_new, int lastCharacter_new, Character tmpCharacter) {
+		int i;
+		int last, start;
+		final int startPrime = alphabet[c].start;
+		final int length = alphabet[c].getLength();
+		Character newCharacter;
+		
+		if (c<=lastPeriodic) {
+			for (i=quantum_alphabet; i<=quantum_wobble; i+=quantum_alphabet) {
+				tmpCharacter.copyFrom(alphabet[c]);
+				tmpCharacter.length=length-i;
+				if (!wobble_find(tmpCharacter,c,false)) {
+					newCharacter = new Character();
+					newCharacter.copyFrom(tmpCharacter);
+					alphabet_new[++lastCharacter_new]=newCharacter;
+				}
+				tmpCharacter.length=length+i;
+				if (!wobble_find(tmpCharacter,c,true)) {
+					newCharacter = new Character();
+					newCharacter.copyFrom(tmpCharacter);
+					alphabet_new[++lastCharacter_new]=newCharacter;
+				}
+			}
+		}
+		else {
+			for (i=quantum_alphabet; i<=quantum_wobble; i+=quantum_alphabet) {
+				start=startPrime-i;
+				for (j=quantum_alphabet; j<=quantum_wobble; j+=quantum_alphabet) {
+					tmpCharacter.copyFrom(alphabet[c]);
+					tmpCharacter.start=start;
+					tmpCharacter.end=tmpCharacter.start+(length-j)-1;
+					if (!wobble_find(tmpCharacter,c,false)) {
+						newCharacter = new Character();
+						newCharacter.copyFrom(tmpCharacter);
+						alphabet_new[++lastCharacter_new]=newCharacter;
+					}
+					tmpCharacter.end=tmpCharacter.start+(length+j)-1;
+					if (!wobble_find(tmpCharacter,c,false)) {
+						newCharacter = new Character();
+						newCharacter.copyFrom(tmpCharacter);
+						alphabet_new[++lastCharacter_new]=newCharacter;
+					}
+				}
+				start=startPrime+i;
+				for (j=quantum_alphabet; j<=quantum_wobble; j+=quantum_alphabet) {
+					tmpCharacter.copyFrom(alphabet[c]);
+					tmpCharacter.start=start;
+					tmpCharacter.end=tmpCharacter.start+(length-j)-1;
+					if (!wobble_find(tmpCharacter,c,true)) {
+						newCharacter = new Character();
+						newCharacter.copyFrom(tmpCharacter);
+						alphabet_new[++lastCharacter_new]=newCharacter;
+					}
+					tmpCharacter.end=tmpCharacter.start+(length+j)-1;
+					if (!wobble_find(tmpCharacter,c,true)) {
+						newCharacter = new Character();
+						newCharacter.copyFrom(tmpCharacter);
+						alphabet_new[++lastCharacter_new]=newCharacter;
+					}
+				}
+			}
+		}
+		return lastCharacter_new;
+	}
+	
+	
+	/**
+	 * @param c searches for an exact occurrence of $character$ starting from position $c$
+	 * in $alphabet$ (excluded);
+	 * @param direction TRUE=forward, FALSE=backward.
+	 */
+	private static final boolean wobble_find(Character character, int c, boolean direction) {
+		int i;
+		int from, to;
+		final boolean orientation = character.orientation;
+		final int repeat = character.repeat;
+		final int start = character.start;
+		
+		if (direction) {
+			from=c+1;
+			if (c<=lastUnique) to=lastUnique;
+			else if (c<=lastPeriodic) to=lastPeriodic;
+			else to=lastAlphabet;
+			for (i=from; i<=to; i++) {
+				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation || alphabet[i].start>start) break;
+				if (alphabet[i].equals(character)) return true;
+			}
+		}
+		else {
+			to=c-1;
+			if (c<=lastUnique) from=0;
+			else if (c<=lastPeriodic) from=lastUnique+1;
+			else from=lastPeriodic+1;
+			for (i=to; i>=from; i--) {
+				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation || alphabet[i].start<start) break;
+				if (alphabet[i].equals(character)) return true;
+			}
+		}
+		return false;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	/**
 	 * Rewrites the translation of a read so that periodic blocks, and blocks adjacent to
 	 * periodic blocks, \emph{wobble}, i.e. they contain, in addition to their original
