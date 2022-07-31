@@ -556,7 +556,7 @@ public class RepeatAlphabet {
 	 * once in the genome, and for a long short-period repeat that occurs just once in the
 	 * genome.
 	 */
-	public static final void compactInstances(int distanceThreshold, int lengthThreshold) {
+	public static final void compactInstances() {
 		final int QUANTUM = IO.quantum;
 		int i, j, k;
 		int first;
@@ -564,7 +564,9 @@ public class RepeatAlphabet {
 		
 		System.err.println("Quantizing characters... ");
 		for (i=0; i<=lastAlphabet; i++) alphabet[i].quantize(QUANTUM);
-		Arrays.sort(alphabet,0,lastAlphabet+1);
+		if (lastUnique>0) Arrays.sort(alphabet,0,lastUnique+1);
+		if (lastPeriodic>lastUnique+1) Arrays.sort(alphabet,lastUnique+1,lastPeriodic+1);
+		if (lastAlphabet>lastPeriodic+1) Arrays.sort(alphabet,lastPeriodic+1,lastAlphabet+1);
 		j=0;
 		for (i=1; i<=lastAlphabet; i++) {
 			if ( alphabet[i].repeat!=alphabet[j].repeat || alphabet[i].orientation!=alphabet[j].orientation || 
@@ -622,7 +624,7 @@ public class RepeatAlphabet {
 	 * the alphabet.
 	 *
 	 * Remark: the reverse-complement of a character might be implied by a character that
-	 * is already in the alphabet: in this case the new character is not added. Or it
+	 * is already in the alphabet: in this case the new character is not added. Or, it
 	 * might imply characters that are already in the alphabet: this case is not handled
 	 * and it is left to the caller to run $compactInstances()$ again.
 	 */
@@ -7302,17 +7304,14 @@ public class RepeatAlphabet {
 	
 	
 	
-	
-	
-	
-	
-	
-	
-	
+	// ---------------------------------- WOBBLING ---------------------------------------
 	
 	/**
 	 * Sets $out[i]=true$ iff $alphabet[i]$ is a non-periodic character that has to be
-	 * wobbled (every periodic character must be wobbled, so marking those is not needed).
+	 * wobbled (every periodic character must be wobbled, marking those is not needed).
+	 *
+	 * @param read2characters a row of the translated reads file;
+	 * @param tmpArray temporary space, of size at least equal to the number of blocks.
 	 */
 	public static final void wobble_markAlphabet(String read2characters, boolean[] out, int[] tmpArray) throws IOException {
 		int i, j, k, c;
@@ -7370,18 +7369,17 @@ public class RepeatAlphabet {
 			}
 		}
 	}
-
 	
 	
 	/**
-	 * ----------> need to close new alphabet by RC, and to build old2new map after this...
+	 * Builds the new alphabet that results from wobbling the characters of the current 
+	 * alphabet that are marked in $flags$, as well as every periodic character. Each 
+	 * section of the new alphabet (unique, periodic, non-periodic) might not be sorted 
+	 * and might contain duplicates.
 	 *
 	 * @param nFlags number of TRUE elements in $flags$, excluding periodic characters;
 	 * @param out output array: contains the values of $lastUnique,lastPeriodic,
-	 * lastAlphabet$ for the new alphabet;
-	 * @return the new alphabet that results from wobbling the characters of the current 
-	 * alphabet that are marked in $flags$; the new alphabet might not be sorted and might
-	 * contain duplicates.
+	 * lastAlphabet$ for the new alphabet.
 	 */
 	public static final Character[] wobble_extendAlphabet(boolean[] flags, int nFlags, int quantum_wobble, int quantum_alphabet, int[] out) throws IOException {
 		final int MAX_NEWCHARS_PER_CHAR = ((quantum_wobble<<1)/quantum_alphabet)*((quantum_wobble<<1)/quantum_alphabet);
@@ -7423,7 +7421,7 @@ public class RepeatAlphabet {
 	 * @return the new value of $lastCharacter_new$ after the procedure completes.
 	 */
 	private static final int wobble_extendAlphabet_impl(int c, int quantum_wobble, int quantum_alphabet, Character[] alphabet_new, int lastCharacter_new, Character tmpCharacter) {
-		int i;
+		int i, j;
 		int last, start;
 		final int startPrime = alphabet[c].start;
 		final int length = alphabet[c].getLength();
@@ -7524,13 +7522,26 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
-	
-	
-	
-	
-	
-	
+	/**
+	 * Stores in $outputFile$ the map oldCharacter -> newCharacter.
+	 */
+	public static final void wobble_buildOld2New(Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastAlphabet_new, String outputFile) throws IOException {
+		int i, j, k;
+		BufferedWriter bw;
+		
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		i=0; j=0;
+		while (i<=lastAlphabet_old) {
+			k=alphabet_new[j].compareTo(alphabet_old[i]);
+			if (k<0) { j++; continue; }
+			else if (k==0) { bw.write(j+""); i++; j++; }
+			else {  
+				System.err.println("wobble_buildOld2New> ERROR: old character not found in the new alphabet: "+alphabet_old[i]);
+				System.exit(1);
+			}
+		}
+		bw.close();
+	}
 	
 	
 	/**
@@ -7550,10 +7561,13 @@ public class RepeatAlphabet {
 	 * non-repetitiveness of a block must require a block to contain a single character.
 	 *
 	 * @param read2characters row of the translated reads file;
+	 * @param alphabet_new the new alphabet that contains the results of wobbling; the 
+	 * procedure translates $read2characters$ to this alphabet;
+	 * @param old2new map $alphabet -> alphabet_new$;
 	 * @param output array; the procedure cumulates to $out[0]$ the number of blocks to 
 	 * which wobbling was applied, and to $out[1]$ the total number of blocks in the read.
 	 */
-	public static final void wobble(String read2characters, int wobbleLength, BufferedWriter bw, int[] tmpArray1, int[] tmpArray2, int[] out) throws IOException {
+	public static final void wobble(String read2characters, int wobbleLength, int[] old2new, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter bw, int[] tmpArray1, int[] tmpArray2, int[] out) throws IOException {
 		int i, j, c;
 		int last, nBlocks, nPeriodicBlocks;
 		
@@ -7564,46 +7578,48 @@ public class RepeatAlphabet {
 		}
 		nBlocks=loadBlocks(read2characters);
 		out[1]+=nBlocks;
-		if (nBlocks==1) {
-			bw.write(read2characters); bw.newLine();
-			return;
-		}
 		Math.set(tmpArray1,nBlocks-1,0);
-		nPeriodicBlocks=0;
-		for (i=0; i<nBlocks; i++) {
-			last=lastInBlock[i];
-			for (j=0; j<=last; j++) {
-				c=Integer.parseInt(blocks[i][j]);
-				if (c<0) c=-1-c;
-				if (c>lastUnique && c<=lastPeriodic) {
-					tmpArray1[i]=1;
-					nPeriodicBlocks++;
-					break;
+		if (nBlocks>1) {
+			nPeriodicBlocks=0;
+			for (i=0; i<nBlocks; i++) {
+				last=lastInBlock[i];
+				for (j=0; j<=last; j++) {
+					c=Integer.parseInt(blocks[i][j]);
+					if (c<0) c=-1-c;
+					if (c>lastUnique && c<=lastPeriodic) {
+						tmpArray1[i]=1;
+						nPeriodicBlocks++;
+						break;
+					}
 				}
 			}
+			if (nPeriodicBlocks>0) {
+				if (tmpArray1[0]==1 && tmpArray1[1]==0) tmpArray1[1]=2;
+				for (i=1; i<nBlocks-1; i++) {
+					if (tmpArray1[i]!=1) continue;
+					if (tmpArray1[i-1]==0) tmpArray1[i-1]=2;
+					if (tmpArray1[i+1]==0) tmpArray1[i+1]=2;
+				}
+				if (tmpArray1[nBlocks-1]==1 && tmpArray1[nBlocks-2]==0) tmpArray1[nBlocks-2]=2;
+			}
 		}
-		if (nPeriodicBlocks==0) {
-			bw.write(read2characters); bw.newLine();
-			return;
-		}
-		if (tmpArray1[0]==1 && tmpArray1[1]==0) tmpArray1[1]=2;
-		for (i=1; i<nBlocks-1; i++) {
-			if (tmpArray1[i]!=1) continue;
-			if (tmpArray1[i-1]==0) tmpArray1[i-1]=2;
-			if (tmpArray1[i+1]==0) tmpArray1[i+1]=2;
-		}
-		if (tmpArray1[nBlocks-1]==1 && tmpArray1[nBlocks-2]==0) tmpArray1[nBlocks-2]=2;
 		
 		// Wobbling blocks
 		for (i=0; i<nBlocks; i++) {
 			if (i>0) bw.write(SEPARATOR_MAJOR+"");
 			if (tmpArray1[i]==0) {
-				bw.write(blocks[i][0]+"");
-				for (j=1; j<=lastInBlock[i]; j++) bw.write(SEPARATOR_MINOR+""+blocks[i][j]);
+				c=Integer.parseInt(blocks[i][0]);
+				if (c>=0) bw.write(old2new[c]+"");
+				else bw.write((-1-old2new[-1-c])+"");
+				for (j=1; j<=lastInBlock[i]; j++) {
+					c=Integer.parseInt(blocks[i][j]);
+					if (c>=0) bw.write(SEPARATOR_MINOR+""+old2new[c]);
+					else bw.write(SEPARATOR_MINOR+""+(-1-old2new[-1-c]));
+				}
 			}
 			else {
 				last=-1;
-				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),wobbleLength,tmpArray2,last);
+				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),wobbleLength,old2new,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpArray2,last);
 				if (last>0) Arrays.sort(tmpArray2,0,last+1);
 				j=0; bw.write(tmpArray2[0]+"");
 				for (j=1; j<=last; j++) {
@@ -7617,36 +7633,37 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Appends character $c$ to $out[outLast+1..]$, as well as all the other characters in
-	 * the alphabet that are the wobble of $alphabet[c]$. Characters are appended in no 
-	 * particular order.
+	 * Let $c$ be the ID of a character in $alphabet$. The procedure translates $c$ to 
+	 * $alphabet_new$, appends it to $out[outLast+1..]$, and then appends all the other 
+	 * characters of $alphabet_new$ that are the wobble of $alphabet[c]$. Characters are 
+	 * appended in no particular order.
 	 * 
 	 * @param c if negative, the characters added to $outLast$ are negative;
 	 * @return the new value of $outLast$ after the procedure completes.
 	 */
-	private static final int wobble_impl(int c, int quantum, int[] out, int outLast) {
+	private static final int wobble_impl(int c, int quantum, int[] old2new, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] out, int outLast) {
 		int i, d, w;
 		int cPrime, from, to;
 		
-		cPrime=c<0?-1-c:c;
-		if (cPrime<=lastUnique) { from=0; to=lastUnique; }
-		else if (cPrime>lastUnique && cPrime<=lastPeriodic) { from=lastUnique+1; to=lastPeriodic; }
-		else if (cPrime<=lastAlphabet) { from=lastPeriodic+1; to=lastAlphabet; }
+		cPrime=old2new[c<0?-1-c:c];
+		if (cPrime<=lastUnique_new) { from=0; to=lastUnique_new; }
+		else if (cPrime>lastUnique_new && cPrime<=lastPeriodic_new) { from=lastUnique_new+1; to=lastPeriodic_new; }
+		else if (cPrime<=lastAlphabet_new) { from=lastPeriodic_new+1; to=lastAlphabet_new; }
 		else {
-			out[++outLast]=c;
+			out[++outLast]=c<0?-1-(lastAlphabet_new+1):lastAlphabet_new+1;
 			return outLast;
 		}
 		d=cPrime-1;
 		while (d>=from) {
-			w=isWobbleOf(d,cPrime,quantum,alphabet);
+			w=isWobbleOf(d,cPrime,quantum,alphabet_new);
 			if (w==-1) break;
 			else if (w==1) out[++outLast]=c<0?-1-d:d;
 			d--;
 		}
-		out[++outLast]=c;
+		out[++outLast]=c<0?-1-cPrime:cPrime;
 		d=cPrime+1;
 		while (d<=to) {
-			w=isWobbleOf(d,cPrime,quantum,alphabet);
+			w=isWobbleOf(d,cPrime,quantum,alphabet_new);
 			if (w==-1) break;
 			else if (w==1) out[++outLast]=c<0?-1-d:d;
 			d++;

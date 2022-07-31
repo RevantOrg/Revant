@@ -278,6 +278,9 @@ fi
 
 if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	echo "Wobbling..."
+	WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
+	WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${WOBBLE_LENGTH} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
 	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		WOBBLE_PREFIX="${TMPFILE_PATH}-spacers-9"
 	else
@@ -289,7 +292,7 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	fi
 	function wobbleThread() {
 		local WOBBLE_FILE_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${TMPFILE_PATH}-wobble-3-${THREAD}.txt
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${TMPFILE_PATH}-wobble-3-${THREAD}.txt
 	}
 	if [ -e ${WOBBLE_PREFIX}-${N_THREADS}.txt ]; then
 		TO=${N_THREADS}
