@@ -278,9 +278,6 @@ fi
 
 if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	echo "Wobbling..."
-	WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
-	WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${WOBBLE_LENGTH} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
 	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		WOBBLE_PREFIX="${TMPFILE_PATH}-spacers-9"
 	else
@@ -289,16 +286,27 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 		# alignments, rather than read-read alignments.
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-wobble-1- ${TMPFILE_PATH}-wobble-2-
 		WOBBLE_PREFIX="${TMPFILE_PATH}-wobble-1"
-	fi
-	function wobbleThread() {
+	fi	
+	function wobbleThreadCreate() {
 		local WOBBLE_FILE_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${TMPFILE_PATH}-wobble-3-${THREAD}.txt
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet1 ${ALPHABET_FILE} ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_PREFIX}-flags-${WOBBLE_FILE_ID}.txt
 	}
 	if [ -e ${WOBBLE_PREFIX}-${N_THREADS}.txt ]; then
 		TO=${N_THREADS}
 	else
 		TO=$(( ${N_THREADS} - 1 ))
 	fi
+	for THREAD in $(seq 0 ${TO}); do
+		wobbleThreadCreate ${THREAD} &
+	done
+	wait
+	WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
+	WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${WOBBLE_PREFIX}-flags ${TO} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
+	function wobbleThread() {
+		local WOBBLE_FILE_ID=$1
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${TMPFILE_PATH}-wobble-3-${WOBBLE_FILE_ID}.txt
+	}
 	for THREAD in $(seq 0 ${TO}); do
 		wobbleThread ${THREAD} &
 	done
