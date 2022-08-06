@@ -315,6 +315,8 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	for THREAD in $(seq 0 ${TO}); do
 		cat ${TMPFILE_PATH}-wobble-3-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 	done
+	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prewobble
+	mv ${WOBBLE_ALPHABET} ${ALPHABET_FILE}
 	echo "Wobbling completed"
 fi
 

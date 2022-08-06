@@ -25,6 +25,7 @@ public class WobbleCreateAlphabet1 {
 		boolean[] flags;
 		int[] tmpArray;
 		
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		flags = new boolean[RepeatAlphabet.lastAlphabet+1];
 		Math.set(flags,RepeatAlphabet.lastAlphabet,false);
 		tmpArray = new int[100];  // Arbitrary

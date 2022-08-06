@@ -28,6 +28,7 @@ public class WobbleCreateAlphabet2 {
 		RepeatAlphabet.Character[] alphabet_old, alphabet_new;
 		
 		System.err.println("Merging bitvectors...");
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		flags = new boolean[RepeatAlphabet.lastAlphabet+1];
 		Math.set(flags,RepeatAlphabet.lastAlphabet,false);
 		for (i=0; i<=LAST_FLAG_FILE; i++) {
@@ -39,17 +40,14 @@ public class WobbleCreateAlphabet2 {
 		for (i=0; i<=RepeatAlphabet.lastAlphabet; i++) nFlags+=flags[i]?1:0;
 		
 		System.err.println("Wobbling "+nFlags+" characters...");
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		alphabet_old=RepeatAlphabet.alphabet; lastUnique_old=RepeatAlphabet.lastUnique; lastPeriodic_old=RepeatAlphabet.lastPeriodic; lastAlphabet_old=RepeatAlphabet.lastAlphabet;
 		alphabet_new=RepeatAlphabet.wobble_extendAlphabet(flags,nFlags,WOBBLE_LENGTH,IO.quantum,out);
 		lastUnique_new=out[0]; lastPeriodic_new=out[1]; lastAlphabet_new=out[2];
 		RepeatAlphabet.alphabet=alphabet_new;
 		RepeatAlphabet.lastUnique=lastUnique_new; RepeatAlphabet.lastPeriodic=lastPeriodic_new; RepeatAlphabet.lastAlphabet=lastAlphabet_new;
-		RepeatAlphabet.compactInstances();
+		RepeatAlphabet.compactInstances_weak();
 		RepeatAlphabet.closeAlphabetByRC();
-		// $compactInstances()$ might be needed again: see $closeAlphabetByRC()$.
-		RepeatAlphabet.compactInstances();
-		System.err.println("Wobbling completed: "+(lastUnique_new-lastUnique_old)+" new unique characters; "+(lastPeriodic_new-lastUnique_new-lastPeriodic_old+lastUnique_old)+" new periodic characters; "+(lastAlphabet_new-lastPeriodic_new-lastAlphabet_old+lastPeriodic_old)+" new non-periodic characters.");
+		System.err.println("Wobbled alphabet created: "+(lastUnique_new-lastUnique_old)+" new unique characters; "+(lastPeriodic_new-lastUnique_new-lastPeriodic_old+lastUnique_old)+" new periodic characters; "+(lastAlphabet_new-lastPeriodic_new-lastAlphabet_old+lastPeriodic_old)+" new non-periodic characters.");
 		RepeatAlphabet.serializeAlphabet(OUTPUT_FILE_ALPHABET);
 		RepeatAlphabet.wobble_buildOld2New(alphabet_old,lastAlphabet_old,alphabet_new,lastAlphabet_new,OUTPUT_FILE_OLD2NEW);
 	}
