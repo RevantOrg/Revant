@@ -302,10 +302,10 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	wait
 	WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
 	WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${WOBBLE_PREFIX}-flags ${TO} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${WOBBLE_PREFIX}-flags ${TO} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
 	function wobbleThread() {
 		local WOBBLE_FILE_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${TMPFILE_PATH}-wobble-3-${WOBBLE_FILE_ID}.txt
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-wobble-3-${WOBBLE_FILE_ID}.txt
 	}
 	for THREAD in $(seq 0 ${TO}); do
 		wobbleThread ${THREAD} &
@@ -319,6 +319,19 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	mv ${WOBBLE_ALPHABET} ${ALPHABET_FILE}
 	echo "Wobbling completed"
 fi
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

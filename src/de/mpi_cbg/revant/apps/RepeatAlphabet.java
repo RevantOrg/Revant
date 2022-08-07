@@ -620,6 +620,37 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * A weaker version of $compactInstances()$ that just removes exact duplicates.
+	 */
+	public static final void compactInstances_weak() {
+		int i, j, k;
+		int first;
+		Character tmpChar;
+		
+		if (lastUnique>0) Arrays.sort(alphabet,0,lastUnique+1);
+		if (lastPeriodic>lastUnique+1) Arrays.sort(alphabet,lastUnique+1,lastPeriodic+1);
+		if (lastAlphabet>lastPeriodic+1) Arrays.sort(alphabet,lastPeriodic+1,lastAlphabet+1);
+		j=0;
+		for (i=1; i<=lastAlphabet; i++) {
+			if ( alphabet[i].repeat!=alphabet[j].repeat || alphabet[i].orientation!=alphabet[j].orientation || 
+				 alphabet[i].start!=alphabet[j].start || alphabet[i].end!=alphabet[j].end || alphabet[i].length!=alphabet[j].length ||
+			     alphabet[i].openStart!=alphabet[j].openStart || alphabet[i].openEnd!=alphabet[j].openEnd
+			   ) {
+				j++;
+				tmpChar=alphabet[j];
+				alphabet[j]=alphabet[i];
+				alphabet[i]=tmpChar;
+			}
+		}
+		lastAlphabet=j;
+		lastUnique=-1; i=0;
+		while (i<=lastAlphabet && alphabet[i].repeat==UNIQUE) lastUnique=i++;
+		lastPeriodic=lastUnique;
+		while (i<=lastAlphabet && alphabet[i].start==-1) lastPeriodic=i++;
+	}
+	
+	
+	/**
 	 * Ensures that the reverse-complement of every character in the alphabet, is also in
 	 * the alphabet.
 	 *
@@ -7307,8 +7338,9 @@ public class RepeatAlphabet {
 	// ---------------------------------- WOBBLING ---------------------------------------
 	
 	/**
-	 * Sets $out[i]=true$ iff $alphabet[i]$ is a non-periodic character that has to be
-	 * wobbled (every periodic character must be wobbled, marking those is not needed).
+	 * Sets $out[i]=true$ iff $alphabet[i]$ is a non-periodic character (possibly non-
+	 * repetitive) that has to be wobbled (every periodic character must be wobbled, 
+	 * marking those is not needed).
 	 *
 	 * @param read2characters a row of the translated reads file;
 	 * @param tmpArray temporary space, of size at least equal to the number of blocks.
@@ -7364,7 +7396,7 @@ public class RepeatAlphabet {
 						}
 						for (k=c; k<=lastUnique; k++) out[k]=true;
 					}
-					else out[c]=true;
+					else if (c<=lastAlphabet) out[c]=true;
 				}
 			}
 		}
@@ -7377,11 +7409,14 @@ public class RepeatAlphabet {
 	 * section of the new alphabet (unique, periodic, non-periodic) might not be sorted 
 	 * and might contain duplicates.
 	 *
+	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
+	 *
 	 * @param nFlags number of TRUE elements in $flags$, excluding periodic characters;
+	 * @param minAlignmentLength min. length of a read-repeat alignment;
 	 * @param out output array: contains the values of $lastUnique,lastPeriodic,
 	 * lastAlphabet$ for the new alphabet.
 	 */
-	public static final Character[] wobble_extendAlphabet(boolean[] flags, int nFlags, int quantum_wobble, int quantum_alphabet, int[] out) throws IOException {
+	public static final Character[] wobble_extendAlphabet(boolean[] flags, int nFlags, int quantum_wobble, int quantum_alphabet, int minAlignmentLength, int[] out) throws IOException {
 		final int MAX_NEWCHARS_PER_CHAR = ((quantum_wobble<<1)/quantum_alphabet)*((quantum_wobble<<1)/quantum_alphabet);
 		int i;
 		int lastUnique_new, lastPeriodic_new, lastAlphabet_new;
@@ -7393,17 +7428,17 @@ public class RepeatAlphabet {
 		lastUnique_new=-1;
 		for (i=0; i<=lastUnique; i++) {
 			alphabet_new[++lastUnique_new]=alphabet[i];
-			if (flags[i]) lastUnique_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,alphabet_new,lastUnique_new,tmpCharacter);
+			if (flags[i]) lastUnique_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,minAlignmentLength,alphabet_new,lastUnique_new,tmpCharacter);
 		}
 		lastPeriodic_new=lastUnique_new;
 		for (i=lastUnique+1; i<=lastPeriodic; i++) {
 			alphabet_new[++lastPeriodic_new]=alphabet[i];
-			lastPeriodic_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,alphabet_new,lastPeriodic_new,tmpCharacter);
+			lastPeriodic_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,minAlignmentLength,alphabet_new,lastPeriodic_new,tmpCharacter);
 		}
 		lastAlphabet_new=lastPeriodic_new;
 		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
 			alphabet_new[++lastAlphabet_new]=alphabet[i];
-			if (flags[i]) lastAlphabet_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,alphabet_new,lastAlphabet_new,tmpCharacter);
+			if (flags[i]) lastAlphabet_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,minAlignmentLength,alphabet_new,lastAlphabet_new,tmpCharacter);
 		}
 		out[0]=lastUnique_new; out[1]=lastPeriodic_new; out[2]=lastAlphabet_new;
 		return alphabet_new;
@@ -7412,26 +7447,32 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Adds to $alphabet_new[lastCharacter_new+1..]$ every character that is produced by
-	 * wobbling $alphabet[c]$ and that is not already in $alphabet$.
+	 * wobbling $alphabet[c]$ and that is not already in $alphabet$. $alphabet$ is assumed
+	 * to be already quantized.
 	 *
 	 * Remark: running this procedure with different values of $c$ might introduce 
 	 * duplicates in $alphabet_new$.
 	 *
+	 * Remark: calling $compactInstances()$ on the post-wobbling alphabet undoes some of 
+	 * the wobbling for half-open and fully-open characters.
+	 *
 	 * @param alphabet_new assumed to be large enough;
+	 * @param minAlignmentLength min. length of a read-repeat alignment;
 	 * @return the new value of $lastCharacter_new$ after the procedure completes.
 	 */
-	private static final int wobble_extendAlphabet_impl(int c, int quantum_wobble, int quantum_alphabet, Character[] alphabet_new, int lastCharacter_new, Character tmpCharacter) {
-		int i, j;
-		int last, start;
+	private static final int wobble_extendAlphabet_impl(int c, int quantum_wobble, int quantum_alphabet, int minAlignmentLength, Character[] alphabet_new, int lastCharacter_new, Character tmpCharacter) {
+		final int MIN_CHARACTER_LENGTH = minAlignmentLength;
+		int i;
+		int repeatLength;
 		final int startPrime = alphabet[c].start;
 		final int length = alphabet[c].getLength();
 		Character newCharacter;
 		
 		if (c<=lastPeriodic) {
+			tmpCharacter.copyFrom(alphabet[c]);
 			for (i=quantum_alphabet; i<=quantum_wobble; i+=quantum_alphabet) {
-				tmpCharacter.copyFrom(alphabet[c]);
 				tmpCharacter.length=length-i;
-				if (!wobble_find(tmpCharacter,c,false)) {
+				if (tmpCharacter.length>=MIN_CHARACTER_LENGTH && !wobble_find(tmpCharacter,c,false)) {
 					newCharacter = new Character();
 					newCharacter.copyFrom(tmpCharacter);
 					alphabet_new[++lastCharacter_new]=newCharacter;
@@ -7445,41 +7486,45 @@ public class RepeatAlphabet {
 			}
 		}
 		else {
+			tmpCharacter.copyFrom(alphabet[c]);
+			repeatLength=repeatLengths[alphabet[c].repeat];
 			for (i=quantum_alphabet; i<=quantum_wobble; i+=quantum_alphabet) {
-				start=startPrime-i;
-				for (j=quantum_alphabet; j<=quantum_wobble; j+=quantum_alphabet) {
-					tmpCharacter.copyFrom(alphabet[c]);
-					tmpCharacter.start=start;
-					tmpCharacter.end=tmpCharacter.start+(length-j)-1;
-					if (!wobble_find(tmpCharacter,c,false)) {
-						newCharacter = new Character();
-						newCharacter.copyFrom(tmpCharacter);
-						alphabet_new[++lastCharacter_new]=newCharacter;
-					}
-					tmpCharacter.end=tmpCharacter.start+(length+j)-1;
-					if (!wobble_find(tmpCharacter,c,false)) {
-						newCharacter = new Character();
-						newCharacter.copyFrom(tmpCharacter);
-						alphabet_new[++lastCharacter_new]=newCharacter;
-					}
-				}
-				start=startPrime+i;
-				for (j=quantum_alphabet; j<=quantum_wobble; j+=quantum_alphabet) {
-					tmpCharacter.copyFrom(alphabet[c]);
-					tmpCharacter.start=start;
-					tmpCharacter.end=tmpCharacter.start+(length-j)-1;
-					if (!wobble_find(tmpCharacter,c,true)) {
-						newCharacter = new Character();
-						newCharacter.copyFrom(tmpCharacter);
-						alphabet_new[++lastCharacter_new]=newCharacter;
-					}
-					tmpCharacter.end=tmpCharacter.start+(length+j)-1;
-					if (!wobble_find(tmpCharacter,c,true)) {
-						newCharacter = new Character();
-						newCharacter.copyFrom(tmpCharacter);
-						alphabet_new[++lastCharacter_new]=newCharacter;
-					}
-				}
+				tmpCharacter.start=startPrime-i;
+				if (tmpCharacter.start>=0) lastCharacter_new=wobble_extendAlphabet_impl_end(tmpCharacter,c,length,repeatLength,MIN_CHARACTER_LENGTH,quantum_alphabet,quantum_wobble,true,alphabet_new,lastCharacter_new);
+				tmpCharacter.start=startPrime;
+				lastCharacter_new=wobble_extendAlphabet_impl_end(tmpCharacter,c,length,repeatLength,MIN_CHARACTER_LENGTH,quantum_alphabet,quantum_wobble,false,alphabet_new,lastCharacter_new);
+				tmpCharacter.start=startPrime+i;
+				if (tmpCharacter.start<repeatLength) lastCharacter_new=wobble_extendAlphabet_impl_end(tmpCharacter,c,length,repeatLength,MIN_CHARACTER_LENGTH,quantum_alphabet,quantum_wobble,true,alphabet_new,lastCharacter_new);
+			}
+		}
+		return lastCharacter_new;
+	}
+	
+	
+	private static final int wobble_extendAlphabet_impl_end(Character tmpCharacter, int c, int length, int repeatLength, int minCharacterLength, int quantum_alphabet, int quantum_wobble, boolean useOriginalLength, Character[] alphabet_new, int lastCharacter_new) {
+		int j;
+		Character newCharacter;
+		
+		if (useOriginalLength) {
+			tmpCharacter.end=tmpCharacter.start+length-1;
+			if (tmpCharacter.end<repeatLength && !wobble_find(tmpCharacter,c,false)) {
+				newCharacter = new Character();
+				newCharacter.copyFrom(tmpCharacter);
+				alphabet_new[++lastCharacter_new]=newCharacter;
+			}
+		}
+		for (j=quantum_alphabet; j<=quantum_wobble; j+=quantum_alphabet) {
+			tmpCharacter.end=tmpCharacter.start+(length-j)-1;
+			if (tmpCharacter.end<repeatLength && tmpCharacter.getLength()>=minCharacterLength && !wobble_find(tmpCharacter,c,false)) {
+				newCharacter = new Character();
+				newCharacter.copyFrom(tmpCharacter);
+				alphabet_new[++lastCharacter_new]=newCharacter;
+			}
+			tmpCharacter.end=tmpCharacter.start+(length+j)-1;
+			if (tmpCharacter.end<repeatLength && tmpCharacter.getLength()>=minCharacterLength && !wobble_find(tmpCharacter,c,false)) {
+				newCharacter = new Character();
+				newCharacter.copyFrom(tmpCharacter);
+				alphabet_new[++lastCharacter_new]=newCharacter;
 			}
 		}
 		return lastCharacter_new;
@@ -7523,21 +7568,62 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Stores in $outputFile$ the map oldCharacter -> newCharacter.
+	 * Stores in $outputFile$ the map $oldCharacter -> newCharacter$, where $newCharacter$
+	 * is a wobble of $oldCharacter$ if it exists, otherwise it is the new character with
+	 * smallest ID that implies $oldCharacter$.
+	 *
+	 * The reason for this is the following. If the new alphabet is processed by 
+	 * $compactInstances()$, it might happen that $oldCharacter$ is not present in the new
+	 * alphabet, and that all its wobbles have been merged with a longer implying 
+	 * character that is not the wobble of $oldCharacter$.
 	 */
-	public static final void wobble_buildOld2New(Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastAlphabet_new, String outputFile) throws IOException {
-		int i, j, k;
+	public static final void wobble_buildOld2New(Character[] alphabet_old, int lastAlphabet_old, int quantum_wobble, int quantum_alphabet, Character[] alphabet_new, int lastAlphabet_new, String outputFile) throws IOException {
+		int i, j, k, p, q;
+		int wobble, implying;
 		BufferedWriter bw;
-		
+		Character character;
+
 		bw = new BufferedWriter(new FileWriter(outputFile));
 		i=0; j=0;
 		while (i<=lastAlphabet_old) {
 			k=alphabet_new[j].compareTo(alphabet_old[i]);
 			if (k<0) { j++; continue; }
-			else if (k==0) { bw.write(j+""); i++; j++; }
-			else {  
-				System.err.println("wobble_buildOld2New> ERROR: old character not found in the new alphabet: "+alphabet_old[i]);
-				System.exit(1);
+			else if (k==0) { bw.write(j+"\n"); i++; j++; }
+			else {
+				// Finding a wobble of $alphabet_old[i]$.
+				character=alphabet_old[i]; wobble=-1;
+				for (p=j; p>=0; p--) {
+					q=isWobbleOf(p,character,quantum_wobble,quantum_alphabet,alphabet_new);
+					if (q==-1) break;
+					else if (q==1) { wobble=p; break; }
+				}
+				if (wobble==-1) {
+					for (p=j+1; p<=lastAlphabet_new; p++) {
+						q=isWobbleOf(p,character,quantum_wobble,quantum_alphabet,alphabet_new);
+						if (q==-1) break;
+						else if (q==1) { wobble=p; break; }
+					}
+				}
+				if (wobble!=-1) { bw.write(wobble+"\n"); i++; }
+				else {
+					// Finding a character that implies $alphabet_old[i]$.
+					implying=-1;
+					for (p=j; p>=0; p--) {
+						if (alphabet_new[p].repeat!=character.repeat || alphabet_new[p].orientation!=character.orientation) break;
+						if (alphabet_new[p].implies(character)) implying=p;
+					}
+					if (implying==-1) {
+						for (p=j+1; p<=lastAlphabet_new; p++) {
+							if (alphabet_new[p].implies_tooFarAfter(character)) break;
+							if (alphabet_new[p].implies(character)) { implying=p; break; }
+						}
+					}
+					if (implying!=-1) { bw.write(implying+"\n"); i++; }
+					else {
+						System.err.println("wobble_buildOld2New> ERROR: old character not equal to or implied by any new character: "+character);
+						System.exit(1);
+					}
+				}
 			}
 		}
 		bw.close();
@@ -7547,8 +7633,8 @@ public class RepeatAlphabet {
 	/**
 	 * Rewrites the translation of a read so that periodic blocks, and blocks adjacent to
 	 * periodic blocks, \emph{wobble}, i.e. they contain, in addition to their original
-	 * characters in $alphabet$, other similar characters whose length is $<=wobbleLength$
-	 * bps away from the original. Reads with just one block are not altered.
+	 * characters in $alphabet$, other similar characters whose length is $<=quantum_
+	 * wobble$ bps away from the original. Reads with just one block are not altered.
 	 *
 	 * Remark: wobbling is designed to increase the number of edges in a highly
 	 * disconnected overlap graph where the endpoints of repeat occurrences are uncertain.
@@ -7567,7 +7653,7 @@ public class RepeatAlphabet {
 	 * @param output array; the procedure cumulates to $out[0]$ the number of blocks to 
 	 * which wobbling was applied, and to $out[1]$ the total number of blocks in the read.
 	 */
-	public static final void wobble(String read2characters, int wobbleLength, int[] old2new, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter bw, int[] tmpArray1, int[] tmpArray2, int[] out) throws IOException {
+	public static final void wobble(String read2characters, int quantum_wobble, int quantum_alphabet, int[] old2new, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter bw, int[] tmpArray1, int[] tmpArray2, int[] out) throws IOException {
 		int i, j, c;
 		int last, nBlocks, nPeriodicBlocks;
 		
@@ -7619,7 +7705,7 @@ public class RepeatAlphabet {
 			}
 			else {
 				last=-1;
-				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),wobbleLength,old2new,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpArray2,last);
+				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),quantum_wobble,quantum_alphabet,old2new,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpArray2,last);
 				if (last>0) Arrays.sort(tmpArray2,0,last+1);
 				j=0; bw.write(tmpArray2[0]+"");
 				for (j=1; j<=last; j++) {
@@ -7641,11 +7727,21 @@ public class RepeatAlphabet {
 	 * @param c if negative, the characters added to $outLast$ are negative;
 	 * @return the new value of $outLast$ after the procedure completes.
 	 */
-	private static final int wobble_impl(int c, int quantum, int[] old2new, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] out, int outLast) {
+	private static final int wobble_impl(int c, int quantum_wobble, int quantum_alphabet, int[] old2new, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] out, int outLast) {
 		int i, d, w;
 		int cPrime, from, to;
+		Character oldCharacter;
 		
-		cPrime=old2new[c<0?-1-c:c];
+		if (c==lastAlphabet+1) {
+			out[++outLast]=lastAlphabet_new+1;
+			return outLast;
+		}
+		else if (c==-1-(lastAlphabet+1)) {
+			out[++outLast]=-1-(lastAlphabet_new+1);
+			return outLast;
+		}
+		if (c<0) { oldCharacter=alphabet[-1-c]; cPrime=old2new[-1-c]; }
+		else { oldCharacter=alphabet[c]; cPrime=old2new[c]; }
 		if (cPrime<=lastUnique_new) { from=0; to=lastUnique_new; }
 		else if (cPrime>lastUnique_new && cPrime<=lastPeriodic_new) { from=lastUnique_new+1; to=lastPeriodic_new; }
 		else if (cPrime<=lastAlphabet_new) { from=lastPeriodic_new+1; to=lastAlphabet_new; }
@@ -7655,7 +7751,7 @@ public class RepeatAlphabet {
 		}
 		d=cPrime-1;
 		while (d>=from) {
-			w=isWobbleOf(d,cPrime,quantum,alphabet_new);
+			w=isWobbleOf(d,oldCharacter,quantum_wobble,quantum_alphabet,alphabet_new);
 			if (w==-1) break;
 			else if (w==1) out[++outLast]=c<0?-1-d:d;
 			d--;
@@ -7663,7 +7759,7 @@ public class RepeatAlphabet {
 		out[++outLast]=c<0?-1-cPrime:cPrime;
 		d=cPrime+1;
 		while (d<=to) {
-			w=isWobbleOf(d,cPrime,quantum,alphabet_new);
+			w=isWobbleOf(d,oldCharacter,quantum_wobble,quantum_alphabet,alphabet_new);
 			if (w==-1) break;
 			else if (w==1) out[++outLast]=c<0?-1-d:d;
 			d++;
@@ -7673,25 +7769,18 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * @return 1=$alphabet[x]$ is identical to $alphabet[y]$ in everything except the 
-	 * length, which differs by at most $quantum$, and the starting position, which 
-	 * differs by at most $quantum$; -1=$alphabet[x]$ is out of the range of candidates 
-	 * that could satisfy (1); 0=none of the above.
+	 * @return 1=$alphabet[x]$ is identical to $reference$ in everything except the 
+	 * length, which differs by at most $quantum_wobble$, and the starting position, which 
+	 * differs by at most $quantum_wobble$; -1=$alphabet[x]$ is out of the range of 
+	 * candidates that could satisfy (1); 0=none of the above.
 	 */
-	private static final int isWobbleOf(int x, int y, int quantum, Character[] alphabet) {
-		if ( alphabet[x].repeat!=alphabet[y].repeat || alphabet[x].orientation!=alphabet[y].orientation || 
-			 alphabet[x].start<alphabet[y].start-quantum || alphabet[x].start>alphabet[y].start+quantum ) return -1;
-		if (alphabet[x].openStart!=alphabet[y].openStart || alphabet[x].openEnd!=alphabet[y].openEnd) return 0;
-		int lengthX, lengthY;
-		if (alphabet[x].start==-1) {
-			lengthX=alphabet[x].length;
-			lengthY=alphabet[y].length;
-		}
-		else {
-			lengthX=alphabet[x].end-alphabet[x].start+1;
-			lengthY=alphabet[y].end-alphabet[y].start+1;
-		}
-		return Math.abs(lengthX,lengthY)<=quantum?1:0;
+	private static final int isWobbleOf(int x, Character reference, int quantum_wobble, int quantum_alphabet, Character[] alphabet) {
+		if ( alphabet[x].repeat!=reference.repeat || alphabet[x].orientation!=reference.orientation || 
+			 alphabet[x].start<reference.start-quantum_wobble || alphabet[x].start>reference.start+quantum_wobble ) return -1;
+		if ( (alphabet[x].openStart!=reference.openStart && alphabet[x].start>quantum_alphabet && reference.start>quantum_alphabet) || 
+			 (alphabet[x].openEnd!=reference.openEnd && alphabet[x].end<repeatLengths[alphabet[x].repeat]-quantum_alphabet && reference.end<repeatLengths[alphabet[x].repeat]-quantum_alphabet)
+		   ) return 0;
+		return Math.abs(alphabet[x].getLength(),reference.getLength())<=quantum_wobble?1:0;
 	}
 	
 	
