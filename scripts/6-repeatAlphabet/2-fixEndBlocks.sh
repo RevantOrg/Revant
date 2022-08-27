@@ -3,7 +3,7 @@
 # For increasing values of k, the script tries to disambiguate the endpoints of reads
 # using a context of length k.
 #
-# Remark: since collecting k-mers is expensive, one might want to try just few values of
+# Remark: since collecting k-mers is expensive, one might want to try just a few values of
 # k.
 #
 # Remark: the script assumes that environment variable $REVANT_BINARIES$ is already set
@@ -19,6 +19,7 @@ HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 TIGHT_MODE="0"
 LOW_QUALITY_TYPE="1"  # 1=replacement, 0=insertion.
 LOW_QUALITY_LENGTH_TOLERANCE="200"  # bps
+MULTI_MODE_OF_NEXT_STAGE="0";  # The value of MULTI_MODE used by 3-getUniqueSubstrings.sh
 MIN_K="2"  # One plus the min length of a context used for disambiguation
 MAX_K="4"  # One plus the max length of a context used for disambiguation
 N_THREADS="1"
@@ -27,6 +28,11 @@ DELETE_TMP_FILES="1"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
+if [ ${MULTI_MODE_OF_NEXT_STAGE} -eq 0 ]; then
+	# Disambiguating the endblocks of a read is useful only if endblocks with multiple
+	# characters are not allowed in the next stage.
+	exit
+fi
 set -o pipefail; set -e; set -u
 export LC_ALL=C  # To speed up the $sort$ command.
 TMPFILE_NAME="fixEndBlocks-tmp"
@@ -39,7 +45,7 @@ READS_BOUNDARIES_FILE="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
-UNIQUE_MODE="1"; MULTI_MODE="1"  # Endblocks are forbidden
+UNIQUE_MODE="1"; MULTI_MODE="1"  # Endblocks are forbidden in this stage
 rm -f ${TMPFILE_PATH}*
 
 function kmersThread() {

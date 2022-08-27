@@ -30,7 +30,9 @@ public class FixPeriodicEndpoints1 {
 		final String READ_READ_ALIGNMENTS_FILE = args[12];
 		final int N_BLOCKS = Integer.parseInt(args[13]);  // Of the alignments file
 		final String LAST_READ_FILE = args[14];  // Last block included
-		final String OUTPUT_PREFIX = args[15];
+		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[15]);
+		final int N_HAPLOTYPES = Integer.parseInt(args[16]);
+		final String OUTPUT_PREFIX = args[17];
 		
 		int i, j;
 		int maxBlockLength;
@@ -51,6 +53,7 @@ public class FixPeriodicEndpoints1 {
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
 		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,tmpArray1,tmpArray2,tmpArray3);
+		RepeatAlphabet.getSpacerGraphStatistics(HAPLOTYPE_COVERAGE,N_HAPLOTYPES,false);
 		RepeatAlphabet.assignBreakpoints();
 		
 RepeatAlphabet.printSpacerNeighbors("/Users/ramseysnow/Downloads/SIMULATED-REPBASE/spacers.dot");		

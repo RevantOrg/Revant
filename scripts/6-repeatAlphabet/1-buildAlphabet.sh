@@ -16,6 +16,7 @@ BROKEN_READS=$2  # 1=TRUE
 KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic
 MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
+N_HAPLOTYPES="1"
 HAPLOTYPE_COVERAGE="30"  # Of one haplotype
 MAX_SPACER_LENGTH="10000"  # 0=assume that the endpoints of periodic repeats are accurate
 WOBBLE_LENGTH="100"  # 0=do not wobble.
@@ -47,6 +48,7 @@ done
 MIN_CHARACTER_FREQUENCY=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
 rm -f ${TMPFILE_PATH}*
 
+
 echo "Splitting the alignments file..."
 if [ ${BROKEN_READS} -eq 1 ]; then
 	# Reusing the chunks of the read-repeat alignments file that are already there (we
@@ -63,6 +65,7 @@ else
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${ALIGNMENTS_FILE} ${TMPFILE_PATH}-1- ${LAST_READA_FILE}
 fi
 echo "Alignments filtered and split in ${N_THREADS} parts"
+
 
 echo "Collecting character instances..."
 function collectionThread() {
@@ -85,6 +88,7 @@ wait
 sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-3-*.txt | uniq - ${TMPFILE_PATH}-4.txt
 N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-4.txt)
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-4.txt ${TMPFILE_PATH}-5-
+
 
 echo "Compacting character instances..."
 function compactionThread() {
@@ -112,10 +116,6 @@ for THREAD in $(seq 0 ${TO}); do
 done
 ALPHABET_SIZE=$( wc -l < ${ALPHABET_FILE} )
 ALPHABET_SIZE=$(( ${ALPHABET_SIZE} - 1 ))
-
-
-
-cp ${ALPHABET_FILE} ${ALPHABET_FILE}-step1
 
 
 echo "Translating reads..."
@@ -184,8 +184,6 @@ for THREAD in $(seq 0 ${TO}); do
 done
 
 
-
-
 if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	echo "Fixing periodic endpoints..."
 	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
@@ -211,7 +209,7 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	echo "Collecting spacers and assigning breakpoints to them..."
 	N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
 	N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${N_THREADS} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-2-
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${N_THREADS} ${LAST_READA_FILE} ${HAPLOTYPE_COVERAGE} ${N_HAPLOTYPES} ${TMPFILE_PATH}-spacers-2-
 	echo "Collecting instances of spacer-induced characters..."
 	function collectionThread_spacers() {
 		local SPACERS_FILE_ID=$1
@@ -274,8 +272,6 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 fi
 
 
-
-
 if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	echo "Wobbling..."
 	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
@@ -319,21 +315,6 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 	mv ${WOBBLE_ALPHABET} ${ALPHABET_FILE}
 	echo "Wobbling completed"
 fi
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 echo "Discarding rare characters..."
@@ -401,6 +382,7 @@ fi
 PASTE_OPTIONS="${PASTE_OPTIONS}}'"
 paste ${INPUT_DIR}/${TMPFILE_NAME}-18-* | eval ${PASTE_OPTIONS} - > ${HISTOGRAM_FILE}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Setminus ${FULLY_CONTAINED_FILE} ${FULLY_UNIQUE_FILE_NEW} > ${FULLY_CONTAINED_FILE_NEW}
+
 
 # Removing all temp files that are not used downstream
 if [ ${DELETE_TMP_FILES} -eq 1 ]; then

@@ -773,9 +773,9 @@ public class Alignments {
 	public static final boolean projectIntersection(int a, int b, int[] out) {
 		final int fromA = a>startA?a:startA;
 		final int toA = b<endA?b:endA;
+		if (toA<fromA) return false;
 		final double ratio = ((double)(endB-startB+1))/(endA-startA+1);
 		
-		if (toA<fromA) return false;
 		if (orientation) {
 			out[0]=startB+(int)(ratio*(fromA-startA));
 			out[1]=endB-(int)(ratio*(endA-toA));

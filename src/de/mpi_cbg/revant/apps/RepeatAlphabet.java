@@ -2273,7 +2273,7 @@ public class RepeatAlphabet {
 				}
 				else {
 					value=oldKmers.get(key);
-					if (value!=null) return (int)(value.count/haplotypeCoverage);
+					if (value!=null) return (int)Math.round(((double)value.count)/haplotypeCoverage);
 				}
 			}
 			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
@@ -2367,7 +2367,7 @@ public class RepeatAlphabet {
 	/**
 	 * Tries to disambiguate the first and the last block of $str$ using the surrounding
 	 * context of length $k$, and appends the updated $str$ to $bw$. This is useful, since
-	 * ambiguous endblocks are not included in the unique intervals that are built 
+	 * ambiguous endblocks might not be included in the unique intervals that are built 
 	 * downstream, and thus a suffix-prefix alignment is more likely to be filtered out by
 	 * $filterAlignments_*()$ if its endblock is ambiguous.
 	 *
@@ -2390,7 +2390,7 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: for simplicity the procedure loads all the blocks of $str$, even though 
 	 * just the first and the last $k+1$ blocks would suffice.
-	 *	
+	 *
 	 * @param kmers a set of k-mers, with their $*Character$ fields correctly set; this
  	 * might be just a subset of all k-mers (e.g. only those with large frequency);
  	 * @param tightMode TRUE=accept a prediction only if every k-mer of $intBlocks[first..
@@ -5067,7 +5067,7 @@ public class RepeatAlphabet {
 	 *
 	 * An element of type 1, 2.1, 3 is called \emph{rigid}, since there is just one way of 
 	 * assigning a breakpoint to it. Short non-repetitive blocks at the beginning/end of a
-	 * read are loaded like 2.2.
+	 * read are loaded and treated like 2.2.
 	 *
 	 * Remark: we need to load a spacer of type 3 in read X, because another read Y might 
 	 * cover, with its beginning or end, some part of the spacer in read X, and some part 
@@ -5353,7 +5353,7 @@ public class RepeatAlphabet {
 		boolean readB_fullyUnique, readB_fullyContained;
 		int i, j, k, p;
 		int firstSpacer, readA, readB, nEdges, row, max, last, fromA, toA, fromB, toB, readA_length, readA_translatedIndex, readB_translatedIndex;
-		int nSingletonSpacers_rigid, nSingletonSpacers_nonRigid_all, nSingletonSpacers_nonRigid_bridging;
+		int nSingletonSpacers_rigid, nSingletonSpacers_nonRigid_all, nSingletonSpacers_nonRigid_bridging, nSingletonSpacers_nonRigid_inactive;
 		String str;
 		BufferedReader br;
 		Spacer tmpSpacer = new Spacer();
@@ -5521,7 +5521,7 @@ public class RepeatAlphabet {
 		
 		// Computing statistics
 		nBridgingSpacers=0; nInactiveSpacers=0;
-		nSingletonSpacers_rigid=0; nSingletonSpacers_nonRigid_all=0; nSingletonSpacers_nonRigid_bridging=0;
+		nSingletonSpacers_rigid=0; nSingletonSpacers_nonRigid_all=0; nSingletonSpacers_nonRigid_bridging=0; nSingletonSpacers_nonRigid_inactive=0;
 		for (i=0; i<=lastSpacer; i++) {
 			if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nBridgingSpacers++;
 			if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-1) nInactiveSpacers++;
@@ -5530,12 +5530,14 @@ public class RepeatAlphabet {
 			else {
 				nSingletonSpacers_nonRigid_all++;
 				if (spacers[i].breakpoint==Math.POSITIVE_INFINITY) nSingletonSpacers_nonRigid_bridging++;
+				else if (spacers[i].breakpoint==Math.POSITIVE_INFINITY-1) nSingletonSpacers_nonRigid_inactive++;
 			}
 		}
 		System.err.println("Total singleton spacers: "+(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all)+" ("+((100.0*(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all))/(lastSpacer+1))+"%)");
 		System.err.println("Rigid singleton spacers: "+nSingletonSpacers_rigid+" ("+((100.0*nSingletonSpacers_rigid)/(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all))+"%)");
 		System.err.println("Non-rigid singleton spacers: "+nSingletonSpacers_nonRigid_all+" ("+((100.0*nSingletonSpacers_nonRigid_all)/(nSingletonSpacers_rigid+nSingletonSpacers_nonRigid_all))+"%)");
 		System.err.println("Non-rigid singleton spacers that are bridging: "+nSingletonSpacers_nonRigid_bridging+" ("+((100.0*nSingletonSpacers_nonRigid_bridging)/nSingletonSpacers_nonRigid_all)+"%)");
+		System.err.println("Non-rigid singleton spacers that are inactive: "+nSingletonSpacers_nonRigid_inactive+" ("+((100.0*nSingletonSpacers_nonRigid_inactive)/nSingletonSpacers_nonRigid_all)+"%)");
 		return nBridgingSpacers;
 	}
 	
@@ -5683,6 +5685,74 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * If most spacers correspond to real non-repetitive regions of the genome, most
+	 * degrees in the spacers graph should be similar to the coverage (we assume that most 
+	 * unique sequence in a polyploid genome is common to all the haplotypes). The 
+	 * procedure returns TRUE iff this is the case.
+	 *
+	 * Remark: if spacers are real non-repetitive regions, the difference in length 
+	 * between adjacent spacers in the spacers graph should also be small. In practice the
+	 * distribution of length differences has large mass at small values even when most 
+	 * spacers are *not* real non-repetitive regions, and a threshold is not clear.
+	 *
+	 * @param haplotypeCoverage of one haplotype;
+	 * @param printHistograms TRUE=prints the degree histogram to STDERR, as well as the
+	 * histogram of length differences between adjacent spacers.
+	 */
+	public static final boolean getSpacerGraphStatistics(int haplotypeCoverage, int nHaplotypes, boolean printHistograms) {
+		final int MIN_FREQUENCY_UNIQUE = haplotypeCoverage*nHaplotypes-(haplotypeCoverage>>1);
+		final int MAX_FREQUENCY_UNIQUE = haplotypeCoverage*nHaplotypes+(haplotypeCoverage>>1);
+		final int MIN_NSPACERS = (lastSpacer+1)>>1;  // Arbitrary
+		boolean out;
+		int i, j;
+		int max, length, last, neighbor;
+		long mass;
+		int[] degreeHistogram, lengthDiffHistogram;
+		
+		// Dregree histogram
+		max=0;
+		for (i=0; i<=lastSpacer; i++) max=Math.max(max,lastSpacerNeighbor[i]+1);
+		degreeHistogram = new int[max+1];
+		Math.set(degreeHistogram,max,0);
+		for (i=0; i<=lastSpacer; i++) degreeHistogram[lastSpacerNeighbor[i]+1]++;
+		mass=0;
+		for (i=MIN_FREQUENCY_UNIQUE; i<=MAX_FREQUENCY_UNIQUE; i++) mass+=degreeHistogram[i];
+		out=mass>=MIN_NSPACERS;
+		if (!printHistograms) return out;
+		System.err.println("Histogram of spacer degrees:");
+		for (i=0; i<=max; i++) System.err.println(i+","+degreeHistogram[i]);
+		
+		// Length diff histogram
+		max=0;
+		for (i=0; i<=lastSpacer; i++) {
+			length=spacers[i].last-spacers[i].first;
+			last=lastSpacerNeighbor[i];
+			for (j=0; j<=last; j+=2) {
+				neighbor=(int)spacerNeighbors[i][j];
+				if (neighbor<0) neighbor=-1-neighbor;
+				max=Math.max(max,Math.abs(length,spacers[neighbor].last-spacers[neighbor].first));
+			}
+		}
+		lengthDiffHistogram = new int[max+1];
+		Math.set(lengthDiffHistogram,max,0);
+		for (i=0; i<=lastSpacer; i++) {
+			length=spacers[i].last-spacers[i].first;
+			last=lastSpacerNeighbor[i];
+			for (j=0; j<=last; j+=2) {
+				neighbor=(int)spacerNeighbors[i][j];
+				if (neighbor<0) neighbor=-1-neighbor;
+				lengthDiffHistogram[Math.abs(length,spacers[neighbor].last-spacers[neighbor].first)]++;
+			}
+		}
+		for (i=0; i<=max; i++) lengthDiffHistogram[i]>>=1;
+		System.err.println("Histogram of length differences between adjacent spacers:");
+		for (i=0; i<=max; i++) System.err.println(i+","+lengthDiffHistogram[i]);
+		
+		return out;
+	}
+	
+	
+	/**
 	 * In DOT format
 	 */
 	public static final void printSpacerNeighbors(String path) throws IOException {
@@ -5823,9 +5893,9 @@ public class RepeatAlphabet {
 	 * that was not reached from a rigid spacer.
 	 *
 	 * Remark: one could alternatively propagate breadth-first. The traversal order is not
-	 * likely to matter in practice. Depth-first makes sense since edges are sorted by
+	 * likely to matter in practice. Depth-first makes sense, since edges are sorted by
 	 * decreasing similarity (but one could put all edges in a priority queue instead). 
-	 * Doing a global alignment of all the reads that have overlapping spacers is
+	 * Doing a global alignment of all the reads that have overlapping spacers is likely
 	 * impractical.
 	 *
 	 * Remark: before propagating normal spacers, the procedure propagates bridging
