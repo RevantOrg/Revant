@@ -13,18 +13,18 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-N_HAPLOTYPES="1"
-HAPLOTYPE_COVERAGE="30"  # Of one haplotype
-MAX_K="8"  # Stops looking for unique k-mers after this length. Should be set using the histogram of recoded lengths.
-UNIQUE_MODE="1"  # Non-repetitive blocks are allowed in a k-mer, except at the first/last
-# position of the k-mer. Usually a good choice.
-MULTI_MODE="0"; ONEMER_FILTER="3"
+N_HAPLOTYPES=$2
+HAPLOTYPE_COVERAGE=$3  # Of one haplotype
+MAX_K=$4  # Stops looking for unique k-mers after this length. Should be set using the
+# histogram of recoded lengths.
+MULTI_MODE=$5
+ONEMER_FILTER=$6
 # Good settings for a mostly periodic genome: MULTI_MODE="0"; ONEMER_FILTER="3"
 # Good settings for a mostly nonperiodic genome: MULTI_MODE="1"; ONEMER_FILTER="2"
-N_THREADS="1"
-DELETE_TMP_FILES="0"
-# REVANT
-JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
+N_THREADS=$7
+DELETE_TMP_FILES=$8
+UNIQUE_MODE="1"  # Non-repetitive blocks are allowed in a k-mer, except at the first/last
+# position of the k-mer. Usually a good choice.
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u

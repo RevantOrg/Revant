@@ -5685,15 +5685,18 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * If most spacers correspond to real non-repetitive regions of the genome, most
-	 * degrees in the spacers graph should be similar to the coverage (we assume that most 
-	 * unique sequence in a polyploid genome is common to all the haplotypes). The 
-	 * procedure returns TRUE iff this is the case.
+	 * If most spacers with positive length correspond to real non-repetitive regions of 
+	 * the genome, most of their degrees in the spacers graph should be similar to the 
+	 * coverage (we assume that most non-repetitive sequence in a polyploid genome is 
+	 * common to all the haplotypes). The procedure returns TRUE iff this is the case.
 	 *
 	 * Remark: if spacers are real non-repetitive regions, the difference in length 
 	 * between adjacent spacers in the spacers graph should also be small. In practice the
 	 * distribution of length differences has large mass at small values even when most 
-	 * spacers are *not* real non-repetitive regions, and a threshold is not clear.
+	 * spacers are not real non-repetitive regions, and a threshold is not clear.
+	 *
+	 * Remark: wrong spacers are a global feature induced by the aligner, so correcting
+	 * just spacers with anomalous degree or length difference does not make much sense.
 	 *
 	 * @param haplotypeCoverage of one haplotype;
 	 * @param printHistograms TRUE=prints the degree histogram to STDERR, as well as the
@@ -5702,27 +5705,37 @@ public class RepeatAlphabet {
 	public static final boolean getSpacerGraphStatistics(int haplotypeCoverage, int nHaplotypes, boolean printHistograms) {
 		final int MIN_FREQUENCY_UNIQUE = haplotypeCoverage*nHaplotypes-(haplotypeCoverage>>1);
 		final int MAX_FREQUENCY_UNIQUE = haplotypeCoverage*nHaplotypes+(haplotypeCoverage>>1);
-		final int MIN_NSPACERS = (lastSpacer+1)>>1;  // Arbitrary
+		final double THRESHOLD = 0.5;  // Arbitrary
 		boolean out;
 		int i, j;
-		int max, length, last, neighbor;
+		int max, length, last, neighbor, degree, nNonemptySpacers;
 		long mass;
 		int[] degreeHistogram, lengthDiffHistogram;
 		
-		// Dregree histogram
+		// Dregree histogram (excluding spacers of length zero).
 		max=0;
 		for (i=0; i<=lastSpacer; i++) max=Math.max(max,lastSpacerNeighbor[i]+1);
 		degreeHistogram = new int[max+1];
 		Math.set(degreeHistogram,max,0);
-		for (i=0; i<=lastSpacer; i++) degreeHistogram[lastSpacerNeighbor[i]+1]++;
+		nNonemptySpacers=0;
+		for (i=0; i<=lastSpacer; i++) {
+			if (spacers[i].first==spacers[i].last) continue;
+			nNonemptySpacers++;
+			last=lastSpacerNeighbor[i]; degree=0;
+			for (j=0; j<=last; j++) {
+				neighbor=(int)spacerNeighbors[i][j];
+				if (spacers[neighbor].first!=spacers[neighbor].last) degree++;
+			}
+			degreeHistogram[degree]++;
+		}
 		mass=0;
 		for (i=MIN_FREQUENCY_UNIQUE; i<=MAX_FREQUENCY_UNIQUE; i++) mass+=degreeHistogram[i];
-		out=mass>=MIN_NSPACERS;
+		out=mass>=nNonemptySpacers*THRESHOLD;
 		if (!printHistograms) return out;
 		System.err.println("Histogram of spacer degrees:");
 		for (i=0; i<=max; i++) System.err.println(i+","+degreeHistogram[i]);
 		
-		// Length diff histogram
+		// Length diff histogram (including spacers of length zero).
 		max=0;
 		for (i=0; i<=lastSpacer; i++) {
 			length=spacers[i].last-spacers[i].first;

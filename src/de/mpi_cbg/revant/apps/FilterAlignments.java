@@ -26,6 +26,12 @@ import de.mpi_cbg.revant.util.Math;
  * Remark: this program does not filter by error rate. This basic check should have been
  * already performed upstream.
  *
+ * Remark: this program does not remove reads that are fully contained in other reads, nor
+ * does it remove the corresponding containment alignments (unless they satisfy the
+ * specified repeat criteria). Removing contained reads might create problems in string
+ * graphs, since it might remove paths that cannot be reconstructed later. Such high-level
+ * filters are left to the caller.
+ *
  * Remark: if there are no low-quality regions, all local alignments (i.e. not suffix-
  * prefix and not containment) are likely repeat-induced, so one could discard them 
  * upstream and feed just suffix-prefix alignments to this program. Local alignments that 

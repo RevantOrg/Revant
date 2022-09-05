@@ -15,17 +15,15 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
-HAPLOTYPE_COVERAGE="30"  # Of one haplotype
+HAPLOTYPE_COVERAGE=$3  # Of one haplotype
 TIGHT_MODE="0"
-LOW_QUALITY_TYPE="1"  # 1=replacement, 0=insertion.
+LOW_QUALITY_TYPE=$4  # 1=replacement, 0=insertion.
 LOW_QUALITY_LENGTH_TOLERANCE="200"  # bps
-MULTI_MODE_OF_NEXT_STAGE="0";  # The value of MULTI_MODE used by 3-getUniqueSubstrings.sh
-MIN_K="2"  # One plus the min length of a context used for disambiguation
-MAX_K="4"  # One plus the max length of a context used for disambiguation
-N_THREADS="1"
-DELETE_TMP_FILES="1"
-# REVANT
-JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
+MULTI_MODE_OF_NEXT_STAGE=$5;  # The value of MULTI_MODE used by 3-getUniqueSubstrings.sh
+MIN_K=$6  # One plus the min length of a context used for disambiguation
+MAX_K=$7  # One plus the max length of a context used for disambiguation
+N_THREADS=$8
+DELETE_TMP_FILES=$9
 # ----------------------------------------------------------------------------------------
 
 if [ ${MULTI_MODE_OF_NEXT_STAGE} -eq 0 ]; then

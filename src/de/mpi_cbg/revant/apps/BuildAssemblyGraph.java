@@ -84,19 +84,11 @@ public class BuildAssemblyGraph {
 				continue;
 			}
 			type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD);
-if ((Alignments.readA==461 && Alignments.readB==533) || (Alignments.readA==533 && Alignments.readB==461)) {
-	System.err.println("VITTU> 1  Alignment type = "+type+"  ALIGNMENT_TYPE="+ALIGNMENT_TYPE+"  "+str1);
-	System.err.println("VITTU> 1  lengthA="+Reads.getReadLength(Alignments.readA-1)+" lengthB="+Reads.getReadLength(Alignments.readB-1));
-}
 			if ((ALIGNMENT_TYPE==2 && type!=0) || (ALIGNMENT_TYPE==1 && type==2)) {
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 				continue;
 			}
 			keep=str2.equalsIgnoreCase("1")&&str3.equalsIgnoreCase("1");
-if ((Alignments.readA==461 && Alignments.readB==533) || (Alignments.readA==533 && Alignments.readB==461)) {
-	System.err.println("VITTU> 2  keep="+keep);
-	System.err.println("VITTU> 2  lengthA="+Reads.getReadLength(Alignments.readA-1)+" lengthB="+Reads.getReadLength(Alignments.readB-1));
-}
 			addEdge(Alignments.readA-1,Alignments.readB-1,keep);
 			addEdge(Alignments.readB-1,Alignments.readA-1,keep);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();

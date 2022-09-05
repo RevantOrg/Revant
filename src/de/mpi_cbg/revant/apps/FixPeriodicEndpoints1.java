@@ -6,11 +6,12 @@ import de.mpi_cbg.revant.factorize.Reads;
 
 /**
  * Collects short non-periodic spacers between periodic endpoints, and assigns arbitrary
- * breakpoints to them.
+ * breakpoints to them. The exit status of the program is 1 if spacers are already
+ * correct and the spacer correction pipeline should stop, 0 otherwise.
  *
  * Remark: this program processes all reads and all alignments sequentially. This is done
  * just for simplicity. Collecting spacers could be done in parallel on different chunks 
- * of reads, but assigning breakpoints needs all spacers in memory. 
+ * of reads, but assigning breakpoints needs all spacers in memory.
  */
 public class FixPeriodicEndpoints1 {
 	
@@ -53,10 +54,8 @@ public class FixPeriodicEndpoints1 {
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
 		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,tmpArray1,tmpArray2,tmpArray3);
-		RepeatAlphabet.getSpacerGraphStatistics(HAPLOTYPE_COVERAGE,N_HAPLOTYPES,false);
+		if (RepeatAlphabet.getSpacerGraphStatistics(HAPLOTYPE_COVERAGE,N_HAPLOTYPES,false)) System.exit(1);
 		RepeatAlphabet.assignBreakpoints();
-		
-RepeatAlphabet.printSpacerNeighbors("/Users/ramseysnow/Downloads/SIMULATED-REPBASE/spacers.dot");		
 		
 		lastRead = new int[N_BLOCKS];
 		br1 = new BufferedReader(new FileReader(LAST_READ_FILE));
@@ -81,6 +80,7 @@ RepeatAlphabet.printSpacerNeighbors("/Users/ramseysnow/Downloads/SIMULATED-REPBA
 			str1=br1.readLine(); str2=br2.readLine();
 		}
 		bw1.close(); bw2.close(); br1.close(); br2.close();
+		System.exit(0);
 	}
 
 }

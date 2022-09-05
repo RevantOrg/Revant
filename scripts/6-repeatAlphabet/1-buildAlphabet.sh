@@ -13,22 +13,21 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
-KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic
-MAX_ALIGNMENT_ERROR="0.3"  # Repeat-read alignments with error > this are discarded
-MIN_ALIGNMENT_LENGTH="500"  # Repeat-read alignments with length < this are discarded
-N_HAPLOTYPES="1"
-HAPLOTYPE_COVERAGE="30"  # Of one haplotype
-MAX_SPACER_LENGTH="10000"  # 0=assume that the endpoints of periodic repeats are accurate
-WOBBLE_LENGTH="100"  # 0=do not wobble.
+MAX_ALIGNMENT_ERROR=$3  # Repeat-read alignments with error > this are discarded
+MIN_ALIGNMENT_LENGTH=$4  # Repeat-read alignments with length < this are discarded
+N_HAPLOTYPES=$5
+HAPLOTYPE_COVERAGE=$6  # Of one haplotype
+N_THREADS=$7
+DELETE_TMP_FILES=$8
+MAX_SPACER_LENGTH=$9  # 0=assume that the endpoints of periodic repeats are accurate
+WOBBLE_LENGTH=${10}  # 0=do not wobble.
 # Good settings for mostly periodic genome: MAX_SPACER_LENGTH="10000"; WOBBLE_LENGTH="100"
-# Good settings for a mostly nonperiodic genome: MAX_SPACER_LENGTH="0"; WOBBLE_LENGTH="0"
+# If spacers are real in the read translations (i.e. if they do not come from
+# idiosyncrasies of the aligner) the translations are automatically untouched.
 # WOBBLE_LENGTH values have to be chosen experimentally. Smaller values might strike a
 # better balance between increasing frequency and not making truly unique k-mers too
 # frequent as to be classified as repeats.
-N_THREADS="1"
-DELETE_TMP_FILES="0"
-# REVANT
-JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
+KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic. Usually good.
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u
@@ -185,135 +184,135 @@ done
 
 
 if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
-	echo "Fixing periodic endpoints..."
+	echo "Trying to fix periodic endpoints if needed..."
 	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-	echo "Splitting the alignments file..."
-	LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
-	if [ ${BROKEN_READS} -eq 1 ]; then
-		# Reusing the chunks of the read-read alignments file that are already there (we
-		# assume that they all have the header).
-		for FILE in $(ls ${INPUT_DIR}/breakReads-tmp-2-*.txt ); do
-			ID=$(basename ${FILE} .txt)
-			ID=${ID#breakReads-tmp-2-}
-			mv ${INPUT_DIR}/breakReads-tmp-2-${ID}.txt ${TMPFILE_PATH}-spacers-1-${ID}.txt
-		done
-	else
-		N_ALIGNMENTS=$(( $(wc -l < ${READ_READ_ALIGNMENTS_FILE}) - 2 ))
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${READ_READ_ALIGNMENTS_FILE} ${TMPFILE_PATH}-spacers-1- ${LAST_READA_FILE}
-	fi
-	echo "Read-read alignments filtered and split in ${N_THREADS} parts"
-	# Splitting read translations based on read-read alignments. This is necessary, since
-	# the previous translated file chunks were split by balancing read-repeat alignments,
-	# rather than read-read alignments.
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-1-1- ${TMPFILE_PATH}-spacers-1-2-
 	echo "Collecting spacers and assigning breakpoints to them..."
 	N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
 	N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${N_THREADS} ${LAST_READA_FILE} ${HAPLOTYPE_COVERAGE} ${N_HAPLOTYPES} ${TMPFILE_PATH}-spacers-2-
-	echo "Collecting instances of spacer-induced characters..."
-	function collectionThread_spacers() {
-		local SPACERS_FILE_ID=$1
-		local LOCAL_N_SPACERS=$(wc -l < ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt)
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints2 ${MAX_SPACER_LENGTH} ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-spacers-2-ids-${THREAD}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD}.txt ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-spacers-3-unique-${SPACERS_FILE_ID}.txt
-		sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt | uniq - ${TMPFILE_PATH}-spacers-4-${SPACERS_FILE_ID}.txt
-	}
-	if [ -e ${TMPFILE_PATH}-spacers-2-${N_THREADS}.txt ]; then
-		TO=${N_THREADS}
-	else
-		TO=$(( ${N_THREADS} - 1 ))
-	fi
-	for THREAD in $(seq 0 ${TO}); do
-		collectionThread_spacers ${THREAD} &
-	done
-	wait
-	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-4-*.txt | uniq - ${TMPFILE_PATH}-spacers-5.txt
-	N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-spacers-5.txt)
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-spacers-5.txt ${TMPFILE_PATH}-spacers-6-
-	echo "Compacting character instances..."
-	for THREAD in $(seq 0 ${TO}); do
-		compactionThread ${THREAD} "${TMPFILE_PATH}-spacers-6-" "${TMPFILE_PATH}-spacers-7-" "${TMPFILE_PATH}-spacers-8-" &
-	done
-	wait
-	ALPHABET_FILE_SPACERS="${INPUT_DIR}/alphabet-spacers.txt"
-	rm -f ${ALPHABET_FILE_SPACERS}
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "${TMPFILE_NAME}-spacers-8-" "${TMPFILE_NAME}-spacers-3-unique-" ${ALPHABET_FILE_SPACERS}
-	for THREAD in $(seq 0 ${TO}); do
-		tail -n +2 ${TMPFILE_PATH}-spacers-8-${THREAD}.txt >> ${ALPHABET_FILE_SPACERS}
-	done
-	ALPHABET_SIZE_SPACERS=$( wc -l < ${ALPHABET_FILE_SPACERS} )
-	ALPHABET_SIZE_SPACERS=$(( ${ALPHABET_SIZE_SPACERS} - 1 ))
-	echo "Translating reads into the spacers-induced alphabet..."
-	function translationThread_spacers() {
-		local THREAD_ID=$1
-		local READ2CHARACTERS_FILE_NEW=$2
-		local READ2BOUNDARIES_FILE_NEW=$3
-		local FULLYCONTAINED_FILE_NEW=$4
-		local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-spacers-2-${THREAD_ID}.txt"
-		local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-spacers-2-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt ${FULLYCONTAINED_FILE_NEW}${THREAD_ID}.txt
-	}
-	for THREAD in $(seq 0 ${TO}); do
-		translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" "${TMPFILE_PATH}-spacers-11-" &
-	done
-	wait
-	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
-	mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-prespacers
-	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prespacers
-	cp ${FULLY_CONTAINED_FILE} ${TMPFILE_PATH}-spacers-12.txt
-	mv ${FULLY_CONTAINED_FILE} ${FULLY_CONTAINED_FILE}-prespacers
-	for THREAD in $(seq 0 ${TO}); do
-		cat ${TMPFILE_PATH}-spacers-9-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
-		cat ${TMPFILE_PATH}-spacers-10-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
-		cat ${TMPFILE_PATH}-spacers-11-${THREAD}.txt >> ${TMPFILE_PATH}-spacers-12.txt
-	done
-	sort --parallel=${N_THREADS} -n ${TMPFILE_PATH}-spacers-12.txt > ${FULLY_CONTAINED_FILE}
-	mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
-	echo "Periodic endpoints fixed"
-fi
-
-
-if [ ${WOBBLE_LENGTH} -ne 0 ]; then
-	echo "Wobbling..."
-	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
-		WOBBLE_PREFIX="${TMPFILE_PATH}-spacers-9"
-	else
+	if [ $? -eq 0 ]; then
+		echo "Splitting the alignments file..."
+		LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
+		if [ ${BROKEN_READS} -eq 1 ]; then
+			# Reusing the chunks of the read-read alignments file that are already there
+			# (we assume that they all have the header).
+			for FILE in $(ls ${INPUT_DIR}/breakReads-tmp-2-*.txt ); do
+				ID=$(basename ${FILE} .txt)
+				ID=${ID#breakReads-tmp-2-}
+				mv ${INPUT_DIR}/breakReads-tmp-2-${ID}.txt ${TMPFILE_PATH}-spacers-1-${ID}.txt
+			done
+		else
+			N_ALIGNMENTS=$(( $(wc -l < ${READ_READ_ALIGNMENTS_FILE}) - 2 ))
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.factorize.SplitAlignments ${N_ALIGNMENTS} ${N_THREADS} ${READ_READ_ALIGNMENTS_FILE} ${TMPFILE_PATH}-spacers-1- ${LAST_READA_FILE}
+		fi
+		echo "Read-read alignments filtered and split in ${N_THREADS} parts"
 		# Splitting read translations based on read-read alignments. This is necessary,
 		# since the previous translated file chunks were split by balancing read-repeat
 		# alignments, rather than read-read alignments.
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-wobble-1- ${TMPFILE_PATH}-wobble-2-
-		WOBBLE_PREFIX="${TMPFILE_PATH}-wobble-1"
-	fi	
-	function wobbleThreadCreate() {
-		local WOBBLE_FILE_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet1 ${ALPHABET_FILE} ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_PREFIX}-flags-${WOBBLE_FILE_ID}.txt
-	}
-	if [ -e ${WOBBLE_PREFIX}-${N_THREADS}.txt ]; then
-		TO=${N_THREADS}
-	else
-		TO=$(( ${N_THREADS} - 1 ))
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-spacers-1-1- ${TMPFILE_PATH}-spacers-1-2-
+		echo "Collecting instances of spacer-induced characters..."
+		function collectionThread_spacers() {
+			local SPACERS_FILE_ID=$1
+			local LOCAL_N_SPACERS=$(wc -l < ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt)
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints2 ${MAX_SPACER_LENGTH} ${TMPFILE_PATH}-spacers-2-${SPACERS_FILE_ID}.txt ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-spacers-2-ids-${THREAD}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD}.txt ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-spacers-3-unique-${SPACERS_FILE_ID}.txt
+			sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-3-${SPACERS_FILE_ID}.txt | uniq - ${TMPFILE_PATH}-spacers-4-${SPACERS_FILE_ID}.txt
+		}
+		if [ -e ${TMPFILE_PATH}-spacers-2-${N_THREADS}.txt ]; then
+			TO=${N_THREADS}
+		else
+			TO=$(( ${N_THREADS} - 1 ))
+		fi
+		for THREAD in $(seq 0 ${TO}); do
+			collectionThread_spacers ${THREAD} &
+		done
+		wait
+		sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-spacers-4-*.txt | uniq - ${TMPFILE_PATH}-spacers-5.txt
+		N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-spacers-5.txt)
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-spacers-5.txt ${TMPFILE_PATH}-spacers-6-
+		echo "Compacting character instances..."
+		for THREAD in $(seq 0 ${TO}); do
+			compactionThread ${THREAD} "${TMPFILE_PATH}-spacers-6-" "${TMPFILE_PATH}-spacers-7-" "${TMPFILE_PATH}-spacers-8-" &
+		done
+		wait
+		ALPHABET_FILE_SPACERS="${INPUT_DIR}/alphabet-spacers.txt"
+		rm -f ${ALPHABET_FILE_SPACERS}
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "${TMPFILE_NAME}-spacers-8-" "${TMPFILE_NAME}-spacers-3-unique-" ${ALPHABET_FILE_SPACERS}
+		for THREAD in $(seq 0 ${TO}); do
+			tail -n +2 ${TMPFILE_PATH}-spacers-8-${THREAD}.txt >> ${ALPHABET_FILE_SPACERS}
+		done
+		ALPHABET_SIZE_SPACERS=$( wc -l < ${ALPHABET_FILE_SPACERS} )
+		ALPHABET_SIZE_SPACERS=$(( ${ALPHABET_SIZE_SPACERS} - 1 ))
+		echo "Translating reads into the spacers-induced alphabet..."
+		function translationThread_spacers() {
+			local THREAD_ID=$1
+			local READ2CHARACTERS_FILE_NEW=$2
+			local READ2BOUNDARIES_FILE_NEW=$3
+			local FULLYCONTAINED_FILE_NEW=$4
+			local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-spacers-2-${THREAD_ID}.txt"
+			local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints3 ${MAX_SPACER_LENGTH} ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-spacers-2-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-2-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-1-${THREAD_ID}.txt ${TMPFILE_PATH}-spacers-1-2-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt ${FULLYCONTAINED_FILE_NEW}${THREAD_ID}.txt
+		}
+		for THREAD in $(seq 0 ${TO}); do
+			translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" "${TMPFILE_PATH}-spacers-11-" &
+		done
+		wait
+		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
+		mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-prespacers
+		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prespacers
+		cp ${FULLY_CONTAINED_FILE} ${TMPFILE_PATH}-spacers-12.txt
+		mv ${FULLY_CONTAINED_FILE} ${FULLY_CONTAINED_FILE}-prespacers
+		for THREAD in $(seq 0 ${TO}); do
+			cat ${TMPFILE_PATH}-spacers-9-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+			cat ${TMPFILE_PATH}-spacers-10-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
+			cat ${TMPFILE_PATH}-spacers-11-${THREAD}.txt >> ${TMPFILE_PATH}-spacers-12.txt
+		done
+		sort --parallel=${N_THREADS} -n ${TMPFILE_PATH}-spacers-12.txt > ${FULLY_CONTAINED_FILE}
+		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
+		echo "Periodic endpoints fixed"
+		if [ ${WOBBLE_LENGTH} -ne 0 ]; then
+			echo "Wobbling..."
+			if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+				WOBBLE_PREFIX="${TMPFILE_PATH}-spacers-9"
+			else
+				# Splitting read translations based on read-read alignments. This is
+				# necessary, since the previous translated file chunks were split by
+				# balancing read-repeat alignments, rather than read-read alignments.
+				java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-wobble-1- ${TMPFILE_PATH}-wobble-2-
+				WOBBLE_PREFIX="${TMPFILE_PATH}-wobble-1"
+			fi	
+			function wobbleThreadCreate() {
+				local WOBBLE_FILE_ID=$1
+				java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet1 ${ALPHABET_FILE} ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_PREFIX}-flags-${WOBBLE_FILE_ID}.txt
+			}
+			if [ -e ${WOBBLE_PREFIX}-${N_THREADS}.txt ]; then
+				TO=${N_THREADS}
+			else
+				TO=$(( ${N_THREADS} - 1 ))
+			fi
+			for THREAD in $(seq 0 ${TO}); do
+				wobbleThreadCreate ${THREAD} &
+			done
+			wait
+			WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
+			WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${WOBBLE_PREFIX}-flags ${TO} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
+			function wobbleThread() {
+				local WOBBLE_FILE_ID=$1
+				java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-wobble-3-${WOBBLE_FILE_ID}.txt
+			}
+			for THREAD in $(seq 0 ${TO}); do
+				wobbleThread ${THREAD} &
+			done
+			wait
+			mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prewobble
+			for THREAD in $(seq 0 ${TO}); do
+				cat ${TMPFILE_PATH}-wobble-3-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+			done
+			mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prewobble
+			mv ${WOBBLE_ALPHABET} ${ALPHABET_FILE}
+			echo "Wobbling completed"
+		fi
 	fi
-	for THREAD in $(seq 0 ${TO}); do
-		wobbleThreadCreate ${THREAD} &
-	done
-	wait
-	WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
-	WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${WOBBLE_PREFIX}-flags ${TO} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
-	function wobbleThread() {
-		local WOBBLE_FILE_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-wobble-3-${WOBBLE_FILE_ID}.txt
-	}
-	for THREAD in $(seq 0 ${TO}); do
-		wobbleThread ${THREAD} &
-	done
-	wait
-	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prewobble
-	for THREAD in $(seq 0 ${TO}); do
-		cat ${TMPFILE_PATH}-wobble-3-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
-	done
-	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prewobble
-	mv ${WOBBLE_ALPHABET} ${ALPHABET_FILE}
-	echo "Wobbling completed"
 fi
 
 

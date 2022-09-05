@@ -12,12 +12,10 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
+LOW_QUALITY_LENGTH=$2  # >=100
+N_THREADS=$3
+DELETE_TMP_FILES=$4
 QUALITY_TRACK_FILE="${INPUT_DIR}/reads-phred.dbdump"
-LOW_QUALITY_LENGTH="100"  # >=100
-N_THREADS="4"
-DELETE_TMP_FILES="1"
-# REVANT
-JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u

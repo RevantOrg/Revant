@@ -12,12 +12,18 @@
 #
 INPUT_DIR=$1
 BROKEN_READS=$2  # 1=TRUE
-MAX_SPACER_LENGTH="0"  # Same as in $1-buildAlphabet.sh$.
+MAX_SPACER_LENGTH=$3  # Same as in $1-buildAlphabet.sh$.
+MIN_ALIGNMENT_LENGTH_READ_READ=$4
+MIN_ALIGNMENT_LENGTH_READ_REPEAT=$5
+MAX_K_UNIQUE_INTERVALS=$6  # Same as in $3-getUniqueSubstrings.sh$
+FILTERING_MODE=$7  # 0=loose, 1=tight, 2=tight with matching characters.
+MIN_INTERSECTION_NONREPETITIVE=$8  # Non-repetitive regions shorter than this n. of
+# bps are not considered trustworthy addresses on the genome.
+# Good settings for a mostly periodic genome: MIN_INTERSECTION_NONREPETITIVE="100000"
+# Good settings for a mostly nonperiodic genome: MIN_INTERSECTION_NONREPETITIVE="500"
+N_THREADS=$9
+DELETE_TMP_FILES=${10}
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-MIN_ALIGNMENT_LENGTH_READ_READ="500"
-MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"
-MAX_K_UNIQUE_INTERVALS="8"  # Same as in $3-getUniqueSubstrings.sh$
-FILTERING_MODE="1"  # 0=loose, 1=tight, 2=tight with matching characters.
 SUFFIX_PREFIX_MODE="0"  # 1=in tight mode, keep suffix-prefix alignments that contain a
 # unique sequence of repeats in a read, and that only straddle a unique sequence of
 # repeats on the other read.
@@ -25,14 +31,6 @@ BOTH_READS_TANDEM="0"  # Discards an alignment affected by tandems in both reads
 # in a single read (0).
 MIN_BLUE_INTERVAL_LENGTH="1"  # Blue intervals with fewer blocks than this are not
 # considered trustworthy. Leaving it to one works best in practice.
-MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than this n. of
-# bps are not considered trustworthy addresses on the genome.
-# Good settings for a mostly periodic genome: MIN_INTERSECTION_NONREPETITIVE="100000"
-# Good settings for a mostly nonperiodic genome: MIN_INTERSECTION_NONREPETITIVE="500"
-N_THREADS="1"
-DELETE_TMP_FILES="1"
-# REVANT
-JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u
