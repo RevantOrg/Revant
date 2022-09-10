@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# Main script that controls the alignments filtering pipeline.
+# Main script that controls the entire alignments filtering pipeline.
 #
 # Remark: the script assumes that environment variable $REVANT_BINARIES$ is already set
 # to the directory that contains REVANT's binaries, i.e. to the directory that contains
@@ -18,7 +18,7 @@ MAX_ALIGNMENT_ERROR="0.3"
 MIN_ALIGNMENT_LENGTH_READ_REPEAT="500"
 MIN_ALIGNMENT_LENGTH_READ_READ="500"
 # ----------------------------- Properties of CLR reads ----------------------------------
-IS_CLR="1"
+IS_CLR="0"
 LOW_QUALITY_LENGTH="100"  # >=100. Break reads at low-quality regions >= this length.
 LOW_QUALITY_TYPE="1"  # 1=replacement, 0=insertion.
 # ---------------------------- Properties of the aligner ---------------------------------
@@ -42,6 +42,7 @@ JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 DELETE_TMP_FILES="1"
 # ----------------------------------------------------------------------------------------
 
+set -o pipefail; set -e; set -u
 export JAVA_RUNTIME_FLAGS
 if [ ${IS_CLR} -eq 1 ]; then
 	BROKEN_READS="1"

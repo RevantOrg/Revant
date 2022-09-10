@@ -26,11 +26,6 @@ N_THREADS=$8
 DELETE_TMP_FILES=$9
 # ----------------------------------------------------------------------------------------
 
-if [ ${MULTI_MODE_OF_NEXT_STAGE} -eq 0 ]; then
-	# Disambiguating the endblocks of a read is useful only if endblocks with multiple
-	# characters are not allowed in the next stage.
-	exit
-fi
 set -o pipefail; set -e; set -u
 export LC_ALL=C  # To speed up the $sort$ command.
 TMPFILE_NAME="fixEndBlocks-tmp"
@@ -45,6 +40,12 @@ ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
 UNIQUE_MODE="1"; MULTI_MODE="1"  # Endblocks are forbidden in this stage
 rm -f ${TMPFILE_PATH}*
+if [ ${MULTI_MODE_OF_NEXT_STAGE} -eq 0 ]; then
+	# Disambiguating the endblocks of a read is useful only if endblocks with multiple
+	# characters are not allowed in the next stage.
+	mv ${READS_TRANSLATED_FILE} ${READS_DISAMBIGUATED_FILE}
+	exit
+fi
 
 function kmersThread() {
 	local LOCAL_K=$1

@@ -5722,8 +5722,9 @@ public class RepeatAlphabet {
 			if (spacers[i].first==spacers[i].last) continue;
 			nNonemptySpacers++;
 			last=lastSpacerNeighbor[i]; degree=0;
-			for (j=0; j<=last; j++) {
+			for (j=0; j<=last; j+=2) {
 				neighbor=(int)spacerNeighbors[i][j];
+				if (neighbor<0) neighbor=-1-neighbor;
 				if (spacers[neighbor].first!=spacers[neighbor].last) degree++;
 			}
 			degreeHistogram[degree]++;
@@ -6099,23 +6100,14 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Stores $spacers$ to multiple files, each containing reads up to $lastRead[i]$
-	 * (included, zero-based).
+	 * Stores $spacers$ to a single file.
 	 */
-	public static final void serializeSpacers(String prefix, int[] lastRead) throws IOException {
-		int i, j;
+	public static final void serializeSpacers(String outputFile) throws IOException {
+		int i;
 		BufferedWriter bw;
 		
-		j=0;
-		bw = new BufferedWriter(new FileWriter(prefix+j+".txt"));
-		for (i=0; i<=lastSpacer; i++) {
-			while (spacers[i].read>lastRead[j]) {
-				bw.close();
-				j++;
-				bw = new BufferedWriter(new FileWriter(prefix+j+".txt"));
-			}
-			spacers[i].serialize(bw);
-		}
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		for (i=0; i<=lastSpacer; i++) spacers[i].serialize(bw);
 		bw.close();
 	}
 	
@@ -6269,7 +6261,7 @@ public class RepeatAlphabet {
 				else {
 					while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[i-1])) spacersCursor++;
 					if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[i-1]) {
-						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (2): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
+						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (3): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
 						System.exit(1);
 					}
 					if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY) {
@@ -6307,7 +6299,7 @@ public class RepeatAlphabet {
 				else {
 					while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[i-1])) spacersCursor++;
 					if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[i-1]) {
-						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (3): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
+						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (4): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
 						System.exit(1);
 					}
 					if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) {
@@ -6335,7 +6327,7 @@ public class RepeatAlphabet {
 				else {
 					while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[i-1])) spacersCursor++;
 					if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[i-1]) {
-						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (4): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
+						System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (5): spacer not found: "+readID+"["+boundaries[i-1]+".."+boundaries[i]+"]");
 						System.exit(1);
 					}
 					if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY-1) { /* NOP */ }
@@ -6356,7 +6348,7 @@ public class RepeatAlphabet {
 			if (isBlockUnique[nBlocks-1] && isBlockPeriodic[nBlocks-2] && !isBlockNonperiodic[nBlocks-2] && readLength-boundaries[nBlocks-2]<=maxSpacerLength) {
 				while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<boundaries[nBlocks-2])) spacersCursor++;
 				if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>boundaries[nBlocks-2]) {
-					System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (3): spacer not found: "+readID+"["+boundaries[nBlocks-2]+".."+(readLength-1)+"]");
+					System.err.println("fixPeriodicEndpoints_collectCharacterInstances> ERROR (6): spacer not found: "+readID+"["+boundaries[nBlocks-2]+".."+(readLength-1)+"]");
 					System.exit(1);
 				}
 				if (spacers[spacersCursor].breakpoint==Math.POSITIVE_INFINITY) {

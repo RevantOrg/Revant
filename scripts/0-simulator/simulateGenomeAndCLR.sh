@@ -10,7 +10,7 @@
 # --------------------------------- CONFIGURATION ----------------------------------------
 # This is the only section of the script that needs to be customized.
 #
-INPUT_DIR=$1
+OUTPUT_DIR=$1
 REPEAT_MODEL_DIR=$2
 REPEATS_DB=$3  # In DAZZDB format. Must contain strings of length >=MIN_ALIGNMENT_LENGTH.
 READ_SIMULATOR=$4  # One of: pbsim, pass, npbss, simlord
@@ -43,27 +43,27 @@ JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 set -o pipefail; set -e; set -u
 
 # Building the genome
-GENOME_FILE="${INPUT_DIR}/genome.fasta"
-GENOME_IMAGE="${INPUT_DIR}/genome.png"
-READS_FILE="${INPUT_DIR}/reads.fasta"
-REPEATS_FILE="${INPUT_DIR}/repeats-used-by-simulator.fasta"
+GENOME_FILE="${OUTPUT_DIR}/genome.fasta"
+GENOME_IMAGE="${OUTPUT_DIR}/genome.png"
+READS_FILE="${OUTPUT_DIR}/reads.fasta"
+REPEATS_FILE="${OUTPUT_DIR}/repeats-used-by-simulator.fasta"
 rm -f ${GENOME_FILE} ${GENOME_IMAGE} ${REPEATS_FILE}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.biology.GenomeSimulator -1 ${NONREPETITIVE_BPS} ${REPETITIVE_NONREPETITIVE_RATIO} ${REPEAT_MODEL_DIR} ${GENOME_FILE} null 0 ${REPEATS_FILE} null ${GENOME_IMAGE} ${AVG_READ_LENGTH} null 0 0 0 0
 GENOME_LENGTH=$(wc -c < ${GENOME_FILE})
 N_READS=$(( (${COVERAGE} * ${GENOME_LENGTH}) / ${AVG_READ_LENGTH} ))
 
 # Simulating reads
-TMP_READS="${INPUT_DIR}/reads.txt"
+TMP_READS="${OUTPUT_DIR}/reads.txt"
 rm -f ${TMP_READS}
 if [ ${READ_SIMULATOR} = "pbsim" ]; then
 	# 2020 - PBSIM2
 	${PBSIM_DIR}/pbsim --depth ${COVERAGE} --length-min ${MIN_READ_LENGTH} --length-max ${MAX_READ_LENGTH} --hmm_model ${PBSIM_DIR}/../data/P6C4.model --length-mean ${AVG_READ_LENGTH} ${GENOME_FILE}
-	mv ./sd_* ${INPUT_DIR}
-	cat ${INPUT_DIR}/sd_0001.fastq | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > ${TMP_READS}
-	rm -f ${INPUT_DIR}/sd_0001.fastq ${INPUT_DIR}/sd_0001.maf ${INPUT_DIR}/sd_0001.ref
+	mv ./sd_* ${OUTPUT_DIR}
+	cat ${OUTPUT_DIR}/sd_0001.fastq | awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' > ${TMP_READS}
+	rm -f ${OUTPUT_DIR}/sd_0001.fastq ${OUTPUT_DIR}/sd_0001.maf ${OUTPUT_DIR}/sd_0001.ref
 elif [ ${READ_SIMULATOR} = "pass" ]; then
 	# 2019 - PaSS
-	PASS_OUTPUT_DIR="${INPUT_DIR}/PaSS"
+	PASS_OUTPUT_DIR="${OUTPUT_DIR}/PaSS"
 	rm -rf ${PASS_OUTPUT_DIR}
 	mkdir ${PASS_OUTPUT_DIR}
 	# Building index
@@ -81,19 +81,19 @@ elif [ ${READ_SIMULATOR} = "pass" ]; then
 elif [ ${READ_SIMULATOR} = "npbss" ]; then
 	# 2018 - NPBSS
 	# cd ${NPBSS_DIR}
-	# octave --eval "pkg load statistics; NPBSS('${INPUT_DIR}/${GENOME_FILE}','-dep ${COVERAGE}','-min ${MIN_READ_LENGTH}','-max ${MAX_READ_LENGTH}','-len ${AVG_READ_LENGTH}')"
+	# octave --eval "pkg load statistics; NPBSS('${OUTPUT_DIR}/${GENOME_FILE}','-dep ${COVERAGE}','-min ${MIN_READ_LENGTH}','-max ${MAX_READ_LENGTH}','-len ${AVG_READ_LENGTH}')"
 	# cd -
 	# NPBSS_OUTPUT_DIR="${OUTPUT_DIR}/NPBSS/"
 	# rm -rf ${NPBSS_OUTPUT_DIR}
 	# mkdir ${NPBSS_OUTPUT_DIR}
-	# mv ${INPUT_DIR}/*_CLR.* ${NPBSS_OUTPUT_DIR}
+	# mv ${OUTPUT_DIR}/*_CLR.* ${NPBSS_OUTPUT_DIR}
 	:
 elif [ ${READ_SIMULATOR} = "simlord" ]; then
 	# 2016 - SimLoRD
 	# SIMLORD_OUTPUT_DIR="${OUTPUT_DIR}/SimLoRD/"
 	# rm -rf ${SIMLORD_OUTPUT_DIR}
 	# mkdir ${SIMLORD_OUTPUT_DIR}
-	# simlord --read-reference ${INPUT_DIR}/${GENOME_FILE} --coverage ${COVERAGE} --max-passes 1 --min-readlength ${MIN_READ_LENGTH} ${SIMLORD_OUTPUT_DIR}
+	# simlord --read-reference ${OUTPUT_DIR}/${GENOME_FILE} --coverage ${COVERAGE} --max-passes 1 --min-readlength ${MIN_READ_LENGTH} ${SIMLORD_OUTPUT_DIR}
 	# mv ${SIMLORD_OUTPUT_DIR}/../SimLoRD* ${SIMLORD_OUTPUT_DIR}
 	:
 else
@@ -103,27 +103,27 @@ fi
 rm -f ${READS_FILE}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.biology.Repbase2Pacbio ${TMP_READS} ${READS_FILE}
 rm -f ${TMP_READS}
-seq 0 $(( ($(wc -l < ${READS_FILE}) / 2) - 1 )) > ${INPUT_DIR}/reads-ids.txt
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.util.Fasta2Lengths ${READS_FILE} > ${INPUT_DIR}/reads-lengths.txt
+seq 0 $(( ($(wc -l < ${READS_FILE}) / 2) - 1 )) > ${OUTPUT_DIR}/reads-ids.txt
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.util.Fasta2Lengths ${READS_FILE} > ${OUTPUT_DIR}/reads-lengths.txt
 
 # Computing alignments
-READS_DB="${INPUT_DIR}/reads.db"
+READS_DB="${OUTPUT_DIR}/reads.db"
 DBrm ${READS_DB}
 ${DAZZDB_DIR}/fasta2DB ${READS_DB} ${READS_FILE}
 DBsplit -x16 ${READS_DB}
 daligner -T${N_THREADS} -M${MAX_MEMORY} -e${READ_READ_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_READ} ${READS_DB} ${READS_DB}
-mv ./*.las ${INPUT_DIR}
-LAsort ${INPUT_DIR}/reads.reads.las
-rm -f ${INPUT_DIR}/reads.reads.las
-LAshow ${READS_DB} ${INPUT_DIR}/reads.reads.S.las > ${INPUT_DIR}/LAshow-reads-reads.txt
-rm -f ${INPUT_DIR}/reads.reads.S.las
+mv ./*.las ${OUTPUT_DIR}
+LAsort ${OUTPUT_DIR}/reads.reads.las
+rm -f ${OUTPUT_DIR}/reads.reads.las
+LAshow ${READS_DB} ${OUTPUT_DIR}/reads.reads.S.las > ${OUTPUT_DIR}/LAshow-reads-reads.txt
+rm -f ${OUTPUT_DIR}/reads.reads.S.las
 REPEATS_FILE=$(basename ${REPEATS_DB} .db)
 daligner -T${N_THREADS} -M0 -t100000000 -e${READ_REPEAT_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${REPEATS_DB} ${READS_DB}
-mv ./*.las ${INPUT_DIR}
-LAsort ${INPUT_DIR}/reads.${REPEATS_FILE}.las
-rm -f ${INPUT_DIR}/reads.${REPEATS_FILE}.las
-LAshow ${READS_DB} ${REPEATS_DB} ${INPUT_DIR}/reads.${REPEATS_FILE}.S.las > ${INPUT_DIR}/LAshow-reads-repeats.txt
-rm -f ${INPUT_DIR}/*.las
+mv ./*.las ${OUTPUT_DIR}
+LAsort ${OUTPUT_DIR}/reads.${REPEATS_FILE}.las
+rm -f ${OUTPUT_DIR}/reads.${REPEATS_FILE}.las
+LAshow ${READS_DB} ${REPEATS_DB} ${OUTPUT_DIR}/reads.${REPEATS_FILE}.S.las > ${OUTPUT_DIR}/LAshow-reads-repeats.txt
+rm -f ${OUTPUT_DIR}/*.las
 
 
 
@@ -140,7 +140,7 @@ rm -f ${INPUT_DIR}/*.las
 
 # ----------------------------------------------------------------------------------------
 # 2016 - LongISLND (Does not ship with a model, cumbersome to create one)
-# ${LONGISLND_DIR}/simulate.py --fasta ${INPUT_DIR}/${GENOME_FILE} --model_dir ........
+# ${LONGISLND_DIR}/simulate.py --fasta ${OUTPUT_DIR}/${GENOME_FILE} --model_dir ........
 
 # ----------------------------------------------------------------------------------------
 # 2016 - SiLiCO (Says it's successful but produces an empty file)
@@ -148,7 +148,7 @@ rm -f ${INPUT_DIR}/*.las
 # SILICO_OUTPUT_DIR="${OUTPUT_DIR}/SiLiCO/"
 # rm -rf ${SILICO_OUTPUT_DIR}
 # mkdir ${SILICO_OUTPUT_DIR}
-# python3 ${SILICO_DIR}/SiLiCO.py -i ${INPUT_DIR}/${GENOME_FILE} -o ${SILICO_OUTPUT_DIR} -m ${AVG_READ_LENGTH} -c ${COVERAGE} --pacbio
+# python3 ${SILICO_DIR}/SiLiCO.py -i ${OUTPUT_DIR}/${GENOME_FILE} -o ${SILICO_OUTPUT_DIR} -m ${AVG_READ_LENGTH} -c ${COVERAGE} --pacbio
 
 # ----------------------------------------------------------------------------------------
 # 2014 - FASTQSim (Extremely slow, does not work with a reference of length 10k)
@@ -157,7 +157,7 @@ rm -f ${INPUT_DIR}/*.las
 # rm -rf ${FASTQSIM_OUTPUT_DIR}
 # mkdir ${FASTQSIM_OUTPUT_DIR}
 # cd ${FASTQSIM_DIR}
-# python ./src/pathoSpike.py -nobackground -platform pacbio -source ${COVERAGE} ${INPUT_DIR}/${GENOME_FILE} false -o ${FASTQSIM_OUTPUT_DIR} -threads ${N_THREADS}
+# python ./src/pathoSpike.py -nobackground -platform pacbio -source ${COVERAGE} ${OUTPUT_DIR}/${GENOME_FILE} false -o ${FASTQSIM_OUTPUT_DIR} -threads ${N_THREADS}
 # cd -
 
 # ----------------------------------------------------------------------------------------
@@ -166,7 +166,7 @@ rm -f ${INPUT_DIR}/*.las
 # PBSIM_DATA_TYPE="CLR"
 # #PBSIM_DATA_TYPE="CCS"
 # PBSIM_ERROR_MODEL="${PBSIM_DIR}/../data/model_qc_clr"
-# ${PBSIM_DIR}/pbsim --data-type ${PBSIM_DATA_TYPE} --depth ${COVERAGE} --length-min ${MIN_READ_LENGTH} --length-max ${MAX_READ_LENGTH} --model_qc ${PBSIM_ERROR_MODEL} --length-mean ${AVG_READ_LENGTH} ${INPUT_DIR}/${GENOME_FILE}
+# ${PBSIM_DIR}/pbsim --data-type ${PBSIM_DATA_TYPE} --depth ${COVERAGE} --length-min ${MIN_READ_LENGTH} --length-max ${MAX_READ_LENGTH} --model_qc ${PBSIM_ERROR_MODEL} --length-mean ${AVG_READ_LENGTH} ${OUTPUT_DIR}/${GENOME_FILE}
 # PBSIM_OUTPUT_DIR="${OUTPUT_DIR}/PBSIM"
 # rm -rf ${PBSIM_OUTPUT_DIR}
 # mkdir ${PBSIM_OUTPUT_DIR}
