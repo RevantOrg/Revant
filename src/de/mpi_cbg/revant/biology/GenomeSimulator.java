@@ -133,12 +133,13 @@ public class GenomeSimulator {
 		int i;
 		long nRepeatBps;
 		String parentString, repeatString;
+		int[] out = new int[2];
 		
 		// Building the genome
 		initializeGenome(N_UNIQUE_BPS,model,sb,random);
 		nRepeatBps=0;
 		while (nRepeatBps<N_REPEAT_BPS) {
-			nRepeatBps+=epoch(model,sb,random);
+			nRepeatBps+=epoch(model,sb,random,out);
 			System.err.println("Epoch completed, "+nRepeatBps+" repeat bps, "+N_UNIQUE_BPS+" unique bps, "+lastRepeat+" distinct repeats.");
 		}
 		
@@ -229,7 +230,7 @@ public class GenomeSimulator {
 	 *
 	 * @return the number of new repetitive basepairs created by the procedure.
 	 */
-	private static final long epoch(RepeatModel model, StringBuilder sb, Random random) {
+	private static final long epoch(RepeatModel model, StringBuilder sb, Random random, int[] out) {
 		final int MAX_NO_CONTRIBUTION_ITERATIONS = 10;  // Arbitrary
 		final int CAPACITY = 1000;  // Arbitrary
 		boolean isSatellite, isUsed;
@@ -243,9 +244,10 @@ public class GenomeSimulator {
 		repeat = new Repeat();
 		if (lastRepeat==0 || random.nextDouble()>model.fromInstanceProb) {
 			// New repeat from scratch
-			if (model.hasUnusedRepbaseStrings()) {
+			model.nUnusedRepbaseStrings(out);
+			if (out[0]+out[1]!=0) {
 				do {
-					isSatellite=model.getType(random)>=Constants.INTERVAL_PERIODIC;
+					isSatellite=out[0]!=0 && model.getType(random)>=Constants.INTERVAL_PERIODIC;
 					if (isSatellite) {
 						id=random.nextInt(model.lastRepbaseSat+1);
 						isUsed=model.repbaseSatIsUsed[id];
@@ -1149,6 +1151,7 @@ public class GenomeSimulator {
 		 * Remark: the procedure does not set field $tree$.
 		 */											  
 		public final void initialize(RepeatModel model, boolean isSatellite, int repbaseID, Random random) {
+			boolean nonperiodicCanOccur;
 			int i;
 			
 			lastRepeat++;
@@ -1162,12 +1165,12 @@ public class GenomeSimulator {
 			else {
 				sequence=model.repbase[repbaseID];
 				sequenceLength=sequence.length();
-				do { type=model.getType(random); }
+				nonperiodicCanOccur=model.nonperiodicProbability()>0;
+				do { type=nonperiodicCanOccur?model.getType(random):random.nextInt(Constants.INTERVAL_PERIODIC); }
 				while ( type==Constants.INTERVAL_PERIODIC || 
 					    (type==Constants.INTERVAL_DENSE_SINGLEDELETION && sequenceLength<DELTA+(model.minAlignmentLength<<1)) ||
 						(type>=Constants.INTERVAL_DENSE_PREFIX && type<=Constants.INTERVAL_DENSE_SUBSTRING && sequenceLength<model.minAlignmentLength<<1)
 					  );
-				
 			}
 			insertionProb=Math.sampleFromSimplex(lastTree+1,random);
 			insertionProbCumulative = new double[lastTree+1];
@@ -1539,6 +1542,14 @@ public class GenomeSimulator {
 		
 		
 		/**
+		 * @return the probabilty of a non-periodic repeat type.
+		 */
+		public final double nonperiodicProbability() {
+			return typeProbCumulative[Constants.INTERVAL_PERIODIC-1];
+		}
+		
+		
+		/**
 		 * @return the length of a non-periodic repeat (>=minAlignmentLength).
 		 */
 		public final int getLength(Random random) {
@@ -1791,19 +1802,22 @@ public class GenomeSimulator {
 		
 		
 		/**
-		 * @return TRUE iff some Repbase strings have not been used in the simulation yet.
+		 * @param out the number of satellite (0) and non-satellite (1) Repbase strings 
+		 * that have not been used in the simulation yet.
 		 */
-		public final boolean hasUnusedRepbaseStrings() { 
+		public final void nUnusedRepbaseStrings(int[] out) { 
 			int i, count;
 			
+			count=0;
+			for (i=0; i<=lastRepbaseSat; i++) {
+				if (!repbaseSatIsUsed[i]) count++;
+			}
+			out[0]=count;
 			count=0;
 			for (i=0; i<=lastRepbase; i++) {
 				if (!repbaseIsUsed[i]) count++;
 			}
-			for (i=0; i<=lastRepbaseSat; i++) {
-				if (!repbaseSatIsUsed[i]) count++;
-			}
-			return count>0;
+			out[1]=count;
 		}
 		
 	}

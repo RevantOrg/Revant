@@ -6664,6 +6664,8 @@ public class RepeatAlphabet {
 		loadBoundaries(read2boundaries_old);
 		nBlocks=loadBlocks(read2characters_old);
 		
+System.err.println("fixPeriodicEndpoints_updateTranslation> 0  read="+readID+" :: "+read2characters_old);		
+		
 		// First block
 		spacersCursor=fixPeriodicEndpoints_updateTranslation_firstBlock(nBlocks,readID,readLength,maxSpacerLength,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,spacersCursor,QUANTUM,read2characters_new,read2boundaries_new,out,tmpArray1);
 		if (nBlocks==1) return spacersCursor;
@@ -6671,6 +6673,9 @@ public class RepeatAlphabet {
 		
 		// Intermediate blocks
 		while (blockCursor<=nBlocks-2) {
+			
+System.err.println("fixPeriodicEndpoints_updateTranslation> 1  blockCursor="+blockCursor+" read="+readID+" :: "+read2characters_old);			
+			
 			p=Integer.parseInt(blocks[blockCursor][0]);
 			if (p<0) p=-1-p;
 			isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
@@ -6787,7 +6792,7 @@ public class RepeatAlphabet {
 		if (lastLeft==-1) leftCharacters_load_prime(true,blockCursor-1,length,blockCursor-1==0,false,oldAlphabet,lastUnique_old,lastPeriodic_old);
 		leftCharacters_addLength(spacers[spacersCursor].breakpoint-spacers[spacersCursor].first);
 		leftCharacters_clear_prime(newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,quantum,tmpArray1);
-		length=boundaries[blockCursor+1]-boundaries[blockCursor];
+		length=(blockCursor+1==nBlocks-1?readLength:boundaries[blockCursor+1])-boundaries[blockCursor];
 		leftCharacters_load_prime(true,blockCursor+1,length,false,blockCursor+1==nBlocks-1,oldAlphabet,lastUnique_old,lastPeriodic_old);
 		leftCharacters_addLength(spacers[spacersCursor].last-spacers[spacersCursor].breakpoint);
 		leftCharacters_setOpen(true,false);
@@ -6961,7 +6966,7 @@ public class RepeatAlphabet {
 		int i, c, p;
 		int length, last;
 		
-		nBoundariesWritten=0;
+		lastLeft=-1; nBoundariesWritten=0;
 		
 		// Single block
 		if (nBlocks==1) {
@@ -6997,7 +7002,6 @@ public class RepeatAlphabet {
 				// The first block is an inactive spacer
 				writeBlock(0,boundaries[0],true,false,quantum,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,read2characters_new,tmpArray);
 				currentBoundary=boundaries[0];
-				lastLeft=-1;
 			}
 			else {
 				if (spacers[spacersCursor].breakpoint>quantum) {
@@ -7020,7 +7024,7 @@ public class RepeatAlphabet {
 		}
 		else { 
 			// The first block is not a spacer
-			blockCursor=1; lastLeft=-1; currentBoundary=-1;
+			blockCursor=1; currentBoundary=-1;
 		}
 		return spacersCursor;
 	}
@@ -7333,7 +7337,7 @@ public class RepeatAlphabet {
 				character.length+=quantum;
 			}
 			if (p<0) {
-				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: unique character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]);
+				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: unique character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[-1-p]);
 				System.exit(1);
 			}
 			out[++last]=p;
@@ -7351,7 +7355,7 @@ public class RepeatAlphabet {
 				character.length+=quantum;
 			}
 			if (p<0) {
-				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[p]);
+				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[-1-p]);
 				System.exit(1);
 			}
 			out[++last]=p;
