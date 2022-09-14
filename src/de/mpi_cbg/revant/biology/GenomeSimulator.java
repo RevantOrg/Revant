@@ -114,14 +114,16 @@ public class GenomeSimulator {
 		final String READS_FILE = args[5];
 		final int READS_COVERAGE = Integer.parseInt(args[6]);
 		final String OUTPUT_FASTA = args[7];
-		final String OUTPUT_DOT = args[8];
-		final String OUTPUT_IMAGE = args[9];
-		final int N_OUTPUT_COLUMNS = Integer.parseInt(args[10]);
-		final String OUTPUT_DBG = args[11];
-		final int DBG_K = Integer.parseInt(args[12]);
-		final int DBG_READ_LENGTH = Integer.parseInt(args[13]);
-		final boolean DBG_UNIQUE_MODE = Integer.parseInt(args[14])==1;
-		final int DBG_DISTANCE_THRESHOLD = Integer.parseInt(args[15]);
+		final String OUTPUT_REPEAT_LENGTHS = args[8];
+		final String OUTPUT_REPEAT_ISPERIODIC = args[9];
+		final String OUTPUT_DOT = args[10];
+		final String OUTPUT_IMAGE = args[11];
+		final int N_OUTPUT_COLUMNS = Integer.parseInt(args[12]);
+		final String OUTPUT_DBG = args[13];
+		final int DBG_K = Integer.parseInt(args[14]);
+		final int DBG_READ_LENGTH = Integer.parseInt(args[15]);
+		final boolean DBG_UNIQUE_MODE = Integer.parseInt(args[16])==1;
+		final int DBG_DISTANCE_THRESHOLD = Integer.parseInt(args[17]);
 		
 		final int STRING_CAPACITY = 1000000;  // Arbitrary
 		final long N_REPEAT_BPS = (long)(REPEAT_BPS_OVER_UNIQUE_BPS*N_UNIQUE_BPS);
@@ -177,7 +179,8 @@ public class GenomeSimulator {
 			}
 			bw.write("}");
 			bw.close();
-		}
+		}		
+		if (!OUTPUT_REPEAT_LENGTHS.equalsIgnoreCase("null") && !OUTPUT_REPEAT_ISPERIODIC.equalsIgnoreCase("null")) printAuxiliaryRepeatFiles(OUTPUT_REPEAT_LENGTHS,OUTPUT_REPEAT_ISPERIODIC);
 		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
 		if (!OUTPUT_DBG.equalsIgnoreCase("null")) buildDBG(DBG_K,DBG_READ_LENGTH,model.minAlignmentLength,DBG_UNIQUE_MODE,DBG_DISTANCE_THRESHOLD,OUTPUT_DBG,true);
 		if (!GENOME_SEQUENCE_FILE.equalsIgnoreCase("null")) printGenome(GENOME_SEQUENCE_FILE);
@@ -975,6 +978,24 @@ public class GenomeSimulator {
 		g2d.drawString(label,x,y);
 	}
 	
+	
+	/**
+	 * @param outputFileLengths file containing the sequence length of every distinct
+	 * repeat;
+	 * @param outputFileIsPeriodic file marking with a one every short-period repeat.
+	 */
+	private static final void printAuxiliaryRepeatFiles(String outputFileLengths, String outputFileIsPeriodic) throws IOException {
+		int i;
+		BufferedWriter bw;
+		
+		bw = new BufferedWriter(new FileWriter(outputFileLengths));
+		for (i=0; i<=lastRepeat; i++) bw.write(repeats[i].sequenceLength+"\n");
+		bw.close();		
+		bw = new BufferedWriter(new FileWriter(outputFileIsPeriodic));
+		for (i=0; i<=lastRepeat; i++) bw.write(repeats[i].type==Constants.INTERVAL_PERIODIC?"1\n":"0\n");
+		bw.close();
+	}
+
 	
 	private static class Repeat {
 		public int tree;

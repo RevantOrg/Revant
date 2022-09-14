@@ -12,8 +12,7 @@
 #
 OUTPUT_DIR=$1
 REPEAT_MODEL_DIR=$2
-REPEATS_DB=$3  # In DAZZDB format. Must contain strings of length >=MIN_ALIGNMENT_LENGTH.
-READ_SIMULATOR=$4  # One of: pbsim, pass, npbss, simlord
+READ_SIMULATOR=$3  # One of: pbsim, pass, npbss, simlord
 # Genome
 NONREPETITIVE_BPS="500"
 REPETITIVE_NONREPETITIVE_RATIO="2000"  # In the genome
@@ -47,8 +46,10 @@ GENOME_FILE="${OUTPUT_DIR}/genome.fasta"
 GENOME_IMAGE="${OUTPUT_DIR}/genome.png"
 READS_FILE="${OUTPUT_DIR}/reads.fasta"
 REPEATS_FILE="${OUTPUT_DIR}/repeats-used-by-simulator.fasta"
-rm -f ${GENOME_FILE} ${GENOME_IMAGE} ${REPEATS_FILE}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.biology.GenomeSimulator -1 ${NONREPETITIVE_BPS} ${REPETITIVE_NONREPETITIVE_RATIO} ${REPEAT_MODEL_DIR} ${GENOME_FILE} null 0 ${REPEATS_FILE} null ${GENOME_IMAGE} ${AVG_READ_LENGTH} null 0 0 0 0
+REPEATS_FILE_LENGTHS="${OUTPUT_DIR}/repeats-lengths.txt"
+REPEATS_FILE_ISPERIODIC="${OUTPUT_DIR}/repeats-isPeriodic.txt"
+rm -f ${GENOME_FILE} ${GENOME_IMAGE} ${REPEATS_FILE} ${REPEATS_FILE_LENGTHS} ${REPEATS_FILE_ISPERIODIC}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.biology.GenomeSimulator -1 ${NONREPETITIVE_BPS} ${REPETITIVE_NONREPETITIVE_RATIO} ${REPEAT_MODEL_DIR} ${GENOME_FILE} null 0 ${REPEATS_FILE} ${REPEATS_FILE_LENGTHS} ${REPEATS_FILE_ISPERIODIC} null ${GENOME_IMAGE} ${AVG_READ_LENGTH} null 0 0 0 0
 GENOME_LENGTH=$(wc -c < ${GENOME_FILE})
 N_READS=$(( (${COVERAGE} * ${GENOME_LENGTH}) / ${AVG_READ_LENGTH} ))
 
@@ -106,7 +107,7 @@ rm -f ${TMP_READS}
 seq 0 $(( ($(wc -l < ${READS_FILE}) / 2) - 1 )) > ${OUTPUT_DIR}/reads-ids.txt
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.util.Fasta2Lengths ${READS_FILE} > ${OUTPUT_DIR}/reads-lengths.txt
 
-# Computing alignments
+# Computing read-read alignments
 READS_DB="${OUTPUT_DIR}/reads.db"
 DBrm ${READS_DB}
 ${DAZZDB_DIR}/fasta2DB ${READS_DB} ${READS_FILE}
@@ -117,12 +118,17 @@ LAsort ${OUTPUT_DIR}/reads.reads.las
 rm -f ${OUTPUT_DIR}/reads.reads.las
 LAshow ${READS_DB} ${OUTPUT_DIR}/reads.reads.S.las > ${OUTPUT_DIR}/LAshow-reads-reads.txt
 rm -f ${OUTPUT_DIR}/reads.reads.S.las
-REPEATS_FILE=$(basename ${REPEATS_DB} .db)
+
+# Computing read-repeat alignments
+REPEATS_DB="${OUTPUT_DIR}/repeats.db"
+DBrm ${REPEATS_DB}
+${DAZZDB_DIR}/fasta2DB ${REPEATS_DB} ${REPEATS_FILE}
 daligner -T${N_THREADS} -M0 -t100000000 -e${READ_REPEAT_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${REPEATS_DB} ${READS_DB}
 mv ./*.las ${OUTPUT_DIR}
-LAsort ${OUTPUT_DIR}/reads.${REPEATS_FILE}.las
-rm -f ${OUTPUT_DIR}/reads.${REPEATS_FILE}.las
-LAshow ${READS_DB} ${REPEATS_DB} ${OUTPUT_DIR}/reads.${REPEATS_FILE}.S.las > ${OUTPUT_DIR}/LAshow-reads-repeats.txt
+REPEATS_FILE_PREFIX=$(basename ${REPEATS_DB} .db)
+LAsort ${OUTPUT_DIR}/reads.${REPEATS_FILE_PREFIX}.las
+rm -f ${OUTPUT_DIR}/reads.${REPEATS_FILE_PREFIX}.las
+LAshow ${READS_DB} ${REPEATS_DB} ${OUTPUT_DIR}/reads.${REPEATS_FILE_PREFIX}.S.las > ${OUTPUT_DIR}/LAshow-reads-repeats.txt
 rm -f ${OUTPUT_DIR}/*.las
 
 

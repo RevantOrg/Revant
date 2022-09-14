@@ -319,6 +319,12 @@ public class RepeatAlphabet {
 		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
 		if (stack.length<lastAlignment+1) stack = new int[lastAlignment+1];
 		
+		
+System.err.println("recodeRead> alignments:");		
+for (int x=0; x<=lastAlignment; x++) System.err.println(alignments[x]);
+		
+		
+		
 		// Building maximal periodic intervals
 		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1; lastStack=-1;
 		for (i=0; i<=lastAlignment; i++) {
@@ -353,6 +359,11 @@ public class RepeatAlphabet {
 			periodicIntervals[++lastPeriodicInterval]=currentStart;
 			periodicIntervals[++lastPeriodicInterval]=currentEnd;
 		}
+		
+
+System.err.println("recodeRead> periodic intervals:");		
+for (int x=0; x<=lastPeriodicInterval; x+=2) System.err.println(periodicIntervals[x]+".."+periodicIntervals[x+1]);
+		
 		
 		// Collecting readA endpoints of all alignments
 		lastPoint=-1;
@@ -1036,6 +1047,16 @@ public class RepeatAlphabet {
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
 						recodeRead(quantum);
+						
+
+
+System.err.println("readA="+previousReadA);
+for (int x=0; x<=lastInSequence; x++) System.err.println(x+": "+sequence[x]);
+						
+						
+						
+						
+						
 						if (lastInSequence==-1) {
 							bw1.newLine(); bw2.newLine(); histogram[0]++;
 							bw3.write(previousReadA+"\n");
@@ -6664,8 +6685,6 @@ public class RepeatAlphabet {
 		loadBoundaries(read2boundaries_old);
 		nBlocks=loadBlocks(read2characters_old);
 		
-System.err.println("fixPeriodicEndpoints_updateTranslation> 0  read="+readID+" :: "+read2characters_old);		
-		
 		// First block
 		spacersCursor=fixPeriodicEndpoints_updateTranslation_firstBlock(nBlocks,readID,readLength,maxSpacerLength,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,spacersCursor,QUANTUM,read2characters_new,read2boundaries_new,out,tmpArray1);
 		if (nBlocks==1) return spacersCursor;
@@ -6673,9 +6692,6 @@ System.err.println("fixPeriodicEndpoints_updateTranslation> 0  read="+readID+" :
 		
 		// Intermediate blocks
 		while (blockCursor<=nBlocks-2) {
-			
-System.err.println("fixPeriodicEndpoints_updateTranslation> 1  blockCursor="+blockCursor+" read="+readID+" :: "+read2characters_old);			
-			
 			p=Integer.parseInt(blocks[blockCursor][0]);
 			if (p<0) p=-1-p;
 			isUnique=p<=lastUnique_old||p==lastAlphabet_old+1;
