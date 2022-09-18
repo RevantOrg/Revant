@@ -47,6 +47,13 @@ import de.mpi_cbg.revant.util.Math;
  * heuristics of the aligner. The tandem would then be modeled like a non-repetitive
  * region. This might still not be a problem in practice, since the same could happen in
  * read-read alignments, i.e. no read-read alignment might fall inside the tandem.
+ *
+ * Remark: the set of all kept suffix-prefix alignments should form a line. In practice 
+ * the line can be broken into components, since e.g. a read might have unique intervals 
+ * only close to its suffix, so no alignment that uses its prefix can ever be kept by a
+ * tight filter. The absence of a unique interval at the prefix might not be real and be 
+ * due to factorization problems or to issues with the aligner: longer reads and higher 
+ * coverage might remove this break on the line.
  */
 public class FilterAlignments {
 	/**

@@ -2,7 +2,6 @@ package de.mpi_cbg.revant.util;
 
 
 public class Constants {
-
 	/**
 	 * Types of interval
 	 */
@@ -43,8 +42,6 @@ public class Constants {
 	public static final int CONTAINMENT_PREFIX = 0;
 	public static final int CONTAINMENT_SUFFIX = 1;
 	public static final int CONTAINMENT_SUBSTRING = 2;
-	
-	
 	
 	
 	/**
