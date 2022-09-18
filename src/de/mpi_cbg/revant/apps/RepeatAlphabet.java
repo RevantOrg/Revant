@@ -188,6 +188,7 @@ public class RepeatAlphabet {
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		final int MAX_SEQUENCE_LENGTH = 1000;  // Arbitrary
+		final int PERIODIC_OVERLAP_THRESHOLD = minAlignmentLength>>1;  // Arbitrary
 		int i;
 		int row, readA, previousReadA;
 		String str;
@@ -231,7 +232,7 @@ public class RepeatAlphabet {
 				if (previousReadA!=-1) {
 					cleanAlignments(distanceThreshold);
 					if (lastAlignment!=-1) {
-						recodeRead(distanceThreshold);
+						recodeRead(distanceThreshold,PERIODIC_OVERLAP_THRESHOLD);
 						if (lastInSequence>=0) addCharacterInstances(bw);
 						sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 					}
@@ -256,7 +257,7 @@ public class RepeatAlphabet {
 		if (previousReadA!=-1) {
 			cleanAlignments(distanceThreshold);
 			if (lastAlignment!=-1) {
-				recodeRead(distanceThreshold);
+				recodeRead(distanceThreshold,PERIODIC_OVERLAP_THRESHOLD);
 				if (lastInSequence>=0) addCharacterInstances(bw);
 				sequenceLengths[lastInSequence+1<MAX_SEQUENCE_LENGTH?lastInSequence+1:MAX_SEQUENCE_LENGTH-1]++;
 			}
@@ -304,7 +305,7 @@ public class RepeatAlphabet {
 	 * Remark: the procedure uses global arrays $alignments,periodicIntervals,points,
 	 * sequence,stack$. $stack$ is assumed to be non-null.
 	 */
-	public static final void recodeRead(int distanceThreshold) {
+	public static final void recodeRead(int distanceThreshold, int periodicOverlapThreshold) {
 		final int CLUSTERING_DISTANCE = distanceThreshold;
 		final int MAX_DENSE_LENGTH = (CLUSTERING_DISTANCE)<<1;  // Arbitrary
 		int i, j, k;
@@ -319,24 +320,18 @@ public class RepeatAlphabet {
 		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
 		if (stack.length<lastAlignment+1) stack = new int[lastAlignment+1];
 		
-		
-System.err.println("recodeRead> alignments:");		
-for (int x=0; x<=lastAlignment; x++) System.err.println(alignments[x]);
-		
-		
-		
 		// Building maximal periodic intervals
 		lastPeriodicInterval=-1; currentStart=-1; currentEnd=-1; lastStack=-1;
 		for (i=0; i<=lastAlignment; i++) {
 			if (!isPeriodic[alignments[i].readB]) continue;
 			if (currentStart==-1) {
 				currentStart=alignments[i].startA; currentEnd=alignments[i].endA;
-				lastStack=0; stack[0]=alignments[i].readB;
+				lastStack=0; stack[0]=alignments[i].orientation?alignments[i].readB:-1-alignments[i].readB;
 				continue;
 			}
-			if (alignments[i].startA<currentEnd-distanceThreshold) {
+			if (alignments[i].startA<currentEnd-periodicOverlapThreshold) {
 				currentEnd=Math.max(currentEnd,alignments[i].endA);
-				stack[++lastStack]=alignments[i].readB;
+				stack[++lastStack]=alignments[i].orientation?alignments[i].readB:-1-alignments[i].readB;
 				continue;
 			}
 			if (lastStack>0) {
@@ -351,7 +346,7 @@ for (int x=0; x<=lastAlignment; x++) System.err.println(alignments[x]);
 				periodicIntervals[++lastPeriodicInterval]=currentStart;
 				periodicIntervals[++lastPeriodicInterval]=currentEnd;
 				currentStart=alignments[i].startA; currentEnd=alignments[i].endA; 
-				lastStack=0; stack[0]=alignments[i].readB;
+				lastStack=0; stack[0]=alignments[i].orientation?alignments[i].readB:-1-alignments[i].readB;
 			}
 			else currentEnd=Math.max(currentEnd,alignments[i].endA);
 		}
@@ -359,11 +354,6 @@ for (int x=0; x<=lastAlignment; x++) System.err.println(alignments[x]);
 			periodicIntervals[++lastPeriodicInterval]=currentStart;
 			periodicIntervals[++lastPeriodicInterval]=currentEnd;
 		}
-		
-
-System.err.println("recodeRead> periodic intervals:");		
-for (int x=0; x<=lastPeriodicInterval; x+=2) System.err.println(periodicIntervals[x]+".."+periodicIntervals[x+1]);
-		
 		
 		// Collecting readA endpoints of all alignments
 		lastPoint=-1;
@@ -506,7 +496,11 @@ for (int x=0; x<=lastPeriodicInterval; x+=2) System.err.println(periodicInterval
 			}
 			if (firstJForNextI==-1 && i<lastPoint && alignments[j].endA>endA) firstJForNextI=j;
 			if (Intervals.areApproximatelyIdentical(alignments[j].startA,alignments[j].endA,startA,endA)) newBlock.addCharacter(alignments[j],distanceThreshold,alignments[j].startA,alignments[j].endA,tmpCharacter);
-			else if ( (isPeriodic[alignments[j].readB] && Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA)) ||
+			else if ( ( isPeriodic[alignments[j].readB] && 
+				        ( Intervals.isApproximatelyContained(alignments[j].startA,alignments[j].endA,startA,endA) ||
+						  Intervals.isApproximatelyContained(startA,endA,alignments[j].startA,alignments[j].endA)	
+					    ) 
+					  ) ||
 				      (!isPeriodic[alignments[j].readB] && Intervals.isApproximatelyContained(startA,endA,alignments[j].startA,alignments[j].endA))
 				    ) newBlock.addCharacter(alignments[j],distanceThreshold,startA,endA,tmpCharacter);
 			j++;
@@ -994,6 +988,7 @@ for (int x=0; x<=lastPeriodicInterval; x+=2) System.err.println(periodicInterval
 		final int ALIGNMENTS_CAPACITY = 100000;  // Arbitrary
 		final int SEQUENCE_CAPACITY = 1000000;  // Arbitrary
 		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
+		final int PERIODIC_OVERLAP_THRESHOLD = minAlignmentLength>>1;  // Arbitrary
 		int i, j;
 		int row, readA, previousReadA;
 		String str;
@@ -1046,17 +1041,7 @@ for (int x=0; x<=lastPeriodicInterval; x+=2) System.err.println(periodicInterval
 					}
 					cleanAlignments(quantum);
 					if (lastAlignment!=-1) {
-						recodeRead(quantum);
-						
-
-
-System.err.println("readA="+previousReadA);
-for (int x=0; x<=lastInSequence; x++) System.err.println(x+": "+sequence[x]);
-						
-						
-						
-						
-						
+						recodeRead(quantum,PERIODIC_OVERLAP_THRESHOLD);
 						if (lastInSequence==-1) {
 							bw1.newLine(); bw2.newLine(); histogram[0]++;
 							bw3.write(previousReadA+"\n");
@@ -1102,7 +1087,7 @@ for (int x=0; x<=lastInSequence; x++) System.err.println(x+": "+sequence[x]);
 			}
 			cleanAlignments(quantum);
 			if (lastAlignment!=-1) {
-				recodeRead(quantum);
+				recodeRead(quantum,PERIODIC_OVERLAP_THRESHOLD);
 				if (lastInSequence==-1) { 
 					bw1.newLine(); bw2.newLine(); histogram[0]++; 
 					bw3.write(previousReadA+"\n");
@@ -1591,8 +1576,11 @@ for (int x=0; x<=lastInSequence; x++) System.err.println(x+": "+sequence[x]);
 						if (!found) {
 							// Looking for a shorter version, since the length of 
 							// character $value$ was not computed in the same way as we do
-							// here.
-							tmpChar.length-=QUANTUM;
+							// here. If the character is open on both sides, we allow for
+							// an even shorter version, since the character might be
+							// longer than the one in the alphabet because of slack both
+							// at the beginning and at the end.
+							tmpChar.length-=(tmpChar.openStart&&tmpChar.openEnd)?(QUANTUM*2):QUANTUM;
 							for (k=value; k<=lastPeriodic; k++) {
 								if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
 								if (alphabet[k].implies(tmpChar)) { found=true; nElements++; }
@@ -7402,7 +7390,7 @@ for (int x=0; x<=lastInSequence; x++) System.err.println(x+": "+sequence[x]);
 		if (p>=0) return p;
 		repeat=character.repeat; orientation=character.orientation; length=character.length;
 		p=-1-p;
-		if (newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) p--;
+		if (p==lastPeriodic_new+1 || newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) p--;
 		k=p;
 		while (k>lastUnique_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && newAlphabet[k].length>=length) k--;
 		k++;
@@ -7436,6 +7424,9 @@ for (int x=0; x<=lastInSequence; x++) System.err.println(x+": "+sequence[x]);
 	 * Sets $out[i]=true$ iff $alphabet[i]$ is a non-periodic character (possibly non-
 	 * repetitive) that has to be wobbled (every periodic character must be wobbled, 
 	 * marking those is not needed).
+	 *
+	 * Remark: the procedure assumes that at least one non-periodic and non-unique
+	 * character exists.
 	 *
 	 * @param read2characters a row of the translated reads file;
 	 * @param tmpArray temporary space, of size at least equal to the number of blocks.
@@ -7471,7 +7462,7 @@ for (int x=0; x<=lastInSequence; x++) System.err.println(x+": "+sequence[x]);
 		}
 		if (tmpArray[nBlocks-1]==1 && tmpArray[nBlocks-2]==0) tmpArray[nBlocks-2]=2;
 		
-		// Marking every non-periodic character as to be wobbled.
+		// Marking every non-periodic character as to be wobbled (if any).
 		for (i=0; i<nBlocks; i++) {
 			if (tmpArray[i]==1) {
 				for (j=0; j<=lastInBlock[i]; j++) {

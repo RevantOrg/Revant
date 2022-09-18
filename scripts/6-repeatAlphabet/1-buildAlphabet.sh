@@ -256,7 +256,7 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		for THREAD in $(seq 0 ${TO}); do
 			translationThread_spacers ${THREAD} "${TMPFILE_PATH}-spacers-9-" "${TMPFILE_PATH}-spacers-10-" "${TMPFILE_PATH}-spacers-11-" &
 		done
-		wait
+		wait	
 		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
 		mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-prespacers
 		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prespacers

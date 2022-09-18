@@ -148,13 +148,16 @@ public class GenomeSimulator {
 		// Printing output
 		if (!OUTPUT_FASTA.equalsIgnoreCase("null")) {
 			bw = new BufferedWriter(new FileWriter(OUTPUT_FASTA));
-			for (i=0; i<=lastRepeat; i++) bw.write(repeats[i].toString(i,model.minAlignmentLength));
+			for (i=0; i<=lastRepeat; i++) {
+				if (repeats[i].type!=-1) bw.write(repeats[i].toString(i,model.minAlignmentLength));
+			}
 			bw.close();
 		}
 		if (!OUTPUT_DOT.equalsIgnoreCase("null")) {
 			bw = new BufferedWriter(new FileWriter(OUTPUT_DOT));
 			bw.write("digraph G { \n");
 			for (i=0; i<=lastRepeat; i++) {
+				if (repeats[i].type==-1) continue;
 				if (repeats[i].parent!=null) {
 					parentString=repeats[i].parent.id;
 					parentString=parentString.replace(' ','_');
@@ -180,7 +183,7 @@ public class GenomeSimulator {
 			bw.write("}");
 			bw.close();
 		}		
-		if (!OUTPUT_REPEAT_LENGTHS.equalsIgnoreCase("null") && !OUTPUT_REPEAT_ISPERIODIC.equalsIgnoreCase("null")) printAuxiliaryRepeatFiles(OUTPUT_REPEAT_LENGTHS,OUTPUT_REPEAT_ISPERIODIC);
+		if (!OUTPUT_REPEAT_LENGTHS.equalsIgnoreCase("null") && !OUTPUT_REPEAT_ISPERIODIC.equalsIgnoreCase("null")) printAuxiliaryRepeatFiles(OUTPUT_REPEAT_LENGTHS,OUTPUT_REPEAT_ISPERIODIC,model.minAlignmentLength);
 		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
 		if (!OUTPUT_DBG.equalsIgnoreCase("null")) buildDBG(DBG_K,DBG_READ_LENGTH,model.minAlignmentLength,DBG_UNIQUE_MODE,DBG_DISTANCE_THRESHOLD,OUTPUT_DBG,true);
 		if (!GENOME_SEQUENCE_FILE.equalsIgnoreCase("null")) printGenome(GENOME_SEQUENCE_FILE);
@@ -980,19 +983,29 @@ public class GenomeSimulator {
 	
 	
 	/**
+	 * @param minAlignmentLength like $Repeat.toString()$, the procedure replicates the 
+	 * sequence if it is shorter than this;
 	 * @param outputFileLengths file containing the sequence length of every distinct
 	 * repeat;
 	 * @param outputFileIsPeriodic file marking with a one every short-period repeat.
 	 */
-	private static final void printAuxiliaryRepeatFiles(String outputFileLengths, String outputFileIsPeriodic) throws IOException {
+	private static final void printAuxiliaryRepeatFiles(String outputFileLengths, String outputFileIsPeriodic, int minAlignmentLength) throws IOException {
 		int i;
+		int length;
 		BufferedWriter bw;
 		
 		bw = new BufferedWriter(new FileWriter(outputFileLengths));
-		for (i=0; i<=lastRepeat; i++) bw.write(repeats[i].sequenceLength+"\n");
-		bw.close();		
+		for (i=0; i<=lastRepeat; i++) {
+			if (repeats[i].type==-1) continue;
+			length=repeats[i].sequenceLength;
+			while (length<minAlignmentLength) length+=repeats[i].sequenceLength;
+			bw.write(length+"\n");
+		}
+		bw.close();	
 		bw = new BufferedWriter(new FileWriter(outputFileIsPeriodic));
-		for (i=0; i<=lastRepeat; i++) bw.write(repeats[i].type==Constants.INTERVAL_PERIODIC?"1\n":"0\n");
+		for (i=0; i<=lastRepeat; i++) {
+			if (repeats[i].type!=-1) bw.write(repeats[i].type==Constants.INTERVAL_PERIODIC?"1\n":"0\n");
+		}
 		bw.close();
 	}
 
