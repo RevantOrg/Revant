@@ -113,6 +113,9 @@ rm -f ${FINAL_INTERVALS_FILE}
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-intervals-*" ); do
 	cat ${FILE} >> ${FINAL_INTERVALS_FILE}
 done
+INTERVAL_STATS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}-stats.txt"
+rm -f ${INTERVAL_STATS_FILE}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.UniqueIntervalsStats ${FINAL_INTERVALS_FILE} ${READS_TRANSLATED_BOUNDARIES} ${INTERVAL_STATS_FILE}
 
 # Collecting tandem intervals
 function tandemsThread() {

@@ -3382,6 +3382,56 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * Writes to $outputFile$ a matrix such that there is a row for every number of blocks
+	 * in a read, and there is a column for every number of unique intervals in a read.
+	 * Cell $(i,j)$ contains the number of reads with $i$ blocks and $j$ unique intervals.
+	 *
+	 * @param maxBlocksPerRead values greater than this are ignored.
+	 */
+	public static final void printUniqueIntervalsStats(String uniqueIntervalsFile, String translatedBoundariesFile, int maxBlocksPerRead, String outputFile) throws IOException {
+		int i, j;
+		int nBlocks, nIntervals;
+		String str1, str2;
+		BufferedReader br1, br2;
+		BufferedWriter bw;
+		int[][] matrix;
+		
+		// Building the matrix
+		matrix = new int[maxBlocksPerRead+1][maxBlocksPerRead+1];
+		Math.set(matrix,0);
+		br1 = new BufferedReader(new FileReader(uniqueIntervalsFile));
+		br2 = new BufferedReader(new FileReader(translatedBoundariesFile));
+		str1=br1.readLine(); str2=br2.readLine();
+		while (str1!=null) {
+			nBlocks=1;
+			i=str2.indexOf(SEPARATOR_MINOR);
+			while (i>=0) {
+				nBlocks++;
+				i=str2.indexOf(SEPARATOR_MINOR,i+1);
+			}
+			nIntervals=1;
+			i=str1.indexOf(SEPARATOR_MINOR);
+			while (i>=0) {
+				nIntervals++;
+				i=str1.indexOf(SEPARATOR_MINOR,i+1);
+			}
+			nIntervals/=3;
+			matrix[Math.min(nBlocks,maxBlocksPerRead)][Math.min(nIntervals,maxBlocksPerRead)]++;
+			str1=br1.readLine(); str2=br2.readLine();
+		}
+		br1.close(); br2.close();
+		
+		// Printing the matrix
+		bw = new BufferedWriter(new FileWriter(outputFile));
+		for (i=0; i<=maxBlocksPerRead; i++) {
+			bw.write(matrix[i][0]+"");
+			for (j=1; j<=maxBlocksPerRead; j++) bw.write(","+matrix[i][j]);
+			bw.newLine();
+		}
+	}
+	
+	
+	/**
 	 * Writes to $outputFile$ a zero for every alignment of $alignmentsFile$ that belongs 
 	 * to a \emph{red region} on both readA and readB, i.e. to a region that fully belongs
 	 * to a repeat character, or to a sequence of repeat characters, that is likely to 
