@@ -103,11 +103,12 @@ public class GenomeSimulator {
 	 * 14: how to handle unique sequence in the alphabet of the DBG: 1=a unique sequence 
 	 *     does not match any other unique sequence, not even one of the same length; 
 	 *     0=unique sequences of the same length are assumed to match;
-	 * 15: distance threshold for building the alphabet of the DBG.
+	 * 15: distance threshold for building the alphabet of the DBG;
+	 * 18: histogram of repeat occurrence lengths (binned by $minAlignmentLength$).
 	 */
 	public static void main(String[] args) throws IOException {
 		final long RANDOM_SEED = Long.parseLong(args[0]);
-		final int N_UNIQUE_BPS = Integer.parseInt(args[1]);
+		int N_UNIQUE_BPS = Integer.parseInt(args[1]);
 		final double REPEAT_BPS_OVER_UNIQUE_BPS = Double.parseDouble(args[2]);
 		final String REPEAT_MODEL_DIR = args[3];
 		final String GENOME_SEQUENCE_FILE = args[4];
@@ -124,10 +125,12 @@ public class GenomeSimulator {
 		final int DBG_READ_LENGTH = Integer.parseInt(args[15]);
 		final boolean DBG_UNIQUE_MODE = Integer.parseInt(args[16])==1;
 		final int DBG_DISTANCE_THRESHOLD = Integer.parseInt(args[17]);
+		final String OCCURRENCE_LENGTH_HISTOGRAM_FILE = args[18];
 		
 		final int STRING_CAPACITY = 1000000;  // Arbitrary
 		final long N_REPEAT_BPS = (long)(REPEAT_BPS_OVER_UNIQUE_BPS*N_UNIQUE_BPS);
 		RepeatModel model = new RepeatModel(REPEAT_MODEL_DIR);
+		N_UNIQUE_BPS=Math.max(N_UNIQUE_BPS,model.minAlignmentLength<<1);
 		StringBuilder sb = new StringBuilder(STRING_CAPACITY);
 		Random random = RANDOM_SEED==-1?new Random():new Random(RANDOM_SEED);
 		BufferedWriter bw;
@@ -186,7 +189,7 @@ public class GenomeSimulator {
 		if (!OUTPUT_REPEAT_LENGTHS.equalsIgnoreCase("null") && !OUTPUT_REPEAT_ISPERIODIC.equalsIgnoreCase("null")) printAuxiliaryRepeatFiles(OUTPUT_REPEAT_LENGTHS,OUTPUT_REPEAT_ISPERIODIC,model.minAlignmentLength);
 		if (!OUTPUT_IMAGE.equalsIgnoreCase("null")) drawGenome(N_OUTPUT_COLUMNS,OUTPUT_IMAGE);
 		if (!OUTPUT_DBG.equalsIgnoreCase("null")) buildDBG(DBG_K,DBG_READ_LENGTH,model.minAlignmentLength,DBG_UNIQUE_MODE,DBG_DISTANCE_THRESHOLD,OUTPUT_DBG,true);
-		if (!GENOME_SEQUENCE_FILE.equalsIgnoreCase("null")) printGenome(GENOME_SEQUENCE_FILE);
+		if (!GENOME_SEQUENCE_FILE.equalsIgnoreCase("null")) printGenome(GENOME_SEQUENCE_FILE,OCCURRENCE_LENGTH_HISTOGRAM_FILE,model.minAlignmentLength);
 		if (!READS_FILE.equalsIgnoreCase("null")) printReads(DBG_READ_LENGTH,READS_COVERAGE,READS_FILE,random);
 	}
 	
@@ -348,26 +351,30 @@ public class GenomeSimulator {
 			toTree=0;
 			if (lastByTree[0]==-1) return 0;
 			i=lastByTree[0]==0?0:random.nextInt(lastByTree[0]+1);
-			lastByTree[fromTree]++;
-			if (lastByTree[fromTree]==byTree[fromTree].length) {
-				RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
-				System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
-				byTree[fromTree]=newByTree;
+			if (fromInstance.sequenceLength>=(model.minAlignmentLength<<1)) {
+				lastByTree[fromTree]++;
+				if (lastByTree[fromTree]==byTree[fromTree].length) {
+					RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
+					System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
+					byTree[fromTree]=newByTree;
+				}
+				byTree[fromTree][lastByTree[fromTree]]=fromInstance;
 			}
-			byTree[fromTree][lastByTree[fromTree]]=fromInstance;
 		}
 		else {
 			toTree=Arrays.binarySearch(repeat.insertionProbCumulative,random.nextDouble());
 			if (toTree<0) toTree=-1-toTree;
 			if (lastByTree[toTree]==-1) return 0;
 			i=lastByTree[toTree]==0?0:random.nextInt(lastByTree[toTree]+1);
-			lastByTree[fromTree]++;
-			if (lastByTree[fromTree]==byTree[fromTree].length) {
-				RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
-				System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
-				byTree[fromTree]=newByTree;
+			if (fromInstance.sequenceLength>=(model.minAlignmentLength<<1)) {
+				lastByTree[fromTree]++;
+				if (lastByTree[fromTree]==byTree[fromTree].length) {
+					RepeatInstance[] newByTree = new RepeatInstance[byTree[fromTree].length<<1];
+					System.arraycopy(byTree[fromTree],0,newByTree,0,byTree[fromTree].length);
+					byTree[fromTree]=newByTree;
+				}
+				byTree[fromTree][lastByTree[fromTree]]=fromInstance;
 			}
-			byTree[fromTree][lastByTree[fromTree]]=fromInstance;
 		}
 		toInstance=byTree[toTree][i];
 		p=model.minAlignmentLength+random.nextInt(Math.max(toInstance.sequenceLength-(model.minAlignmentLength<<1),1));
@@ -381,9 +388,9 @@ public class GenomeSimulator {
 		suffix.previous=fromInstance;
 		suffix.next=toInstance.next;
 		if (toInstance.next!=null) toInstance.next.previous=suffix;
-		if (prefix.sequenceLength>=model.minAlignmentLength<<1) {
+		if (prefix.sequenceLength>=(model.minAlignmentLength<<1)) {
 			byTree[toTree][i]=prefix;
-			if (suffix.sequenceLength>=model.minAlignmentLength<<1) {
+			if (suffix.sequenceLength>=(model.minAlignmentLength<<1)) {
 				lastByTree[toTree]++;
 				if (lastByTree[toTree]==byTree[toTree].length) {
 					RepeatInstance[] newByTree = new RepeatInstance[byTree[toTree].length<<1];
@@ -393,7 +400,7 @@ public class GenomeSimulator {
 				byTree[toTree][lastByTree[toTree]]=suffix;
 			}
 		}
-		else if (suffix.sequenceLength>=model.minAlignmentLength<<1) byTree[toTree][i]=suffix;
+		else if (suffix.sequenceLength>=(model.minAlignmentLength<<1)) byTree[toTree][i]=suffix;
 		else {
 			for (j=i; j<lastByTree[toTree]; j++) byTree[toTree][j]=byTree[toTree][j+1];
 			lastByTree[toTree]--;
@@ -556,19 +563,28 @@ public class GenomeSimulator {
 	/**
 	 * As a single string.
 	 */
-	private static final void printGenome(String outputFile) throws IOException {
+	private static final void printGenome(String outputFile, String outputHistogram, int minAlignmentLength) throws IOException {
+		final int N_LENGTH_BINS = 100;  // Arbitrary
 		final long genomeLength = getGenomeLength(true);
+		int i;
 		RepeatInstance currentInstance;
 		BufferedWriter bw;
+		int[] lengthHistogram;
 		
+		lengthHistogram = new int[N_LENGTH_BINS];
+		Math.set(lengthHistogram,N_LENGTH_BINS-1,0);
 		bw = new BufferedWriter(new FileWriter(outputFile));
 		bw.write(">U0/1/0_"+(genomeLength-1)+"/ \n");
 		currentInstance=root;
 		while (currentInstance.next!=null) {
 			currentInstance=currentInstance.next;
 			bw.write(currentInstance.sequence);
+			lengthHistogram[currentInstance.sequenceLength/minAlignmentLength]++;
 		}
 		bw.write("\n"); bw.close();
+		bw = new BufferedWriter(new FileWriter(outputHistogram));
+		for (i=0; i<N_LENGTH_BINS; i++) { bw.write((i*minAlignmentLength)+","+lengthHistogram[i]); bw.newLine(); }
+		bw.close();
 	}
 	
 	
@@ -718,13 +734,15 @@ public class GenomeSimulator {
 			out.sequenceLength=prefixLength;
 			out.repeat=repeat;
 			out.orientation=orientation;
-			if (orientation) {
-				out.repeatStart=repeatStart;
-				out.repeatEnd=repeatStart+prefixLength-1;
-			}
-			else {
-				out.repeatEnd=repeatEnd;
-				out.repeatStart=repeatStart+sequenceLength-prefixLength-1;
+			if (repeat.type<Constants.INTERVAL_PERIODIC) {
+				if (orientation) {
+					out.repeatStart=repeatStart;
+					out.repeatEnd=repeatStart+prefixLength-1;
+				}
+				else {
+					out.repeatEnd=repeatEnd;
+					out.repeatStart=repeatStart+sequenceLength-prefixLength-1;
+				}
 			}
 			out.previous=previous;
 			out.next=null;
@@ -738,13 +756,15 @@ public class GenomeSimulator {
 			out.sequenceLength=suffixLength;
 			out.repeat=repeat;
 			out.orientation=orientation;
-			if (orientation) {
-				out.repeatStart=repeatEnd-suffixLength+1;
-				out.repeatEnd=repeatEnd;
-			}
-			else {
-				out.repeatEnd=repeatEnd-(sequenceLength-suffixLength);
-				out.repeatStart=repeatStart;
+			if (repeat.type<Constants.INTERVAL_PERIODIC) {
+				if (orientation) {
+					out.repeatStart=repeatEnd-suffixLength+1;
+					out.repeatEnd=repeatEnd;
+				}
+				else {
+					out.repeatEnd=repeatEnd-(sequenceLength-suffixLength);
+					out.repeatStart=repeatStart;
+				}
 			}
 			out.previous=null;
 			out.next=next;
