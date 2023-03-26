@@ -1,2 +1,0 @@
-// Length probability of the period of a long-period repeat (in multiples of minAlignmentLength).
-1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01 1.00000000e-01

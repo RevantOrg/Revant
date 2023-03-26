@@ -1,2 +1,4 @@
-// Frequency probability of a repeat (in powers of 10).
-2.00000000e-01 2.00000000e-01 2.00000000e-01 2.00000000e-01 7.50000000e-02 7.50000000e-02 1.70000000e-02 1.60000000e-02 1.60000000e-02
+// Frequency probability of a repeat (bin: 10^i+1..10^(i+1), i>=0).
+2
+0.1
+0.0

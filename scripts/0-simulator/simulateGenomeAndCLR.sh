@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-#
-#
+# Simulates a repetitive haploid genome from a Repbase file, samples reads from it, and
+# computes all read-read alignments and all read-repeat alignments.
 #
 # Remark: the script assumes that environment variable $REVANT_BINARIES$ is already set
 # to the directory that contains REVANT's binaries, i.e. to the directory that contains

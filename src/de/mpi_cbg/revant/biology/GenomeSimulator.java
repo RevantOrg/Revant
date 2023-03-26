@@ -1512,71 +1512,36 @@ public class GenomeSimulator {
 			br.close();
 			
 			// Loading $lengthProb*$.
-			br = new BufferedReader(new FileReader(configDir+"/lengthProb.txt"));
-			str=br.readLine();  // Skipping header
-			str=br.readLine();
-			br.close();
-			tokens=str.split(" ");
-			length=tokens.length;
-			lengthProb = new double[length];
-			for (i=0; i<length; i++) lengthProb[i]=Double.parseDouble(tokens[i]);
-			tokens=null;
+			lengthProb=loadProbabilities(configDir+"/lengthProb.txt");
+			length=lengthProb.length;
 			lengthProbCumulative = new double[length];
 			lengthProbCumulative[0]=lengthProb[0];
 			for (i=1; i<length; i++) lengthProbCumulative[i]=lengthProb[i]+lengthProbCumulative[i-1];
 			
 			// Loading $lengthProbShortPeriod*$.
-			br = new BufferedReader(new FileReader(configDir+"/lengthProbShortPeriod.txt"));
-			str=br.readLine();  // Skipping header
-			str=br.readLine();
-			br.close();
-			tokens=str.split(" ");
-			length=tokens.length;
-			lengthProbShortPeriod = new double[length];
-			for (i=0; i<length; i++) lengthProbShortPeriod[i]=Double.parseDouble(tokens[i]);
-			tokens=null;
+			lengthProbShortPeriod=loadProbabilities(configDir+"/lengthProbShortPeriod.txt");
+			length=lengthProbShortPeriod.length;
 			lengthProbShortPeriodCumulative = new double[length];
 			lengthProbShortPeriodCumulative[0]=lengthProbShortPeriod[0];
 			for (i=1; i<length; i++) lengthProbShortPeriodCumulative[i]=lengthProbShortPeriod[i]+lengthProbShortPeriodCumulative[i-1];
 			
 			// Loading $lengthProbLongPeriod*$.
-			br = new BufferedReader(new FileReader(configDir+"/lengthProbLongPeriod.txt"));
-			str=br.readLine();  // Skipping header
-			str=br.readLine();
-			br.close();
-			tokens=str.split(" ");
-			length=tokens.length;
-			lengthProbLongPeriod = new double[length];
-			for (i=0; i<length; i++) lengthProbLongPeriod[i]=Double.parseDouble(tokens[i]);
-			tokens=null;
+			lengthProbLongPeriod=loadProbabilities(configDir+"/lengthProbLongPeriod.txt");
+			length=lengthProbLongPeriod.length;
 			lengthProbLongPeriodCumulative = new double[length];
 			lengthProbLongPeriodCumulative[0]=lengthProbLongPeriod[0];
 			for (i=1; i<length; i++) lengthProbLongPeriodCumulative[i]=lengthProbLongPeriod[i]+lengthProbLongPeriodCumulative[i-1];
 			
 			// Loading $frequencyProb*$.
-			br = new BufferedReader(new FileReader(configDir+"/frequencyProb.txt"));
-			str=br.readLine();  // Skipping header
-			str=br.readLine();
-			br.close();
-			tokens=str.split(" ");
-			length=tokens.length;
-			frequencyProb = new double[length];
-			for (i=0; i<length; i++) frequencyProb[i]=Double.parseDouble(tokens[i]);
-			tokens=null;
+			frequencyProb=loadProbabilities(configDir+"/frequencyProb.txt");
+			length=frequencyProb.length;
 			frequencyProbCumulative = new double[length];
 			frequencyProbCumulative[0]=frequencyProb[0];
 			for (i=1; i<length; i++) frequencyProbCumulative[i]=frequencyProb[i]+frequencyProbCumulative[i-1];
 			
 			// Loading $frequencyProbPeriodic*$.
-			br = new BufferedReader(new FileReader(configDir+"/frequencyProbPeriodic.txt"));
-			str=br.readLine();  // Skipping header
-			str=br.readLine();
-			br.close();
-			tokens=str.split(" ");
-			length=tokens.length;
-			frequencyProbPeriodic = new double[length];
-			for (i=0; i<length; i++) frequencyProbPeriodic[i]=Double.parseDouble(tokens[i]);
-			tokens=null;
+			frequencyProbPeriodic=loadProbabilities(configDir+"/frequencyProbPeriodic.txt");
+			length=frequencyProbPeriodic.length;
 			frequencyProbPeriodicCumulative = new double[length];
 			frequencyProbPeriodicCumulative[0]=frequencyProbPeriodic[0];
 			for (i=1; i<length; i++) frequencyProbPeriodicCumulative[i]=frequencyProbPeriodic[i]+frequencyProbPeriodicCumulative[i-1];
@@ -1585,6 +1550,28 @@ public class GenomeSimulator {
 			repbaseFile=configDir+"/repbase.fa";
 			if (new File(repbaseFile).exists()) loadRepbase(repbaseFile,minAlignmentLength);
 			else { lastRepbase=-1; lastRepbaseSat=-1; }
+		}
+		
+		
+		/**
+		 * @param file assumed to have the following content:
+		 * first row: header; 
+		 * second row: number of bins;
+		 * following rows: probability of each bin.
+		 */
+		private final double[] loadProbabilities(String file) throws IOException {
+			int i, n;
+			String str;
+			BufferedReader br;
+			double[] out;
+			
+			br = new BufferedReader(new FileReader(file));
+			str=br.readLine();  // Skipping header
+			n=Integer.parseInt(br.readLine());
+			out = new double[n];
+			for (i=0; i<n; i++) out[i]=Double.parseDouble(br.readLine());
+			br.close();
+			return out;
 		}
 		
 		

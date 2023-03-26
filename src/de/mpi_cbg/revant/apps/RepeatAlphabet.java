@@ -552,7 +552,7 @@ public class RepeatAlphabet {
 	 * Remark: the procedure compacts only characters in the same orientation.
 	 *
 	 * Remark: the procedure does not explicitly remove characters with no discriminative
-	 * power, since it assumes they have not been added to $alphabet$ in ther first place.
+	 * power, since it assumes they have not been added to $alphabet$ in the first place.
 	 * 
 	 * Remark: assume that the repeat database contains a repeat that occurs in full just 
 	 * once in the genome, and that is longer than every read. At the end of the procedure 
@@ -3461,7 +3461,7 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure does not need $alphabet$, but it needs the following arrays: 
 	 * isBlockUnique_all | fullyUnique, fullyContained, boundaries_all, blueIntervals, 
-	 * blueIntervals_reads. 
+	 * blueIntervals_reads.
 	 *
 	 * @param alignmentsFile output of LAshow, assumed to be sorted by readA;
 	 * @param minIntersection_nonrepetitive min. length of a non-repetitive substring of 
@@ -5134,8 +5134,8 @@ public class RepeatAlphabet {
 	 * to spacers of type 3, in which case it would become disconnected in the spacers 
 	 * graph, and the breakpoint decision taken in the connected component of the spacer 
 	 * in read X would not propagate to the spacer in read Y.
-	 * Another reason for loading spacers of type 3 is that the the non-repetitive part of
-	 * the spacer might come from a periodic repeat that is completely different from the
+	 * Another reason for loading spacers of type 3 is that the non-repetitive part of the
+	 * spacer might come from a periodic repeat that is completely different from the
 	 * adjacent one, or from a non-periodic repeat, and using the spacers graph we could
 	 * take a consistent decision on how to handle its breakpoints.
 	 *
