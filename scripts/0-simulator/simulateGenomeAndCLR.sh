@@ -110,7 +110,7 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.uti
 
 # Computing read-read alignments
 READS_DB="${OUTPUT_DIR}/reads.db"
-DBrm ${READS_DB}
+DBrm ${READS_DB} && echo 0 || echo 1
 ${DAZZDB_DIR}/fasta2DB ${READS_DB} ${READS_FILE}
 DBsplit -x16 ${READS_DB}
 daligner -T${N_THREADS} -M${MAX_MEMORY} -e${READ_READ_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_READ} ${READS_DB} ${READS_DB}
@@ -122,7 +122,7 @@ rm -f ${OUTPUT_DIR}/reads.reads.S.las
 
 # Computing read-repeat alignments
 REPEATS_DB="${OUTPUT_DIR}/repeats.db"
-DBrm ${REPEATS_DB}
+DBrm ${REPEATS_DB} && echo 0 || echo 1
 ${DAZZDB_DIR}/fasta2DB ${REPEATS_DB} ${REPEATS_FILE}
 daligner -T${N_THREADS} -M0 -t100000000 -e${READ_REPEAT_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${REPEATS_DB} ${READS_DB}
 mv ./*.las ${OUTPUT_DIR}

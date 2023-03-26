@@ -2104,7 +2104,7 @@ public class RepeatAlphabet {
 		loadBlocks(str); loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
-		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
+		if (stack==null || stack.length<(1+sum)*3) stack = new int[(1+sum)*3];
 		
 		// Processing every k-mer in the read
 		if (newKmers==null) {
@@ -2254,7 +2254,7 @@ public class RepeatAlphabet {
 	 *
 	 * @param key temporary space;
 	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
-	 * elements in $intBlocks$;
+	 * elements in $intBlocks$ plus one;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
@@ -2288,7 +2288,7 @@ public class RepeatAlphabet {
 			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
 			else {
 				lastChild++;
-				tmpArray1[top1-2]=lastChild;
+				tmpArray1[top1-2]=lastChild;				
 				tmpArray1[++top1]=-1; tmpArray1[++top1]=lastChild; tmpArray1[++top1]=row+1;
 				tmpArray2[++top2]=intBlocks[row+1][lastChild];
 			}
