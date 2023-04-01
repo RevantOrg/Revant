@@ -28,8 +28,10 @@ public class GetShortestUniqueIntervals {
 		final int ONEMER_MODE = Integer.parseInt(args[7]);
 		final String UNIQUE_KMERS_FILE = args[8];
 		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[9]);
-		final String OLD_INTERVALS_FILE = args[10];  // NULL to discard it
-		final String NEW_INTERVALS_FILE = args[11];  // Output
+		final int IDENTITY_THRESHOLD = Integer.parseInt(args[10]);
+		final int DISTANCE_THRESHOLD = Integer.parseInt(args[11]);
+		final String OLD_INTERVALS_FILE = args[12];  // NULL to discard it
+		final String NEW_INTERVALS_FILE = args[13];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -91,7 +93,7 @@ public class GetShortestUniqueIntervals {
 			else lastUniqueInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,ONEMER_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,readLength,RepeatAlphabet.boundaries,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,ONEMER_MODE,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,readLength,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {

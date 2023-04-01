@@ -2078,12 +2078,14 @@ public class RepeatAlphabet {
 	 * to avoid unique k-mer occurrences that cover the first/last block of a read, as 
 	 * well, but this is likely overengineering);
 	 * @param haplotypeCoverage coverage of one haplotype;
+	 * @param identityThreshold,distanceThreshold used only when $newKmers$ is null; see 
+	 * $isCharacterAmbiguousInBlock()$;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, int oneMerFilter, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, int oneMerFilter, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
 		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
@@ -2117,7 +2119,16 @@ public class RepeatAlphabet {
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-				if (nHaplotypes!=-1 && (k>1 || ONEMER_TABLE[lastInBlock_int[i]>0?1:0][i==0||i==nBlocks-1?1:0][oneMerFilter])) { 
+				if (nHaplotypes==-1) continue;
+//if (k>1 || ONEMER_TABLE[lastInBlock_int[i]>0?1:0][i==0||i==nBlocks-1?1:0][oneMerFilter]) &&
+				if ( (i!=0 && i!=nBlocks-k) ||
+					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,identityThreshold,distanceThreshold)) || 
+					 (i!=0 && i==nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,identityThreshold,distanceThreshold)) ||
+					 ( i==0 && i==nBlocks-k && 
+					   !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,identityThreshold,distanceThreshold) &&
+					   !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,identityThreshold,distanceThreshold)
+					 )
+				   ) { 
 					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
 				}
 			}
@@ -2216,6 +2227,60 @@ public class RepeatAlphabet {
 	}
 	
 	
+	/**
+	 * @param block the first or the last block of $intBlocks$;
+	 * @param characterID an element of $block$;
+	 * @param identityThreshold used to check if two positions are similar;
+	 * @param distanceThreshold used to check if two positions are different;
+	 * @return TRUE iff another character in $block$ contains $characterID$ as a suffix
+	 * (in the case of first block) or as a prefix (in the case of last block).
+	 */
+	private static final boolean isCharacterAmbiguousInBlock(int characterID, int[] block, int block_last, boolean isFirstBlock, int identityThreshold, int distanceThreshold) {
+		final boolean orientation = alphabet[characterID].orientation;
+		int i, c;
+		int start, end, length;
+		final int repeat = alphabet[characterID].repeat;
+		Character character;
+		
+		if (characterID>lastUnique && characterID<=lastPeriodic) {
+			length=alphabet[characterID].length;
+			for (i=0; i<=block_last; i++) {
+				c=block[i];
+				if (c==characterID) continue;
+				character=alphabet[c];
+				if (character.repeat!=repeat || character.orientation!=orientation) continue;
+				if (character.length>length+distanceThreshold) return true;
+			}
+		}
+		else {
+			start=alphabet[characterID].start; end=alphabet[characterID].end;
+			if (isFirstBlock) {
+				for (i=0; i<=block_last; i++) {
+					c=block[i];
+					if (c==characterID) continue;
+					character=alphabet[c];
+					if (character.repeat!=repeat || character.orientation!=orientation) continue;
+					if ( (orientation && Math.abs(character.end,end)<=identityThreshold && character.start<start-distanceThreshold) ||
+						 (!orientation && Math.abs(character.start,start)<=identityThreshold && character.end>end+distanceThreshold)	 
+					   ) return true;
+				}
+			}
+			else {
+				for (i=0; i<=block_last; i++) {
+					c=block[i];
+					if (c==characterID) continue;
+					character=alphabet[c];
+					if (character.repeat!=repeat || character.orientation!=orientation) continue;
+					if ( (orientation && Math.abs(character.start,start)<=identityThreshold && character.end>end+distanceThreshold) ||
+						 (!orientation && Math.abs(character.end,end)<=identityThreshold && character.start<start-distanceThreshold)
+					   ) return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	
 	public static final void kmerPool_init(int k) {
 		kmerPool = new Kmer[100];  // Arbitrary
 		for (int i=0; i<kmerPool.length; i++) {
@@ -2255,7 +2320,9 @@ public class RepeatAlphabet {
 	 * @param key temporary space;
 	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
 	 * elements in $intBlocks$ plus one;
-	 * @param tmpArray2 temporary space, of size at least k;
+	 * @param tmpArray2 temporary space of size at least k; if $newKmers=null$ and the
+	 * procedure does not return -1, this array contains the k-mer that, after
+	 * canonization, was found in $oldKmers$;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
 	private static final int getKmers_impl(int first, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int haplotypeCoverage, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
@@ -7398,18 +7465,18 @@ public class RepeatAlphabet {
 		}
 		else if (character.start==-1) {
 			p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
-			if (p<0) {
+			if (p==Math.NEGATIVE_INFINITY) {
 				character.length+=quantum;
 				p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
 				character.length-=quantum;
 			}
-			if (p<0) {
+			if (p==Math.NEGATIVE_INFINITY) {
 				character.length-=quantum;
 				p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
 				character.length+=quantum;
 			}
-			if (p<0) {
-				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character+"\n first candidate in the new alphabet: "+newAlphabet[-1-p]);
+			if (p==Math.NEGATIVE_INFINITY) {
+				System.err.println("fixPeriodicEndpoints_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character);
 				System.exit(1);
 			}
 			out[++last]=p;
@@ -7427,9 +7494,10 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * @return if $character$ occurs in $newAlphabet$, the position of it; otherwise, the 
-	 * position of the smallest element of $newAlphabet$ that implies $character$; -1
-	 * if no element of $newAlphabet$ implies $character$.
+	 * @return if $character$ occurs in $newAlphabet$, the position of it; otherwise -1-X,
+	 * where X is the position of the smallest element of $newAlphabet$ that implies 
+	 * $character$; $Math.NEGATIVE_INFINITY$ if no element of $newAlphabet$ implies
+	 * $character$.
 	 */
 	private static final int fixPeriodicEndpoints_lookupPeriodic(Character character, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new) {
 		boolean orientation;
@@ -7441,27 +7509,28 @@ public class RepeatAlphabet {
 		repeat=character.repeat; orientation=character.orientation; length=character.length;
 		p=-1-p;
 		if (p==lastPeriodic_new+1 || newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) p--;
+		if (p<=lastUnique_new || newAlphabet[p].repeat!=repeat || newAlphabet[p].orientation!=orientation) return Math.NEGATIVE_INFINITY;
 		k=p;
 		while (k>lastUnique_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && newAlphabet[k].length>=length) k--;
 		k++;
 		while (k<=lastPeriodic_new && newAlphabet[k].repeat==repeat && newAlphabet[k].orientation==orientation && !newAlphabet[k].implies(character)) k++;
-		p=k;
-		return p;
+		if (k>lastPeriodic_new || newAlphabet[k].repeat!=repeat || newAlphabet[k].orientation!=orientation) return Math.NEGATIVE_INFINITY;
+		else return -1-k;
 	}
 	
 	
 	/**
-	 * @return if $character$ occurs in $newAlphabet$, the position of it; otherwise, the 
-	 * position of the smallest element of $newAlphabet$ that implies $character$; -1
-	 * if no element of $newAlphabet$ implies $character$.
+	 * @return if $character$ occurs in $newAlphabet$, the position of it; otherwise -1-X,
+	 * where X is the position of the smallest element of $newAlphabet$ that implies 
+	 * $character$; $lastAlphabet_new+1$ if no element of $newAlphabet$ implies
+	 * $character$.
 	 */
 	private static final int fixPeriodicEndpoints_lookupUnique(Character character, Character[] newAlphabet, int lastUnique_new, int lastAlphabet_new) {
 		int p;
 		
 		p=Arrays.binarySearch(newAlphabet,0,lastUnique_new+1,character);
 		if (p>=0) return p;
-		p=-1-p;
-		if (newAlphabet[p].repeat!=UNIQUE) return lastAlphabet_new+1;
+		if (newAlphabet[-1-p].repeat!=UNIQUE) return lastAlphabet_new+1;
 		else return p;
 	}
 	

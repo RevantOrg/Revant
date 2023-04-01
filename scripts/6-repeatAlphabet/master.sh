@@ -26,6 +26,8 @@ MAX_SPACER_LENGTH="10000"  # 0=assume that the endpoints of periodic repeats are
 WOBBLE_LENGTH="100"  # 0=do not wobble.
 # Good settings for mostly periodic genome: MAX_SPACER_LENGTH="10000"; WOBBLE_LENGTH="100"
 # ------------------------- Properties of genome addresses -------------------------------
+IDENTITY_THRESHOLD="100"  # For ambiguous characters in first/last block. >=WOBBLE_LENGTH.
+DISTANCE_THRESHOLD=$(( ${IDENTITY_THRESHOLD} * 4 ))  # >=IDENTITY_THRESHOLD
 MULTI_MODE="0"; ONEMER_FILTER="3"
 # Good settings for a mostly periodic genome: MULTI_MODE="0"; ONEMER_FILTER="3"
 # Good settings for a mostly nonperiodic genome: MULTI_MODE="1"; ONEMER_FILTER="2"
@@ -35,7 +37,7 @@ MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than t
 # Good settings for a mostly periodic genome: MIN_INTERSECTION_NONREPETITIVE="100000"
 # Good settings for a mostly nonperiodic genome: MIN_INTERSECTION_NONREPETITIVE="500"
 # ------------------------ Properties of alignment filters -------------------------------
-ALIGNMENT_FILTERING_MODE="1"  # 0=loose, 1=tight, 2=tight with matching characters.
+ALIGNMENT_FILTERING_MODE="0"  # 0=loose, 1=tight, 2=tight with matching characters.
 # ----------------------------------- Resources ------------------------------------------
 N_THREADS="4"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
@@ -53,7 +55,7 @@ fi
 ./1-buildAlphabet.sh ${INPUT_DIR} ${BROKEN_READS} ${MAX_ALIGNMENT_ERROR} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${N_HAPLOTYPES} ${HAPLOTYPE_COVERAGE} ${N_THREADS} ${DELETE_TMP_FILES} ${MAX_SPACER_LENGTH} ${WOBBLE_LENGTH}
 MIN_K_FOR_DISAMBIGUATION="2"; MAX_K_FOR_DISAMBIGUATION="4"
 ./2-fixEndBlocks.sh ${INPUT_DIR} ${BROKEN_READS} ${HAPLOTYPE_COVERAGE} ${LOW_QUALITY_TYPE} ${MULTI_MODE} ${MIN_K_FOR_DISAMBIGUATION} ${MAX_K_FOR_DISAMBIGUATION} ${N_THREADS} ${DELETE_TMP_FILES}
-./3-getUniqueSubstrings.sh ${INPUT_DIR} ${N_HAPLOTYPES} ${HAPLOTYPE_COVERAGE} ${MAX_K_UNIQUE} ${MULTI_MODE} ${ONEMER_FILTER} ${N_THREADS} ${DELETE_TMP_FILES}
+./3-getUniqueSubstrings.sh ${INPUT_DIR} ${N_HAPLOTYPES} ${HAPLOTYPE_COVERAGE} ${MAX_K_UNIQUE} ${MULTI_MODE} ${ONEMER_FILTER} ${N_THREADS} ${DELETE_TMP_FILES} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD}
 ./4-filterAlignments.sh ${INPUT_DIR} ${BROKEN_READS} ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${MAX_K_UNIQUE} ${ALIGNMENT_FILTERING_MODE} ${MIN_INTERSECTION_NONREPETITIVE} ${N_THREADS} ${DELETE_TMP_FILES}
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 N_READS=$(wc -l < ${READ_LENGTHS_FILE})

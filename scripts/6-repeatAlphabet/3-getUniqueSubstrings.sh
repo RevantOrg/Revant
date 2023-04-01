@@ -23,6 +23,8 @@ ONEMER_FILTER=$6
 # Good settings for a mostly nonperiodic genome: MULTI_MODE="1"; ONEMER_FILTER="2"
 N_THREADS=$7
 DELETE_TMP_FILES=$8
+IDENTITY_THRESHOLD=$9
+DISTANCE_THRESHOLD=${10}
 UNIQUE_MODE="1"  # Non-repetitive blocks are allowed in a k-mer, except at the first/last
 # position of the k-mer. Usually a good choice.
 # ----------------------------------------------------------------------------------------
@@ -65,7 +67,7 @@ function intervalsThread() {
 	local LOCAL_UNIQUE_KMERS_FILE=$5
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$6
 	local LOCAL_INTERVALS_FILE=$7
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} ${ONEMER_FILTER} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} ${ONEMER_FILTER} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
 }
 
 FINAL_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
