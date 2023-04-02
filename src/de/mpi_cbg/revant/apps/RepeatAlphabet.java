@@ -2043,18 +2043,19 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * If $newKmers$ is not null, the procedure uses every length-k window that satisfies 
-	 * the conditions in $uniqueMode,multiMode$ (see procedure $isValidWindow()$ for 
-	 * details) to add a k-mer to $newKmers$. If a block contains multiple characters, 
-	 * every character can be used to build a k-mer. K-mers are canonized before being 
-	 * added to $newKmers$ (see $Kmer.canonize()$). Array $avoidedIntervals$ contains 
-	 * tuples (position,length,nHaplotypes) sorted by position: if a window contains one 
-	 * such interval, it is not used to build k-mers.
+	 * If $newKmers$ is not null, the procedure uses every length-k window (except the
+	 * first/last if the first/last block contains multiple characters: see procedure
+	 * $isValidWindow()$ for details) to add a k-mer to $newKmers$. If a block contains 
+	 * multiple characters, every character can be used to build a k-mer. K-mers are 
+	 * canonized before being added to $newKmers$ (see $Kmer.canonize()$). Array 
+	 * $avoidedIntervals$ contains tuples (position,length,nHaplotypes) sorted by 
+	 * position: if a window contains one such interval, it is not used to build k-mers.
 	 *
-	 * If $newKmers$ is null, the procedure checks instead if a window contains a k-mer in 
-	 * $oldKmers$, and if so it appends a (position,length,nHaplotypes) tuple to 
-	 * $avoidedIntervals$ ($nHaplotypes$ is decided according to $haplotypeCoverage$).
-	 * The new value of $lastAvoidedInterval$ is returned in output.
+	 * If $newKmers$ is null, the procedure checks instead if any window (including the
+	 * first/last above) contains a k-mer in $oldKmers$, and if so it appends a (position,
+	 * length,nHaplotypes) tuple to $avoidedIntervals$ ($nHaplotypes$ is decided according
+	 * to $haplotypeCoverage$). The new value of $lastAvoidedInterval$ is returned in
+	 * output.
      *
 	 * Remark: one-mers collected by this procedure might have a different (and even 
 	 * smaller) count than the one produced by the $getCharacterHistogram()$ pipeline, 
@@ -2085,7 +2086,8 @@ public class RepeatAlphabet {
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int uniqueMode, int multiMode, int oneMerFilter, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, int oneMerFilter, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+		final int UNIQUE_MODE = 1;
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
 		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
@@ -2114,7 +2116,7 @@ public class RepeatAlphabet {
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;
+				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,0,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
@@ -2139,7 +2141,7 @@ public class RepeatAlphabet {
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;			
-				if (!isValidWindow(i,k,nBlocks,uniqueMode,multiMode,readLength)) continue;			
+				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,1,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				

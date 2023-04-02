@@ -19,11 +19,10 @@ HAPLOTYPE_COVERAGE=$3  # Of one haplotype
 TIGHT_MODE="0"
 LOW_QUALITY_TYPE=$4  # 1=replacement, 0=insertion.
 LOW_QUALITY_LENGTH_TOLERANCE="200"  # bps
-MULTI_MODE_OF_NEXT_STAGE=$5;  # The value of MULTI_MODE used by 3-getUniqueSubstrings.sh
-MIN_K=$6  # One plus the min length of a context used for disambiguation
-MAX_K=$7  # One plus the max length of a context used for disambiguation
-N_THREADS=$8
-DELETE_TMP_FILES=$9
+MIN_K=$5  # One plus the min length of a context used for disambiguation
+MAX_K=$6  # One plus the max length of a context used for disambiguation
+N_THREADS=$7
+DELETE_TMP_FILES=$8
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u
@@ -38,14 +37,7 @@ READS_BOUNDARIES_FILE="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
-UNIQUE_MODE="1"; MULTI_MODE="1"  # Endblocks are forbidden in this stage
 rm -f ${TMPFILE_PATH}*
-if [ ${MULTI_MODE_OF_NEXT_STAGE} -eq 0 ]; then
-	# Disambiguating the endblocks of a read is useful only if endblocks with multiple
-	# characters are not allowed in the next stage.
-	mv ${READS_TRANSLATED_FILE} ${READS_DISAMBIGUATED_FILE}
-	exit
-fi
 
 function kmersThread() {
 	local LOCAL_K=$1
@@ -53,7 +45,7 @@ function kmersThread() {
 	local LOCAL_BOUNDARIES_FILE=$3
 	local LOCAL_READ_LENGTHS_FILE=$4
 	local LOCAL_KMERS_FILE=$5
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${UNIQUE_MODE} ${MULTI_MODE} null ${LOCAL_KMERS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null ${LOCAL_KMERS_FILE}
 }
 
 function fixThread() {

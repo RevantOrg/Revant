@@ -17,10 +17,8 @@ public class CollectKmers {
 		final String BOUNDARIES_FILE = args[2];
 		final String READ_LENGTHS_FILE = args[3];
 		final String ALPHABET_FILE = args[4];
-		final int UNIQUE_MODE = Integer.parseInt(args[5]);  // See $RepeatAlphabet.isValidWindow()$
-		final int MULTI_MODE = Integer.parseInt(args[6]);
-		final String AVOIDED_INTERVALS_FILE = args[7];  // NULL to discard it
-		final String KMERS_FILE = args[8];  // Output file
+		final String AVOIDED_INTERVALS_FILE = args[5];  // NULL to discard it
+		final String KMERS_FILE = args[6];  // Output file
 		
 		boolean INTERVALS_FILE_EXISTS = !AVOIDED_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -66,13 +64,13 @@ public class CollectKmers {
 			else lastAvoidedInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			RepeatAlphabet.getKmers(str1,K,UNIQUE_MODE,MULTI_MODE,-1/*argument not used*/,kmers,null,avoidedIntervals,lastAvoidedInterval,-1,readLength,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
+			RepeatAlphabet.getKmers(str1,K,-1/*argument not used*/,kmers,null,avoidedIntervals,lastAvoidedInterval,-1,readLength,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
 			str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; 
 			str3=br3.readLine(); str4=br4.readLine(); row++;
 		}
 		br1.close(); br3.close(); br4.close(); nKmers=kmers.size();
 		if (INTERVALS_FILE_EXISTS) br2.close();
-		System.err.println(nKmers+" total distinct "+K+"-mers (uniqueMode="+UNIQUE_MODE+", multiMode="+MULTI_MODE+")");
+		System.err.println(nKmers+" total distinct "+K+"-mers");
 		
 		// Serializing sorted k-mers
 		keys = new RepeatAlphabet.Kmer[nKmers];
