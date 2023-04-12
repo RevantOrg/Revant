@@ -101,7 +101,7 @@ public class RepeatAlphabet {
 	 */
 	private static int[][] neighbors;
 	private static int[] lastNeighbor;
-	private static int[] stack, stack2, connectedComponent, connectedComponentSize;
+	private static int[] stack, stack2, stack3, connectedComponent, connectedComponentSize;
 	private static int nComponents;
 	private static Character[] mergedCharacters;
 	
@@ -2723,6 +2723,7 @@ public class RepeatAlphabet {
 	 */
 	public static final long getTandemIntervals(String translatedFile, String boundariesFile, String readLengthsFile, String outputFile) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
+		final int CAPACITY = 100;  // Arbitrary
 		int i;
 		int nBlocks, lastTandem, readLength;
 		long out;
@@ -2730,8 +2731,11 @@ public class RepeatAlphabet {
 		Character tmpChar;
 		BufferedReader br1, br2, br3;
 		BufferedWriter bw;
+		boolean[] tmpBoolean1, tmpBoolean2;
 		
 		tmpChar = new Character();
+		tmpBoolean1 = new boolean[CAPACITY];
+		tmpBoolean2 = new boolean[CAPACITY];
 		br1 = new BufferedReader(new FileReader(translatedFile));
 		br2 = new BufferedReader(new FileReader(boundariesFile));
 		br3 = new BufferedReader(new FileReader(readLengthsFile));
@@ -2747,7 +2751,9 @@ public class RepeatAlphabet {
 			loadBoundaries(str2);
 			readLength=Integer.parseInt(str3);
 			loadIntBlocks(nBlocks,boundaries,readLength,tmpChar);
-			lastTandem=getTandemIntervals_impl(nBlocks,boundaries,readLength,IDENTITY_THRESHOLD,tmpChar);
+			if (tmpBoolean1.length<nBlocks) tmpBoolean1 = new boolean[nBlocks];
+			if (tmpBoolean2.length<nBlocks) tmpBoolean2 = new boolean[nBlocks];
+			lastTandem=getTandemIntervals_impl(nBlocks,boundaries,readLength,IDENTITY_THRESHOLD,tmpChar,tmpBoolean1,tmpBoolean2);
 			if (lastTandem==-1) {
 				bw.newLine();
 				str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
@@ -2768,25 +2774,31 @@ public class RepeatAlphabet {
 	 * Stores in global variable $tandemIntervals$ the set of all maximal tandem intervals
 	 * of $intBlocks$, where a tandem interval is a maximal substring such that all its
 	 * blocks have a character in common. The procedure searches also for maximal 
-	 * intervals that all share an inexact character, with some limited tolerance. Tandem 
+	 * intervals that all share an inexact character, with some limited tolerance. For
+	 * short-period repeats a tandem interval is defined as a maximal substring such that 
+	 * all its blocks have a repeat in common in the same orientation (adjacent characters
+	 * with the same periodic repeat and orientation, but different length, can happen 
+	 * both in the original factorization and as a result of spacers resolution). Tandem
 	 * intervals that intersect are merged (adjacent tandem intervals are not merged).
 	 *
-	 * Remark: this definition of tandem is likely too simple for real data, since the
-	 * aligner might fail to align some repeat to some tandem unit, or the alignment might
-	 * be a bit off and give rise to a different character in our alphabet.
+	 * Remark: for non-periodic repeats, this definition of tandem is likely too simple 
+	 * for real data, since the aligner might fail to align some repeat to some tandem 
+	 * unit, or the alignment might be a bit off and give rise to a different character in
+	 * our alphabet.
 	 *
 	 * Remark: the procedure assumes that array $repeatLength$ has already been loaded, 
 	 * and it uses global arrays $stack,stack2$.
 	 *
 	 * @param nBlocks assumed >1;
 	 * @param tmpChar temporary space;
+	 * @param tmpBoolean* temporary space of size at least $nBlocks$;
 	 * @return the last element in $tandemIntervals$.
 	 */
-	private static final int getTandemIntervals_impl(int nBlocks, int[] boundaries, int readLength, int distanceThreshold, Character tmpChar) {
+	private static final int getTandemIntervals_impl(int nBlocks, int[] boundaries, int readLength, int distanceThreshold, Character tmpChar, boolean[] tmpBoolean1, boolean[] tmpBoolean2) {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean found, processFirstBlock, processLastBlock;
 		int i, j, k, h, c, d;
-		int max, last1, last2, lastInterval, tandemLength, from, to, toPrime, length, repeatLength;
+		int max, last1, last2, last3, lastInterval, tandemLength, from, to, toPrime, length, repeatLength;
 		Pair tmpInterval;
 		int[] tmpArray;
 		
@@ -2796,93 +2808,109 @@ public class RepeatAlphabet {
 		for (i=0; i<nBlocks; i++) max=Math.max(max,lastInBlock_int[i]+1);
 		if (stack==null || stack.length<max) stack = new int[max];
 		if (stack2==null || stack2.length<max) stack2 = new int[max];
+		if (stack3==null || stack3.length<max) stack3 = new int[max];
 		
-		// Collecting intervals that share a character
+		// Marking non-repetitive and periodic blocks
+		for (i=0; i<nBlocks; i++) {
+			tmpBoolean1[i]=false; tmpBoolean2[i]=false;
+			for (j=0; j<=lastInBlock_int[i]; j++) {
+				c=intBlocks[i][j];
+				if (c<0) c=-1-c;
+				if (c>lastAlphabet || c<=lastUnique) tmpBoolean1[i]=true;
+				else if (c>lastUnique && c<=lastPeriodic) tmpBoolean2[i]=true;
+			}
+		}	
+		
+		// Collecting intervals that share similar non-periodic characters
 		processFirstBlock=true; processLastBlock=true; lastInterval=-1;
 		for (i=0; i<nBlocks-1; i++) {
-			System.arraycopy(intBlocks[i],0,stack,0,lastInBlock_int[i]+1);
-			last1=lastInBlock_int[i]; tandemLength=1;
-			for (j=i+1; j<nBlocks; j++) {
-				last2=Math.setIntersection(intBlocks[j],0,lastInBlock_int[j],stack,0,last1,stack2,0);
-				if (last2==-1) break;
-				tandemLength++;
-				tmpArray=stack; stack=stack2; stack2=tmpArray;
-				last1=last2;
-			}
-			if (tandemLength>1) {
-				found=false;
-				if (i>0) {
-					for (j=0; j<=lastInBlock_int[i-1]; j++) {
-						if (intBlocks[i-1][j]>lastAlphabet || alphabet[intBlocks[i-1][j]].repeat==-1) continue;
-						tmpChar.copyFrom(alphabet[intBlocks[i-1][j]]);
-						repeatLength=repeatLengths[tmpChar.repeat];
-						length=boundaries[i-1]-(i==1?0:boundaries[i-2]);
-						if (intBlocks[i-1][j]<=lastPeriodic) tmpChar.length=length;
-						else {
-							if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
-							else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+			if (tmpBoolean1[i] || tmpBoolean2[i]) continue;
+			to=-1; last1=-1;
+			for (j=0; j<=lastInBlock_int[i]; j++) {
+				c=intBlocks[i][j];
+				toPrime=-1;
+				for (k=i+1; k<=nBlocks-1; k++) {
+					if (tmpBoolean1[k] || tmpBoolean2[k]) break;
+					found=false;
+					for (h=0; h<=lastInBlock_int[k]; h++) {
+						d=intBlocks[k][h];
+						if ( alphabet[d].repeat==alphabet[c].repeat && alphabet[d].orientation==alphabet[c].orientation &&
+							 ( (alphabet[c].start==alphabet[d].start && Math.abs(alphabet[c].end,alphabet[d].end)<=IDENTITY_THRESHOLD) ||
+							   (alphabet[c].end==alphabet[d].end && Math.abs(alphabet[c].start,alphabet[d].start)<=IDENTITY_THRESHOLD)
+							 )
+						   ) {
+							found=true;
+							break;
 						}
-						for (k=0; k<=last1; k++) {
-							if (tmpChar.isSuffixOf(alphabet[stack[k]],distanceThreshold)) {
-								found=true;
-								break;
-							}
-						}
-						if (found) break;
 					}
+					if (!found) break;
+					else toPrime=k;
 				}
-				from=found?i-1:i;
-				found=false;
-				if (i+tandemLength<=nBlocks-1) {
-					for (j=0; j<=lastInBlock_int[i+tandemLength]; j++) {
-						if (intBlocks[i+tandemLength][j]>lastAlphabet || alphabet[intBlocks[i+tandemLength][j]].repeat==-1) continue;
-						tmpChar.copyFrom(alphabet[intBlocks[i+tandemLength][j]]);
-						tmpChar.openEnd=true;
-						repeatLength=repeatLengths[tmpChar.repeat];
-						length=(i+tandemLength==nBlocks-1?readLength:boundaries[i+tandemLength])-boundaries[i+tandemLength-1];
-						if (intBlocks[i+tandemLength][j]<=lastPeriodic) tmpChar.length=length;
-						else {
-							if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
-							else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
-						}
-						for (k=0; k<=last1; k++) {
-							if (tmpChar.isPrefixOf(alphabet[stack[k]],distanceThreshold)) {
-								found=true;
-								break;
-							}
-						}
-						if (found) break;
-					}
+				if (toPrime!=-1) {
+					if (toPrime>to) { to=toPrime; last1=0; stack[0]=c; }
+					else if (toPrime==to) stack[++last1]=c;
 				}
-				to=found?i+tandemLength:i+tandemLength-1;
-				lastInterval++;
-				if (lastInterval>=tandemIntervals.length) {
-					Pair[] newArray = new Pair[tandemIntervals.length<<1];
-					System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
-					tandemIntervals=newArray;
-				}
-				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(from,to);
-				else tandemIntervals[lastInterval].set(from,to);
-				if (from<=1) processFirstBlock=false;
-				if (to>=nBlocks-2) processLastBlock=false;
 			}
+			if (to==-1) continue;
+			found=false;
+			if (i>0 && !tmpBoolean1[i-1] && !tmpBoolean2[i-1]) {
+				for (j=0; j<=lastInBlock_int[i-1]; j++) {
+					tmpChar.copyFrom(alphabet[intBlocks[i-1][j]]);
+					repeatLength=repeatLengths[tmpChar.repeat];
+					length=boundaries[i-1]-(i==1?0:boundaries[i-2]);
+					if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+					else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+					for (k=0; k<=last1; k++) {
+						if (tmpChar.isSuffixOf(alphabet[stack[k]],distanceThreshold)) {
+							found=true;
+							break;
+						}
+					}
+					if (found) break;
+				}
+			}
+			from=found?i-1:i;
+			found=false;
+			if (to+1<=nBlocks-1 && !tmpBoolean1[to+1] && !tmpBoolean2[to+1]) {
+				for (j=0; j<=lastInBlock_int[to+1]; j++) {
+					tmpChar.copyFrom(alphabet[intBlocks[to+1][j]]);
+					tmpChar.openEnd=true;
+					repeatLength=repeatLengths[tmpChar.repeat];
+					length=(to+1==nBlocks-1?readLength:boundaries[to+1])-boundaries[to];
+					if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+					else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+					for (k=0; k<=last1; k++) {
+						if (tmpChar.isPrefixOf(alphabet[stack[k]],distanceThreshold)) {
+							found=true;
+							break;
+						}
+					}
+					if (found) break;
+				}
+			}
+			if (found) to++;
+			lastInterval++;
+			if (lastInterval>=tandemIntervals.length) {
+				Pair[] newArray = new Pair[tandemIntervals.length<<1];
+				System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
+				tandemIntervals=newArray;
+			}
+			if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(from,to);
+			else tandemIntervals[lastInterval].set(from,to);
+			if (from<=1) processFirstBlock=false;
+			if (to>=nBlocks-2) processLastBlock=false;
 		}
 		
-		// Adding interval $[0..1]$ if it is a tandem.
-		if (processFirstBlock) {
+		// Adding interval $[0..1]$ if it is a non-periodic partial tandem.
+		if (processFirstBlock && !tmpBoolean1[0] && !tmpBoolean2[0] && !tmpBoolean1[1] && !tmpBoolean2[1]) {
 			found=false;
 			for (i=0; i<=lastInBlock_int[0]; i++) {
-				if (intBlocks[0][i]>lastAlphabet || alphabet[intBlocks[0][i]].repeat==-1) continue;
 				tmpChar.copyFrom(alphabet[intBlocks[0][i]]);
 				repeatLength=repeatLengths[tmpChar.repeat];
 				length=boundaries[0];
-				if (intBlocks[0][i]<=lastPeriodic) tmpChar.length=length;
-				else {
-					if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
-					else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
-				}
+				if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+				else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
 				for (j=0; j<=lastInBlock_int[1]; j++) {
-					if (intBlocks[1][j]>lastAlphabet || alphabet[intBlocks[1][j]].repeat==-1) continue;
 					if (tmpChar.isSuffixOf(alphabet[intBlocks[1][j]],distanceThreshold)) {
 						found=true;
 						break;
@@ -2902,21 +2930,16 @@ public class RepeatAlphabet {
 			}
 		}
 	
-		// Adding interval $[nBlocks-2..nBlocks-1]$ if it is a tandem.
-		if (processLastBlock) {
+		// Adding interval $[nBlocks-2..nBlocks-1]$ if it is a non-periodic partial tandem
+		if (processLastBlock && !tmpBoolean1[nBlocks-1] && !tmpBoolean2[nBlocks-1] && !tmpBoolean1[nBlocks-2] && !tmpBoolean2[nBlocks-2]) {
 			found=false;
 			for (i=0; i<=lastInBlock_int[nBlocks-1]; i++) {
-				if (intBlocks[nBlocks-1][i]>lastAlphabet || alphabet[intBlocks[nBlocks-1][i]].repeat==-1) continue;
 				tmpChar.copyFrom(alphabet[intBlocks[nBlocks-1][i]]);
 				repeatLength=repeatLengths[tmpChar.repeat];
 				length=readLength-boundaries[nBlocks-2];
-				if (intBlocks[nBlocks-1][i]<=lastPeriodic) tmpChar.length=length;
-				else {
-					if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
-					else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
-				}
+				if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+				else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
 				for (j=0; j<=lastInBlock_int[nBlocks-2]; j++) {
-					if (intBlocks[nBlocks-2][j]>lastAlphabet || alphabet[intBlocks[nBlocks-2][j]].repeat==-1) continue;
 					if (tmpChar.isPrefixOf(alphabet[intBlocks[nBlocks-2][j]],distanceThreshold)) {
 						found=true;
 						break;
@@ -2936,45 +2959,41 @@ public class RepeatAlphabet {
 			}
 		}
 		
-		// Collecting intervals that share similar characters
+		// Collecting intervals that share the same periodic repeat and orientation
 		for (i=0; i<nBlocks-1; i++) {
-			to=0;
+			if (tmpBoolean1[i] || !tmpBoolean2[i]) continue;
+			last1=-1;
 			for (j=0; j<=lastInBlock_int[i]; j++) {
 				c=intBlocks[i][j];
-				if (c<=lastUnique || c>lastAlphabet) continue;
-				toPrime=0;
-				for (k=i+1; k<=nBlocks-1; k++) {
-					found=false;
-					for (h=0; h<=lastInBlock_int[k]; h++) {
-						d=intBlocks[k][h];
-						if (d<=lastUnique || d>lastAlphabet) continue;
-						if ( alphabet[d].repeat==alphabet[c].repeat && alphabet[d].orientation==alphabet[c].orientation &&
-							 ( (alphabet[c].repeat<=lastPeriodic && Math.abs(alphabet[c].length,alphabet[d].length)<=IDENTITY_THRESHOLD) ||
-							   ( alphabet[c].repeat>lastPeriodic && 
-								 ( (alphabet[c].start==alphabet[d].start && Math.abs(alphabet[c].end,alphabet[d].end)<=IDENTITY_THRESHOLD) ||
-								   (alphabet[c].end==alphabet[d].end && Math.abs(alphabet[c].start,alphabet[d].start)<=IDENTITY_THRESHOLD)
-								 )
-							   )
-							 )
-						   ) {
-							found=true;
-							break;
-						}
-					}
-					if (!found) break;
-					else toPrime=k;
-				}
-				to=Math.max(to,toPrime);
+				if (c<0) c=-1-c;
+				if (c>lastUnique && c<=lastPeriodic) stack[++last1]=alphabet[c].orientation?alphabet[c].repeat:-1-alphabet[c].repeat;
 			}
-			if (to!=0) {
+			if (last1==-1) continue;
+			tandemLength=1;
+			for (j=i+1; j<nBlocks; j++) {
+				if (tmpBoolean1[j] || !tmpBoolean2[j]) break;
+				last2=-1;
+				for (h=0; h<=lastInBlock_int[j]; h++) {
+					c=intBlocks[j][h];
+					if (c<0) c=-1-c;
+					if (c>lastUnique && c<=lastPeriodic) stack2[++last2]=alphabet[c].orientation?alphabet[c].repeat:-1-alphabet[c].repeat;
+				}
+				if (last2==-1) break;
+				last3=Math.setIntersection(stack,0,last1,stack2,0,last2,stack3,0);
+				if (last3==-1) break;
+				tandemLength++;
+				tmpArray=stack; stack=stack3; stack3=tmpArray;
+				last1=last3;
+			}
+			if (tandemLength>1) {
 				lastInterval++;
 				if (lastInterval>=tandemIntervals.length) {
 					Pair[] newArray = new Pair[tandemIntervals.length<<1];
 					System.arraycopy(tandemIntervals,0,newArray,0,tandemIntervals.length);
 					tandemIntervals=newArray;
 				}
-				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(i,to);
-				else tandemIntervals[lastInterval].set(i,to);
+				if (tandemIntervals[lastInterval]==null) tandemIntervals[lastInterval] = new Pair(i,i+tandemLength-1);
+				else tandemIntervals[lastInterval].set(i,i+tandemLength-1);
 			}
 		}
 		
@@ -4251,7 +4270,15 @@ public class RepeatAlphabet {
 	 * it either (1) is strictly contained in a tandem, or (2) is identical to a tandem, 
 	 * but the tandem is not a blue interval, or (3) straddles or contains a tandem, does
 	 * not contain a nonrepetitive character, and all blue intervals in the alignment fall
-	 * inside a tandem.
+	 * strictly inside a tandem.
+	 *
+	 * Remark: assume that a blue interval AB straddles two tandems but falls strictly
+	 * inside their concatenation, and assume that both tandems are short-period. In this
+	 * case we are also observing several other left-extensions of A and several other
+	 * right-extensions of B at the same location. Throughout the code we assume that AB
+	 * unique means that the length of A and B should be exactly as specified, but in this
+	 * case we are not sure of the values of these lengths. So the procedure discards such
+	 * alignment.
 	 *
 	 * Remark: every block inside a tandem might be tagged with several characters, and it
 	 * might happen that a sequence of such characters occurs just once inside the tandem,
@@ -4326,7 +4353,9 @@ public class RepeatAlphabet {
 				if (!bothReads) {
 					if ( containedA || 
 					     (identicalA && !filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || 
-					     (!identicalA && filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD) && !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive))
+					     ( !identicalA && !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) &&
+						   filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
+						 )
 					   ) {
 						bw.write("0\n"); str=br.readLine(); row++;
 						continue;
@@ -4334,7 +4363,11 @@ public class RepeatAlphabet {
 				}
 				else {
 					if ( (identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || 
-					     (!identicalA && !containedA && !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD))
+					     ( !identicalA && !containedA && 
+						   ( filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) ||
+						     !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
+						   )
+						 )
 					   ) {
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
@@ -4371,7 +4404,9 @@ public class RepeatAlphabet {
 				if (!bothReads) {
 					if ( containedB || 
 					     (identicalB && !filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
-					     (!identicalB && filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD) && !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive))
+					     ( !identicalB && !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) &&
+						   filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
+						 )
 					   ) {
 						bw.write("0\n"); str=br.readLine(); row++;
 						continue;
@@ -4379,7 +4414,11 @@ public class RepeatAlphabet {
 				}
 				else {
 					if ( (identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
-					     (!identicalB && !containedB && !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD))
+					     ( !identicalB && !containedB && 
+							( filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) ||
+						      !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
+						    )
+						 )
 					   ) {
 						out[1][type]++;
 						bw.write("1\n"); str=br.readLine(); row++;
@@ -4424,24 +4463,26 @@ public class RepeatAlphabet {
 	
 	/**
 	 * @return TRUE iff $[intervalStart..intervalEnd]$ strictly contains blue intervals,
-	 * and all blue intervals strictly contained in the interval, are also strictly 
-	 * contained in a tandem. So, if $[intervalStart..intervalEnd]$ contains a tandem, and
-	 * the tandem coincides with a blue interval, the procedure returns FALSE. Blue 
-	 * intervals that coincide with $[intervalStart..intervalEnd]$ are not considered.
+	 * and every blue interval strictly contained in the interval, either:
+	 * - is strictly contained in a tandem, or
+	 * - straddles multiple adjacent short-period tandems.
+	 * Remark: if $[intervalStart..intervalEnd]$ contains a tandem, and the tandem 
+	 * coincides with a blue interval, the procedure returns FALSE. Blue intervals that
+	 * coincide with $[intervalStart..intervalEnd]$ are not considered.
 	 * @param distanceThreshold a contained blue interval that coincides with a tandem 
 	 * interval, but that is at most this far from the read start/end, is considered
 	 * strictly contained in the tandem interval.
 	 */
 	private static final boolean filterAlignments_tandem_allContainedBlueInTandem(int readID, int boundariesAllID, int blueIntervalsID, int intervalStart, int intervalEnd, int nBlocks, int readLength, int distanceThreshold) {
 		boolean containsBlue, found;
-		int i, j;
+		int i, j, k;
 		int firstBlock, lastBlock, firstPosition, lastPosition, lastBlueInterval, lastTandemInterval;
 		
 		if (blueIntervalsID==-1) return false;
 		lastBlueInterval=blueIntervals[blueIntervalsID].length-1;
 		lastTandemInterval=lastTandem[readID];
 		if (lastTandemInterval==-1) return false;
-		j=0; containsBlue=false;
+		j=0; k=0; containsBlue=false;
 		for (i=0; i<lastBlueInterval; i+=3) {
 			firstBlock=blueIntervals[blueIntervalsID][i];
 			if (firstBlock==0) firstPosition=0;
@@ -4469,10 +4510,79 @@ public class RepeatAlphabet {
 					}
 					j+=2;
 				}
+				if (!found) {
+					k=filterAlignments_tandem_straddlesTandems(firstBlock,lastBlock,readID,k,lastTandemInterval);
+					if (k<0) k=-1-k;
+					else if (filterAlignments_tandem_allShortPeriod(boundariesAllID,firstBlock,lastBlock)) found=true;
+				}
 				if (!found) return false;
 			}
 		}
 		return containsBlue;
+	}
+	
+	
+	/**
+	 * @param tandemCursor tandem intervals are considered from this index included;
+	 * @return X if [firstBlock..lastBlock] straddles multiple tandems, and -1-X
+	 * otherwise, where X is the new value of $tandemCursor$, i.e. the index of the first
+	 * tandem that can overlap an interval that starts afer $lastBlock$.
+	 * By straddling we mean that [firstBlock..lastBlock] overlaps more than one adjacent
+	 * tandem, and either the first or the last overlapping tandem is not fully contained
+	 * in [firstBlock..lastBlock].
+	 */
+	private static final int filterAlignments_tandem_straddlesTandems(int firstBlock, int lastBlock, int readID, int tandemCursor, int lastTandemInterval) {
+		boolean straddlesLeft, straddlesRight;
+		int i;
+		int last;
+		
+		i=tandemCursor; last=-1; straddlesLeft=false; straddlesRight=false;
+		while (i<lastTandemInterval) {
+			if (tandems[readID][i]>lastBlock) break;
+			if (tandems[readID][i+1]<firstBlock) {
+				i+=2;
+				continue;
+			}
+			if (last==-1) {
+				if (tandems[readID][i]>firstBlock || tandems[readID][i+1]>=lastBlock) return -1-i;
+				if (tandems[readID][i]<firstBlock) straddlesLeft=true;
+				last=tandems[readID][i+1];
+				i+=2;
+			}
+			else {
+				if (tandems[readID][i]!=last+1) return -1-i;
+				if (tandems[readID][i+1]>lastBlock) straddlesRight=true;
+				last=tandems[readID][i+1];
+				i+=2;
+			}
+		}
+		if (!straddlesLeft && !straddlesRight) return -1-(i-2);
+		else return i-2;
+	}
+	
+	
+	/**
+	 * Remark: this procedure assumes that $translation_all$ has already been loaded.
+	 *
+	 * @return TRUE iff every block in $[firstBlock..lastBlock]$ contains a short-period
+	 * character.
+	 */
+	private static final boolean filterAlignments_tandem_allShortPeriod(int boundariesAllID, int firstBlock, int lastBlock) {
+		boolean found;
+		int i, j, c;
+		int last;
+		
+		for (i=firstBlock; i<=lastBlock; i++) {
+			last=translation_all[boundariesAllID][i].length-1;
+			found=false;
+			for (j=0; j<=last; j++) {
+				c=translation_all[boundariesAllID][i][j];
+				if (c<0) c=-1-c;
+				if (c>lastUnique && c<=lastPeriodic) { found=true; break; }
+			}
+			if (!found) return false;
+		}
+		return true;
 	}
 	
 	
