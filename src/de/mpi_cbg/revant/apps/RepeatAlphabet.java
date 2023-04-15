@@ -3743,6 +3743,91 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * Assume that an alignment contains a blue region in readA, and assume that the first
+	 * block of such blue region contains short-period repeats. The procedure checks 
+	 * whether any of those short-period repeats occurs in the intervals of readB to which
+	 * the previous block is projected by the alignment currently loaded in $Alignments$. 
+	 * The last block of the blue region is handled symmetrically.
+	 *
+	 * This is useful, since a short-period match in readB suggests that the length of the
+	 * first/last block of the blue region in readA should not be trusted.
+	 *
+	 * Remark: the repeats in the preceding/following block in readA are not checked: this
+	 * is responsibility of $filterAlignments_tandem()$.
+	 *
+	 * @param blockID assumed to contain a short-period character;
+	 * @param direction FALSE=left, TRUE=right;
+	 * @param blockBoundary left-boundary of $blockID$ if $direction=FALSE$, right-
+	 * boundary otherwise;
+	 * @param minLength no check is performed if the alignment context before/after
+	 * $blockID$ in readA is shorter than this;
+	 * @param tmpArray* temporary space of length at least equal to the max number of
+	 * distinct repeats (considered with their orientation) in a translated block.
+	 */
+	private static final boolean isShortPeriodBlockTrustworthy(int blockID, boolean direction, int blockBoundary, int readID, int boundariesAllID, int[] readLengths, int minLength, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+		int i, j, c;
+		int segmentStartA, segmentEndA, segmentStartB, segmentEndB, boundariesAllIDB;
+		int firstBlockB, lastBlockB, last, last1, last2;
+		final int readB = Alignments.readB-1;
+		
+		if ((!direction && blockID==0) || (direction && blockID==translation_all[boundariesAllID].length-1)) return true;
+		if (readInArray(readB,fullyUnique,fullyUnique.length-1,0)>=0) {
+			// We assume that the factorization of readB is correct
+			return true;
+		}
+		if (readInArray(readB,fullyContained,fullyContained.length-1,0)>=0) {
+			// We assume that the factorization of readB is correct and that readB is
+			// entirely covered by the same short-period repeats.
+			return false;
+		}
+		if (!direction) {
+			segmentStartA=Math.max(Alignments.startA,blockID==1?0:boundaries_all[boundariesAllID][blockID-2]);
+			segmentEndA=blockBoundary;
+		}
+		else {
+			segmentStartA=blockBoundary;
+			segmentEndA=Math.min(Alignments.endA,blockID==translation_all[boundariesAllID].length-2?readLengths[readB]-1:boundaries_all[boundariesAllID][blockID+1]);
+		}
+		if (segmentEndA-segmentStartA<minLength) return true;
+		
+		// Collecting repeats in readA's $blockID$.
+		last=translation_all[boundariesAllID][blockID].length-1;
+		last1=-1;
+		for (i=0; i<=last; i++) {
+			c=translation_all[boundariesAllID][blockID][i];
+			if (c<0) c=-1-c;
+			if (c>lastUnique && c<=lastPeriodic) tmpArray1[++last1]=alphabet[c].orientation?alphabet[c].repeat:-1-alphabet[c].repeat;
+		}
+		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
+		
+		// Collecting repeats in the blocks covered by the projection on readB
+		if (!Alignments.projectIntersection(segmentStartA,segmentEndA,tmpArray3)) {
+			System.err.println("isPeriodicBlockTrustworthy> ERROR: Empty projection: readA="+readID+"["+segmentStartA+".."+segmentEndA+"] -> readB="+readB);
+			System.exit(1);
+		}
+		segmentStartB=tmpArray3[0]; segmentEndB=tmpArray3[1];
+		boundariesAllIDB=readInArray(readB,translated,translated.length-1,0);
+		firstBlockB=Arrays.binarySearch(boundaries_all[boundariesAllIDB],segmentStartB);
+		lastBlockB=firstBlockB;
+		while (lastBlockB<translation_all[boundariesAllIDB].length && segmentEndB>boundaries_all[boundariesAllIDB][lastBlockB]) lastBlockB++;		
+		last2=-1;
+		for (i=firstBlockB; i<=lastBlockB; i++) {
+			last=translation_all[boundariesAllIDB][i].length-1;
+			for (j=0; j<=last; j++) {
+				c=translation_all[boundariesAllIDB][i][j];
+				if (c<0) c=-1-c;
+				if (c>lastUnique && c<=lastPeriodic) {
+					if (Alignments.orientation) tmpArray2[++last2]=alphabet[c].orientation?alphabet[c].repeat:-1-alphabet[c].repeat;
+					else tmpArray2[++last2]=alphabet[c].orientation?-1-alphabet[c].repeat:alphabet[c].repeat;
+				}
+			}
+		}
+		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
+		return !Math.nonemptyIntersection(tmpArray1,0,last1,tmpArray2,0,last2);
+	}
+	
+	
+	/**
 	 * @param array sorted;
 	 * @param position an arbitrary position in $array$ from which to start the search
 	 * (might be greater than $last$);
@@ -4465,10 +4550,19 @@ public class RepeatAlphabet {
 	 * @return TRUE iff $[intervalStart..intervalEnd]$ strictly contains blue intervals,
 	 * and every blue interval strictly contained in the interval, either:
 	 * - is strictly contained in a tandem, or
-	 * - straddles multiple adjacent short-period tandems.
+	 * - straddles a short-period tandem on the left or on the right side.
+	 *
 	 * Remark: if $[intervalStart..intervalEnd]$ contains a tandem, and the tandem 
 	 * coincides with a blue interval, the procedure returns FALSE. Blue intervals that
 	 * coincide with $[intervalStart..intervalEnd]$ are not considered.
+	 *
+	 * Remark: a blue interval might straddle a short-period tandem on some side, but it
+	 * might strictly contain no short-period tandem.
+	 *
+	 * Remark: a blue interval that straddles a non-short-period tandem is considered 
+	 * reliable instead, since the boundaries between the units of such a tandem are
+	 * assumed to be clearly defined.
+	 *
 	 * @param distanceThreshold a contained blue interval that coincides with a tandem 
 	 * interval, but that is at most this far from the read start/end, is considered
 	 * strictly contained in the tandem interval.
@@ -4511,9 +4605,9 @@ public class RepeatAlphabet {
 					j+=2;
 				}
 				if (!found) {
-					k=filterAlignments_tandem_straddlesTandems(firstBlock,lastBlock,readID,k,lastTandemInterval);
+					k=filterAlignments_tandem_straddlesShortPeriodTandem(firstBlock,lastBlock,readID,boundariesAllID,k,lastTandemInterval);
 					if (k<0) k=-1-k;
-					else if (filterAlignments_tandem_allShortPeriod(boundariesAllID,firstBlock,lastBlock)) found=true;
+					else found=true;
 				}
 				if (!found) return false;
 			}
@@ -4524,14 +4618,14 @@ public class RepeatAlphabet {
 	
 	/**
 	 * @param tandemCursor tandem intervals are considered from this index included;
-	 * @return X if [firstBlock..lastBlock] straddles multiple tandems, and -1-X
+	 * @return X if [firstBlock..lastBlock] straddles a short-period tandem, and -1-X
 	 * otherwise, where X is the new value of $tandemCursor$, i.e. the index of the first
-	 * tandem that can overlap an interval that starts afer $lastBlock$.
-	 * By straddling we mean that [firstBlock..lastBlock] overlaps more than one adjacent
-	 * tandem, and either the first or the last overlapping tandem is not fully contained
-	 * in [firstBlock..lastBlock].
+	 * tandem that can overlap an interval that starts after $lastBlock$.
+	 * By straddling we mean that [firstBlock..lastBlock] overlaps a tandem on its left or
+	 * right side, and neither the tandem is fully contained in [firstBlock..lastBlock],
+	 * nor [firstBlock..lastBlock] is fully contained in the tandem.
 	 */
-	private static final int filterAlignments_tandem_straddlesTandems(int firstBlock, int lastBlock, int readID, int tandemCursor, int lastTandemInterval) {
+	private static final int filterAlignments_tandem_straddlesShortPeriodTandem(int firstBlock, int lastBlock, int readID, int boundariesAllID, int tandemCursor, int lastTandemInterval) {
 		boolean straddlesLeft, straddlesRight;
 		int i;
 		int last;
@@ -4543,46 +4637,16 @@ public class RepeatAlphabet {
 				i+=2;
 				continue;
 			}
-			if (last==-1) {
-				if (tandems[readID][i]>firstBlock || tandems[readID][i+1]>=lastBlock) return -1-i;
-				if (tandems[readID][i]<firstBlock) straddlesLeft=true;
-				last=tandems[readID][i+1];
-				i+=2;
-			}
-			else {
-				if (tandems[readID][i]!=last+1) return -1-i;
-				if (tandems[readID][i+1]>lastBlock) straddlesRight=true;
-				last=tandems[readID][i+1];
-				i+=2;
-			}
+			if (tandems[readID][i]<firstBlock && tandems[readID][i+1]<=lastBlock) straddlesLeft=true;
+			else if (tandems[readID][i]>=firstBlock && tandems[readID][i+1]>lastBlock) straddlesRight=true;
+			if (last==-1 && tandems[readID][i+1]>lastBlock) last=i;
+			i+=2;
 		}
-		if (!straddlesLeft && !straddlesRight) return -1-(i-2);
-		else return i-2;
-	}
-	
-	
-	/**
-	 * Remark: this procedure assumes that $translation_all$ has already been loaded.
-	 *
-	 * @return TRUE iff every block in $[firstBlock..lastBlock]$ contains a short-period
-	 * character.
-	 */
-	private static final boolean filterAlignments_tandem_allShortPeriod(int boundariesAllID, int firstBlock, int lastBlock) {
-		boolean found;
-		int i, j, c;
-		int last;
-		
-		for (i=firstBlock; i<=lastBlock; i++) {
-			last=translation_all[boundariesAllID][i].length-1;
-			found=false;
-			for (j=0; j<=last; j++) {
-				c=translation_all[boundariesAllID][i][j];
-				if (c<0) c=-1-c;
-				if (c>lastUnique && c<=lastPeriodic) { found=true; break; }
-			}
-			if (!found) return false;
-		}
-		return true;
+		if (last==-1) last=tandemCursor;
+		if ( (straddlesLeft && isBlockPeriodic(boundariesAllID,firstBlock)) ||
+			 (straddlesRight && isBlockPeriodic(boundariesAllID,lastBlock))
+		   ) return last;
+		else return -1-last;
 	}
 	
 	
@@ -5781,14 +5845,18 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * @param readID row of $translation_all$.
+	 * @param readID row of $translation_all$, which is assumed to have already been 
+	 * loaded;
+	 * @return TRUE iff block $blockID$ of translated read $boundariesAllID$ contains a
+	 * short-period character.
 	 */
 	private static final boolean isBlockPeriodic(int readID, int blockID) {
-		final int last = translation_all[readID][blockID].length-1;
 		int i, c;
+		final int last = translation_all[readID][blockID].length-1;
 		
 		for (i=0; i<=last; i++) {
 			c=translation_all[readID][blockID][i];
+			if (c<0) c=-1-c;
 			if (c>lastUnique && c<=lastPeriodic) return true;
 		}
 		return false;
