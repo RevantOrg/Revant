@@ -766,13 +766,13 @@ public class Alignments {
 	
 	/**
 	 * Consider the global variables set by $readAlignmentFile()$. The procedure projects
-	 * on readB the interval $[a..b] \intersection [startA..endA]$ on readA.
+	 * on readB the interval $[x..y] \intersection [startA..endA]$ on readA.
 	 *
 	 * @return FALSE if the intersection is empty.
 	 */
-	public static final boolean projectIntersection(int a, int b, int[] out) {
-		final int fromA = a>startA?a:startA;
-		final int toA = b<endA?b:endA;
+	public static final boolean projectIntersection(int x, int y, int[] out) {
+		final int fromA = x>startA?x:startA;
+		final int toA = y<endA?y:endA;
 		if (toA<fromA) return false;
 		final double ratio = ((double)(endB-startB+1))/(endA-startA+1);
 		
@@ -786,6 +786,27 @@ public class Alignments {
 		}
 		return true;
 	}
-
+	
+	
+	/**
+	 * Same as $projectIntersection()$, but projects from readB to readA.
+	 */
+	public static final boolean projectIntersectionBA(int x, int y, int[] out) {
+		final int fromB = x>startB?x:startB;
+		final int toB = y<endB?y:endB;
+		if (toB<fromB) return false;
+		final double ratio = ((double)(endA-startA+1))/(endB-startB+1);
+		
+		if (orientation) {
+			out[0]=startA+(int)(ratio*(fromB-startB));
+			out[1]=endA-(int)(ratio*(endB-toB));
+		}
+		else {
+			out[0]=startA+(int)(ratio*(endB-toB));
+			out[1]=endA-(int)(ratio*(fromB-startB));
+		}
+		return true;
+	}
+	
 
 }
