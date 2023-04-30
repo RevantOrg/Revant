@@ -3756,7 +3756,7 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Assume that an alignment contains a blue region in readA, and assume that the first
-	 * block of such blue region contains short-period repeats. The procedure checks 
+	 * block of such a blue region contains short-period repeats. The procedure checks 
 	 * whether any of those short-period repeats occurs in the intervals of readB to which
 	 * the previous block is projected by the alignment currently loaded in $Alignments$. 
 	 * The last block of the blue region is handled symmetrically. This is useful, since a
@@ -3764,7 +3764,7 @@ public class RepeatAlphabet {
 	 * blue region in readA should not be trusted.
 	 *
 	 * Remark: the repeats in the preceding/following block in readA are not checked: this
-	 * is responsibility of $filterAlignments_tandem()$.
+	 * is the responsibility of $filterAlignments_tandem()$.
 	 *
 	 * Remark: readB is handled symmetrically as readA, i.e. $readID$ can be either readA
 	 * or readB in the alignment that is currently loaded in $Alignments$.
@@ -3775,7 +3775,7 @@ public class RepeatAlphabet {
 	 */
 	private static final int isShortPeriodBlockTrustworthy(int blockID, boolean direction, int readID, int boundariesAllID, int identityThreshold) {
 		final int MAX_LENGTH = 1000;  // Arbitrary
-		int i, c;
+		int i, j, c;
 		int segmentStart, segmentEnd, otherSegmentStart, otherSegmentEnd, otherBoundariesAllID;
 		int otherFirstBlock, otherLastBlock, otherBlock, last, last1, last2;
 		final int otherReadID = readID==Alignments.readA-1?Alignments.readB-1:Alignments.readA-1;
@@ -3802,7 +3802,7 @@ public class RepeatAlphabet {
 		}
 		else {
 			segmentStart=boundaries_all[boundariesAllID][blockID];
-			segmentEnd=Math.min(alignmentEnd,blockID==translation_all[boundariesAllID].length-2?Reads.getReadLength(otherReadID)-1:boundaries_all[boundariesAllID][blockID+1]);
+			segmentEnd=Math.min(alignmentEnd,blockID==translation_all[boundariesAllID].length-2?Reads.getReadLength(readID)-1:boundaries_all[boundariesAllID][blockID+1]);
 			if (segmentEnd>segmentStart+MAX_LENGTH) segmentEnd=segmentStart+MAX_LENGTH;
 		}
 		if (segmentEnd-segmentStart<=identityThreshold) {
@@ -3830,7 +3830,14 @@ public class RepeatAlphabet {
 			System.err.println("isShortPeriodBlockTrustworthy> ERROR: Block "+blockID+" of read "+readID+" is not periodic.");
 			System.exit(1);
 		}
-		if (last1>0) Arrays.sort(shortPeriodTmp1,0,last1+1);
+		if (last1>0) {
+			Arrays.sort(shortPeriodTmp1,0,last1+1);
+			j=0;
+			for (i=1; i<=last1; i++) {
+				if (shortPeriodTmp1[i]!=shortPeriodTmp1[j]) shortPeriodTmp1[++j]=shortPeriodTmp1[i];
+			}
+			last1=j;
+		}
 		
 		// Collecting repeats in the blocks covered by the projection on otherReadID
 		if ( (readID==Alignments.readA-1 && !Alignments.projectIntersection(segmentStart,segmentEnd,shortPeriodTmp3)) ||
@@ -3882,9 +3889,16 @@ public class RepeatAlphabet {
 				if (Alignments.orientation) shortPeriodTmp2[last2]=alphabet[c].orientation?alphabet[c].repeat:-1-alphabet[c].repeat;
 				else shortPeriodTmp2[last2]=alphabet[c].orientation?-1-alphabet[c].repeat:alphabet[c].repeat;
 			}
-		}
+		}		
 		if (last2==-1) return 1;
-		if (last2>0) Arrays.sort(shortPeriodTmp2,0,last2+1);
+		if (last2>0) {
+			Arrays.sort(shortPeriodTmp2,0,last2+1);
+			j=0;
+			for (i=1; i<=last1; i++) {
+				if (shortPeriodTmp2[i]!=shortPeriodTmp2[j]) shortPeriodTmp2[++j]=shortPeriodTmp2[i];
+			}
+			last2=j;
+		}			
 		return Math.nonemptyIntersection(shortPeriodTmp1,0,last1,shortPeriodTmp2,0,last2)?0:1;
 	}
 	
