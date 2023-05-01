@@ -4459,7 +4459,7 @@ public class RepeatAlphabet {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int TANDEM_DISTANCE_THRESHOLD = minAlignmentLength_readRepeat;  // Arbitrary
 		boolean found, containedA, identicalA, containedB, identicalB;
-		int i, p;
+		int i, j, p;
 		int length, lengthA, lengthB, row, type, nBlocks, readA, readB, startA, endA, startB, endB;
 		int lastTranslated, lastBlueInterval, blueIntervalA, blueIntervalB, tandemCursor;
 		int firstTandemPosition, lastTandemPosition, firstTandemBlockA, lastTandemBlockA, firstTandemBlockB, lastTandemBlockB;
@@ -4494,43 +4494,62 @@ public class RepeatAlphabet {
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
 				if (lastBlueInterval>blueIntervals_last || blueIntervals_reads[lastBlueInterval]!=readA) blueIntervalA=-1;
 				else blueIntervalA=lastBlueInterval;
-				nBlocks=boundaries_all[lastTranslated].length+1;
-				containedA=false; identicalA=false; firstTandemBlockA=-1; lastTandemBlockA=-1;
-				for (i=0; i<lastTandem[readA]; i+=2) {
-					if (tandems[readA][i]==0) firstTandemPosition=0;
-					else firstTandemPosition=boundaries_all[lastTranslated][tandems[readA][i]-1];
-					if (tandems[readA][i+1]==nBlocks-1) lastTandemPosition=lengthA-1;
-					else lastTandemPosition=boundaries_all[lastTranslated][tandems[readA][i+1]];
-					if (Intervals.areApproximatelyIdentical(startA,endA,firstTandemPosition,lastTandemPosition)) identicalA=true;
-					else if (Intervals.isApproximatelyContained(startA,endA,firstTandemPosition,lastTandemPosition)) containedA=true;
-					if (identicalA || containedA) {
-						firstTandemBlockA=tandems[readA][i]; 
-						lastTandemBlockA=tandems[readA][i+1];
-						break;
+				i=filterAlignments_tandem_isBlue_interval(blueIntervalA,startA,endA,lengthA,lastTranslated);
+				if (i>=0) {
+					j=filterAlignments_tandem_straddlesShortPeriodTandem(blueIntervals[blueIntervalA][i],blueIntervals[blueIntervalA][i]+blueIntervals[blueIntervalA][i+1]-1,readA,lastTranslated,0,lastTandem[readA]);
+					if (!bothReads) {
+						if (j>=0) {
+							bw.write("0\n"); str=br.readLine(); row++;
+							continue;
+						}
 					}
-				}
-				if (!bothReads) {
-					if ( containedA || 
-					     ( identicalA && !filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) ||
-					     ( !identicalA && !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) &&
-						   filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
-						 )
-					   ) {
-						bw.write("0\n"); str=br.readLine(); row++;
-						continue;
+					else {
+						if (j<0) {
+							out[1][type]++;
+							bw.write("1\n"); str=br.readLine(); row++;
+							continue;
+						}
 					}
 				}
 				else {
-					if ( (identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) || 
-					     ( !identicalA && !containedA && 
-						   ( filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) ||
-						     !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
-						   )
-						 )
-					   ) {
-						out[1][type]++;
-						bw.write("1\n"); str=br.readLine(); row++;
-						continue;
+					nBlocks=boundaries_all[lastTranslated].length+1;
+					containedA=false; identicalA=false; firstTandemBlockA=-1; lastTandemBlockA=-1;
+					for (i=0; i<lastTandem[readA]; i+=2) {
+						if (tandems[readA][i]==0) firstTandemPosition=0;
+						else firstTandemPosition=boundaries_all[lastTranslated][tandems[readA][i]-1];
+						if (tandems[readA][i+1]==nBlocks-1) lastTandemPosition=lengthA-1;
+						else lastTandemPosition=boundaries_all[lastTranslated][tandems[readA][i+1]];
+						if (Intervals.areApproximatelyIdentical(startA,endA,firstTandemPosition,lastTandemPosition)) identicalA=true;
+						else if (Intervals.isApproximatelyContained(startA,endA,firstTandemPosition,lastTandemPosition)) containedA=true;
+						if (identicalA || containedA) {
+							firstTandemBlockA=tandems[readA][i]; 
+							lastTandemBlockA=tandems[readA][i+1];
+							break;
+						}
+					}
+					if (!bothReads) {
+						if ( containedA || 
+						     (identicalA && !filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) ||
+						     ( !identicalA && !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) &&
+							   filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
+							 )
+						   ) {
+							bw.write("0\n"); str=br.readLine(); row++;
+							continue;
+						}
+					}
+					else {
+						if ( (identicalA && filterAlignments_tandem_isBlue(blueIntervalA,firstTandemBlockA,lastTandemBlockA)) ||
+						     ( !identicalA && !containedA && 
+							   ( filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) ||
+							     !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
+							   )
+							 )
+						   ) {
+							out[1][type]++;
+							bw.write("1\n"); str=br.readLine(); row++;
+							continue;
+						}
 					}
 				}
 			}
@@ -4545,43 +4564,62 @@ public class RepeatAlphabet {
 			if (p>=0) {
 				blueIntervalB=readInArray(readB,blueIntervals_reads,blueIntervals_reads.length-1,lastBlueInterval);
 				startB=Alignments.startB; endB=Alignments.endB;
-				nBlocks=boundaries_all[p].length+1;
-				containedB=false; identicalB=false; firstTandemBlockB=-1; lastTandemBlockB=-1;
-				for (i=0; i<lastTandem[readB]; i+=2) {
-					if (tandems[readB][i]==0) firstTandemPosition=0;
-					else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
-					if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=lengthB-1;
-					else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
-					if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
-					else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
-					if (identicalB || containedB) {
-						firstTandemBlockB=tandems[readB][i];
-						lastTandemBlockB=tandems[readB][i+1];
-						break;
+				i=filterAlignments_tandem_isBlue_interval(blueIntervalB,startB,endB,lengthB,p);
+				if (i>=0) {
+					j=filterAlignments_tandem_straddlesShortPeriodTandem(blueIntervals[blueIntervalB][i],blueIntervals[blueIntervalB][i]+blueIntervals[blueIntervalB][i+1]-1,readB,p,0,lastTandem[readB]);
+					if (!bothReads) {
+						if (j>=0) {
+							bw.write("0\n"); str=br.readLine(); row++;
+							continue;
+						}
 					}
-				}
-				if (!bothReads) {
-					if ( containedB || 
-					     (identicalB && !filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
-					     ( !identicalB && !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) &&
-						   filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
-						 )
-					   ) {
-						bw.write("0\n"); str=br.readLine(); row++;
-						continue;
-					}
+					else {
+						if (j<0) {
+							out[1][type]++;
+							bw.write("1\n"); str=br.readLine(); row++;
+							continue;
+						}
+					}	
 				}
 				else {
-					if ( (identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) || 
-					     ( !identicalB && !containedB && 
-							( filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) ||
-						      !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
-						    )
-						 )
-					   ) {
-						out[1][type]++;
-						bw.write("1\n"); str=br.readLine(); row++;
-						continue;
+					nBlocks=boundaries_all[p].length+1;
+					containedB=false; identicalB=false; firstTandemBlockB=-1; lastTandemBlockB=-1;
+					for (i=0; i<lastTandem[readB]; i+=2) {
+						if (tandems[readB][i]==0) firstTandemPosition=0;
+						else firstTandemPosition=boundaries_all[p][tandems[readB][i]-1];
+						if (tandems[readB][i+1]==nBlocks-1) lastTandemPosition=lengthB-1;
+						else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
+						if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
+						else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
+						if (identicalB || containedB) {
+							firstTandemBlockB=tandems[readB][i];
+							lastTandemBlockB=tandems[readB][i+1];
+							break;
+						}
+					}
+					if (!bothReads) {
+						if ( containedB || 
+						     (identicalB && !filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) ||
+						     ( !identicalB && !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) &&
+							   filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
+							 )
+						   ) {
+							bw.write("0\n"); str=br.readLine(); row++;
+							continue;
+						}
+					}
+					else {
+						if ( (identicalB && filterAlignments_tandem_isBlue(blueIntervalB,firstTandemBlockB,lastTandemBlockB)) ||
+						     ( !identicalB && !containedB && 
+								( filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) ||
+							      !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
+							    )
+							 )
+						   ) {
+							out[1][type]++;
+							bw.write("1\n"); str=br.readLine(); row++;
+							continue;
+						}
 					}
 				}
 			}
@@ -4591,7 +4629,10 @@ public class RepeatAlphabet {
 				continue;
 			}
 			if (bothReads) bw.write("0\n");
-			else bw.write("1\n");
+			else {
+				out[1][type]++;
+				bw.write("1\n");
+			}
 			str=br.readLine(); row++;
 		}
 		br.close(); bw.close();
@@ -4617,6 +4658,31 @@ public class RepeatAlphabet {
 			}
 		}
 		return false;
+	}
+	
+	
+	/**
+	 * @return X iff interval $[first..last]$ (in bp) of the read is identical to the
+	 * element of $blueIntervals[blueIntervalsID]$ that starts at index X (-1 otherwise).
+	 */
+	private static final int filterAlignments_tandem_isBlue_interval(int blueIntervalsID, int first, int last, int readLength, int boundariesID) {
+		int i;
+		int firstPrime, lastPrime, firstBlock, lastBlock;
+
+		if (blueIntervalsID==-1) return -1;
+		final int nBlocks = boundaries_all[boundariesID].length+1;
+		final int lastBlueInterval = blueIntervals[blueIntervalsID].length-1;
+		for (i=0; i<lastBlueInterval; i+=3) {
+			firstBlock=blueIntervals[blueIntervalsID][i];
+			lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
+			firstPrime=firstBlock==0?0:boundaries_all[boundariesID][firstBlock-1];
+			lastPrime=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesID][lastBlock];
+			if ( Intervals.areApproximatelyIdentical(first,last,firstPrime,lastPrime) && 
+				 !Intervals.isApproximatelyContained(first,last,firstPrime,lastPrime) &&
+			     !Intervals.isApproximatelyContained(firstPrime,lastPrime,first,last)
+			   ) return i;
+		}
+		return -1;
 	}
 
 	
@@ -4716,7 +4782,7 @@ public class RepeatAlphabet {
 			if (last==-1 && tandems[readID][i+1]>lastBlock) last=i;
 			i+=2;
 		}
-		if (last==-1) last=tandemCursor;
+		if (last==-1) last=tandemCursor;		
 		if ( (straddlesLeft && isBlockPeriodic(boundariesAllID,firstBlock)) ||
 			 (straddlesRight && isBlockPeriodic(boundariesAllID,lastBlock))
 		   ) return last;
