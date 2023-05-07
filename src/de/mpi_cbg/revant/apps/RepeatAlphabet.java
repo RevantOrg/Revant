@@ -4677,10 +4677,7 @@ public class RepeatAlphabet {
 			lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
 			firstPrime=firstBlock==0?0:boundaries_all[boundariesID][firstBlock-1];
 			lastPrime=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesID][lastBlock];
-			if ( Intervals.areApproximatelyIdentical(first,last,firstPrime,lastPrime) && 
-				 !Intervals.isApproximatelyContained(first,last,firstPrime,lastPrime) &&
-			     !Intervals.isApproximatelyContained(firstPrime,lastPrime,first,last)
-			   ) return i;
+			if (Intervals.areApproximatelyIdentical(first,last,firstPrime,lastPrime)) return i;
 		}
 		return -1;
 	}
