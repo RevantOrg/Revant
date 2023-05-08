@@ -2024,25 +2024,6 @@ public class RepeatAlphabet {
 	// ------------------------------ K-MER PROCEDURES -----------------------------------
 	
 	/**
-	 * Tells whether a one-mer that is marked as unique based just on frequency, should be 
-	 * used to mark a read block as a unique address on the genome. M=multiple characters 
-	 * occur in the read block; E=the block is the first/last one of the read; 
-	 * oneMerFilter=selection criterion.
-     *
-	 * M  E   oneMerFilter
-	 *        0  1  2  3
-	 * 0  0	  1  1  1  1
-     * 0  1   1  1  1  0
-	 * 1  0   1  0  1  1
-	 * 1  1   1  0  0  0
-	 */
-	private static final boolean[][][] ONEMER_TABLE = new boolean[][][] {
-		{ {true,true,true,true}, {true,true,true,false} },
-		{ {true,false,true,true}, {true,false,false,false} }
-	};
-	
-	
-	/**
 	 * If $newKmers$ is not null, the procedure uses every length-k window (except the
 	 * first/last if the first/last block contains multiple characters: see procedure
 	 * $isValidWindow()$ for details) to add a k-mer to $newKmers$. If a block contains 
@@ -2071,13 +2052,7 @@ public class RepeatAlphabet {
 	 * slowdowns.
 	 *
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
-	 * 
-	 * @param oneMerFilter if $newKmers$ is null, use the criterion specified in 
-	 * $ONEMER_TABLE[][][oneMerFilter]$ to decide whether a one-mer should be considered a 
-	 * unique address on the genome (for $k>1$ we run no filter, since we assume that 
-	 * contexts longer than one are enough to disambiguate; alternatively, one could try 
-	 * to avoid unique k-mer occurrences that cover the first/last block of a read, as 
-	 * well, but this is likely overengineering);
+	 *
 	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param identityThreshold,distanceThreshold used only when $newKmers$ is null; see 
 	 * $isCharacterAmbiguousInBlock()$;
@@ -2086,7 +2061,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, int oneMerFilter, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int UNIQUE_MODE = 1;
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
@@ -2122,7 +2097,6 @@ public class RepeatAlphabet {
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 				if (nHaplotypes==-1) continue;
-//if (k>1 || ONEMER_TABLE[lastInBlock_int[i]>0?1:0][i==0||i==nBlocks-1?1:0][oneMerFilter]) &&
 				if ( (i!=0 && i!=nBlocks-k) ||
 					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,identityThreshold,distanceThreshold)) || 
 					 (i!=0 && i==nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,identityThreshold,distanceThreshold)) ||
@@ -2489,6 +2463,7 @@ public class RepeatAlphabet {
 	 * every read with at least 3 blocks.
 	 */
 	public static final void fixEndBlocks(String str, int k, HashMap<Kmer,Kmer> kmers, boolean tightMode, Kmer context, int[] boundaries, int readLength, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3, Character tmpChar, BufferedWriter bw, int[] out, int[][] ambiguityHistogram) throws IOException {
+		boolean ambiguousFirst, ambiguousLast;
 		int i, j, c, d, p, q;
 		int nBlocks, sum, fixedFirst, fixedLast;
 		
@@ -2518,18 +2493,20 @@ public class RepeatAlphabet {
 		for (i=1; i<nBlocks-1; i++) {
 			if (lastInBlock_int[i]>0) ambiguityHistogram[1][lastInBlock_int[i]+1>=ambiguityHistogram[1].length?ambiguityHistogram[1].length-1:lastInBlock_int[i]+1]++;
 		}
-		if (lastInBlock_int[0]==0 && lastInBlock_int[nBlocks-1]==0) {
+		ambiguousFirst=fixEndBlocks_isAmbiguous(0);
+		ambiguousLast=fixEndBlocks_isAmbiguous(nBlocks-1);
+		if (!ambiguousFirst && !ambiguousLast) {
 			bw.write(str); bw.newLine();
 			return;
 		}
-		if (lastInBlock_int[0]>0) out[1]++;
-		if (lastInBlock_int[nBlocks-1]>0) out[1]++;
+		if (ambiguousFirst) out[1]++;
+		if (ambiguousLast) out[1]++;
 		
 		// Non-kmer-based fixes
 		p=str.indexOf(SEPARATOR_MAJOR+""); q=str.lastIndexOf(SEPARATOR_MAJOR+"");
 		fixedFirst=-1; fixedLast=-1;
-		if (lastInBlock_int[0]>0) fixedFirst=fixEndBlocks_impl_basic(0);
-		if (lastInBlock_int[nBlocks-1]>0) fixedLast=fixEndBlocks_impl_basic(nBlocks-1);
+		if (ambiguousFirst) fixedFirst=fixEndBlocks_impl_basic(0);
+		if (ambiguousLast) fixedLast=fixEndBlocks_impl_basic(nBlocks-1);
 		if (fixedFirst>=0 && fixedLast>=0) {
 			out[0]+=2;
 			bw.write(fixedFirst+str.substring(p,q+1)+fixedLast); bw.newLine();
@@ -2553,7 +2530,7 @@ public class RepeatAlphabet {
 		sum=0;
 		for (i=0; i<nBlocks; i++) sum+=lastInBlock_int[i]+1;
 		if (stack==null || stack.length<sum*3) stack = new int[sum*3];
-		if (lastInBlock_int[0]>0) {
+		if (ambiguousFirst) {
 			if (fixedFirst>=0) {
 				out[0]++;
 				bw.write(fixedFirst+str.substring(p,q+1));
@@ -2568,7 +2545,7 @@ public class RepeatAlphabet {
 			}
 		}
 		else bw.write(str.substring(0,q+1));
-		if (lastInBlock_int[nBlocks-1]>0) {
+		if (ambiguousLast) {
 			if (fixedLast>=0) {
 				out[0]++;
 				bw.write(fixedLast+"");
@@ -2584,6 +2561,25 @@ public class RepeatAlphabet {
 		}
 		else bw.write(str.substring(q+1));
 		bw.newLine();
+	}
+	
+	
+	/**
+	 * @return TRUE if the block contains different repeats, or different orientations of
+	 * the same repeat.
+	 */
+	private static final boolean fixEndBlocks_isAmbiguous(int blockID) {
+		int i, c;
+		int repeat, orientation;
+		
+		if (lastInBlock_int[blockID]==0) return false;
+		repeat=-1; orientation=-1;
+		for (i=0; i<=lastInBlock_int[blockID]; i++) {
+			c=intBlocks[blockID][i];
+			if (repeat==-1) { repeat=alphabet[c].repeat; orientation=alphabet[c].orientation?1:0; }
+			else if (alphabet[c].repeat!=repeat || (alphabet[c].orientation?1:0)!=orientation) return true;
+		}
+		return false;
 	}
 	
 	
