@@ -3967,6 +3967,7 @@ public class RepeatAlphabet {
 	 */
 	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, boolean suffixPrefixMode, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength, long[][] out) throws IOException {
 		final int DISTANCE_THRESHOLD = IO.quantum;
+		final int IDENTITY_THRESHOLD = IO.quantum;
 		boolean orientation, overlapsUniqueA, straddlesLeftA, straddlesRightA;
 		int p, q;
 		int row, readA, readB, startA, endA, startB, endB, lengthA, lengthB, type;
@@ -4011,7 +4012,7 @@ public class RepeatAlphabet {
 				}
 				readAInTranslated=lastTranslated;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
+				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength,IDENTITY_THRESHOLD);
 				if (q==-1) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
@@ -4050,7 +4051,7 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength);
+			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength,IDENTITY_THRESHOLD);
 			if (q==-1) bw.write("0\n");
 			else if (q==0 || q==1) {
 				if (mode) {
@@ -4199,7 +4200,7 @@ public class RepeatAlphabet {
 	 * 5: both (3) and (4) are true;
 	 * -1: none of the above is true.
 	 */
-	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength) {
+	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength, int identityThreshold) {
 		boolean straddlesLeft, straddlesRight;
 		int i, j;
 		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
@@ -4252,11 +4253,15 @@ public class RepeatAlphabet {
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
-				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
-					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
-				   ) return 2;
-				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) straddlesRight=true;
-				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) straddlesLeft=true;
+				if ( (!isBlockPeriodic(boundariesAllID,firstBlock) || isShortPeriodBlockTrustworthy(firstBlock,false,readID,boundariesAllID,identityThreshold)!=0) &&
+			  		 (!isBlockPeriodic(boundariesAllID,lastBlock) || isShortPeriodBlockTrustworthy(lastBlock,true,readID,boundariesAllID,identityThreshold)!=0) 
+				   ) {
+	   				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
+	   					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
+	   				   ) return 2;
+	   				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) straddlesRight=true;
+	   				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) straddlesLeft=true;
+				}
 			}
 			if (straddlesLeft) {
 				if (straddlesRight) return 5;
@@ -4684,10 +4689,16 @@ public class RepeatAlphabet {
 	 * Remark: if $[intervalStart..intervalEnd]$ contains a tandem, and the tandem 
 	 * coincides with a blue interval and is not short-period, the procedure returns 
 	 * FALSE. Blue intervals that are identical to a short-period tandem are not 
-	 * considered trustworthy, since the short-period region that underlies the tandem
-	 * might have been split into blocks in a random way, and such a random split might 
-	 * have been classified as unique just because its global frequency fell in the right
-	 * bin by chance. The accuracy of short-period tandems is questionable in general.
+	 * considered trustworthy, since in practice it's not clear if the short-period region
+	 * that underlies the tandem gets factorized into blocks in a consistent way across 
+	 * all reads that cover it. Note that, in practice, the endpoints of read-(short-
+	 * period repeat) alignments can indeed form clear clusters (in addition to regions 
+	 * with uniform endpoint distribution), and such clusters can indeed be converted into
+	 * splitpoints by our upstream procedures correctly. Nonetheless, which alignments and
+	 * which short-period repeats appear is probably affected by the heuristics of the 
+	 * aligner, and a tandem might have been classified as unique just because its global 
+	 * frequency fell in the right bin by chance. So it is probably more prudent not to
+	 * rely on such a factorization.
 	 * 
 	 * Remark: blue intervals that coincide with $[intervalStart..intervalEnd]$ are not
 	 * considered and should be handled separately.
