@@ -125,6 +125,8 @@ REPEATS_DB="${OUTPUT_DIR}/repeats.db"
 DBrm ${REPEATS_DB} && echo 0 || echo 1
 ${DAZZDB_DIR}/fasta2DB ${REPEATS_DB} ${REPEATS_FILE}
 daligner -T${N_THREADS} -M0 -t100000000 -e${READ_REPEAT_IDENTITY} -l${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${REPEATS_DB} ${READS_DB}
+# Remark: using -M0 gives more alignments than -M${MAX_MEMORY}, even though daligner does
+# not use MAX_MEMORY when computing read-repeat alignments.
 mv ./*.las ${OUTPUT_DIR}
 REPEATS_FILE_PREFIX=$(basename ${REPEATS_DB} .db)
 LAsort ${OUTPUT_DIR}/reads.${REPEATS_FILE_PREFIX}.las
