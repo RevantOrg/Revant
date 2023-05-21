@@ -6,8 +6,8 @@ import de.mpi_cbg.revant.factorize.Reads;
 
 /**
  * Collects short non-periodic spacers between periodic endpoints, and assigns arbitrary
- * breakpoints to them. The exit status of the program is 1 if spacers are already
- * correct and the spacer correction pipeline should stop, 0 otherwise.
+ * breakpoints to them. The program prints "1" to STDOUT if spacers are already correct
+ * and the spacer correction pipeline should stop, "0" otherwise.
  *
  * Remark: this program processes all reads and all alignments sequentially. This is done
  * just for simplicity. Collecting spacers could be done in parallel on different chunks 
@@ -46,11 +46,12 @@ public class FixPeriodicEndpoints1 {
 		tmpArray3 = new int[maxBlockLength];
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
+		if (RepeatAlphabet.lastSpacer==-1) { System.out.println("1"); return; }
 		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,tmpArray1,tmpArray2,tmpArray3);
-		if (RepeatAlphabet.getSpacerGraphStatistics(HAPLOTYPE_COVERAGE,N_HAPLOTYPES,false)) System.exit(1);
+		if (RepeatAlphabet.getSpacerGraphStatistics(HAPLOTYPE_COVERAGE,N_HAPLOTYPES,false)) { System.out.println("1"); return; }
 		RepeatAlphabet.assignBreakpoints();
 		RepeatAlphabet.serializeSpacers(OUTPUT_FILE);
-		System.exit(0);
+		System.out.println("0");
 	}
 
 }

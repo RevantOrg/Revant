@@ -183,14 +183,17 @@ for THREAD in $(seq 0 ${TO}); do
 done
 
 
+PERIODIC_ENDPOINTS_FIXED="0"
 if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	echo "Trying to fix periodic endpoints if needed..."
 	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 	echo "Collecting spacers and assigning breakpoints to them..."
 	N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
 	N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${HAPLOTYPE_COVERAGE} ${N_HAPLOTYPES} ${TMPFILE_PATH}-spacers.txt
-	if [ $? -eq 0 ]; then
+	SPACERS_ARE_CORRECT=$(java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${HAPLOTYPE_COVERAGE} ${N_HAPLOTYPES} ${TMPFILE_PATH}-spacers.txt)
+	if [ ${SPACERS_ARE_CORRECT} -eq 1 ]; then
+		PERIODIC_ENDPOINTS_FIXED="0"
+	else
 		echo "Splitting the alignments file..."
 		LAST_READA_FILE="${INPUT_DIR}/LAshow-reads-reads-lastReadA.txt"
 		if [ ${BROKEN_READS} -eq 1 ]; then
@@ -332,7 +335,7 @@ function cleaningThread1() {
 }
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-12-"
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_BOUNDARIES} "${TMPFILE_PATH}-13-"
-for FILE in $(find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do
+for FILE in $( find ${INPUT_DIR} -name "${TMPFILE_NAME}-12-*" ); do
 	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-12-}
 	cleaningThread1 "${INPUT_DIR}/${TMPFILE_NAME}-12-${THREAD_ID}" "${INPUT_DIR}/${TMPFILE_NAME}-13-${THREAD_ID}" "${TMPFILE_PATH}-14-" "${TMPFILE_PATH}-15-" ${THREAD_ID} &
 done
@@ -386,14 +389,18 @@ java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.app
 
 # Removing all temp files that are not used downstream
 if [ ${DELETE_TMP_FILES} -eq 1 ]; then
-	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+	SPACERS_NUMBER=$( find ${INPUT_DIR} -name "${TMPFILE_NAME}-spacers-1-*.txt" | wc -l )
+	if [ ${SPACERS_NUMBER} -gt 0 ]; then
 		rm -rf ${INPUT_DIR}/preserve
 		mkdir ${INPUT_DIR}/preserve
 		mv ${TMPFILE_PATH}-spacers-1-*.txt ${INPUT_DIR}/preserve
 	fi
 	rm -f ${TMPFILE_PATH}*
-	if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
+	if [ ${SPACERS_NUMBER} -gt 0 ]; then
 		mv ${INPUT_DIR}/preserve/*.txt ${INPUT_DIR}
 		rm -rf ${INPUT_DIR}/preserve
 	fi
 fi
+
+# Return value
+echo ${PERIODIC_ENDPOINTS_FIXED} > ${TMPFILE_PATH}-return.txt

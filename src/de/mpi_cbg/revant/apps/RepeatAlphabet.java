@@ -3734,8 +3734,8 @@ public class RepeatAlphabet {
 				if ( ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					   Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
 					 ) &&
-					 (!isBlockPeriodic(boundariesAllID,firstBlock) || isShortPeriodBlockTrustworthy(firstBlock,false,readID,boundariesAllID,identityThreshold)!=0) &&
-				     (!isBlockPeriodic(boundariesAllID,lastBlock) || isShortPeriodBlockTrustworthy(lastBlock,true,readID,boundariesAllID,identityThreshold)!=0)
+					 (!isBlockPeriodic(boundariesAllID,firstBlock) || isShortPeriodBlockTrustworthy(firstBlock,false,readID,boundariesAllID,identityThreshold)==1) &&
+				     (!isBlockPeriodic(boundariesAllID,lastBlock) || isShortPeriodBlockTrustworthy(lastBlock,true,readID,boundariesAllID,identityThreshold)==1)
 				   ) return -2;
 			}
 		}

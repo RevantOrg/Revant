@@ -244,7 +244,7 @@ public class GenomeSimulator {
 		final int CAPACITY = 1000;  // Arbitrary
 		boolean isSatellite, isUsed;
 		int i, j;
-		int repeatTree, insertionTree, noContribution, id, length;
+		int repeatTree, insertionTree, noContribution, id, length, type;
 		long newBps, totalNewBps;
 		Repeat repeat;
 		RepeatInstance instance;
@@ -255,8 +255,10 @@ public class GenomeSimulator {
 			// New repeat from scratch
 			model.nUnusedRepbaseStrings(out);
 			if (out[0]+out[1]!=0) {
+				type=-1;
 				do {
-					isSatellite=out[0]!=0 && model.getType(random)>=Constants.INTERVAL_PERIODIC;
+					type=model.getType(random);
+					isSatellite=out[0]!=0 && type==Constants.INTERVAL_PERIODIC;
 					if (isSatellite) {
 						id=random.nextInt(model.lastRepbaseSat+1);
 						isUsed=model.repbaseSatIsUsed[id];
@@ -268,7 +270,7 @@ public class GenomeSimulator {
 						model.repbaseIsUsed[id]=true;
 					}
 				} while (isUsed);
-				repeat.initialize(model,isSatellite,id,random);
+				repeat.initialize(model,type,id,random);
 			}
 			else repeat.initialize(model,sb,random);
 			repeatTree=-1;
@@ -579,7 +581,7 @@ public class GenomeSimulator {
 		while (currentInstance.next!=null) {
 			currentInstance=currentInstance.next;
 			bw.write(currentInstance.sequence);
-			lengthHistogram[currentInstance.sequenceLength/minAlignmentLength]++;
+			lengthHistogram[Math.min(currentInstance.sequenceLength/minAlignmentLength,N_LENGTH_BINS-1)]++;
 		}
 		bw.write("\n"); bw.close();
 		bw = new BufferedWriter(new FileWriter(outputHistogram));
@@ -1204,8 +1206,8 @@ public class GenomeSimulator {
 		 *
 		 * Remark: the procedure does not set field $tree$.
 		 */											  
-		public final void initialize(RepeatModel model, boolean isSatellite, int repbaseID, Random random) {
-			boolean nonperiodicCanOccur;
+		public final void initialize(RepeatModel model, int inputType, int repbaseID, Random random) {
+			final boolean isSatellite = inputType==Constants.INTERVAL_PERIODIC;
 			int i;
 			
 			lastRepeat++;
@@ -1219,12 +1221,11 @@ public class GenomeSimulator {
 			else {
 				sequence=model.repbase[repbaseID];
 				sequenceLength=sequence.length();
-				nonperiodicCanOccur=model.nonperiodicProbability()>0;
-				do { type=nonperiodicCanOccur?model.getType(random):random.nextInt(Constants.INTERVAL_PERIODIC); }
+				type=inputType;
 				while ( type==Constants.INTERVAL_PERIODIC || 
 					    (type==Constants.INTERVAL_DENSE_SINGLEDELETION && sequenceLength<DELTA+(model.minAlignmentLength<<1)) ||
 						(type>=Constants.INTERVAL_DENSE_PREFIX && type<=Constants.INTERVAL_DENSE_SUBSTRING && sequenceLength<model.minAlignmentLength<<1)
-					  );
+					  ) type=model.getType(random);
 			}
 			insertionProb=Math.sampleFromSimplex(lastTree+1,random);
 			insertionProbCumulative = new double[lastTree+1];
@@ -1576,9 +1577,19 @@ public class GenomeSimulator {
 		
 		
 		public final int getType(Random random) {
-			double p = random.nextDouble();
-			int out = Arrays.binarySearch(typeProbCumulative,p);
-			return out<0?-out-1:out;
+			int out;
+			double p;
+			
+			p=random.nextDouble();
+			if (p==0) {
+				out=0;
+				while (out<N_REPEAT_TYPES && typeProbCumulative[out]==0) out++;
+			}
+			else {
+				out=Arrays.binarySearch(typeProbCumulative,p);
+				if (out<0) out=-1-out;
+			}
+			return out==N_REPEAT_TYPES?N_REPEAT_TYPES-1:out;
 		}
 		
 		
