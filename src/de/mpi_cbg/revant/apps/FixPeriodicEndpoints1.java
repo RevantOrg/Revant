@@ -45,7 +45,7 @@ public class FixPeriodicEndpoints1 {
 		tmpArray2 = new int[maxBlockLength];
 		tmpArray3 = new int[maxBlockLength];
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
-		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH,maxBlockLength);
+		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH);
 		if (RepeatAlphabet.lastSpacer==-1) { System.out.println("1"); return; }
 		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,tmpArray1,tmpArray2,tmpArray3);
 		if (RepeatAlphabet.getSpacerGraphStatistics(HAPLOTYPE_COVERAGE,N_HAPLOTYPES,false)) { System.out.println("1"); return; }
