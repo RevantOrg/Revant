@@ -6244,7 +6244,7 @@ public class RepeatAlphabet {
 		public static final int ORDER_DIFFS = 1;
 		public static int order;
 		
-		public double neighbor, offset, diffs;
+		public double neighbor, offset, offsetPrime, diffs;
 		
 		public Edge() { }
 		
@@ -6252,8 +6252,16 @@ public class RepeatAlphabet {
 			set(n,o,d);
 		}
 		
+		public Edge(double n, double o, double op, double d) {
+			set(n,o,op,d);
+		}
+		
 		public void set(double n, double o, double d) {
 			this.neighbor=n; this.offset=o; this.diffs=d;
+		}
+		
+		public void set(double n, double o, double op, double d) {
+			this.neighbor=n; this.offset=o; this.offsetPrime=op; this.diffs=d;
 		}
 		
 		public int compareTo(Object other) {
@@ -7985,13 +7993,14 @@ public class RepeatAlphabet {
 	 */
 	public static final void loadTandemSpacerNeighbors(String alignmentsFile, int[] tmpArray) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
-		final int CAPACITY = 6;  // Arbitrary, multiple of 2.
+		final int CAPACITY = 12;  // Arbitrary, multiple of 4.
 		final int nTranslated = translated.length;
 		boolean fullyContainedB;
-		int i, j, k, p;
+		int i, j, k, n, p;
 		int row, readA, readB, readBPrime, lengthB, fromB, toB, max, last, nEdges;
 		int firstSpacer, translatedCursor;
 		int nEdgesTotal, nSingletonSpacers, nSpacersWithSolution;
+		double avgDiffs;
 		String str;
 		BufferedReader br;
 		Spacer tmpSpacer = new Spacer();
@@ -8045,12 +8054,13 @@ public class RepeatAlphabet {
 				}
 			}
 			lengthB=Reads.getReadLength(readB);
+			avgDiffs=((double)(Alignments.diffs<<1))/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2);
 			for (i=firstSpacer; i<=lastSpacer; i++) {
 				if (spacers[i].read!=readA) break;
 				if ( !Intervals.isApproximatelyContained(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA) &&
 					 !Intervals.areApproximatelyIdentical(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA)
 				   ) continue;
-				Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray);
+				if (!Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray)) continue;
 				fromB=tmpArray[0]; toB=tmpArray[1];
 				// Adding edges
 				if (!fullyContainedB) {
@@ -8058,13 +8068,7 @@ public class RepeatAlphabet {
 					if (p>=0) {
 						for (j=p; j<=lastSpacer; j++) {
 							if (spacers[j].read!=readB) break;
-							if ( Intervals.isApproximatelyContained(spacers[j].first,spacers[j].last,fromB,toB) ||
-								 Intervals.areApproximatelyIdentical(spacers[j].first,spacers[j].last,fromB,toB)
-							   ) {
-								loadTandemSpacerNeighbors_impl(i,j);
-								nEdges++;
-								break;
-							}
+							loadTandemSpacerNeighbors_impl(i,j,fromB,toB,avgDiffs,tmpArray);
 						}
 					}
 				}
@@ -8102,36 +8106,43 @@ public class RepeatAlphabet {
 		for (i=0; i<max; i++) edges[i] = new Edge();
 		for (i=0; i<=lastSpacer; i++) {
 			last=lastSpacerNeighbor[i];
-			if (last==0) continue;
-			nEdges=(last+1)>>1;
-			for (j=0; j<last; j+=2) edges[j>>1].set(spacerNeighbors[i][j],-1,spacerNeighbors[i][j+1]);
-			if (nEdges>1) {
-				Edge.order=Edge.ORDER_NEIGHBOR;
-				Arrays.sort(edges,0,nEdges);
-				k=0;
-				for (j=1; j<nEdges; j++) {
-					if (edges[j].neighbor!=edges[k].neighbor) {
-						k++;
-						tmpEdge=edges[k]; edges[k]=edges[j]; edges[j]=tmpEdge;
-					}
-					else edges[k].diffs=Math.min(edges[k].diffs,edges[j].diffs);
+			nEdges=(last+1)>>2;
+			if (nEdges<=1) continue;
+			for (j=0; j<last; j+=4) edges[j>>2].set(spacerNeighbors[i][j],spacerNeighbors[i][j+1],spacerNeighbors[i][j+2],spacerNeighbors[i][j+3]);
+			Edge.order=Edge.ORDER_NEIGHBOR;
+			Arrays.sort(edges,0,nEdges);
+			k=0; n=1;
+			for (j=1; j<nEdges; j++) {
+				if (edges[j].neighbor!=edges[k].neighbor) {
+					edges[k].offset/=n; edges[k].offsetPrime/=n;
+					k++; n=1;
+					tmpEdge=edges[k]; edges[k]=edges[j]; edges[j]=tmpEdge;
+					continue;
 				}
-				nEdges=k+1;
+				edges[k].diffs=Math.min(edges[k].diffs,edges[j].diffs);
+				edges[k].offset+=edges[j].offset;
+				edges[k].offsetPrime+=edges[j].offsetPrime;
+				n++;
 			}
+			nEdges=k+1; nEdgesTotal+=nEdges;
 			if (nEdges>1) {
 				Edge.order=Edge.ORDER_DIFFS;
 				Arrays.sort(edges,0,nEdges);
 			}
 			k=-1;
-			for (j=0; j<nEdges; j++) spacerNeighbors[i][++k]=edges[j].neighbor;
+			for (j=0; j<nEdges; j++) {
+				spacerNeighbors[i][++k]=edges[j].neighbor;
+				spacerNeighbors[i][++k]=edges[j].offset;
+				spacerNeighbors[i][++k]=edges[j].offsetPrime;
+				spacerNeighbors[i][++k]=edges[j].diffs;
+			}
 			lastSpacerNeighbor[i]=k;
-			nEdgesTotal+=k+1;
 		}
 		
 		// Computing statistics
 		nSingletonSpacers=0; nSpacersWithSolution=0;
 		for (i=0; i<=lastSpacer; i++) {
-			if (spacers[i].hasSolution) nSpacersWithSolution++;
+			if (spacers[i].lastSolution>=0) nSpacersWithSolution++;
 			if (lastSpacerNeighbor[i]==-1) nSingletonSpacers++;
 		}
 		System.err.println("Tandem spacer edges: "+(nEdgesTotal>>1));
@@ -8141,26 +8152,70 @@ public class RepeatAlphabet {
 	}
 	
 	
-	private static final void loadTandemSpacerNeighbors_impl(int spacerAID, int spacerBID) {
-		double ratio;
+	/**
+	 * Remark: a spacer on readA can be connected to multiple spacers on readB, or vice
+	 * versa.
+	 *
+	 * @param avgDiffs of the alignment;
+	 * @return the number of directed edges added.
+	 */
+	private static final int loadTandemSpacerNeighbors_impl(int spacerAID, int spacerBID, int fromB, int toB, double avgDiffs, int[] tmpArray) {
+		boolean isEmpty, edgeAB, edgeBA;
+		int offsetAB_first, offsetAB_last, offsetBA_first, offsetBA_last, out;
 		final Spacer spacerA = spacers[spacerAID];
 		final Spacer spacerB = spacers[spacerBID];
 		
-		if (lastSpacerNeighbor[spacerAID]+2>=spacerNeighbors[spacerAID].length) {
-			double[] newArray = new double[spacerNeighbors[spacerAID].length<<1];
-			System.arraycopy(spacerNeighbors[spacerAID],0,newArray,0,spacerNeighbors[spacerAID].length);
-			spacerNeighbors[spacerAID]=newArray;
+		// Deciding which directions to add
+		edgeAB=false; edgeBA=false; offsetAB_first=0; offsetAB_last=0; offsetBA_first=0; offsetBA_last=0;
+		if ( Intervals.isApproximatelyContained(spacerB.first,spacerB.last,fromB,toB) &&
+			 !Intervals.areApproximatelyIdentical(spacerB.first,spacerB.last,fromB,toB)
+		   ) {
+	        if (Alignments.projectIntersectionBA(spacerB.first,spacerB.last,tmpArray)) {
+		        edgeAB=true;
+			    offsetAB_first=tmpArray[0]>=spacerA.first?tmpArray[0]-spacerA.first:0;
+			    offsetAB_last=tmpArray[1]<=spacerA.last?tmpArray[1]-spacerA.first:spacerA.last-spacerA.first;
+		    }
 		}
-		ratio=((double)(Alignments.diffs<<1))/(Alignments.endA-Alignments.startA+Alignments.endB-Alignments.startB+2);
-		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=Alignments.orientation?spacerBID:-1-spacerBID;
-		spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=ratio;
-		if (lastSpacerNeighbor[spacerBID]+2>=spacerNeighbors[spacerBID].length) {
-			double[] newArray = new double[spacerNeighbors[spacerBID].length<<1];
-			System.arraycopy(spacerNeighbors[spacerBID],0,newArray,0,spacerNeighbors[spacerBID].length);
-			spacerNeighbors[spacerBID]=newArray;
+		else if ( Intervals.isApproximatelyContained(fromB,toB,spacerB.first,spacerB.last) &&
+			      !Intervals.areApproximatelyIdentical(fromB,toB,spacerB.first,spacerB.last)
+		        ) {
+		    edgeBA=true;
+			offsetBA_first=fromB>=spacerB.first?fromB-spacerB.first:0;
+			offsetBA_last=toB<=spacerB.last?toB-spacerB.first:spacerB.last-spacerB.first;
 		}
-		spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=Alignments.orientation?spacerAID:-1-spacerAID;
-		spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=ratio;
+		else if (Intervals.areApproximatelyIdentical(fromB,toB,spacerB.first,spacerB.last)) {
+			edgeAB=true; edgeBA=true;
+			offsetAB_first=0; offsetAB_last=spacerA.last-spacerA.first;
+			offsetBA_first=0; offsetBA_last=spacerB.last-spacerB.first;
+		}
+		
+		// Adding directed edges
+		out=0;
+		if (edgeAB) {
+			if (lastSpacerNeighbor[spacerAID]+4>=spacerNeighbors[spacerAID].length) {
+				double[] newArray = new double[spacerNeighbors[spacerAID].length<<1];
+				System.arraycopy(spacerNeighbors[spacerAID],0,newArray,0,spacerNeighbors[spacerAID].length);
+				spacerNeighbors[spacerAID]=newArray;
+			}
+			spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=Alignments.orientation?spacerBID:-1-spacerBID;
+			spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=offsetAB_first;
+			spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=offsetAB_last;
+			spacerNeighbors[spacerAID][++lastSpacerNeighbor[spacerAID]]=avgDiffs;
+			out++;
+		}
+		if (edgeBA) {
+			if (lastSpacerNeighbor[spacerBID]+4>=spacerNeighbors[spacerBID].length) {
+				double[] newArray = new double[spacerNeighbors[spacerBID].length<<1];
+				System.arraycopy(spacerNeighbors[spacerBID],0,newArray,0,spacerNeighbors[spacerBID].length);
+				spacerNeighbors[spacerBID]=newArray;
+			}
+			spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=Alignments.orientation?spacerAID:-1-spacerAID;
+			spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=offsetBA_first;
+			spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=offsetBA_last;
+			spacerNeighbors[spacerBID][++lastSpacerNeighbor[spacerBID]]=avgDiffs;
+			out++;
+		}
+		return out;
 	}
 	
 	
@@ -8181,26 +8236,26 @@ public class RepeatAlphabet {
 			length=fullyContained_translation[readB].length;
 			for (i=0; i<length; i++) {
 				c=fullyContained_translation[readB][i];
-				if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1);
+				if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
 			}
 		}
 		else {
 			length=translation_all[readB][blockB].length;
 			for (i=0; i<length; i++) {
 				c=translation_all[readB][blockB][i];
-				if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1);
+				if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
 				else {
-					blockLast=blockB==length-1?readLengthB-1:boundaries_all[blockB];
+					blockLast=blockB==length-1?readLengthB-1:boundaries_all[readB][blockB];
 					if (alignmentLastB>blockLast) alignmentLastB=blockLast;
 					blockFirst=blockB==0?0:boundaries_all[readB][blockB-1];
 					if (alignmentFirstB<blockFirst) alignmentFirstB=blockFirst;
 					if (blockB==0) {
-						if (alphabet[c].orientation) spacer.addSolution(alphabet[c].repeat,Alignments.orientation,alphabet[c].end-(blockLast-alignmentFirstB),alphabet[c].end-(blockLast-alignmentLastB));
-						else spacer.addSolution(alphabet[c].repeat,!Alignments.orientation,alphabet[c].start+(blockLast-alignmentLastB),alphabet[c].start+(blockLast-alignmentFirstB));
+						if (alphabet[c].orientation) spacer.addSolution(alphabet[c].repeat,Alignments.orientation,alphabet[c].end-(blockLast-alignmentFirstB),alphabet[c].end-(blockLast-alignmentLastB),false);
+						else spacer.addSolution(alphabet[c].repeat,!Alignments.orientation,alphabet[c].start+(blockLast-alignmentLastB),alphabet[c].start+(blockLast-alignmentFirstB),false);
 					}
 					else {  // Holds also for the last block
-						if (alphabet[c].orientation) spacer.addSolution(alphabet[c].repeat,Alignments.orientation,alphabet[c].start+(alignmentFirstB-blockFirst),alphabet[c].start+(alignmentLastB-blockFirst));
-						else spacer.addSolution(alphabet[c].repeat,!Alignments.orientation,alphabet[c].end-(alignmentLastB-blockFirst),alphabet[c].end-(alignmentFirstB-blockFirst));
+						if (alphabet[c].orientation) spacer.addSolution(alphabet[c].repeat,Alignments.orientation,alphabet[c].start+(alignmentFirstB-blockFirst),alphabet[c].start+(alignmentLastB-blockFirst),false);
+						else spacer.addSolution(alphabet[c].repeat,!Alignments.orientation,alphabet[c].end-(alignmentLastB-blockFirst),alphabet[c].end-(alignmentFirstB-blockFirst),false);
 					}
 				}
 			}
@@ -8679,8 +8734,15 @@ public class RepeatAlphabet {
 	
 	
 	public static class Spacer implements Comparable {
-		boolean rigidLeft, rigidRight;
+		public boolean rigidLeft, rigidRight;
 		public int read, first, last, breakpoint;
+		
+		/**
+		 * Used only by tandem spacers
+		 */
+		private static final int CAPACITY = 12;  // Arbitrary, multiple of 3.
+		public int[] solutions;
+		public int lastSolution;
 		
 		/**
 		 * Index of the non-repetitive block (if any) in the translation of $read$.
@@ -8703,6 +8765,111 @@ public class RepeatAlphabet {
 			else if (rigidLeft) breakpoint=first;
 			else if (rigidRight) breakpoint=last;
 			else breakpoint=(first+last)>>1;  // Arbitrary
+		}
+		
+		/**
+		 * Used only by tandem spacers
+		 */
+		public void addSolution(int repeat, boolean orientation, int first, int last, boolean isShortPeriod) {
+			if (solutions==null) {
+				solutions = new int[CAPACITY];
+				lastSolution=-1;
+			}
+			else if (lastSolution+3>=solutions.length) {
+				int[] newArray = new int[solutions.length<<1];
+				System.arraycopy(solutions,0,newArray,0,solutions.length);
+				solutions=newArray;
+			}
+			solutions[++lastSolution]=orientation?repeat:-1-repeat;
+			solutions[++lastSolution]=isShortPeriod?-1-first:first;
+			solutions[++lastSolution]=last;
+		}
+		
+		/**
+		 * Used only by tandem spacers.
+		 *
+		 * @param tmpArray temporary space, assumed to be large enough;
+		 * @return TRUE iff all solutions with the same repeat use the same substring of
+		 * it (i.e. start/end positions differ by $<=threshold$) in the same orientation.
+		 * At the end of the procedure all such copies are replaced with a single average.
+		 */
+		public boolean solutionsAreConsistent(int threshold, SpacerSolution[] tmpArray) {
+			boolean orientation, isShortPeriod;
+			int i, j, k, n;
+			int repeat, min1, max1, min2, max2, sum1, sum2;
+			final int nSolutions = (lastSolution+1)/3;
+			
+			if (nSolutions==1) return true;
+			
+			// Sorting solutions
+			for (i=0; i<=lastSolution; i+=3) {
+				j=i/3;
+				if (solutions[i]<0)	{
+					tmpArray[j].repeat=-1-solutions[i];
+					tmpArray[j].orientation=false;
+				}
+				else {
+					tmpArray[j].repeat=solutions[i];
+					tmpArray[j].orientation=true;
+				}
+				if (solutions[i+1]<0) {
+					tmpArray[j].first=-1-solutions[i+1];
+					tmpArray[j].isShortPeriod=true;
+				}
+				else {
+					tmpArray[j].first=solutions[i+1];
+					tmpArray[j].isShortPeriod=false;
+				}
+				tmpArray[j].last=solutions[i+2];
+			}
+			Arrays.sort(tmpArray,0,nSolutions);
+			
+			// Merging solutions
+			j=0; n=1;
+			repeat=tmpArray[0].repeat; orientation=tmpArray[0].orientation;
+			isShortPeriod=tmpArray[0].isShortPeriod;
+			min1=tmpArray[0].first; max1=min1; sum1=min1;
+			min2=tmpArray[0].last; max2=min2; sum2=min2;
+			for (i=1; i<nSolutions; i++) {
+				if (tmpArray[i].repeat!=repeat) {
+					if (!isShortPeriod) {
+						if (max1-min1>threshold || max2-min2>threshold) return false;
+						tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n;
+					}
+					tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
+					tmpArray[j].isShortPeriod=isShortPeriod;
+					j++; n=1;
+					repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
+					isShortPeriod=tmpArray[i].isShortPeriod;
+					min1=tmpArray[i].first; max1=min1; sum1=min1;
+					min2=tmpArray[i].last; max2=min2; sum2=min2;
+					continue;
+				}
+				if (tmpArray[i].orientation!=orientation) return false;
+				if (tmpArray[i].first<min1) min1=tmpArray[i].first;
+				if (tmpArray[i].first>max1) max1=tmpArray[i].first;
+				sum1+=tmpArray[i].first;
+				if (tmpArray[i].last<min2) min2=tmpArray[i].last;
+				if (tmpArray[i].last>max2) max2=tmpArray[i].last;
+				sum2+=tmpArray[i].last;
+				n++;
+			}
+			if (!isShortPeriod) {
+				if (max1-min1>threshold || max2-min2>threshold) return false;
+				tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n;
+			}
+			tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
+			tmpArray[j].isShortPeriod=isShortPeriod;
+			
+			// Storing the result of the merge
+			k=-1;
+			for (i=0; i<=j; i++) {
+				solutions[++k]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
+				solutions[++k]=tmpArray[i].isShortPeriod?-1-tmpArray[i].first:tmpArray[i].first;
+				solutions[++k]=tmpArray[i].last;
+			}
+			lastSolution=k;
+			return true;
 		}
 		
 		/**
@@ -8736,6 +8903,21 @@ public class RepeatAlphabet {
 			blockID=Integer.parseInt(tokens[4]);
 			rigidLeft=Integer.parseInt(tokens[5])==1;
 			rigidRight=Integer.parseInt(tokens[6])==1;
+		}
+	}
+	
+	
+	public static class SpacerSolution implements Comparable {
+		public boolean orientation, isShortPeriod;
+		public int repeat, first, last;
+		
+		public SpacerSolution() { }
+		
+		public int compareTo(Object other) {
+			SpacerSolution otherSolution = (SpacerSolution)other;
+			if (repeat<otherSolution.repeat) return -1;
+			else if (repeat>otherSolution.repeat) return 1;
+			else return 0;
 		}
 	}
 	
