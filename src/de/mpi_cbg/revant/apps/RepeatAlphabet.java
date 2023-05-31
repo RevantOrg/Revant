@@ -8008,6 +8008,7 @@ public class RepeatAlphabet {
 		Edge[] edges;
 		
 		// Loading edges
+		for (i=0; i<=lastSpacer; i++) spacers[i].lastSolution=-1;
 		spacerNeighbors = new double[lastSpacer+1][CAPACITY];
 		lastSpacerNeighbor = new int[lastSpacer+1];
 		Math.set(lastSpacerNeighbor,lastSpacer,-1);
@@ -8263,7 +8264,64 @@ public class RepeatAlphabet {
 	}
 	
 	
-	
+	/**
+	 * @param distanceThreshold used only by the consistency computation.
+	 */
+	private static final void propagateSolutions(double[][] spacerNeighbors, int distanceThreshold) {
+		final int CAPACITY = 10;  // Arbitrary
+		
+		boolean orientation;
+		int i, j;
+		int top, last, currentSpacer, neighbor, nPropagated;
+		SpacerSolution[] tmpArray;
+		
+		// Computing consistent solutions
+		tmpArray = new SpacerSolution[CAPACITY];
+		for (i=0; i<tmpArray.length; i++) tmpArray[i] = new SpacerSolution();
+		for (i=0; i<=lastSpacer; i++) {
+			if (tmpArray.length<spacers[i].lastSolution+1) {
+				SpacerSolution[] newArray = new SpacerSolution[tmpArray.length<<1];
+				System.arraycopy(tmpArray,0,newArray,0,tmpArray.length);
+				for (i=tmpArray.length; i<newArray.length; i++) newArray[i] = new SpacerSolution();
+				tmpArray=newArray;
+			}
+			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
+		}
+		
+		// Propagating solutions
+		nPropagated=0;
+		for (i=0; i<=lastSpacer; i++) spacers[i].breakpoint=-1;  // Used as a flag
+		if (stack==null || stack.length<lastSpacer+1) stack = new int[lastSpacer+1];
+		for (i=0; i<=lastSpacer; i++) {
+			if (spacers[i].lastSolution==-1) continue;
+			stack[0]=i; top=0;
+			while (top>=0) {
+				currentSpacer=stack[top--];
+				last=lastSpacerNeighbor[currentSpacer];
+				for (j=0; j<=last; j+=4) {
+					neighbor=(int)spacerNeighbors[currentSpacer][j];
+					if (neighbor<0) { orientation=false; neighbor=-1-neighbor; }
+					else orientation=true;
+					if (spacers[neighbor].breakpoint==i) continue;
+					if (spacers[neighbor].addSolutions(spacers[currentSpacer],(int)spacerNeighbors[currentSpacer][j+1],(int)spacerNeighbors[currentSpacer][j+2],orientation)) nPropagated++;
+					stack[++top]=neighbor;
+				}
+				spacers[currentSpacer].breakpoint=i;
+			}
+		}
+		System.err.println(nPropagated+" spacers with no solution, acquired a solution after propagation ("+((100.0*nPropagated)/(lastSpacer+1))+"%).");
+		
+		// Making propagated solutions consistent
+		for (i=0; i<=lastSpacer; i++) {
+			if (tmpArray.length<spacers[i].lastSolution+1) {
+				SpacerSolution[] newArray = new SpacerSolution[tmpArray.length<<1];
+				System.arraycopy(tmpArray,0,newArray,0,tmpArray.length);
+				for (i=tmpArray.length; i<newArray.length; i++) newArray[i] = new SpacerSolution();
+				tmpArray=newArray;
+			}
+			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
+		}
+	}
 	
 	
 	
@@ -8781,25 +8839,64 @@ public class RepeatAlphabet {
 				solutions=newArray;
 			}
 			solutions[++lastSolution]=orientation?repeat:-1-repeat;
-			solutions[++lastSolution]=isShortPeriod?-1-first:first;
-			solutions[++lastSolution]=last;
+			if (isShortPeriod) {
+				solutions[++lastSolution]=Math.POSITIVE_INFINITY;
+				solutions[++lastSolution]=Math.POSITIVE_INFINITY;
+			}
+			else {
+				solutions[++lastSolution]=first;
+				solutions[++lastSolution]=last;
+			}
+		}
+		
+		/**
+		 * Used only by tandem spacers.
+		 * Adds to $solutions$ all the elements of $from.solutions$.
+		 *
+		 * @param from assumed to contain some solution;
+		 * @return TRUE iff $solutions$ changes from empty to nonempty.
+		 */
+		public final boolean addSolutions(Spacer from, int fromOffsetFirst, int fromOffsetLast, boolean orientation) {
+			final boolean out = solutions==null||lastSolution==-1;
+			boolean fromOrientation;
+			int i;
+			int fromRepeat;
+			
+			for (i=0; i<=from.lastSolution; i+=3) {
+				if (from.solutions[i]<0) {
+					fromRepeat=-1-from.solutions[i];
+					fromOrientation=false;
+				}
+				else {
+					fromRepeat=from.solutions[i];
+					fromOrientation=true;
+				}
+				if (from.solutions[i+1]==Math.POSITIVE_INFINITY) addSolution(fromRepeat,fromOrientation&orientation,Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY,true);
+				else addSolution(fromRepeat,fromOrientation&orientation,from.solutions[i+1]+fromOffsetFirst,from.solutions[i+1]+fromOffsetLast,false);
+			}
+			return out;
 		}
 		
 		/**
 		 * Used only by tandem spacers.
 		 *
+		 * Remark: the procedure discards non-periodic repeats such that different 
+		 * substrings of them are identical.
+		 *
 		 * @param tmpArray temporary space, assumed to be large enough;
-		 * @return TRUE iff all solutions with the same repeat use the same substring of
-		 * it (i.e. start/end positions differ by $<=threshold$) in the same orientation.
-		 * At the end of the procedure all such copies are replaced with a single average.
+		 * @return TRUE iff there is at least one repeat such that all its solutions use
+		 * the same substring of it (i.e. start/end positions differ by $<=threshold$) in
+		 * the same orientation. At the end of the procedure all such substrings are
+		 * replaced with a single average, and repeats that do not satisfy the condition
+		 * are removed.
 		 */
 		public boolean solutionsAreConsistent(int threshold, SpacerSolution[] tmpArray) {
-			boolean orientation, isShortPeriod;
+			boolean orientation, isShortPeriod, isConsistent;
 			int i, j, k, n;
 			int repeat, min1, max1, min2, max2, sum1, sum2;
 			final int nSolutions = (lastSolution+1)/3;
 			
-			if (nSolutions==1) return true;
+			if (nSolutions<=1) return true;
 			
 			// Sorting solutions
 			for (i=0; i<=lastSolution; i+=3) {
@@ -8825,7 +8922,7 @@ public class RepeatAlphabet {
 			Arrays.sort(tmpArray,0,nSolutions);
 			
 			// Merging solutions
-			j=0; n=1;
+			j=0; n=1; isConsistent=true;
 			repeat=tmpArray[0].repeat; orientation=tmpArray[0].orientation;
 			isShortPeriod=tmpArray[0].isShortPeriod;
 			min1=tmpArray[0].first; max1=min1; sum1=min1;
@@ -8833,19 +8930,22 @@ public class RepeatAlphabet {
 			for (i=1; i<nSolutions; i++) {
 				if (tmpArray[i].repeat!=repeat) {
 					if (!isShortPeriod) {
-						if (max1-min1>threshold || max2-min2>threshold) return false;
-						tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n;
+						if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
+						if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
 					}
-					tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
-					tmpArray[j].isShortPeriod=isShortPeriod;
-					j++; n=1;
+					if (isConsistent) {
+						tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
+						tmpArray[j].isShortPeriod=isShortPeriod;
+						j++;
+					}
+					n=1; isConsistent=true;
 					repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
 					isShortPeriod=tmpArray[i].isShortPeriod;
 					min1=tmpArray[i].first; max1=min1; sum1=min1;
 					min2=tmpArray[i].last; max2=min2; sum2=min2;
 					continue;
 				}
-				if (tmpArray[i].orientation!=orientation) return false;
+				if (tmpArray[i].orientation!=orientation) isConsistent=false;
 				if (tmpArray[i].first<min1) min1=tmpArray[i].first;
 				if (tmpArray[i].first>max1) max1=tmpArray[i].first;
 				sum1+=tmpArray[i].first;
@@ -8855,11 +8955,13 @@ public class RepeatAlphabet {
 				n++;
 			}
 			if (!isShortPeriod) {
-				if (max1-min1>threshold || max2-min2>threshold) return false;
-				tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n;
+				if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
+				if (isConsistent) tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n;
 			}
-			tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
-			tmpArray[j].isShortPeriod=isShortPeriod;
+			if (isConsistent) {
+				tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
+				tmpArray[j].isShortPeriod=isShortPeriod;
+			}
 			
 			// Storing the result of the merge
 			k=-1;
