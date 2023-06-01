@@ -8265,14 +8265,16 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * @param distanceThreshold used only by the consistency computation.
+	 * @param distanceThreshold used only by the consistency computation;
+	 * @return TRUE iff most spacers have a solution after propagation.
 	 */
-	private static final void propagateSolutions(double[][] spacerNeighbors, int distanceThreshold) {
+	private static final boolean propagateSolutions(double[][] spacerNeighbors, int distanceThreshold) {
 		final int CAPACITY = 10;  // Arbitrary
+		final double THRESHOLD = 0.5;  // Arbitrary
 		
 		boolean orientation;
 		int i, j;
-		int top, last, currentSpacer, neighbor, nPropagated;
+		int top, last, currentSpacer, neighbor, nPropagated, nSolved;
 		SpacerSolution[] tmpArray;
 		
 		// Computing consistent solutions
@@ -8312,6 +8314,7 @@ public class RepeatAlphabet {
 		System.err.println(nPropagated+" spacers with no solution, acquired a solution after propagation ("+((100.0*nPropagated)/(lastSpacer+1))+"%).");
 		
 		// Making propagated solutions consistent
+		nSolved=0;
 		for (i=0; i<=lastSpacer; i++) {
 			if (tmpArray.length<spacers[i].lastSolution+1) {
 				SpacerSolution[] newArray = new SpacerSolution[tmpArray.length<<1];
@@ -8320,7 +8323,10 @@ public class RepeatAlphabet {
 				tmpArray=newArray;
 			}
 			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
+			if (spacers[i].lastSolution>=0) nSolved++;
 		}
+		
+		return nSolved>=(lastSpacer+1)*THRESHOLD; 
 	}
 	
 	
@@ -8993,7 +8999,12 @@ public class RepeatAlphabet {
 			bw.write(breakpoint+""+SEPARATOR_MINOR);
 			bw.write(blockID+""+SEPARATOR_MINOR);
 			bw.write((rigidLeft?"1":"0")+SEPARATOR_MINOR);
-			bw.write((rigidRight?"1":"0")+(SEPARATOR_MINOR+"\n"));
+			bw.write((rigidRight?"1":"0")+SEPARATOR_MINOR);
+			bw.write(lastSolution+""+SEPARATOR_MINOR);
+			if (lastSolution==-1) { bw.newLine(); return; }
+			bw.write(solutions[0]+"");
+			for (int i=1; i<=lastSolution; i++) bw.write(SEPARATOR_MINOR+""+solutions[i]);
+			bw.newLine();
 		}
 		
 		public void deserialize(String str) throws IOException {
@@ -9005,6 +9016,10 @@ public class RepeatAlphabet {
 			blockID=Integer.parseInt(tokens[4]);
 			rigidLeft=Integer.parseInt(tokens[5])==1;
 			rigidRight=Integer.parseInt(tokens[6])==1;
+			lastSolution=Integer.parseInt(tokens[7]);
+			if (lastSolution==-1) return;
+			solutions = new int[lastSolution+1];
+			for (int i=0; i<=lastSolution; i++) solutions[i]=Integer.parseInt(tokens[8+i]);
 		}
 	}
 	
