@@ -7907,19 +7907,21 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Loads all the non-repetitive blocks that are adjacent to a tandem.
+	 * Loads in global variable $spacers$ all the non-repetitive blocks that are adjacent
+	 * to a tandem.
 	 *
 	 * Remark: the procedure assumes that $loadTandemIntervals()$ has already been called,
 	 * ands that $tandems$ is sorted.
 	 */
 	public static final void loadTandemSpacers(int maxSpacerLength) {
 		final int LAST_THREE_BITS = 0x00000007;
+		final int CAPACITY = 100;  // Arbitrary
 		int i, j;
 		int nBlocks, readID, block, cell, mask, first, last, length;
 		final int nTranslatedReads = translated.length;
 		int[] lengthHistogram;
 		
-		if (spacers!=null) spacers = new Spacer[100];  // Arbitrary
+		if (spacers!=null) spacers = new Spacer[CAPACITY];
 		lastSpacer=-1;
 		lengthHistogram = new int[Math.ceil(maxSpacerLength<<1,IO.quantum)];  // Arbitrary
 		Math.set(lengthHistogram,lengthHistogram.length-1,0);
@@ -7942,7 +7944,8 @@ public class RepeatAlphabet {
 							System.arraycopy(spacers,0,newArray,0,spacers.length);
 							spacers=newArray;
 						}
-						spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
+						if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
+						else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
 					}
 				}
 				block=tandems[i][j+1]+1;
@@ -7960,7 +7963,8 @@ public class RepeatAlphabet {
 							System.arraycopy(spacers,0,newArray,0,spacers.length);
 							spacers=newArray;
 						}
-						spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
+						if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
+						else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
 					}
 				}
 			}
@@ -7972,13 +7976,14 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Creates an edge between two spacers iff there is a read-read alignment in 
+	 * Creates a directed edge between two spacers iff there is a read-read alignment in 
 	 * $alignmentsFile$ that induces an identity or a containment when projected onto the
 	 * same read. An edge $(x,y)$ is represented as an integer in $spacerNeighbors[x]$, 
 	 * that is either $y$ or $-1-y$, depending on the orientation of the alignment.
 	 * The procedure also adds solutions to spacers, where a solution is an immediate 
 	 * alignment to (a substring of) a repeat block. A spacer is \emph{solved} if all its
-	 * solutions are consistent.
+	 * solutions are consistent. Edges are directed according to how solutions should be
+	 * propagated.
 	 *
 	 * Remark: let a spacer be left-rigid iff its left side is adjacent to another block.
 	 * The procedure does not use rigidity as a criterion for building edges, since the
@@ -8154,7 +8159,9 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Remark: a spacer on readA can be connected to multiple spacers on readB, or vice
+	 * Remark: edges are directed according to how solution should propagate.
+	 *
+	 * Remark: a spacer on readA can be connected to multiple spacers on readB, and vice
 	 * versa.
 	 *
 	 * @param avgDiffs of the alignment;
@@ -8328,6 +8335,283 @@ public class RepeatAlphabet {
 		
 		return nSolved>=(lastSpacer+1)*THRESHOLD; 
 	}
+	
+	
+	/**
+	 * Similar to $fixPeriodicEndpoints_collectCharacterInstances()$. Alters an existing 
+	 * read translation using tandem spacer solutions. Every new character instance that 
+	 * is not already in $alphabet$ is written to $bw$. Every character in $alphabet$ that
+	 * is used in the new translation is marked in $used$.	
+	 * 
+	 * @param used same size as $alphabet$;
+	 * @param spacersCursor current position in $spacers$;
+	 * @param tmpArray temporary space, with a number of cells at least equal to the
+	 * number of blocks in the translation;
+	 * @return the new value of $spacersCursor$.
+	 */
+	public static final int tandemSpacers_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, String read2tandems, int readLength, int distanceThreshold, boolean[] used, BufferedWriter bw, Character tmpCharacter, int[] tmpArray) throws IOException {
+		final int QUANTUM = IO.quantum;
+		final String SEPARATOR = ",";
+		int i, j, p, q;
+		int blockID, nBlocks, lastTandem;
+		
+		// Loading the input
+		if (read2tandems.length()==0) return spacersCursor;
+		i=0; p=read2tandems.indexOf(SEPARATOR);
+		while (p>=0) {
+			i++;
+			p=read2tandems.indexOf(SEPARATOR,p+1);
+		}
+		lastTandem=i;
+		i=-1; p=0; q=read2tandems.indexOf(SEPARATOR);
+		while (q>=0) {
+			tmpArray[++i]=Integer.parseInt(read2tandems.substring(p,q));
+			p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+		}
+		tmpArray[++i]=Integer.parseInt(read2tandems.substring(p));
+		loadBoundaries(read2boundaries);
+		nBlocks=loadBlocks(read2characters);
+		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
+		Math.set(tmpBoolean,nBlocks-1,false);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
+		
+		// Building characters from spacers
+		for (i=0; i<=lastTandem; i+=2) {
+			blockID=tmpArray[i]-1;
+			if (blockID>=0 && !tmpBoolean[blockID]) {
+				spacersCursor=tandemSpacers_collectCharacterInstances_impl(readID,blockID,boundaries,nBlocks,readLength,spacersCursor,distanceThreshold,QUANTUM,used,bw,tmpCharacter);
+				tmpBoolean[blockID]=true;
+			}
+			blockID=tmpArray[i+1]+1;
+			if (blockID<nBlocks && !tmpBoolean[blockID]) {
+				spacersCursor=tandemSpacers_collectCharacterInstances_impl(readID,blockID,boundaries,nBlocks,readLength,spacersCursor,distanceThreshold,QUANTUM,used,bw,tmpCharacter);
+				tmpBoolean[blockID]=true;
+			}
+		}
+		
+		// Marking as used every character in every other block
+		for (i=0; i<nBlocks; i++) {
+			if (tmpBoolean[i]) continue;
+			for (j=0; j<=lastInBlock_int[i]; j++) used[intBlocks[i][j]]=true;
+		}
+		return spacersCursor;
+	}
+	
+	
+	/**
+	 * @param tmpCharacter temporary space;
+	 * @return the new value of $spacersCursor$.
+	 */
+	private static final int tandemSpacers_collectCharacterInstances_impl(int readID, int blockID, int[] boundaries, int nBlocks, int readLength, int spacersCursor, int distanceThreshold, int quantum, boolean[] used, BufferedWriter bw, Character tmpCharacter) throws IOException {
+		int i, j;
+		int first, last, lastSolution;
+		Spacer spacer;
+		
+		first=blockID==0?0:boundaries[blockID-1];
+		last=blockID==nBlocks-1?readLength-1:boundaries[blockID];
+		while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID) spacersCursor++;
+		if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>first) {
+			System.err.println("tandemSpacers_collectCharacterInstances_impl> ERROR: spacer not found: "+readID+"["+first+".."+last+"]");
+			System.exit(1);
+		}
+		spacer=spacers[spacersCursor];
+		lastSolution=spacer.lastSolution;
+		for (i=0; i<=lastSolution; i+=3) {
+			if (spacer.solutions[i]>=0) {
+				tmpCharacter.repeat=spacer.solutions[i];
+				tmpCharacter.orientation=true;
+			}
+			else {
+				tmpCharacter.repeat=-1-spacer.solutions[i];
+				tmpCharacter.orientation=false;
+			}
+			if (spacer.solutions[i+1]!=-1) {
+				tmpCharacter.start=spacer.solutions[i+1];
+				tmpCharacter.end=spacer.solutions[i+2];
+				tmpCharacter.length=0;
+				if (blockID==0) {
+					if (tmpCharacter.orientation) tmpCharacter.openStart=first>distanceThreshold;
+					else tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+				} 
+				else if (blockID==nBlocks-1) {
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+					else tmpCharacter.openStart=first>distanceThreshold;
+				}
+				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
+			}
+			else {
+				tmpCharacter.length=last-first+1;
+				if (blockID==0) {
+					if (tmpCharacter.orientation) tmpCharacter.openStart=true;
+					else tmpCharacter.openEnd=true;
+				}
+				else if (blockID==nBlocks-1) {
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=true;
+					else tmpCharacter.openStart=true;
+				}
+				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
+			}
+			tmpCharacter.quantize(quantum);
+			if (tmpCharacter.start==-1) j=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,tmpCharacter);
+			else j=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,tmpCharacter);
+			if (j>=0) used[j]=true;
+			else bw.write(tmpCharacter.toString()+"\n");
+		}
+		return spacersCursor;
+	}
+	
+	
+	/**
+	 * Like $tandemSpacers_collectCharacterInstances()$, but looks up in the new alphabet
+	 * every existing and new character induced by solving a tandem spacer, and keeps a 
+	 * tandem spacer with no solution intact.
+	 *
+	 * @param out the procedure cumulates the number of spacers fixed at every length 
+	 * (multiple of $IO.quantum$);
+	 * @param tmpArray temporary space, with a number of cells at least equal to the 
+	 * number of blocks.
+	 */
+	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, int distanceThreshold, int[] out, Character tmpCharacter, int[] tmpArray) throws IOException {
+		final int QUANTUM = IO.quantum;
+		final String SEPARATOR = ",";
+		int i, j, p, q, c;
+		int blockID, nBlocks, last, lastTandem;
+		
+		// Loading the input
+		if (read2characters_old.length()==0) {
+			read2characters_new.newLine();
+			return spacersCursor;
+		}
+		if (read2tandems_old.length()>=0) {
+			i=0; p=read2tandems_old.indexOf(SEPARATOR);
+			while (p>=0) {
+				i++;
+				p=read2tandems_old.indexOf(SEPARATOR,p+1);
+			}
+			lastTandem=i;
+			i=-1; p=0; q=read2tandems_old.indexOf(SEPARATOR);
+			while (q>=0) {
+				tmpArray[++i]=Integer.parseInt(read2tandems_old.substring(p,q));
+				p=q+1; q=read2tandems_old.indexOf(SEPARATOR,p);
+			}
+			tmpArray[++i]=Integer.parseInt(read2tandems_old.substring(p));
+		}
+		else lastTandem=-1;
+		loadBoundaries(read2boundaries_old);
+		nBlocks=loadBlocks(read2characters_old);
+		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
+		Math.set(tmpBoolean,nBlocks-1,false);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
+		
+		// Marking spacer blocks
+		for (i=0; i<=lastTandem; i+=2) {
+			blockID=tmpArray[i]-1;
+			if (blockID>=0) tmpBoolean[blockID]=true;
+			blockID=tmpArray[i+1]+1;
+			if (blockID<nBlocks) tmpBoolean[blockID]=true;
+		}
+		
+		// Recoding characters
+		for (i=0; i<nBlocks; i++) {
+			if (tmpBoolean[i]) spacersCursor=tandemSpacers_updateTranslation_impl(readID,i,boundaries,nBlocks,readLength,spacersCursor,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,distanceThreshold,QUANTUM,read2characters_new,out,tmpArray,tmpCharacter);
+			else {
+				last=lastInBlock[i];
+				p=-1;
+				for (j=0; j<=last; j++) {			
+					c=Integer.parseInt(blocks[i][j]);
+					if (c<0) c=-1-c;
+					if (c==lastAlphabet_old+1) tmpArray[++p]=lastAlphabet_new+1;
+					else {
+						tmpCharacter.copyFrom(alphabet_old[c]);
+						p=fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,tmpArray,p);
+					}
+				}
+				if (p>0) Arrays.sort(tmpArray,0,p+1);
+				read2characters_new.write(tmpArray[0]+"");
+				for (j=1; j<=p; j++) {
+					if (tmpArray[j]!=tmpArray[j-1]) read2characters_new.write(SEPARATOR_MINOR+""+tmpArray[j]);
+				}
+			}
+			if (i<nBlocks-1) read2characters_new.write(SEPARATOR_MAJOR+"");
+		}
+		read2characters_new.newLine();
+		return spacersCursor;
+	}
+		
+		
+	/**
+	 * Identical to $tandemSpacers_collectCharacterInstances_impl()$.
+	 */
+	private static final int tandemSpacers_updateTranslation_impl(int readID, int blockID, int[] boundaries, int nBlocks, int readLength, int spacersCursor, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int distanceThreshold, int quantum, BufferedWriter bw, int[] out, int[] tmpArray, Character tmpCharacter) throws IOException {
+		int i, p;
+		int first, last, lastSolution;
+		Spacer spacer;
+	
+		first=blockID==0?0:boundaries[blockID-1];
+		last=blockID==nBlocks-1?readLength-1:boundaries[blockID];
+		while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID) spacersCursor++;
+		if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>first) {
+			System.err.println("tandemSpacers_updateTranslation_impl> ERROR: spacer not found: "+readID+"["+first+".."+last+"]");
+			System.exit(1);
+		}
+		spacer=spacers[spacersCursor];
+		lastSolution=spacer.lastSolution;
+		p=-1;
+		for (i=0; i<=lastSolution; i+=3) {
+			if (spacer.solutions[i]>=0) {
+				tmpCharacter.repeat=spacer.solutions[i];
+				tmpCharacter.orientation=true;
+			}
+			else {
+				tmpCharacter.repeat=-1-spacer.solutions[i];
+				tmpCharacter.orientation=false;
+			}
+			if (spacer.solutions[i+1]!=-1) {
+				tmpCharacter.start=spacer.solutions[i+1];
+				tmpCharacter.end=spacer.solutions[i+2];
+				tmpCharacter.length=0;
+				if (blockID==0) {
+					if (tmpCharacter.orientation) tmpCharacter.openStart=first>distanceThreshold;
+					else tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+				} 
+				else if (blockID==nBlocks-1) {
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+					else tmpCharacter.openStart=first>distanceThreshold;
+				}
+				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
+			}
+			else {
+				tmpCharacter.length=last-first+1;
+				if (blockID==0) {
+					if (tmpCharacter.orientation) tmpCharacter.openStart=true;
+					else tmpCharacter.openEnd=true;
+				}
+				else if (blockID==nBlocks-1) {
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=true;
+					else tmpCharacter.openStart=true;
+				}
+				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
+			}
+			tmpCharacter.quantize(quantum);
+			p=fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,tmpArray,p);
+			out[Math.min((tmpCharacter.start==-1?tmpCharacter.length:tmpCharacter.end-tmpCharacter.start+1)/IO.quantum,out.length-1)]++;
+		}
+		if (p==-1) {  // Spacer with no solution
+			tmpCharacter.repeat=UNIQUE;
+			tmpCharacter.orientation=true;
+			tmpCharacter.start=-1; tmpCharacter.end=-1;
+			tmpCharacter.length=last-first+1;
+			if (blockID==0) tmpCharacter.openStart=true;
+			else if (blockID==nBlocks-1) tmpCharacter.openEnd=true;
+			else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
+			tmpCharacter.quantize(quantum);
+			p=fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,tmpArray,p);
+		}
+		bw.write(tmpArray[0]);
+		for (i=1; i<=p; i++) bw.write(SEPARATOR_MINOR+""+tmpArray[p]);
+		return spacersCursor;
+	}
+	
 	
 	
 	
@@ -8816,6 +9100,10 @@ public class RepeatAlphabet {
 		public Spacer() { }
 		
 		public Spacer(int r, int f, int l, boolean fl, boolean fr, int b) {
+			set(r,f,l,fl,fr,b);
+		}
+		
+		public void set(int r, int f, int l, boolean fl, boolean fr, int b) {
 			this.read=r; this.first=f; this.last=l;
 			this.rigidLeft=fl; this.rigidRight=fr;
 			this.blockID=b;
@@ -8846,8 +9134,8 @@ public class RepeatAlphabet {
 			}
 			solutions[++lastSolution]=orientation?repeat:-1-repeat;
 			if (isShortPeriod) {
-				solutions[++lastSolution]=Math.POSITIVE_INFINITY;
-				solutions[++lastSolution]=Math.POSITIVE_INFINITY;
+				solutions[++lastSolution]=-1;
+				solutions[++lastSolution]=-1;
 			}
 			else {
 				solutions[++lastSolution]=first;
@@ -8877,7 +9165,7 @@ public class RepeatAlphabet {
 					fromRepeat=from.solutions[i];
 					fromOrientation=true;
 				}
-				if (from.solutions[i+1]==Math.POSITIVE_INFINITY) addSolution(fromRepeat,fromOrientation&orientation,Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY,true);
+				if (from.solutions[i+1]==-1) addSolution(fromRepeat,fromOrientation&orientation,-1,-1,true);
 				else addSolution(fromRepeat,fromOrientation&orientation,from.solutions[i+1]+fromOffsetFirst,from.solutions[i+1]+fromOffsetLast,false);
 			}
 			return out;
@@ -8887,7 +9175,7 @@ public class RepeatAlphabet {
 		 * Used only by tandem spacers.
 		 *
 		 * Remark: the procedure discards non-periodic repeats such that different 
-		 * substrings of them are identical.
+		 * substrings of them (possibly in diferent orientations) are identical.
 		 *
 		 * @param tmpArray temporary space, assumed to be large enough;
 		 * @return TRUE iff there is at least one repeat such that all its solutions use
@@ -8915,15 +9203,8 @@ public class RepeatAlphabet {
 					tmpArray[j].repeat=solutions[i];
 					tmpArray[j].orientation=true;
 				}
-				if (solutions[i+1]<0) {
-					tmpArray[j].first=-1-solutions[i+1];
-					tmpArray[j].isShortPeriod=true;
-				}
-				else {
-					tmpArray[j].first=solutions[i+1];
-					tmpArray[j].isShortPeriod=false;
-				}
-				tmpArray[j].last=solutions[i+2];
+				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
+				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
 			}
 			Arrays.sort(tmpArray,0,nSolutions);
 			
@@ -8973,7 +9254,7 @@ public class RepeatAlphabet {
 			k=-1;
 			for (i=0; i<=j; i++) {
 				solutions[++k]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
-				solutions[++k]=tmpArray[i].isShortPeriod?-1-tmpArray[i].first:tmpArray[i].first;
+				solutions[++k]=tmpArray[i].first;
 				solutions[++k]=tmpArray[i].last;
 			}
 			lastSolution=k;
@@ -9026,7 +9307,8 @@ public class RepeatAlphabet {
 	
 	public static class SpacerSolution implements Comparable {
 		public boolean orientation, isShortPeriod;
-		public int repeat, first, last;
+		public int repeat;
+		public int first, last;  // -1 if short-period
 		
 		public SpacerSolution() { }
 		
