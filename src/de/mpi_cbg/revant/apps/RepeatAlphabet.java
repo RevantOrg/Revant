@@ -7913,7 +7913,7 @@ public class RepeatAlphabet {
 	 * Remark: the procedure assumes that $loadTandemIntervals()$ has already been called,
 	 * ands that $tandems$ is sorted.
 	 */
-	public static final void loadTandemSpacers(int maxSpacerLength) {
+	public static final void loadTandemSpacers() {
 		final int LAST_THREE_BITS = 0x00000007;
 		final int CAPACITY = 100;  // Arbitrary
 		int i, j;
@@ -7923,7 +7923,7 @@ public class RepeatAlphabet {
 		
 		if (spacers!=null) spacers = new Spacer[CAPACITY];
 		lastSpacer=-1;
-		lengthHistogram = new int[Math.ceil(maxSpacerLength<<1,IO.quantum)];  // Arbitrary
+		lengthHistogram = new int[100];  // Arbitrary
 		Math.set(lengthHistogram,lengthHistogram.length-1,0);
 		for (i=0; i<nTranslatedReads; i++) {
 			nBlocks=translation_all[i].length;
@@ -7937,7 +7937,7 @@ public class RepeatAlphabet {
 					last=block==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[i][block];
 					length=last-first+1;
 					lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
-					if (length<=maxSpacerLength && (spacers[lastSpacer].read!=readID||spacers[lastSpacer].blockID!=block)) {
+					if (spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=block) {
 						lastSpacer++;
 						if (lastSpacer==spacers.length) {
 							Spacer[] newArray = new Spacer[spacers.length<<1];
@@ -7956,7 +7956,7 @@ public class RepeatAlphabet {
 					last=block==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[i][block];
 					length=last-first+1;;
 					lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
-					if (length<=maxSpacerLength && (spacers[lastSpacer].read!=readID||spacers[lastSpacer].blockID!=block)) {
+					if (spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=block) {
 						lastSpacer++;
 						if (lastSpacer==spacers.length) {
 							Spacer[] newArray = new Spacer[spacers.length<<1];
@@ -7995,8 +7995,11 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: $spacerNeighbors[i]$ is sorted by decreasing alignment similarity for every
 	 * $i$.
+	 *
+	 * @param tmpArray temporary space, of size at least two;
+	 * @return the total number of spacers with a solution.
 	 */
-	public static final void loadTandemSpacerNeighbors(String alignmentsFile, int[] tmpArray) throws IOException {
+	public static final int loadTandemSpacerNeighbors(String alignmentsFile, int[] tmpArray) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int CAPACITY = 12;  // Arbitrary, multiple of 4.
 		final int nTranslated = translated.length;
@@ -8103,6 +8106,12 @@ public class RepeatAlphabet {
 			}
 		}
 		br.close();
+		nSingletonSpacers=0; nSpacersWithSolution=0;
+		for (i=0; i<=lastSpacer; i++) {
+			if (spacers[i].lastSolution>=0) nSpacersWithSolution++;
+			if (lastSpacerNeighbor[i]==-1) nSingletonSpacers++;
+		}
+		if (nSpacersWithSolution==0) return 0;
 		
 		// Removing duplicates and sorting edges
 		nEdgesTotal=0; max=0;
@@ -8145,16 +8154,11 @@ public class RepeatAlphabet {
 			lastSpacerNeighbor[i]=k;
 		}
 		
-		// Computing statistics
-		nSingletonSpacers=0; nSpacersWithSolution=0;
-		for (i=0; i<=lastSpacer; i++) {
-			if (spacers[i].lastSolution>=0) nSpacersWithSolution++;
-			if (lastSpacerNeighbor[i]==-1) nSingletonSpacers++;
-		}
 		System.err.println("Tandem spacer edges: "+(nEdgesTotal>>1));
 		System.err.println("Tandem spacers: "+(lastSpacer+1));
 		System.err.println("Tandem spacers, singleton: "+nSingletonSpacers+" ("+(100.0*nSingletonSpacers/(lastSpacer+1))+"%)");
 		System.err.println("Tandem spacers with solution: "+nSpacersWithSolution+" ("+(100.0*nSpacersWithSolution/(lastSpacer+1))+"%)");
+		return nSpacersWithSolution;
 	}
 	
 	
@@ -8272,10 +8276,10 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * @param distanceThreshold used only by the consistency computation;
+	 * @param distanceThreshold used only by calls to $Spacer.solutionsAreConsistent()$;
 	 * @return TRUE iff most spacers have a solution after propagation.
 	 */
-	private static final boolean propagateSolutions(double[][] spacerNeighbors, int distanceThreshold) {
+	public static final boolean propagateSolutions(int distanceThreshold) {
 		final int CAPACITY = 10;  // Arbitrary
 		final double THRESHOLD = 0.5;  // Arbitrary
 		
