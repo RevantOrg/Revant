@@ -8473,7 +8473,8 @@ public class RepeatAlphabet {
 	 * @param out the procedure cumulates the number of spacers fixed at every length 
 	 * (multiple of $IO.quantum$);
 	 * @param tmpArray temporary space, with a number of cells at least equal to the 
-	 * number of blocks.
+	 * number of blocks;
+	 * @return the new value of $spacersCursor$.
 	 */
 	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, int distanceThreshold, int[] out, Character tmpCharacter, int[] tmpArray) throws IOException {
 		final int QUANTUM = IO.quantum;

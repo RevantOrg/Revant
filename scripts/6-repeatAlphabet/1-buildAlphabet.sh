@@ -20,7 +20,8 @@ HAPLOTYPE_COVERAGE=$6  # Of one haplotype
 N_THREADS=$7
 DELETE_TMP_FILES=$8
 MAX_SPACER_LENGTH=$9  # 0=assume that the endpoints of periodic repeats are accurate
-WOBBLE_LENGTH=${10}  # 0=do not wobble.
+WOBBLE_LENGTH=${10}  # 0=do not wobble
+FIX_TANDEM_SPACERS=${11}  # 0=assume that non-repetitive blocks near tandems are real.
 # Good settings for mostly periodic genome: MAX_SPACER_LENGTH="10000"; WOBBLE_LENGTH="100"
 # If spacers are real in the read translations (i.e. if they do not come from
 # idiosyncrasies of the aligner) the translations are automatically untouched.
@@ -183,6 +184,99 @@ for THREAD in $(seq 0 ${TO}); do
 done
 
 
+
+
+TANDEM_SPACERS_FIXED="0"
+if [ ${FIX_TANDEM_SPACERS} -eq 1 ]; then
+	echo "Trying to fix tandem spacers if needed..."
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-tspacers-1-
+	function tandemsThread() {
+		local LOCAL_TRANSLATED_READS_FILE=$1
+		local LOCAL_BOUNDARIES_FILE=$2
+		local LOCAL_READ_LENGTHS_FILE=$3
+		local LOCAL_TANDEMS_FILE=$4
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
+	}
+	echo "Computing tandem track..."
+	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_PATH}-8-*.txt"); do
+		THREAD_ID=${FILE#${TMPFILE_PATH}-8-}
+		THREAD_ID=${THREAD_ID%.txt}
+		tandemsThread ${FILE} ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-1-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-2-${THREAD_ID}.txt &
+	done
+	wait
+	TANDEMS_FILE="${TMPFILE_PATH}-tspacers-3.txt"
+	rm -f ${TANDEMS_FILE}
+	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_PATH}-tspacers-2-*.txt"); do
+		cat ${FILE} >> ${TANDEMS_FILE}
+	done
+	echo "Collecting tandem spacers and assigning solutions to them..."
+	N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
+	N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
+	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
+	SPACERS_ARE_CORRECT=$(java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers1 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${TANDEMS_FILE} ${TMPFILE_PATH}-tspacers-3.txt)
+	if [ ${SPACERS_ARE_CORRECT} -ne 0 ]; then
+		TANDEM_SPACERS_FIXED="0"
+	else
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} ${TMPFILE_PATH}-tspacers-3.txt ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-tspacers-4-
+		echo "Collecting instances of characters induced by solved tandem spacers..."
+		function collectionThread_tspacers() {
+			local SPACERS_FILE_ID=$1
+			local LOCAL_N_SPACERS=$(wc -l < ${TMPFILE_PATH}-tspacers-4-${SPACERS_FILE_ID}.txt)
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers2 ${TMPFILE_PATH}-tspacers-4-${SPACERS_FILE_ID}.txt ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-tspacers-4-ids-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-tspacers-4-lengths-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-8-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-9-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-tspacers-2-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-tspacers-5-${SPACERS_FILE_ID}.txt
+			sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-tspacers-5-${SPACERS_FILE_ID}.txt | uniq - ${TMPFILE_PATH}-tspacers-6-${SPACERS_FILE_ID}.txt
+		}
+		if [ -e ${TMPFILE_PATH}-tspacers-4-${N_THREADS}.txt ]; then
+			TO=${N_THREADS}
+		else
+			TO=$(( ${N_THREADS} - 1 ))
+		fi
+		for THREAD in $(seq 0 ${TO}); do
+			collectionThread_tspacers ${THREAD} &
+		done
+		wait
+		sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-tspacers-6-*.txt | uniq - ${TMPFILE_PATH}-tspacers-7.txt
+		N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-tspacers-7.txt)
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-tspacers-7.txt ${TMPFILE_PATH}-tspacers-8-
+		echo "Compacting character instances..."
+		for THREAD in $(seq 0 ${TO}); do
+			compactionThread ${THREAD} "${TMPFILE_PATH}-tspacers-8-" "${TMPFILE_PATH}-tspacers-9-" "${TMPFILE_PATH}-tspacers-10-" &
+		done
+		wait
+		head -n 1 ${ALPHABET_FILE} | cut -d , -f 4 > "${TMPFILE_PATH}-tspacers-unique.txt"
+		ALPHABET_FILE_SPACERS="${INPUT_DIR}/alphabet-tspacers.txt"
+		rm -f ${ALPHABET_FILE_SPACERS}
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "${TMPFILE_NAME}-tspacers-10-" "${TMPFILE_PATH}-tspacers-unique" ${ALPHABET_FILE_SPACERS}
+		for THREAD in $(seq 0 ${TO}); do
+			tail -n +2 ${TMPFILE_PATH}-tspacers-10-${THREAD}.txt >> ${ALPHABET_FILE_SPACERS}
+		done
+		ALPHABET_SIZE_SPACERS=$( wc -l < ${ALPHABET_FILE_SPACERS} )
+		ALPHABET_SIZE_SPACERS=$(( ${ALPHABET_SIZE_SPACERS} - 1 ))
+		echo "Translating reads into the alphabet induced by solved tandem spacers..."
+		function translationThread_tspacers() {
+			local THREAD_ID=$1
+			local READ2CHARACTERS_FILE_NEW=$2
+			local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-tspacers-4-${THREAD_ID}.txt"
+			local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers3 ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-tspacers-4-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-4-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-2-${THREAD_ID}.txt
+		}
+		for THREAD in $(seq 0 ${TO}); do
+			translationThread_spacers ${THREAD} "${TMPFILE_PATH}-tspacers-11-" &
+		done
+		wait
+		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
+		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prespacers
+		for THREAD in $(seq 0 ${TO}); do
+			cat ${TMPFILE_PATH}-tspacers-11-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+		done
+		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
+		TANDEM_SPACERS_FIXED="1"
+		echo "Tandem spacers fixed"
+	fi
+fi
+
+
+
+
 PERIODIC_ENDPOINTS_FIXED="0"
 if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	echo "Trying to fix periodic endpoints if needed..."
@@ -272,6 +366,7 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 		done
 		sort --parallel=${N_THREADS} -n ${TMPFILE_PATH}-spacers-12.txt > ${FULLY_CONTAINED_FILE}
 		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
+		PERIODIC_ENDPOINTS_FIXED="1"
 		echo "Periodic endpoints fixed"
 		if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 			echo "Wobbling..."

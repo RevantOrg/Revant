@@ -7,7 +7,9 @@ import java.io.*;
  * file that specifies the last read ID of each block.
  */
 public class SplitSpacers {
-	
+	/**
+	 * @param args 2: use $null$ to avoid splitting spacers.
+	 */
 	public static void main(String[] args) throws IOException {
 		final String LAST_READ_FILE = args[0];  // Of every block (last block included).
 		final int N_BLOCKS = Integer.parseInt(args[1]);
@@ -28,20 +30,22 @@ public class SplitSpacers {
 		br1.close();
 		
 		// Serializing spacers
-		i=0;
-		bw1 = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+"0.txt"));
-		br1 = new BufferedReader(new FileReader(SPACERS_FILE));
-		str1=br1.readLine();
-		while (str1!=null) {
-			if (Integer.parseInt(str1.substring(0,str1.indexOf(RepeatAlphabet.SEPARATOR_MINOR)))>lastRead[i]) {
-				bw1.close();
-				i++;
-				bw1 = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+i+".txt"));
-			}
-			bw1.write(str1); bw1.newLine();
+		if (!SPACERS_FILE.equalsIgnoreCase("null")) {
+			i=0;
+			bw1 = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+"0.txt"));
+			br1 = new BufferedReader(new FileReader(SPACERS_FILE));
 			str1=br1.readLine();
+			while (str1!=null) {
+				if (Integer.parseInt(str1.substring(0,str1.indexOf(RepeatAlphabet.SEPARATOR_MINOR)))>lastRead[i]) {
+					bw1.close();
+					i++;
+					bw1 = new BufferedWriter(new FileWriter(OUTPUT_PREFIX+i+".txt"));
+				}
+				bw1.write(str1); bw1.newLine();
+				str1=br1.readLine();
+			}
+			bw1.close(); br1.close();
 		}
-		bw1.close(); br1.close();
 		
 		// Serializing read IDs and lengths
 		i=0;
