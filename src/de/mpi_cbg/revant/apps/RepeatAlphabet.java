@@ -1622,9 +1622,16 @@ public class RepeatAlphabet {
 					else {
 						tmpChar.copyFrom(alphabet[value]);
 						tmpChar.length=(i==nBlocks-1?readLength:boundaries[i])-(i==0?0:boundaries[i-1]+1);
-						if (i==0) tmpChar.openStart=true;
-						if (i==nBlocks-1) tmpChar.openEnd=true;
-						repeat=alphabet[value].repeat; orientation=alphabet[value].orientation;
+						repeat=alphabet[value].repeat;
+						orientation=alphabet[value].orientation;
+						if (i==0) {
+							if (orientation) tmpChar.openStart=true;
+							else tmpChar.openEnd=true;
+						}
+						if (i==nBlocks-1) {
+							if (orientation) tmpChar.openEnd=true;
+							else tmpChar.openStart=true;
+						}
 						tmpChar.quantize(QUANTUM);
 						found=false;
 						for (c=value; c<=lastPeriodic; c++) {
@@ -5797,6 +5804,7 @@ public class RepeatAlphabet {
 		final int MIN_INTERSECTION = (3*IDENTITY_THRESHOLD)>>1;  // Arbitrary
 		final int PERIODIC_CONTEXT = minAlignmentLength_readRepeat>>1;  // Arbitrary
 		final int CAPACITY = 6;  // Arbitrary, multiple of 3.
+		final int nTranslated = translated.length;
 		boolean readB_fullyUnique, readB_fullyContained;
 		int i, j, k, p;
 		int firstSpacer, readA, readB, nEdges, row, max, last, fromA, toA, fromB, toB, readA_length, readA_translatedIndex, readB_translatedIndex;
@@ -5814,24 +5822,27 @@ public class RepeatAlphabet {
 		Math.set(lastSpacerNeighbor,lastSpacer,-1);
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
-		str=br.readLine(); firstSpacer=0; nEdges=0; row=0;
-		while (str!=null) {
-			row++;
-			if (row%1000000==0) System.err.println("Processed "+row+" alignments");
-			Alignments.readAlignmentFile(str);
+		str=br.readLine(); firstSpacer=0; nEdges=0; readA_translatedIndex=0; row=1;
+		while (str!=null && firstSpacer<=lastSpacer) {
 			readA=Alignments.readA-1;
 			if (readA<spacers[firstSpacer].read) {
 				str=br.readLine();
+				if (str!=null) {
+					Alignments.readAlignmentFile(str);
+					if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+				}
 				continue;
 			}
-			while (firstSpacer<=lastSpacer && spacers[firstSpacer].read<readA) firstSpacer++;
-			if (firstSpacer>lastSpacer) break;
-			if (readA<spacers[firstSpacer].read) {
-				str=br.readLine();
+			if (spacers[firstSpacer].read<readA) {
+				firstSpacer++;
 				continue;
+			}
+			while (readA_translatedIndex<nTranslated && translated[readA_translatedIndex]<readA) readA_translatedIndex++;
+			if (translated[readA_translatedIndex]!=readA) {
+				System.err.println("loadSpacerNeighbors> ERROR: readA="+readA+" is not translated but has a spacer?!");
+				System.exit(1);
 			}
 			readA_length=Reads.getReadLength(readA);
-			readA_translatedIndex=Arrays.binarySearch(translated,readA);
 			readB=Alignments.readB-1;
 			readB_fullyUnique=Arrays.binarySearch(fullyUnique,readB)>=0;
 			readB_fullyContained=Arrays.binarySearch(fullyContained,readB)>=0;
@@ -5926,6 +5937,10 @@ public class RepeatAlphabet {
 				}
 			}
 			str=br.readLine();
+			if (str!=null) {
+				Alignments.readAlignmentFile(str);
+				if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+			}
 		}
 		br.close();
 		System.err.println("Loaded "+nEdges+" spacer edges");
@@ -7873,7 +7888,7 @@ public class RepeatAlphabet {
 	
 	
 	
-	// ------------------ INACCURATE PERIODIC ENDPOINTS - TANDEMS ------------------------
+	// ---------------- BLOCKS NEAR TANDEMS ANNOTATED AS NONREPETITIVE -------------------
 	
 	/**
 	 * The translation of every read that is fully contained in a single repeat
@@ -7907,8 +7922,17 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Loads in global variable $spacers$ all the non-repetitive blocks that are adjacent
+	 * Non-repetitive blocks that are close to a long-period tandem (i.e. close to a 
+	 * sequence of blocks that all have the same nonperiodic character) can be missing 
+	 * read-repeat alignments that are not reported by the aligner. This happens e.g. in 
+	 * daligner, even after increasing memory for read-repeat alignments. This procedure
+	 * loads in global variable $spacers$ all the non-repetitive blocks that are adjacent
 	 * to a tandem.
+	 *
+	 * Remark: of course the tandem track used by this procedure might be different from
+	 * the tandem track that will be used downstream to filter alignments, since spacers
+	 * near a tandem might themselves become part of a tandem. The tandem track should be
+	 * recomputed once the tandem spacers correction phase is completed.
 	 *
 	 * Remark: the procedure assumes that $loadTandemIntervals()$ has already been called,
 	 * ands that $tandems$ is sorted.
@@ -8163,7 +8187,7 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Remark: edges are directed according to how solution should propagate.
+	 * Remark: edges are directed according to how solutions should propagate.
 	 *
 	 * Remark: a spacer on readA can be connected to multiple spacers on readB, and vice
 	 * versa.
@@ -8434,12 +8458,12 @@ public class RepeatAlphabet {
 				tmpCharacter.end=spacer.solutions[i+2];
 				tmpCharacter.length=0;
 				if (blockID==0) {
-					if (tmpCharacter.orientation) tmpCharacter.openStart=first>distanceThreshold;
-					else tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+					if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
+					else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
 				} 
 				else if (blockID==nBlocks-1) {
-					if (tmpCharacter.orientation) tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
-					else tmpCharacter.openStart=first>distanceThreshold;
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+					else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 				}
 				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
 			}
@@ -8576,12 +8600,12 @@ public class RepeatAlphabet {
 				tmpCharacter.end=spacer.solutions[i+2];
 				tmpCharacter.length=0;
 				if (blockID==0) {
-					if (tmpCharacter.orientation) tmpCharacter.openStart=first>distanceThreshold;
-					else tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+					if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
+					else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
 				} 
 				else if (blockID==nBlocks-1) {
-					if (tmpCharacter.orientation) tmpCharacter.openEnd=last<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
-					else tmpCharacter.openStart=first>distanceThreshold;
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+					else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 				}
 				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
 			}
