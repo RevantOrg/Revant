@@ -53,6 +53,9 @@ function kmersThread() {
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$5
 	local LOCAL_KMERS_FILE=$6
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_KMERS_FILE}
+	if [ $? -ne 0 ]; then
+		exit
+	fi
 }
 
 function intervalsThread() {
@@ -64,6 +67,9 @@ function intervalsThread() {
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$6
 	local LOCAL_INTERVALS_FILE=$7
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
+	if [ $? -ne 0 ]; then
+		exit
+	fi
 }
 
 FINAL_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
@@ -122,6 +128,9 @@ function tandemsThread() {
 	local LOCAL_READ_LENGTHS_FILE=$3
 	local LOCAL_TANDEMS_FILE=$4
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
+	if [ $? -ne 0 ]; then
+		exit
+	fi
 }
 echo "Collecting tandems..."
 for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do

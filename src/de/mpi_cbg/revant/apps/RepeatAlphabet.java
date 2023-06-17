@@ -7945,9 +7945,9 @@ public class RepeatAlphabet {
 		final int nTranslatedReads = translated.length;
 		int[] lengthHistogram;
 		
-		if (spacers!=null) spacers = new Spacer[CAPACITY];
+		if (spacers==null) spacers = new Spacer[CAPACITY];
 		lastSpacer=-1;
-		lengthHistogram = new int[100];  // Arbitrary
+		lengthHistogram = new int[11];  // Arbitrary, multiples of $IO.quantum$.
 		Math.set(lengthHistogram,lengthHistogram.length-1,0);
 		for (i=0; i<nTranslatedReads; i++) {
 			nBlocks=translation_all[i].length;
@@ -7955,46 +7955,49 @@ public class RepeatAlphabet {
 			readID=translated[i];
 			for (j=0; j<lastTandem[readID]; j+=2) {
 				block=tandems[i][j]-1;
-				cell=block>>>3; mask=1<<(block&LAST_THREE_BITS);
-				if ((isBlockUnique_all[i][cell]&mask)!=0) {
-					first=block==0?0:boundaries_all[i][block-1];
-					last=block==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[i][block];
-					length=last-first+1;
-					lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
-					if (spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=block) {
-						lastSpacer++;
-						if (lastSpacer==spacers.length) {
-							Spacer[] newArray = new Spacer[spacers.length<<1];
-							System.arraycopy(spacers,0,newArray,0,spacers.length);
-							spacers=newArray;
+				if (block>=0) {
+					cell=block>>>3; mask=1<<(block&LAST_THREE_BITS);
+					if ((isBlockUnique_all[i][cell]&mask)!=0) {
+						first=block==0?0:boundaries_all[i][block-1];
+						last=block==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[i][block];
+						length=last-first+1;
+						lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
+						if (lastSpacer==-1 || spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=block) {
+							lastSpacer++;
+							if (lastSpacer==spacers.length) {
+								Spacer[] newArray = new Spacer[spacers.length<<1];
+								System.arraycopy(spacers,0,newArray,0,spacers.length);
+								spacers=newArray;
+							}
+							if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
+							else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
 						}
-						if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
-						else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
 					}
 				}
 				block=tandems[i][j+1]+1;
-				if (block==nBlocks) continue;
-				cell=block>>>3; mask=1<<(block&LAST_THREE_BITS);
-				if ((isBlockUnique_all[i][cell]&mask)!=0) {
-					first=block==0?0:boundaries_all[i][block-1];
-					last=block==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[i][block];
-					length=last-first+1;;
-					lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
-					if (spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=block) {
-						lastSpacer++;
-						if (lastSpacer==spacers.length) {
-							Spacer[] newArray = new Spacer[spacers.length<<1];
-							System.arraycopy(spacers,0,newArray,0,spacers.length);
-							spacers=newArray;
+				if (block<nBlocks) {
+					cell=block>>>3; mask=1<<(block&LAST_THREE_BITS);
+					if ((isBlockUnique_all[i][cell]&mask)!=0) {
+						first=block==0?0:boundaries_all[i][block-1];
+						last=block==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[i][block];
+						length=last-first+1;;
+						lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
+						if (lastSpacer==-1 || spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=block) {
+							lastSpacer++;
+							if (lastSpacer==spacers.length) {
+								Spacer[] newArray = new Spacer[spacers.length<<1];
+								System.arraycopy(spacers,0,newArray,0,spacers.length);
+								spacers=newArray;
+							}
+							if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
+							else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
 						}
-						if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
-						else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
 					}
 				}
 			}
 		}
-		System.err.println("Loaded "+(lastSpacer+1)+" spacers ("+(((double)(lastSpacer+1))/nTranslatedReads)+" per translated read).");
-		System.err.println("Histogram of all observed spacer lengths:");
+		System.err.println("Loaded "+(lastSpacer+1)+" tandem spacers ("+(((double)(lastSpacer+1))/nTranslatedReads)+" per translated read).");
+		System.err.println("Histogram of all observed tandem spacer lengths:");
 		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);		
 	}
 	
@@ -8107,7 +8110,7 @@ public class RepeatAlphabet {
 				}
 				// Adding solutions
 				if (fullyContainedB) addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
-				else {						
+				else {
 					last=translation_all[readBPrime].length-2;	
 					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
 					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
@@ -8265,7 +8268,7 @@ public class RepeatAlphabet {
 	 */
 	private static final void addSpacerSolutions(Spacer spacer, boolean fullyContainedB, int readB, int blockB, int alignmentFirstB, int alignmentLastB, int readLengthB) {
 		int i, c;
-		int length, blockFirst, blockLast;
+		int length, nBlocks, blockFirst, blockLast;
 		Character tmpChar;
 		
 		if (fullyContainedB) {
@@ -8276,12 +8279,14 @@ public class RepeatAlphabet {
 			}
 		}
 		else {
+			nBlocks=translation_all[readB].length;
 			length=translation_all[readB][blockB].length;
 			for (i=0; i<length; i++) {
 				c=translation_all[readB][blockB][i];
-				if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
+				if (c<=lastUnique || c>lastAlphabet) continue;
+				else if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
 				else {
-					blockLast=blockB==length-1?readLengthB-1:boundaries_all[readB][blockB];
+					blockLast=blockB==nBlocks-1?readLengthB-1:boundaries_all[readB][blockB];
 					if (alignmentLastB>blockLast) alignmentLastB=blockLast;
 					blockFirst=blockB==0?0:boundaries_all[readB][blockB-1];
 					if (alignmentFirstB<blockFirst) alignmentFirstB=blockFirst;
@@ -8317,21 +8322,22 @@ public class RepeatAlphabet {
 		for (i=0; i<tmpArray.length; i++) tmpArray[i] = new SpacerSolution();
 		for (i=0; i<=lastSpacer; i++) {
 			if (tmpArray.length<spacers[i].lastSolution+1) {
-				SpacerSolution[] newArray = new SpacerSolution[tmpArray.length<<1];
+				SpacerSolution[] newArray = new SpacerSolution[spacers[i].lastSolution+1];
 				System.arraycopy(tmpArray,0,newArray,0,tmpArray.length);
-				for (i=tmpArray.length; i<newArray.length; i++) newArray[i] = new SpacerSolution();
+				for (j=tmpArray.length; j<newArray.length; j++) newArray[j] = new SpacerSolution();
 				tmpArray=newArray;
 			}
 			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
+			spacers[i].flag=spacers[i].lastSolution!=-1;
+			spacers[i].breakpoint=-1;  // Used as a flag
 		}
 		
-		// Propagating solutions
+		// Propagating solutions to spacers without solutions
 		nPropagated=0;
-		for (i=0; i<=lastSpacer; i++) spacers[i].breakpoint=-1;  // Used as a flag
 		if (stack==null || stack.length<lastSpacer+1) stack = new int[lastSpacer+1];
 		for (i=0; i<=lastSpacer; i++) {
-			if (spacers[i].lastSolution==-1) continue;
-			stack[0]=i; top=0;
+			if (!spacers[i].flag) continue;
+			stack[0]=i; top=0; spacers[i].breakpoint=i;
 			while (top>=0) {
 				currentSpacer=stack[top--];
 				last=lastSpacerNeighbor[currentSpacer];
@@ -8339,26 +8345,30 @@ public class RepeatAlphabet {
 					neighbor=(int)spacerNeighbors[currentSpacer][j];
 					if (neighbor<0) { orientation=false; neighbor=-1-neighbor; }
 					else orientation=true;
-					if (spacers[neighbor].breakpoint==i) continue;
+					if (spacers[neighbor].flag || spacers[neighbor].breakpoint==i) continue;
+					spacers[neighbor].breakpoint=i;
 					if (spacers[neighbor].addSolutions(spacers[currentSpacer],(int)spacerNeighbors[currentSpacer][j+1],(int)spacerNeighbors[currentSpacer][j+2],orientation)) nPropagated++;
 					stack[++top]=neighbor;
 				}
-				spacers[currentSpacer].breakpoint=i;
 			}
 		}
-		System.err.println(nPropagated+" spacers with no solution, acquired a solution after propagation ("+((100.0*nPropagated)/(lastSpacer+1))+"%).");
+		System.err.println(nPropagated+" tandem spacers with no solution, acquired a solution after propagation ("+((100.0*nPropagated)/(lastSpacer+1))+"%).");
 		
 		// Making propagated solutions consistent
 		nSolved=0;
 		for (i=0; i<=lastSpacer; i++) {
+			if (spacers[i].flag) {
+				nSolved++;
+				continue;
+			}
 			if (tmpArray.length<spacers[i].lastSolution+1) {
-				SpacerSolution[] newArray = new SpacerSolution[tmpArray.length<<1];
+				SpacerSolution[] newArray = new SpacerSolution[spacers[i].lastSolution+1];
 				System.arraycopy(tmpArray,0,newArray,0,tmpArray.length);
-				for (i=tmpArray.length; i<newArray.length; i++) newArray[i] = new SpacerSolution();
+				for (j=tmpArray.length; j<newArray.length; j++) newArray[j] = new SpacerSolution();
 				tmpArray=newArray;
 			}
 			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
-			if (spacers[i].lastSolution>=0) nSolved++;
+			if (spacers[i].lastSolution!=-1) nSolved++;
 		}
 		
 		return nSolved>=(lastSpacer+1)*THRESHOLD; 
@@ -8369,7 +8379,9 @@ public class RepeatAlphabet {
 	 * Similar to $fixPeriodicEndpoints_collectCharacterInstances()$. Alters an existing 
 	 * read translation using tandem spacer solutions. Every new character instance that 
 	 * is not already in $alphabet$ is written to $bw$. Every character in $alphabet$ that
-	 * is used in the new translation is marked in $used$.	
+	 * is used in the new translation is marked in $used$.
+	 *
+	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
 	 * 
 	 * @param used same size as $alphabet$;
 	 * @param spacersCursor current position in $spacers$;
@@ -8406,12 +8418,12 @@ public class RepeatAlphabet {
 		// Building characters from spacers
 		for (i=0; i<=lastTandem; i+=2) {
 			blockID=tmpArray[i]-1;
-			if (blockID>=0 && !tmpBoolean[blockID]) {
+			if (blockID>=0 && isBlockUnique[blockID] && !tmpBoolean[blockID]) {
 				spacersCursor=tandemSpacers_collectCharacterInstances_impl(readID,blockID,boundaries,nBlocks,readLength,spacersCursor,distanceThreshold,QUANTUM,used,bw,tmpCharacter);
 				tmpBoolean[blockID]=true;
 			}
 			blockID=tmpArray[i+1]+1;
-			if (blockID<nBlocks && !tmpBoolean[blockID]) {
+			if (blockID<nBlocks && isBlockUnique[blockID]) {
 				spacersCursor=tandemSpacers_collectCharacterInstances_impl(readID,blockID,boundaries,nBlocks,readLength,spacersCursor,distanceThreshold,QUANTUM,used,bw,tmpCharacter);
 				tmpBoolean[blockID]=true;
 			}
@@ -8494,6 +8506,8 @@ public class RepeatAlphabet {
 	 * every existing and new character induced by solving a tandem spacer, and keeps a 
 	 * tandem spacer with no solution intact.
 	 *
+	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
+	 *
 	 * @param out the procedure cumulates the number of spacers fixed at every length 
 	 * (multiple of $IO.quantum$);
 	 * @param tmpArray temporary space, with a number of cells at least equal to the 
@@ -8535,9 +8549,9 @@ public class RepeatAlphabet {
 		// Marking spacer blocks
 		for (i=0; i<=lastTandem; i+=2) {
 			blockID=tmpArray[i]-1;
-			if (blockID>=0) tmpBoolean[blockID]=true;
+			if (blockID>=0 && isBlockUnique[blockID]) tmpBoolean[blockID]=true;
 			blockID=tmpArray[i+1]+1;
-			if (blockID<nBlocks) tmpBoolean[blockID]=true;
+			if (blockID<nBlocks && isBlockUnique[blockID]) tmpBoolean[blockID]=true;
 		}
 		
 		// Recoding characters
@@ -8566,8 +8580,8 @@ public class RepeatAlphabet {
 		read2characters_new.newLine();
 		return spacersCursor;
 	}
-		
-		
+	
+	
 	/**
 	 * Identical to $tandemSpacers_collectCharacterInstances_impl()$.
 	 */
@@ -9125,6 +9139,11 @@ public class RepeatAlphabet {
 		 * Index of the non-repetitive block (if any) in the translation of $read$.
 		 */
 		public int blockID;
+		
+		/**
+		 * Temporary space
+		 */
+		public boolean flag;
 		
 		public Spacer() { }
 		

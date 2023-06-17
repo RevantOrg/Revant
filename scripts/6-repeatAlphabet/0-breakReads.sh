@@ -39,6 +39,9 @@ function alignmentsThread1() {
 	local ALIGNMENTS_FILE_ID=$1
 	local WRITE_HEADER=$2
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 1 ${WRITE_HEADER} ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}.txt
+	if [ $? -ne 0 ]; then
+		exit
+	fi
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
@@ -71,6 +74,9 @@ function alignmentsThread2() {
 	local ALIGNMENTS_FILE_ID=$1
 	local WRITE_HEADER=$2
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 0 ${WRITE_HEADER} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID}.txt
+	if [ $? -ne 0 ]; then
+		exit
+	fi
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))

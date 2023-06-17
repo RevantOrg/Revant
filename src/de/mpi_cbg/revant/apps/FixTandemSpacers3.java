@@ -22,6 +22,8 @@ public class FixTandemSpacers3 {
 		final String READ2BOUNDARIES_FILE_OLD = args[7];  // Of a chunk of reads
 		final String READ2CHARACTERS_FILE_NEW = args[8];  // Of a chunk of reads
 		final String TANDEMS_FILE = args[9];  // Of a chunk of reads
+		final String REPEAT_LENGTHS_FILE = args[10];
+		final int N_REPEATS = Integer.parseInt(args[11]);
 		
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		
@@ -34,6 +36,7 @@ public class FixTandemSpacers3 {
 		int[] histogram, tmpArray;
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
 		
+		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,2);
 		oldAlphabet=RepeatAlphabet.alphabet;
 		lastUnique_old=RepeatAlphabet.lastUnique;

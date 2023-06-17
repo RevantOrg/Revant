@@ -26,7 +26,9 @@ public class FixTandemSpacers2 {
 		final String TRANSLATED_READS_CHARACTERS_FILE = args[5];  // Of a chunk of reads
 		final String TRANSLATED_READS_BOUNDARIES_FILE = args[6];  // Of a chunk of reads
 		final String TANDEMS_FILE = args[7];  // Of a chunk of reads
-		final String OUTPUT_FILE = args[8];  // Of a chunk of reads
+		final String REPEAT_LENGTHS_FILE = args[8];
+		final int N_REPEATS = Integer.parseInt(args[9]);		
+		final String OUTPUT_FILE = args[10];  // Of a chunk of reads
 		
 		final int CAPACITY = 100;  // Arbitrary
 		final int DISTANCE_THRESHOLD = IO.quantum;
@@ -40,6 +42,7 @@ public class FixTandemSpacers2 {
 		boolean[] used, isBlockPeriodic, isBlockNonperiodic;
 		int[] tmpArray;
 		
+		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
 		RepeatAlphabet.deserializeSpacers(SPACERS_FILE,N_SPACERS);
 		used = new boolean[RepeatAlphabet.lastAlphabet+2];

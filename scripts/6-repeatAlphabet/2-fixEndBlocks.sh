@@ -46,6 +46,9 @@ function kmersThread() {
 	local LOCAL_READ_LENGTHS_FILE=$4
 	local LOCAL_KMERS_FILE=$5
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null ${LOCAL_KMERS_FILE}
+	if [ $? -ne 0 ]; then
+		exit
+	fi
 }
 
 function fixThread() {
@@ -57,6 +60,9 @@ function fixThread() {
 	local LOCAL_NEW_TRANSLATED_FILE=$6
 	local LOCAL_STATS_FILE=$7
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixEndBlocks ${ALPHABET_FILE} ${LOCAL_OLD_TRANSLATED_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${LOCAL_KMERS_FILE} ${LOCAL_K} ${TIGHT_MODE} ${LOCAL_NEW_TRANSLATED_FILE} ${LOCAL_STATS_FILE}
+	if [ $? -ne 0 ]; then
+		exit
+	fi
 }
 
 rm -f "${TMPFILE_PATH}-1-*"
