@@ -37,7 +37,7 @@ MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than t
 # ------------------------ Properties of alignment filters -------------------------------
 ALIGNMENT_FILTERING_MODE="0"  # 0=loose, 1=tight, 2=tight with matching characters.
 # ----------------------------------- Resources ------------------------------------------
-N_THREADS="4"
+N_THREADS="1"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 DELETE_TMP_FILES="1"
 # ----------------------------------------------------------------------------------------

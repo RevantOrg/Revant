@@ -33,7 +33,7 @@ public class FixTandemSpacers3 {
 		BufferedReader br1, br2, br3, br4, br5;
 		BufferedWriter bw;
 		RepeatAlphabet.Character tmpCharacter = new RepeatAlphabet.Character();
-		int[] histogram, tmpArray;
+		int[] histogram;
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
 		
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
@@ -50,7 +50,6 @@ public class FixTandemSpacers3 {
 		RepeatAlphabet.deserializeSpacers(SPACERS_FILE,N_SPACERS);
 		histogram = new int[21];  // Arbitrary
 		Math.set(histogram,0,histogram.length-1);
-		tmpArray = new int[100];  // Arbitrary
 		br1 = new BufferedReader(new FileReader(READ_IDS_FILE));
 		br2 = new BufferedReader(new FileReader(READ_LENGTHS_FILE));
 		br3 = new BufferedReader(new FileReader(READ2CHARACTERS_FILE_OLD));
@@ -60,9 +59,10 @@ public class FixTandemSpacers3 {
 		i=0; j=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		while (str1!=null) {
-			nBlocks=1+((str4.length()+1)>>1);  // Loose upper bound
-			if (tmpArray.length<nBlocks) tmpArray = new int[nBlocks];			
-			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,oldAlphabet,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw,DISTANCE_THRESHOLD,histogram,tmpCharacter,tmpArray);
+System.err.println("Translating read: "+str1);			
+System.err.println(str3);
+System.err.println(str4);
+			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,oldAlphabet,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw,DISTANCE_THRESHOLD,histogram,tmpCharacter);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		}
 		br1.close(); br2.close(); br3.close(); br4.close(); br5.close(); bw.close();

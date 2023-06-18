@@ -8298,6 +8298,13 @@ public class RepeatAlphabet {
 						if (alphabet[c].orientation) spacer.addSolution(alphabet[c].repeat,Alignments.orientation,alphabet[c].start+(alignmentFirstB-blockFirst),alphabet[c].start+(alignmentLastB-blockFirst),false);
 						else spacer.addSolution(alphabet[c].repeat,!Alignments.orientation,alphabet[c].end-(alignmentLastB-blockFirst),alphabet[c].end-(alignmentFirstB-blockFirst),false);
 					}
+					
+if (spacer.solutions[spacer.lastSolution-1]<0 || spacer.solutions[spacer.lastSolution]<0) {
+	System.err.println("ERROR: added a negative solution to spacer "+spacer);
+	System.err.println("solutions: "+spacer.printSolutions());
+	System.exit(1);
+}
+					
 				}
 			}
 		}
@@ -8396,7 +8403,15 @@ public class RepeatAlphabet {
 		int blockID, nBlocks, lastTandem;
 		
 		// Loading the input
-		if (read2tandems.length()==0) return spacersCursor;
+		nBlocks=loadBlocks(read2characters);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
+		if (read2tandems.length()==0) {
+			for (i=0; i<nBlocks; i++) {
+				for (j=0; j<=lastInBlock_int[i]; j++) used[intBlocks[i][j]]=true;
+			}
+			return spacersCursor;
+		}
+		loadBoundaries(read2boundaries);
 		i=0; p=read2tandems.indexOf(SEPARATOR);
 		while (p>=0) {
 			i++;
@@ -8409,11 +8424,8 @@ public class RepeatAlphabet {
 			p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
 		}
 		tmpArray[++i]=Integer.parseInt(read2tandems.substring(p));
-		loadBoundaries(read2boundaries);
-		nBlocks=loadBlocks(read2characters);
 		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
 		Math.set(tmpBoolean,nBlocks-1,false);
-		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
 		
 		// Building characters from spacers
 		for (i=0; i<=lastTandem; i+=2) {
@@ -8469,6 +8481,7 @@ public class RepeatAlphabet {
 				tmpCharacter.start=spacer.solutions[i+1];
 				tmpCharacter.end=spacer.solutions[i+2];
 				tmpCharacter.length=0;
+				tmpCharacter.openStart=false; tmpCharacter.openEnd=false;
 				if (blockID==0) {
 					if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 					else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
@@ -8477,10 +8490,10 @@ public class RepeatAlphabet {
 					if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
 					else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 				}
-				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
 			}
 			else {
 				tmpCharacter.length=last-first+1;
+				tmpCharacter.openStart=false; tmpCharacter.openEnd=false;
 				if (blockID==0) {
 					if (tmpCharacter.orientation) tmpCharacter.openStart=true;
 					else tmpCharacter.openEnd=true;
@@ -8489,9 +8502,9 @@ public class RepeatAlphabet {
 					if (tmpCharacter.orientation) tmpCharacter.openEnd=true;
 					else tmpCharacter.openStart=true;
 				}
-				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
 			}
 			tmpCharacter.quantize(quantum);
+if (readID==6) System.err.println("VITTU> read "+readID+" creates the following spacer character instance from blockID="+blockID+": "+tmpCharacter);			
 			if (tmpCharacter.start==-1) j=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,tmpCharacter);
 			else j=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,tmpCharacter);
 			if (j>=0) used[j]=true;
@@ -8508,71 +8521,80 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
 	 *
+	 * Remark: the procedure uses global arrays $stack,tmpBoolean$.
+	 *
 	 * @param out the procedure cumulates the number of spacers fixed at every length 
 	 * (multiple of $IO.quantum$);
-	 * @param tmpArray temporary space, with a number of cells at least equal to the 
-	 * number of blocks;
 	 * @return the new value of $spacersCursor$.
 	 */
-	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, int distanceThreshold, int[] out, Character tmpCharacter, int[] tmpArray) throws IOException {
+	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, int distanceThreshold, int[] out, Character tmpCharacter) throws IOException {
+		final int CAPACITY = 100;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		final String SEPARATOR = ",";
 		int i, j, p, q, c;
-		int blockID, nBlocks, last, lastTandem;
+		int blockID, nBlocks, last;
 		
-		// Loading the input
+		// Loading the input and marking spacer blocks
 		if (read2characters_old.length()==0) {
 			read2characters_new.newLine();
 			return spacersCursor;
 		}
-		if (read2tandems_old.length()>=0) {
-			i=0; p=read2tandems_old.indexOf(SEPARATOR);
-			while (p>=0) {
-				i++;
-				p=read2tandems_old.indexOf(SEPARATOR,p+1);
-			}
-			lastTandem=i;
-			i=-1; p=0; q=read2tandems_old.indexOf(SEPARATOR);
-			while (q>=0) {
-				tmpArray[++i]=Integer.parseInt(read2tandems_old.substring(p,q));
-				p=q+1; q=read2tandems_old.indexOf(SEPARATOR,p);
-			}
-			tmpArray[++i]=Integer.parseInt(read2tandems_old.substring(p));
-		}
-		else lastTandem=-1;
 		loadBoundaries(read2boundaries_old);
 		nBlocks=loadBlocks(read2characters_old);
 		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
 		Math.set(tmpBoolean,nBlocks-1,false);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
-		
-		// Marking spacer blocks
-		for (i=0; i<=lastTandem; i+=2) {
-			blockID=tmpArray[i]-1;
-			if (blockID>=0 && isBlockUnique[blockID]) tmpBoolean[blockID]=true;
-			blockID=tmpArray[i+1]+1;
+		if (read2tandems_old.length()>0) {
+			i=-1; p=0; q=read2tandems_old.indexOf(SEPARATOR);
+			while (q>=0) {
+				i++;
+				if (i%2==0)  {
+					blockID=Integer.parseInt(read2tandems_old.substring(p,q))-1;
+					if (blockID>=0 && isBlockUnique[blockID]) tmpBoolean[blockID]=true;
+				}
+				else {
+					blockID=Integer.parseInt(read2tandems_old.substring(p,q))+1;
+					if (blockID<nBlocks && isBlockUnique[blockID]) tmpBoolean[blockID]=true;
+				}
+				p=q+1; q=read2tandems_old.indexOf(SEPARATOR,p);
+			}
+			blockID=Integer.parseInt(read2tandems_old.substring(p))+1;
 			if (blockID<nBlocks && isBlockUnique[blockID]) tmpBoolean[blockID]=true;
 		}
 		
 		// Recoding characters
+		if (stack==null || stack.length==0) stack = new int[CAPACITY];
 		for (i=0; i<nBlocks; i++) {
-			if (tmpBoolean[i]) spacersCursor=tandemSpacers_updateTranslation_impl(readID,i,boundaries,nBlocks,readLength,spacersCursor,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,distanceThreshold,QUANTUM,read2characters_new,out,tmpArray,tmpCharacter);
+			if (tmpBoolean[i]) spacersCursor=tandemSpacers_updateTranslation_spacerBlock(readID,i,boundaries,nBlocks,readLength,spacersCursor,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,distanceThreshold,QUANTUM,read2characters_new,out,tmpCharacter);
 			else {
 				last=lastInBlock[i];
 				p=-1;
 				for (j=0; j<=last; j++) {			
 					c=Integer.parseInt(blocks[i][j]);
 					if (c<0) c=-1-c;
-					if (c==lastAlphabet_old+1) tmpArray[++p]=lastAlphabet_new+1;
+					if (c==lastAlphabet_old+1) {
+						p++;
+						if (p==stack.length) {
+							int[] newArray = new int[stack.length<<1];
+							System.arraycopy(stack,0,newArray,0,stack.length);
+							stack=newArray;
+						}
+						stack[p]=lastAlphabet_new+1;
+					}
 					else {
 						tmpCharacter.copyFrom(alphabet_old[c]);
-						p=fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,tmpArray,p);
+						q=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,p);
+						if (q==p) {
+							System.err.println("tandemSpacers_updateTranslation> ERROR: character in non-spacer block not found in the new alphabet: read="+readID+" block="+i+" character="+tmpCharacter);
+							System.exit(1);
+						}
+						p=q;
 					}
 				}
-				if (p>0) Arrays.sort(tmpArray,0,p+1);
-				read2characters_new.write(tmpArray[0]+"");
+				if (p>0) Arrays.sort(stack,0,p+1);
+				read2characters_new.write(stack[0]+"");
 				for (j=1; j<=p; j++) {
-					if (tmpArray[j]!=tmpArray[j-1]) read2characters_new.write(SEPARATOR_MINOR+""+tmpArray[j]);
+					if (stack[j]!=stack[j-1]) read2characters_new.write(SEPARATOR_MINOR+""+stack[j]);
 				}
 			}
 			if (i<nBlocks-1) read2characters_new.write(SEPARATOR_MAJOR+"");
@@ -8583,9 +8605,10 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Identical to $tandemSpacers_collectCharacterInstances_impl()$.
+	 * Identical to $tandemSpacers_collectCharacterInstances_impl()$, but uses global 
+	 * array $stack$ for temporary space.
 	 */
-	private static final int tandemSpacers_updateTranslation_impl(int readID, int blockID, int[] boundaries, int nBlocks, int readLength, int spacersCursor, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int distanceThreshold, int quantum, BufferedWriter bw, int[] out, int[] tmpArray, Character tmpCharacter) throws IOException {
+	private static final int tandemSpacers_updateTranslation_spacerBlock(int readID, int blockID, int[] boundaries, int nBlocks, int readLength, int spacersCursor, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int distanceThreshold, int quantum, BufferedWriter bw, int[] out, Character tmpCharacter) throws IOException {
 		int i, p;
 		int first, last, lastSolution;
 		Spacer spacer;
@@ -8594,7 +8617,7 @@ public class RepeatAlphabet {
 		last=blockID==nBlocks-1?readLength-1:boundaries[blockID];
 		while (spacersCursor<=lastSpacer && spacers[spacersCursor].read<readID) spacersCursor++;
 		if (spacersCursor>lastSpacer || spacers[spacersCursor].read>readID || spacers[spacersCursor].first>first) {
-			System.err.println("tandemSpacers_updateTranslation_impl> ERROR: spacer not found: "+readID+"["+first+".."+last+"]");
+			System.err.println("tandemSpacers_updateTranslation_spacerBlock> ERROR: spacer not found: "+readID+"["+first+".."+last+"]");
 			System.exit(1);
 		}
 		spacer=spacers[spacersCursor];
@@ -8613,6 +8636,7 @@ public class RepeatAlphabet {
 				tmpCharacter.start=spacer.solutions[i+1];
 				tmpCharacter.end=spacer.solutions[i+2];
 				tmpCharacter.length=0;
+				tmpCharacter.openStart=false; tmpCharacter.openEnd=false;
 				if (blockID==0) {
 					if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 					else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
@@ -8621,10 +8645,10 @@ public class RepeatAlphabet {
 					if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
 					else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 				}
-				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
 			}
 			else {
 				tmpCharacter.length=last-first+1;
+				tmpCharacter.openStart=false; tmpCharacter.openEnd=false;
 				if (blockID==0) {
 					if (tmpCharacter.orientation) tmpCharacter.openStart=true;
 					else tmpCharacter.openEnd=true;
@@ -8633,10 +8657,11 @@ public class RepeatAlphabet {
 					if (tmpCharacter.orientation) tmpCharacter.openEnd=true;
 					else tmpCharacter.openStart=true;
 				}
-				else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
 			}
 			tmpCharacter.quantize(quantum);
-			p=fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,tmpArray,p);
+System.err.println("VITTU> 1  calling tandemSpacers_updateTranslation_impl() on readID="+readID+" blockID="+blockID+" tmpCharacter="+tmpCharacter+" first="+first+" last="+last+" repeatLength="+repeatLengths[tmpCharacter.repeat]);
+System.err.println("solutions: "+spacer.printSolutions());
+			p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p);
 			out[Math.min((tmpCharacter.start==-1?tmpCharacter.length:tmpCharacter.end-tmpCharacter.start+1)/IO.quantum,out.length-1)]++;
 		}
 		if (p==-1) {  // Spacer with no solution
@@ -8644,16 +8669,139 @@ public class RepeatAlphabet {
 			tmpCharacter.orientation=true;
 			tmpCharacter.start=-1; tmpCharacter.end=-1;
 			tmpCharacter.length=last-first+1;
+			tmpCharacter.openStart=false; tmpCharacter.openEnd=false;
 			if (blockID==0) tmpCharacter.openStart=true;
 			else if (blockID==nBlocks-1) tmpCharacter.openEnd=true;
-			else { tmpCharacter.openStart=false; tmpCharacter.openEnd=false; }
 			tmpCharacter.quantize(quantum);
-			p=fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,tmpArray,p);
+			p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p);
 		}
-		bw.write(tmpArray[0]);
-		for (i=1; i<=p; i++) bw.write(SEPARATOR_MINOR+""+tmpArray[p]);
+		bw.write(stack[0]);
+		for (i=1; i<=p; i++) bw.write(SEPARATOR_MINOR+""+stack[p]);
 		return spacersCursor;
 	}
+	
+	
+	/**
+	 * Similar to $fixPeriodicEndpoints_updateTranslation_impl()$, but writes the output 
+	 * to global array $stack[last+1..]$, and returns all implying characters, rather
+	 * than the exact match, for nonperiodic repeats.
+	 *
+	 * @return the new value of $last$.
+	 */
+	private static final int tandemSpacers_updateTranslation_impl(Character character, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int quantum, int last) {
+		int p;
+		
+		if (character.repeat==UNIQUE) {
+			p=fixPeriodicEndpoints_lookupUnique(character,newAlphabet,lastUnique_new,lastAlphabet_new);
+			last++;
+			if (last==stack.length) {
+				int[] newArray = new int[stack.length<<1];
+				System.arraycopy(stack,0,newArray,0,stack.length);
+				stack=newArray;
+			}
+			stack[last]=p;
+		}
+		else if (character.start==-1) {
+			p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
+			if (p==Math.NEGATIVE_INFINITY) {
+				character.length+=quantum;
+				p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
+				character.length-=quantum;
+			}
+			if (p==Math.NEGATIVE_INFINITY) {
+				character.length-=quantum;
+				p=fixPeriodicEndpoints_lookupPeriodic(character,newAlphabet,lastUnique_new,lastPeriodic_new);
+				character.length+=quantum;
+			}
+			if (p==Math.NEGATIVE_INFINITY) {
+				System.err.println("tandemSpacers_updateTranslation_impl> ERROR: periodic character not found in the new alphabet\n query: "+character);
+				System.exit(1);
+			}
+			last++;
+			if (last==stack.length) {
+				int[] newArray = new int[stack.length<<1];
+				System.arraycopy(stack,0,newArray,0,stack.length);
+				stack=newArray;
+			}
+			stack[last]=p;
+		}
+		else {
+			p=tandemSpacers_lookupNonperiodic(character,newAlphabet,lastPeriodic_new,lastAlphabet_new,last);
+			if (p==last) {
+				System.err.println("tandemSpacers_updateTranslation_impl> ERROR: non-periodic character not found in the new alphabet\n query: "+character);
+				System.exit(1);
+			}
+			last=p;
+		}
+		return last;
+	}
+	
+	
+	/**
+	 * Similar to $translate()$, but writes to global array $stack$. If $X$ is half-open,
+	 * the procedure writes to $stack[outLast+1..]$ the sorted list of all characters in 
+	 * $newAlphabet$ that are similar to or imply $X$; if $X$ is closed, the procedure 
+	 * writes the closed character in $newAlphabet$ that is identical to $X$.
+	 *
+	 * @return the new value of $outLast$.
+	 */
+	private static final int tandemSpacers_lookupNonperiodic(Character character, Character[] newAlphabet, int lastPeriodic_new, int lastAlphabet_new, int outLast) {
+		final boolean orientation = character.orientation;
+		int i, p;
+		int last;
+		final int repeat = character.repeat;
+		
+		last=outLast;
+		p=Arrays.binarySearch(newAlphabet,lastPeriodic_new+1,lastAlphabet_new+1,character);
+		if (p>=0) {
+			last++;
+			if (last==stack.length) {
+				int[] newArray = new int[stack.length<<1];
+				System.arraycopy(stack,0,newArray,0,stack.length);
+				stack=newArray;
+			}
+			stack[last]=p;
+		}
+		else if (character.isOpen()) {
+			p=-1-p;
+			for (i=p; i<=lastAlphabet; i++) {
+				if (alphabet[i].repeat!=character.repeat || alphabet[i].orientation!=character.orientation) break;
+				if (alphabet[i].implies(character)) {
+					last++;
+					if (last==stack.length) {
+						int[] newArray = new int[stack.length<<1];
+						System.arraycopy(stack,0,newArray,0,stack.length);
+						stack=newArray;
+					}
+					stack[last]=i;
+				}
+			}
+			for (i=p-1; i>lastPeriodic; i--) {
+				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation) break;
+				if (alphabet[i].implies(character)) {
+					last++;
+					if (last==stack.length) {
+						int[] newArray = new int[stack.length<<1];
+						System.arraycopy(stack,0,newArray,0,stack.length);
+						stack=newArray;
+					}
+					stack[last]=i;
+				}
+			}
+			if (last>outLast+1) {
+				Arrays.sort(stack,outLast+1,last+1);
+				p=outLast+1;
+				for (i=outLast+2; i<=last; i++) {
+					if (stack[i]!=stack[p]) stack[++p]=stack[i];
+				}
+				last=p;
+			}
+		}
+		return last;
+	}
+	
+	
+	
 	
 	
 	
@@ -9320,6 +9468,12 @@ public class RepeatAlphabet {
 		}
 		
 		public String toString() { return read+"["+first+".."+breakpoint+".."+last+"] ("+blockID+")"; }
+		
+		public String printSolutions() {
+			String out = "";
+			for (int i=0; i<=lastSolution; i+=3) out+=solutions[i]+"["+solutions[i+1]+".."+solutions[i+2]+"] ";
+			return out;
+		}
 		
 		public void serialize(BufferedWriter bw) throws IOException {
 			bw.write(read+""+SEPARATOR_MINOR);
