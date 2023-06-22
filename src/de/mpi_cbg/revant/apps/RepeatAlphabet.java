@@ -8267,8 +8267,10 @@ public class RepeatAlphabet {
 	 * @param blockB ID of a block in $translation_all[readB]$.
 	 */
 	private static final void addSpacerSolutions(Spacer spacer, boolean fullyContainedB, int readB, int blockB, int alignmentFirstB, int alignmentLastB, int readLengthB) {
+		final int MIN_SOLUTION_LENGTH = (spacer.last-spacer.first+1)-IO.quantum;
+		boolean repeatOrientation;
 		int i, c;
-		int length, nBlocks, blockFirst, blockLast;
+		int length, nBlocks, blockFirst, blockLast, repeatFirst, repeatLast;
 		Character tmpChar;
 		
 		if (fullyContainedB) {
@@ -8286,25 +8288,41 @@ public class RepeatAlphabet {
 				if (c<=lastUnique || c>lastAlphabet) continue;
 				else if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
 				else {
+					blockFirst=blockB==0?0:boundaries_all[readB][blockB-1];
 					blockLast=blockB==nBlocks-1?readLengthB-1:boundaries_all[readB][blockB];
 					if (alignmentLastB>blockLast) alignmentLastB=blockLast;
-					blockFirst=blockB==0?0:boundaries_all[readB][blockB-1];
+					else if (alignmentLastB<blockFirst) alignmentLastB=blockFirst;
 					if (alignmentFirstB<blockFirst) alignmentFirstB=blockFirst;
+					else if (alignmentFirstB>blockLast) alignmentFirstB=blockLast;
 					if (blockB==0) {
-						if (alphabet[c].orientation) spacer.addSolution(alphabet[c].repeat,Alignments.orientation,alphabet[c].end-(blockLast-alignmentFirstB),alphabet[c].end-(blockLast-alignmentLastB),false);
-						else spacer.addSolution(alphabet[c].repeat,!Alignments.orientation,alphabet[c].start+(blockLast-alignmentLastB),alphabet[c].start+(blockLast-alignmentFirstB),false);
+						if (alphabet[c].orientation) {
+							repeatOrientation=Alignments.orientation;
+							repeatFirst=alphabet[c].end-(blockLast-alignmentFirstB);
+							repeatLast=alphabet[c].end-(blockLast-alignmentLastB);
+						}
+						else {
+							repeatOrientation=!Alignments.orientation;
+							repeatFirst=alphabet[c].start+(blockLast-alignmentLastB);
+							repeatLast=alphabet[c].start+(blockLast-alignmentFirstB);
+						}
 					}
 					else {  // Holds also for the last block
-						if (alphabet[c].orientation) spacer.addSolution(alphabet[c].repeat,Alignments.orientation,alphabet[c].start+(alignmentFirstB-blockFirst),alphabet[c].start+(alignmentLastB-blockFirst),false);
-						else spacer.addSolution(alphabet[c].repeat,!Alignments.orientation,alphabet[c].end-(alignmentLastB-blockFirst),alphabet[c].end-(alignmentFirstB-blockFirst),false);
+						if (alphabet[c].orientation) {
+							repeatOrientation=Alignments.orientation;
+							repeatFirst=alphabet[c].start+(alignmentFirstB-blockFirst);
+							repeatLast=alphabet[c].start+(alignmentLastB-blockFirst);
+						}
+						else {
+							repeatOrientation=!Alignments.orientation;
+							repeatFirst=alphabet[c].end-(alignmentLastB-blockFirst);
+							repeatLast=alphabet[c].end-(alignmentFirstB-blockFirst);
+						}
 					}
-					
-if (spacer.solutions[spacer.lastSolution-1]<0 || spacer.solutions[spacer.lastSolution]<0) {
-	System.err.println("ERROR: added a negative solution to spacer "+spacer);
-	System.err.println("solutions: "+spacer.printSolutions());
-	System.exit(1);
-}
-					
+					if (repeatFirst>=0 && repeatLast>=0 && repeatLast-repeatFirst+1>=MIN_SOLUTION_LENGTH) {
+						// repeat{First,Last} might be negative if the repeat is shorter
+						// than the block used for creating the solution.
+						spacer.addSolution(alphabet[c].repeat,repeatOrientation,repeatFirst,repeatLast,false);				
+					}
 				}
 			}
 		}
