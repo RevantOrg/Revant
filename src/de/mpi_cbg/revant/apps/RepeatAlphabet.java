@@ -8522,7 +8522,6 @@ public class RepeatAlphabet {
 				}
 			}
 			tmpCharacter.quantize(quantum);
-if (readID==6) System.err.println("VITTU> read "+readID+" creates the following spacer character instance from blockID="+blockID+": "+tmpCharacter);			
 			if (tmpCharacter.start==-1) j=Arrays.binarySearch(alphabet,lastUnique+1,lastPeriodic+1,tmpCharacter);
 			else j=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,tmpCharacter);
 			if (j>=0) used[j]=true;
@@ -8677,8 +8676,6 @@ if (readID==6) System.err.println("VITTU> read "+readID+" creates the following 
 				}
 			}
 			tmpCharacter.quantize(quantum);
-System.err.println("VITTU> 1  calling tandemSpacers_updateTranslation_impl() on readID="+readID+" blockID="+blockID+" tmpCharacter="+tmpCharacter+" first="+first+" last="+last+" repeatLength="+repeatLengths[tmpCharacter.repeat]);
-System.err.println("solutions: "+spacer.printSolutions());
 			p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p);
 			out[Math.min((tmpCharacter.start==-1?tmpCharacter.length:tmpCharacter.end-tmpCharacter.start+1)/IO.quantum,out.length-1)]++;
 		}
@@ -8693,8 +8690,8 @@ System.err.println("solutions: "+spacer.printSolutions());
 			tmpCharacter.quantize(quantum);
 			p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p);
 		}
-		bw.write(stack[0]);
-		for (i=1; i<=p; i++) bw.write(SEPARATOR_MINOR+""+stack[p]);
+		bw.write(stack[0]+"");
+		for (i=1; i<=p; i++) bw.write(SEPARATOR_MINOR+""+stack[i]);
 		return spacersCursor;
 	}
 	
@@ -8743,7 +8740,7 @@ System.err.println("solutions: "+spacer.printSolutions());
 			}
 			stack[last]=p;
 		}
-		else {
+		else {			
 			p=tandemSpacers_lookupNonperiodic(character,newAlphabet,lastPeriodic_new,lastAlphabet_new,last);
 			if (p==last) {
 				System.err.println("tandemSpacers_updateTranslation_impl> ERROR: non-periodic character not found in the new alphabet\n query: "+character);
@@ -9389,7 +9386,7 @@ System.err.println("solutions: "+spacer.printSolutions());
 		 * Used only by tandem spacers.
 		 *
 		 * Remark: the procedure discards non-periodic repeats such that different 
-		 * substrings of them (possibly in diferent orientations) are identical.
+		 * substrings of them (possibly in different orientations) are identical.
 		 *
 		 * @param tmpArray temporary space, assumed to be large enough;
 		 * @return TRUE iff there is at least one repeat such that all its solutions use
@@ -9457,7 +9454,7 @@ System.err.println("solutions: "+spacer.printSolutions());
 			}
 			if (!isShortPeriod) {
 				if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
-				if (isConsistent) tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n;
+				if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
 			}
 			if (isConsistent) {
 				tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
