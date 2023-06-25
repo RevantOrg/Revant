@@ -59,9 +59,6 @@ public class FixTandemSpacers3 {
 		i=0; j=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		while (str1!=null) {
-System.err.println("Translating read: "+str1);			
-System.err.println(str3);
-System.err.println(str4);
 			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,oldAlphabet,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw,DISTANCE_THRESHOLD,histogram,tmpCharacter);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		}

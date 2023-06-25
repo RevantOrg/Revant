@@ -204,7 +204,7 @@ if [ ${FIX_TANDEM_SPACERS} -eq 1 ]; then
 		local LOCAL_BOUNDARIES_FILE=$2
 		local LOCAL_READ_LENGTHS_FILE=$3
 		local LOCAL_TANDEMS_FILE=$4
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 0 ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
 		if [ $? -ne 0 ]; then
 			exit
 		fi
@@ -281,8 +281,8 @@ if [ ${FIX_TANDEM_SPACERS} -eq 1 ]; then
 			translationThread_tspacers ${THREAD} "${TMPFILE_PATH}-tspacers-12-" &
 		done
 		wait
-		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prespacers
-		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prespacers
+		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-preTspacers
+		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-preTspacers
 		for THREAD in $(seq 0 ${TO}); do
 			cat ${TMPFILE_PATH}-tspacers-12-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 		done

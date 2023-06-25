@@ -39,7 +39,7 @@ ALIGNMENT_FILTERING_MODE="0"  # 0=loose, 1=tight, 2=tight with matching characte
 # ----------------------------------- Resources ------------------------------------------
 N_THREADS="1"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
-DELETE_TMP_FILES="1"
+DELETE_TMP_FILES="0"
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u
