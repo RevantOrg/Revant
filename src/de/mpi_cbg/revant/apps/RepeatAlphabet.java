@@ -8863,6 +8863,156 @@ public class RepeatAlphabet {
 	
 	
 	
+	// ------------------------ CONCATENATING ADJACENT CHARACTERS ------------------------
+	
+	/**
+	 * Given an existing read translation, the procedure tries to concatenate characters 
+	 * in adjacent blocks, that are also adjacent on the repeat. Every new character 
+	 * instance that is not already in $alphabet$ is written to $bw$. Every character in
+	 * $alphabet$ that is used in the new translation is marked in $used$.
+	 * 
+	 * This is useful especially for non-periodic tandems, where the read-repeat aligner
+	 * might miss some substrings of some units, breaking the tandem at random positions.
+	 * Such non-repetitive blocks might be corrected back to repetitive blocks by the
+	 * tandem pipeline upstream, but the corrected sequence of blocks remains difficult to
+	 * use for computing the tandem tracks that are necessary for filtering alignments.
+	 * Moreover, since the corrected characters are likely random, their frequency might
+	 * be low and they might get deleted in later stages, or they might get erroneously
+	 * included in unique k-mers (in the worst case, an entire broken tandem might get
+	 * replaced with a non-repetitive block, since the characters in the corrected blocks
+	 * might be too infrequent).
+	 *
+	 * Remark: the utility of this function beyond tandems is not clear.
+	 *
+	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
+	 * 
+	 * @param distanceThreshold decides if two characters are adjacent in the repeat;
+	 * @param used same size as $alphabet$;
+	 * @param tmpBoolean* temporary space, with a number of cells at least equal to the
+	 * number of blocks in the translation;
+	 * @param tmpArray temporary space with at least two cells.
+	 */
+	public static final void concatenateBlocks_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, int distanceThreshold, int quantum, boolean[] used, BufferedWriter bw, Character tmpCharacter, boolean[] tmpBoolean1, boolean[] tmpBoolean2, boolean[] tmpBoolean3, int[] tmpArray) throws IOException {
+		int i, j, k, c;
+		int max, nBlocks, last, toBlock, start, end;
+		
+		// Allocating memory
+		nBlocks=loadBlocks(read2characters);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
+		loadBoundaries(read2boundaries);
+		max=0;
+		for (i=0; i<nBlocks; i++) max=Math.max(max,lastInBlock_int[i]+1);
+		max*=4;
+		if (stack==null || stack.length<max) stack = new int[max];
+		
+		// Marking non-repetitive and periodic blocks
+		for (i=0; i<nBlocks; i++) {
+			tmpBoolean1[i]=false; tmpBoolean2[i]=false; tmpBoolean3[i]=false;
+			for (j=0; j<=lastInBlock_int[i]; j++) {
+				c=intBlocks[i][j];
+				if (c<0) c=-1-c;
+				if (c>lastAlphabet || c<=lastUnique) tmpBoolean1[i]=true;
+				else if (c>lastUnique && c<=lastPeriodic) tmpBoolean2[i]=true;
+			}
+		}
+		
+		// Concatenating non-periodic characters
+		i=0;
+		while (i<nBlocks-1) {
+			if (tmpBoolean1[i] || tmpBoolean2[i]) { i++; continue; }
+			concatenateBlocks_impl(i,nBlocks,distanceThreshold,tmpBoolean1,tmpBoolean2,tmpArray);
+			toBlock=tmpArray[0]; 
+			if (toBlock==-1) { i++; continue; }
+			for (j=i; j<=toBlock; j++) tmpBoolean3[j]=true;
+			last=tmpArray[1];
+			for (j=0; j<=last; j+=4) {
+				tmpCharacter.repeat=stack[j];
+				tmpCharacter.orientation=stack[j+1]==1;
+				tmpCharacter.start=stack[j+2];
+				start=i==0?0:boundaries[i-1];
+				end=toBlock==nBlocks-1?readLength-1:boundaries[toBlock];	
+				tmpCharacter.end=Math.min(Math.max(stack[j+3],tmpCharacter.start+end-start),repeatLengths[tmpCharacter.repeat]-1);
+				if (i==0) {
+					if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
+					else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+				} 
+				else if (toBlock==nBlocks-1) {
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+					else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
+				}
+				tmpCharacter.quantize(quantum);
+				k=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,tmpCharacter);
+				if (k>=0) used[k]=true;
+				else bw.write(tmpCharacter.toString()+"\n");
+			}
+			i=toBlock+1;
+		}
+		
+		// Marking as used every character in every non-concatenated block
+		for (i=0; i<nBlocks; i++) {
+			if (tmpBoolean3[i]) continue;
+			for (j=0; j<=lastInBlock_int[i]; j++) used[intBlocks[i][j]]=true;
+		}
+	}
+	
+	
+	/**
+	 * Stores in global variable $stack[0..X]$ the characters produced by starting the 
+	 * concatenation from $fromBlock$. All such characters span the same sequence of 
+	 * blocks. Only the longest sequence of concatenable blocks is considered.
+	 *
+	 * @param out output array: 0=last block reached by the concatenation process from
+	 * $fromBlock$; 1=X.
+	 */
+	private static final void concatenateBlocks_impl(int fromBlock, int nBlocks, int distanceThreshold, boolean[] tmpBoolean1, boolean[] tmpBoolean2, int[] out) {
+		final int lastChar = lastInBlock_int[fromBlock];
+		boolean found, orientation;
+		int i, j, k, c, d;
+		int toBlock, toBlockPrime, last, repeat, start, end;
+		Character character;
+		
+		toBlock=-1; last=-1;
+		for (i=0; i<=lastChar; i++) {
+			c=intBlocks[fromBlock][i];
+			character=alphabet[c];
+			repeat=character.repeat; orientation=character.orientation; start=character.start; end=character.end;
+			toBlockPrime=-1;
+			for (j=fromBlock+1; j<=nBlocks-1; j++) {
+				if (tmpBoolean1[j] || tmpBoolean2[j]) break;
+				found=false;
+				for (k=0; k<=lastInBlock_int[j]; k++) {
+					d=intBlocks[j][k];
+					if ( alphabet[d].repeat==repeat && alphabet[d].orientation==orientation &&
+						 ( (orientation && Math.abs(alphabet[d].start-end)<=distanceThreshold) ||
+						   (!orientation && Math.abs(alphabet[d].end-start)<=distanceThreshold)
+						 )
+					   ) {
+		   				found=true;
+						start=Math.min(start,alphabet[d].start);
+		   				end=Math.max(end,alphabet[d].end);
+						break;
+					}
+				}
+				if (!found) break;
+				toBlockPrime=j;
+			}
+			if (toBlockPrime==-1) continue;
+			if (toBlockPrime>toBlock) { toBlock=toBlockPrime; last=-1; }
+			if (toBlockPrime>=toBlock) {
+				stack[++last]=repeat;
+				stack[++last]=orientation?1:0;
+				stack[++last]=start;
+				stack[++last]=end;
+			}
+		}
+		out[0]=toBlock; out[1]=last;
+	}
+	
+	
+	
+	
+	
+	
 	
 	
 	
