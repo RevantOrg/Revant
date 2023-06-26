@@ -8903,7 +8903,7 @@ public class RepeatAlphabet {
 		max=0;
 		for (i=0; i<nBlocks; i++) max=Math.max(max,lastInBlock_int[i]+1);
 		max*=4;
-		if (stack==null || stack.length<max) stack = new int[max];
+		if (stack2==null || stack2.length<max) stack2 = new int[max];
 		
 		// Marking non-repetitive and periodic blocks
 		for (i=0; i<nBlocks; i++) {
@@ -8926,12 +8926,12 @@ public class RepeatAlphabet {
 			for (j=i; j<=toBlock; j++) tmpBoolean3[j]=true;
 			last=tmpArray[1];
 			for (j=0; j<=last; j+=4) {
-				tmpCharacter.repeat=stack[j];
-				tmpCharacter.orientation=stack[j+1]==1;
-				tmpCharacter.start=stack[j+2];
+				tmpCharacter.repeat=stack2[j];
+				tmpCharacter.orientation=stack2[j+1]==1;
+				tmpCharacter.start=stack2[j+2];
 				start=i==0?0:boundaries[i-1];
 				end=toBlock==nBlocks-1?readLength-1:boundaries[toBlock];	
-				tmpCharacter.end=Math.min(Math.max(stack[j+3],tmpCharacter.start+end-start),repeatLengths[tmpCharacter.repeat]-1);
+				tmpCharacter.end=Math.min(Math.max(stack2[j+3],tmpCharacter.start+end-start),repeatLengths[tmpCharacter.repeat]-1);
 				if (i==0) {
 					if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 					else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
@@ -8957,7 +8957,7 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Stores in global variable $stack[0..X]$ the characters produced by starting the 
+	 * Stores in global variable $stack2[0..X]$ the characters produced by starting the 
 	 * concatenation from $fromBlock$. All such characters span the same sequence of 
 	 * blocks. Only the longest sequence of concatenable blocks is considered.
 	 *
@@ -8999,14 +8999,164 @@ public class RepeatAlphabet {
 			if (toBlockPrime==-1) continue;
 			if (toBlockPrime>toBlock) { toBlock=toBlockPrime; last=-1; }
 			if (toBlockPrime>=toBlock) {
-				stack[++last]=repeat;
-				stack[++last]=orientation?1:0;
-				stack[++last]=start;
-				stack[++last]=end;
+				stack2[++last]=repeat;
+				stack2[++last]=orientation?1:0;
+				stack2[++last]=start;
+				stack2[++last]=end;
 			}
 		}
 		out[0]=toBlock; out[1]=last;
 	}
+	
+	
+	/**
+	 * Like $concatenateBlocks_collectCharacterInstances()$, but looks up in the new 
+	 * alphabet every existing and new character induced by concatenation.
+	 *
+	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
+	 *
+	 * Remark: the procedure uses global arrays $stack,stack2$.
+	 *
+	 * @param distanceThreshold decides if two characters are adjacent in the repeat;
+	 * @param tmpBoolean* temporary space, with a number of cells at least equal to the
+	 * number of blocks in the old translation;
+	 * @param tmpArray temporary space with at least two cells.
+	 */
+	public static final void concatenateBlocks_updateTranslation(int readLength, String read2characters_old, String read2boundaries_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int distanceThreshold, Character tmpCharacter, int[] tmpArray, boolean[] tmpBoolean1, boolean[] tmpBoolean2) throws IOException {
+		final int CAPACITY = 100;  // Arbitrary
+		final int QUANTUM = IO.quantum;	
+		int i, j, k, p, c;
+		int max, nBlocks, last, toBlock, nextI, start, end;
+		
+		// Allocating memory
+		nBlocks=loadBlocks(read2characters_old);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
+		loadBoundaries(read2boundaries_old);
+		max=0;
+		for (i=0; i<nBlocks; i++) max=Math.max(max,lastInBlock_int[i]+1);
+		max*=4;
+		if (stack2==null || stack2.length<max) stack2 = new int[max];
+		if (stack==null || stack.length==0) stack = new int[CAPACITY];
+		
+		// Marking non-repetitive and periodic blocks
+		for (i=0; i<nBlocks; i++) {
+			tmpBoolean1[i]=false; tmpBoolean2[i]=false;
+			for (j=0; j<=lastInBlock_int[i]; j++) {
+				c=intBlocks[i][j];
+				if (c<0) c=-1-c;
+				if (c>lastAlphabet || c<=lastUnique) tmpBoolean1[i]=true;
+				else if (c>lastUnique && c<=lastPeriodic) tmpBoolean2[i]=true;
+			}
+		}
+		
+		// Concatenating non-periodic characters
+		i=0;
+		while (i<nBlocks-1) {
+			if (tmpBoolean1[i] || tmpBoolean2[i]) {
+				p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_old,lastAlphabet_old,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
+				toBlock=i; nextI=i+1;
+			}
+			else {
+				concatenateBlocks_impl(i,nBlocks,distanceThreshold,tmpBoolean1,tmpBoolean2,tmpArray);
+				if (tmpArray[0]==-1) {
+					p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_old,lastAlphabet_old,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
+					toBlock=i; nextI=i+1;
+				}
+				else {
+					toBlock=tmpArray[0]; nextI=toBlock+1; p=-1; last=tmpArray[1];
+					for (j=0; j<=last; j+=4) {
+						tmpCharacter.repeat=stack2[j];
+						tmpCharacter.orientation=stack2[j+1]==1;
+						tmpCharacter.start=stack2[j+2];
+						start=i==0?0:boundaries[i-1];
+						end=toBlock==nBlocks-1?readLength-1:boundaries[toBlock];	
+						tmpCharacter.end=Math.min(Math.max(stack2[j+3],tmpCharacter.start+end-start),repeatLengths[tmpCharacter.repeat]-1);
+						if (i==0) {
+							if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
+							else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+						} 
+						else if (toBlock==nBlocks-1) {
+							if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
+							else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
+						}
+						tmpCharacter.quantize(QUANTUM);
+						p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,p);
+					}
+				}
+			}
+			read2characters_new.write(stack[0]+"");
+			for (j=1; j<=p; j++) read2characters_new.write(SEPARATOR_MINOR+""+stack[j]);
+			if (toBlock<nBlocks-1) {
+				read2characters_new.write(SEPARATOR_MAJOR+"");
+				read2boundaries_new.write(boundaries[toBlock]+(toBlock==nBlocks-2?"":SEPARATOR_MINOR+""));
+			}
+			i=nextI;
+		}
+		read2characters_new.newLine(); read2boundaries_new.newLine();
+	}
+		
+		
+	/**
+	 * Adds to global array $stack$ the translation in the new alphabet of every character
+	 * in $blockID$.
+	 *
+	 * @return the last element written to $stack$.
+	 */
+	private static final int concatenateBlocks_updateTranslation_impl(int blockID, int quantum, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, Character tmpCharacter) {
+		int i, j, p, q, c;
+		final int last = lastInBlock[blockID];
+		
+		p=-1;
+		for (i=0; i<=last; i++) {			
+			c=Integer.parseInt(blocks[blockID][i]);
+			if (c<0) c=-1-c;
+			if (c==lastAlphabet_old+1) {
+				p++;
+				if (p==stack.length) {
+					int[] newArray = new int[stack.length<<1];
+					System.arraycopy(stack,0,newArray,0,stack.length);
+					stack=newArray;
+				}
+				stack[p]=lastAlphabet_new+1;
+			}
+			else {
+				tmpCharacter.copyFrom(alphabet_old[c]);
+				q=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p);
+				if (q==p) {
+					System.err.println("concatenateBlocks_updateTranslation_impl> ERROR: character in a non-concatenated block not found in the new alphabet: block="+blockID+" character="+tmpCharacter);
+					System.exit(1);
+				}
+				p=q;
+			}
+		}
+		if (p>0) Arrays.sort(stack,0,p+1);
+		i=0;
+		for (j=1; j<=p; j++) {
+			if (stack[j]!=stack[i]) stack[++i]=stack[j];
+		}
+		return i;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
