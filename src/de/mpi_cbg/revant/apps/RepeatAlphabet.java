@@ -8867,20 +8867,20 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Given an existing read translation, the procedure tries to concatenate characters 
-	 * in adjacent blocks, that are also adjacent on the repeat. Every new character 
-	 * instance that is not already in $alphabet$ is written to $bw$. Every character in
-	 * $alphabet$ that is used in the new translation is marked in $used$.
+	 * in adjacent non-periodic blocks, that are also adjacent on their repeat. Every new
+	 * character instance that is not already in $alphabet$ is written to $bw$. Every
+	 * character in $alphabet$ that is used in the new translation is marked in $used$.
 	 * 
 	 * This is useful especially for non-periodic tandems, where the read-repeat aligner
 	 * might miss some substrings of some units, breaking the tandem at random positions.
 	 * Such non-repetitive blocks might be corrected back to repetitive blocks by the
-	 * tandem pipeline upstream, but the corrected sequence of blocks remains difficult to
-	 * use for computing the tandem tracks that are necessary for filtering alignments.
-	 * Moreover, since the corrected characters are likely random, their frequency might
-	 * be low and they might get deleted in later stages, or they might get erroneously
-	 * included in unique k-mers (in the worst case, an entire broken tandem might get
-	 * replaced with a non-repetitive block, since the characters in the corrected blocks
-	 * might be too infrequent).
+	 * tandem pipeline upstream, but even the corrected sequence of blocks might be 
+	 * difficult to use for computing the tandem tracks that are used in alignment 
+	 * filtering. Moreover, since the corrected characters are likely random substrings, 
+	 * their frequency might be low and they might get deleted in later stages, or they
+	 * might get erroneously included in unique k-mers (in the worst case, an entire 
+	 * broken tandem might get replaced with a non-repetitive block, since the characters
+	 * in the corrected blocks might be too infrequent).
 	 *
 	 * Remark: the utility of this function beyond tandems is not clear.
 	 *
@@ -9018,15 +9018,18 @@ public class RepeatAlphabet {
 	 * Remark: the procedure uses global arrays $stack,stack2$.
 	 *
 	 * @param distanceThreshold decides if two characters are adjacent in the repeat;
+	 * @param stats output array: 0=number of blocks involved in a concatenation; 
+	 * 1=total number of blocks;
 	 * @param tmpBoolean* temporary space, with a number of cells at least equal to the
 	 * number of blocks in the old translation;
 	 * @param tmpArray temporary space with at least two cells.
 	 */
-	public static final void concatenateBlocks_updateTranslation(int readLength, String read2characters_old, String read2boundaries_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int distanceThreshold, Character tmpCharacter, int[] tmpArray, boolean[] tmpBoolean1, boolean[] tmpBoolean2) throws IOException {
+	public static final void concatenateBlocks_updateTranslation(int readLength, String read2characters_old, String read2boundaries_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int distanceThreshold, int[] stats, Character tmpCharacter, int[] tmpArray, boolean[] tmpBoolean1, boolean[] tmpBoolean2) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
-		final int QUANTUM = IO.quantum;	
+		final int QUANTUM = IO.quantum;
+		boolean hasBoundary;
 		int i, j, k, p, c;
-		int max, nBlocks, last, toBlock, nextI, start, end;
+		int max, nBlocks, nConcatenatedBlocks, last, toBlock, nextI, start, end;
 		
 		// Allocating memory
 		nBlocks=loadBlocks(read2characters_old);
@@ -9050,7 +9053,7 @@ public class RepeatAlphabet {
 		}
 		
 		// Concatenating non-periodic characters
-		i=0;
+		i=0; hasBoundary=false; nConcatenatedBlocks=0;
 		while (i<nBlocks-1) {
 			if (tmpBoolean1[i] || tmpBoolean2[i]) {
 				p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_old,lastAlphabet_old,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
@@ -9082,6 +9085,7 @@ public class RepeatAlphabet {
 						tmpCharacter.quantize(QUANTUM);
 						p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,p);
 					}
+					nConcatenatedBlocks+=toBlock-i+1;
 				}
 			}
 			read2characters_new.write(stack[0]+"");
@@ -9089,10 +9093,13 @@ public class RepeatAlphabet {
 			if (toBlock<nBlocks-1) {
 				read2characters_new.write(SEPARATOR_MAJOR+"");
 				read2boundaries_new.write(boundaries[toBlock]+(toBlock==nBlocks-2?"":SEPARATOR_MINOR+""));
+				hasBoundary=true;
 			}
 			i=nextI;
 		}
 		read2characters_new.newLine(); read2boundaries_new.newLine();
+		fullyContained_new.write(hasBoundary?"0\n":"1\n");
+		stats[0]=nConcatenatedBlocks; stats[1]=nBlocks;
 	}
 		
 		
