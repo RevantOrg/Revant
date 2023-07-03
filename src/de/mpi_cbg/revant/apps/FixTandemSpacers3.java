@@ -37,16 +37,19 @@ public class FixTandemSpacers3 {
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
 		
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,2);
-		oldAlphabet=RepeatAlphabet.alphabet;
-		lastUnique_old=RepeatAlphabet.lastUnique;
-		lastPeriodic_old=RepeatAlphabet.lastPeriodic;
-		lastAlphabet_old=RepeatAlphabet.lastAlphabet;
+		
+		// Loading alphabets. The order of the two deserializations matters.
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_NEW,2);
 		newAlphabet=RepeatAlphabet.alphabet;
 		lastUnique_new=RepeatAlphabet.lastUnique;
 		lastPeriodic_new=RepeatAlphabet.lastPeriodic;
 		lastAlphabet_new=RepeatAlphabet.lastAlphabet;
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,2);
+		oldAlphabet=RepeatAlphabet.alphabet;
+		lastUnique_old=RepeatAlphabet.lastUnique;
+		lastPeriodic_old=RepeatAlphabet.lastPeriodic;
+		lastAlphabet_old=RepeatAlphabet.lastAlphabet;
+		
 		RepeatAlphabet.deserializeSpacers(SPACERS_FILE,N_SPACERS);
 		histogram = new int[21];  // Arbitrary
 		Math.set(histogram,0,histogram.length-1);
@@ -59,7 +62,7 @@ public class FixTandemSpacers3 {
 		i=0; j=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		while (str1!=null) {
-			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,oldAlphabet,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw,DISTANCE_THRESHOLD,histogram,tmpCharacter);
+			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw,DISTANCE_THRESHOLD,histogram,tmpCharacter);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		}
 		br1.close(); br2.close(); br3.close(); br4.close(); br5.close(); bw.close();

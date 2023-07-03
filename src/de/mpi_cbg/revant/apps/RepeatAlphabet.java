@@ -8577,7 +8577,8 @@ public class RepeatAlphabet {
 	 * every existing and new character induced by solving a tandem spacer, and keeps a 
 	 * tandem spacer with no solution intact.
 	 *
-	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
+	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded, and 
+	 * that global variable $alphabet$ contains the old alphabet.
 	 *
 	 * Remark: the procedure uses global arrays $stack,tmpBoolean$.
 	 *
@@ -8585,7 +8586,7 @@ public class RepeatAlphabet {
 	 * (multiple of $IO.quantum$);
 	 * @return the new value of $spacersCursor$.
 	 */
-	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, int distanceThreshold, int[] out, Character tmpCharacter) throws IOException {
+	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, int distanceThreshold, int[] out, Character tmpCharacter) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		final String SEPARATOR = ",";
@@ -8630,7 +8631,7 @@ public class RepeatAlphabet {
 				for (j=0; j<=last; j++) {			
 					c=Integer.parseInt(blocks[i][j]);
 					if (c<0) c=-1-c;
-					if (c==lastAlphabet_old+1) {
+					if (c==lastAlphabet+1) {
 						p++;
 						if (p==stack.length) {
 							int[] newArray = new int[stack.length<<1];
@@ -8640,7 +8641,7 @@ public class RepeatAlphabet {
 						stack[p]=lastAlphabet_new+1;
 					}
 					else {
-						tmpCharacter.copyFrom(alphabet_old[c]);
+						tmpCharacter.copyFrom(alphabet[c]);
 						q=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,p);
 						if (q==p) {
 							System.err.println("tandemSpacers_updateTranslation> ERROR: character in non-spacer block not found in the new alphabet: read="+readID+" block="+i+" character="+tmpCharacter);
@@ -8781,7 +8782,7 @@ public class RepeatAlphabet {
 			}
 			stack[last]=p;
 		}
-		else {			
+		else {
 			p=tandemSpacers_lookupNonperiodic(character,newAlphabet,lastPeriodic_new,lastAlphabet_new,last);
 			if (p==last) {
 				System.err.println("tandemSpacers_updateTranslation_impl> ERROR: non-periodic character not found in the new alphabet\n query: "+character);
@@ -8820,9 +8821,9 @@ public class RepeatAlphabet {
 		}
 		else if (character.isOpen()) {
 			p=-1-p;
-			for (i=p; i<=lastAlphabet; i++) {
-				if (alphabet[i].repeat!=character.repeat || alphabet[i].orientation!=character.orientation) break;
-				if (alphabet[i].implies(character)) {
+			for (i=p; i<=lastAlphabet_new; i++) {
+				if (newAlphabet[i].repeat!=character.repeat || newAlphabet[i].orientation!=character.orientation) break;
+				if (newAlphabet[i].implies(character)) {
 					last++;
 					if (last==stack.length) {
 						int[] newArray = new int[stack.length<<1];
@@ -8833,8 +8834,8 @@ public class RepeatAlphabet {
 				}
 			}
 			for (i=p-1; i>lastPeriodic; i--) {
-				if (alphabet[i].repeat!=repeat || alphabet[i].orientation!=orientation) break;
-				if (alphabet[i].implies(character)) {
+				if (newAlphabet[i].repeat!=repeat || newAlphabet[i].orientation!=orientation) break;
+				if (newAlphabet[i].implies(character)) {
 					last++;
 					if (last==stack.length) {
 						int[] newArray = new int[stack.length<<1];
@@ -8880,7 +8881,8 @@ public class RepeatAlphabet {
 	 * their frequency might be low and they might get deleted in later stages, or they
 	 * might get erroneously included in unique k-mers (in the worst case, an entire 
 	 * broken tandem might get replaced with a non-repetitive block, since the characters
-	 * in the corrected blocks might be too infrequent).
+	 * in the corrected blocks might be too infrequent). The alphabet might also get
+	 * slightly smaller, which might speed up all procedures downstream.
 	 *
 	 * Remark: the utility of this function beyond tandems is not clear.
 	 *
@@ -8932,13 +8934,22 @@ public class RepeatAlphabet {
 				start=i==0?0:boundaries[i-1];
 				end=toBlock==nBlocks-1?readLength-1:boundaries[toBlock];	
 				tmpCharacter.end=Math.min(Math.max(stack2[j+3],tmpCharacter.start+end-start),repeatLengths[tmpCharacter.repeat]-1);
+				tmpCharacter.length=0;
 				if (i==0) {
 					if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 					else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
-				} 
-				else if (toBlock==nBlocks-1) {
+				}
+				else {
+					if (tmpCharacter.orientation) tmpCharacter.openStart=false;
+					else tmpCharacter.openEnd=false;
+				}
+				if (toBlock==nBlocks-1) {
 					if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
 					else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
+				}
+				else {
+					if (tmpCharacter.orientation) tmpCharacter.openEnd=false;
+					else tmpCharacter.openStart=false;
 				}
 				tmpCharacter.quantize(quantum);
 				k=Arrays.binarySearch(alphabet,lastPeriodic+1,lastAlphabet+1,tmpCharacter);
@@ -8960,6 +8971,9 @@ public class RepeatAlphabet {
 	 * Stores in global variable $stack2[0..X]$ the characters produced by starting the 
 	 * concatenation from $fromBlock$. All such characters span the same sequence of 
 	 * blocks. Only the longest sequence of concatenable blocks is considered.
+	 *
+	 * Remark: the procedure works on the alphabet that is currently loaded in global
+	 * variable $alphabet$.
 	 *
 	 * @param out output array: 0=last block reached by the concatenation process from
 	 * $fromBlock$; 1=X.
@@ -9013,7 +9027,8 @@ public class RepeatAlphabet {
 	 * Like $concatenateBlocks_collectCharacterInstances()$, but looks up in the new 
 	 * alphabet every existing and new character induced by concatenation.
 	 *
-	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
+	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded, and 
+	 * that global variable $alphabet$ contains the old alphabet.
 	 *
 	 * Remark: the procedure uses global arrays $stack,stack2$.
 	 *
@@ -9024,7 +9039,7 @@ public class RepeatAlphabet {
 	 * number of blocks in the old translation;
 	 * @param tmpArray temporary space with at least two cells.
 	 */
-	public static final void concatenateBlocks_updateTranslation(int readLength, String read2characters_old, String read2boundaries_old, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int distanceThreshold, int[] stats, Character tmpCharacter, int[] tmpArray, boolean[] tmpBoolean1, boolean[] tmpBoolean2) throws IOException {
+	public static final void concatenateBlocks_updateTranslation(int readLength, String read2characters_old, String read2boundaries_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int distanceThreshold, int[] stats, Character tmpCharacter, int[] tmpArray, boolean[] tmpBoolean1, boolean[] tmpBoolean2) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		boolean hasBoundary;
@@ -9056,13 +9071,14 @@ public class RepeatAlphabet {
 		i=0; hasBoundary=false; nConcatenatedBlocks=0;
 		while (i<nBlocks-1) {
 			if (tmpBoolean1[i] || tmpBoolean2[i]) {
-				p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_old,lastAlphabet_old,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
+System.err.println("VITTU> i="+i+" tmpBoolean1="+tmpBoolean1[i]+" tmpBoolean2="+tmpBoolean2[i]);				
+				p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
 				toBlock=i; nextI=i+1;
 			}
 			else {
 				concatenateBlocks_impl(i,nBlocks,distanceThreshold,tmpBoolean1,tmpBoolean2,tmpArray);
 				if (tmpArray[0]==-1) {
-					p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_old,lastAlphabet_old,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
+					p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
 					toBlock=i; nextI=i+1;
 				}
 				else {
@@ -9074,15 +9090,30 @@ public class RepeatAlphabet {
 						start=i==0?0:boundaries[i-1];
 						end=toBlock==nBlocks-1?readLength-1:boundaries[toBlock];	
 						tmpCharacter.end=Math.min(Math.max(stack2[j+3],tmpCharacter.start+end-start),repeatLengths[tmpCharacter.repeat]-1);
+						tmpCharacter.length=0;
 						if (i==0) {
 							if (tmpCharacter.orientation) tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 							else tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
-						} 
-						else if (toBlock==nBlocks-1) {
+						}
+						else {
+							if (tmpCharacter.orientation) tmpCharacter.openStart=false;
+							else tmpCharacter.openEnd=false;
+						}
+						if (toBlock==nBlocks-1) {
 							if (tmpCharacter.orientation) tmpCharacter.openEnd=tmpCharacter.end<repeatLengths[tmpCharacter.repeat]-distanceThreshold;
 							else tmpCharacter.openStart=tmpCharacter.start>distanceThreshold;
 						}
+						else {
+							if (tmpCharacter.orientation) tmpCharacter.openEnd=false;
+							else tmpCharacter.openStart=false;
+						}
 						tmpCharacter.quantize(QUANTUM);
+if (tmpCharacter.repeat==0 && tmpCharacter.orientation==false && tmpCharacter.start==1100 && tmpCharacter.end==2000) {
+	System.err.println("VITTU> 1  block="+i+" toBlock="+toBlock+" query="+tmpCharacter);
+	System.err.println("read2characters_old: "+read2characters_old);
+	System.err.println("read2boundaries_old: "+read2boundaries_old);
+	System.err.println("original repeat interval: "+stack2[j+2]+".."+Math.min(Math.max(stack2[j+3],tmpCharacter.start+end-start),repeatLengths[tmpCharacter.repeat]-1));
+}
 						p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,p);
 					}
 					nConcatenatedBlocks+=toBlock-i+1;
@@ -9107,9 +9138,12 @@ public class RepeatAlphabet {
 	 * Adds to global array $stack$ the translation in the new alphabet of every character
 	 * in $blockID$.
 	 *
+	 * Remark: the procedure assumes that global variable $alphabet$ contains the old
+	 * alphabet.
+	 *
 	 * @return the last element written to $stack$.
 	 */
-	private static final int concatenateBlocks_updateTranslation_impl(int blockID, int quantum, Character[] alphabet_old, int lastAlphabet_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, Character tmpCharacter) {
+	private static final int concatenateBlocks_updateTranslation_impl(int blockID, int quantum, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, Character tmpCharacter) {
 		int i, j, p, q, c;
 		final int last = lastInBlock[blockID];
 		
@@ -9117,7 +9151,7 @@ public class RepeatAlphabet {
 		for (i=0; i<=last; i++) {			
 			c=Integer.parseInt(blocks[blockID][i]);
 			if (c<0) c=-1-c;
-			if (c==lastAlphabet_old+1) {
+			if (c==lastAlphabet+1) {
 				p++;
 				if (p==stack.length) {
 					int[] newArray = new int[stack.length<<1];
@@ -9127,7 +9161,7 @@ public class RepeatAlphabet {
 				stack[p]=lastAlphabet_new+1;
 			}
 			else {
-				tmpCharacter.copyFrom(alphabet_old[c]);
+				tmpCharacter.copyFrom(alphabet[c]);
 				q=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p);
 				if (q==p) {
 					System.err.println("concatenateBlocks_updateTranslation_impl> ERROR: character in a non-concatenated block not found in the new alphabet: block="+blockID+" character="+tmpCharacter);

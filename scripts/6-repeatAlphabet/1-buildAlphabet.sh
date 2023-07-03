@@ -336,10 +336,10 @@ if [ ${CONCATENATE_BLOCKS} -eq 1 ]; then
 	echo "Translating reads into the alphabet induced by concatenation..."
 	function translationThread_concatenate() {
 		local THREAD_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks2 ${ALPHABET_FILE} ${ALPHABET_FILE_CONCATENATE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-10.txt ${TMPFILE_PATH}-concatenate-11.txt ${TMPFILE_PATH}-concatenate-12.txt
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks2 ${ALPHABET_FILE} ${ALPHABET_FILE_CONCATENATE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-10-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-11-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-12-${THREAD_ID}.txt
 	}
 	for THREAD in $(seq 0 ${TO}); do
-		translationThread_tspacers ${THREAD} &
+		translationThread_concatenate ${THREAD} &
 	done
 	wait
 	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-preConcatenation
@@ -347,9 +347,9 @@ if [ ${CONCATENATE_BLOCKS} -eq 1 ]; then
 	mv ${FULLY_CONTAINED_FILE} ${FULLY_CONTAINED_FILE}-preConcatenation
 	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-preConcatenation
 	for THREAD in $(seq 0 ${TO}); do
-		cat ${TMPFILE_PATH}-tspacers-10-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
-		cat ${TMPFILE_PATH}-tspacers-11-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
-		cat ${TMPFILE_PATH}-tspacers-12-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
+		cat ${TMPFILE_PATH}-concatenate-10-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+		cat ${TMPFILE_PATH}-concatenate-11-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
+		cat ${TMPFILE_PATH}-concatenate-12-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
 	done
 	mv ${ALPHABET_FILE_CONCATENATE} ${ALPHABET_FILE}
 	echo "Concatenation completed"

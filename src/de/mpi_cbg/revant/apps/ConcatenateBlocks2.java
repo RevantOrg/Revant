@@ -15,11 +15,13 @@ public class ConcatenateBlocks2 {
 		final String ALPHABET_FILE_OLD = args[0];  // Of all reads
 		final String ALPHABET_FILE_NEW = args[1];  // Of all reads
 		final String READ_LENGTHS_FILE = args[2];  // Of a chunk of reads
-		final String READ2CHARACTERS_FILE_OLD = args[3];  // Of a chunk of reads
-		final String READ2BOUNDARIES_FILE_OLD = args[4];  // Of a chunk of reads
-		final String READ2CHARACTERS_FILE_NEW = args[5];  // Of a chunk of reads
-		final String READ2BOUNDARIES_FILE_NEW = args[6];  // Of a chunk of reads
-		final String FULLYCONTAINED_FILE_NEW = args[7];  // Of a chunk of reads
+		final String REPEAT_LENGTHS_FILE = args[3];
+		final int N_REPEATS = Integer.parseInt(args[4]);
+		final String READ2CHARACTERS_FILE_OLD = args[5];  // Of a chunk of reads
+		final String READ2BOUNDARIES_FILE_OLD = args[6];  // Of a chunk of reads
+		final String READ2CHARACTERS_FILE_NEW = args[7];  // Of a chunk of reads
+		final String READ2BOUNDARIES_FILE_NEW = args[8];  // Of a chunk of reads
+		final String FULLYCONTAINED_FILE_NEW = args[9];  // Of a chunk of reads
 		
 		final int CAPACITY = 100;  // Arbitrary
 		final int DISTANCE_THRESHOLD = IO.quantum;
@@ -36,16 +38,20 @@ public class ConcatenateBlocks2 {
 		int[] stats = new int[2];
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
 		
-		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,2);
-		oldAlphabet=RepeatAlphabet.alphabet;
-		lastUnique_old=RepeatAlphabet.lastUnique;
-		lastPeriodic_old=RepeatAlphabet.lastPeriodic;
-		lastAlphabet_old=RepeatAlphabet.lastAlphabet;
+		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
+		
+		// Loading alphabets. The order of the two deserializations matters.
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_NEW,2);
 		newAlphabet=RepeatAlphabet.alphabet;
 		lastUnique_new=RepeatAlphabet.lastUnique;
 		lastPeriodic_new=RepeatAlphabet.lastPeriodic;
 		lastAlphabet_new=RepeatAlphabet.lastAlphabet;
+		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_OLD,2);
+		oldAlphabet=RepeatAlphabet.alphabet;
+		lastUnique_old=RepeatAlphabet.lastUnique;
+		lastPeriodic_old=RepeatAlphabet.lastPeriodic;
+		lastAlphabet_old=RepeatAlphabet.lastAlphabet;
+		
 		tmpBoolean1 = new boolean[CAPACITY]; 
 		tmpBoolean2 = new boolean[CAPACITY];
 		br1 = new BufferedReader(new FileReader(READ_LENGTHS_FILE));
@@ -62,9 +68,9 @@ public class ConcatenateBlocks2 {
 				tmpBoolean1 = new boolean[nBlocks];
 				tmpBoolean2 = new boolean[nBlocks];
 			}
-			RepeatAlphabet.concatenateBlocks_updateTranslation(Integer.parseInt(str1),str2,str3,oldAlphabet,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,DISTANCE_THRESHOLD,stats,tmpCharacter,tmpArray,tmpBoolean1,tmpBoolean2);
+			RepeatAlphabet.concatenateBlocks_updateTranslation(Integer.parseInt(str1),str2,str3,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,DISTANCE_THRESHOLD,stats,tmpCharacter,tmpArray,tmpBoolean1,tmpBoolean2);
 			nBlocks_concatenated+=stats[0]; nBlocks_total+=stats[1];
-			if (i%100000==0) System.err.println("Processed "+i+" reads");
+			if (i%10000==0) System.err.println("Processed "+i+" reads");
 			i++;
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 		}

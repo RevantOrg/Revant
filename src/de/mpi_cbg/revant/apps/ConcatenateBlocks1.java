@@ -59,7 +59,7 @@ public class ConcatenateBlocks1 {
 				tmpBoolean3 = new boolean[nBlocks];
 			}
 			RepeatAlphabet.concatenateBlocks_collectCharacterInstances(str2,str3,Integer.parseInt(str1),DISTANCE_THRESHOLD,QUANTUM,used,bw,tmpCharacter,tmpBoolean1,tmpBoolean2,tmpBoolean3,tmpArray);
-			if (i%100000==0) System.err.println("Processed "+i+" reads");
+			if (i%10000==0) System.err.println("Processed "+i+" reads");
 			i++;
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 		}
