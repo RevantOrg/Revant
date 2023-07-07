@@ -8012,6 +8012,7 @@ public class RepeatAlphabet {
 							}
 							if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
 							else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
+if (readID==1194) System.err.println("loadTandemSpacers> 1  CREATED SPACER from block "+block+": "+spacers[lastSpacer]);
 						}
 					}
 				}
@@ -8032,6 +8033,7 @@ public class RepeatAlphabet {
 							}
 							if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,block!=0,block!=nBlocks-1,block);
 							else spacers[lastSpacer].set(readID,first,last,block!=0,block!=nBlocks-1,block);
+if (readID==1194) System.err.println("loadTandemSpacers> 2  CREATED SPACER from block "+block+": "+spacers[lastSpacer]);							
 						}
 					}
 				}
@@ -9039,7 +9041,7 @@ public class RepeatAlphabet {
 	 * number of blocks in the old translation;
 	 * @param tmpArray temporary space with at least two cells.
 	 */
-	public static final void concatenateBlocks_updateTranslation(int readLength, String read2characters_old, String read2boundaries_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int distanceThreshold, int[] stats, Character tmpCharacter, int[] tmpArray, boolean[] tmpBoolean1, boolean[] tmpBoolean2) throws IOException {
+	public static final void concatenateBlocks_updateTranslation(int readID, int readLength, String read2characters_old, String read2boundaries_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, BufferedWriter fullyContained_new, int distanceThreshold, int[] stats, Character tmpCharacter, int[] tmpArray, boolean[] tmpBoolean1, boolean[] tmpBoolean2) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		boolean hasBoundary;
@@ -9066,16 +9068,18 @@ public class RepeatAlphabet {
 				else if (c>lastUnique && c<=lastPeriodic) tmpBoolean2[i]=true;
 			}
 		}
+if (readID==54) System.err.println("concatenateBlocks_updateTranslation> 0  readID="+readID+" nBlocks="+nBlocks);
 		
 		// Concatenating non-periodic characters
 		i=0; hasBoundary=false; nConcatenatedBlocks=0;
-		while (i<nBlocks-1) {
+		while (i<nBlocks) {
+if (readID==54) System.err.println("concatenateBlocks_updateTranslation> 1  i="+i);			
 			if (tmpBoolean1[i] || tmpBoolean2[i]) {
-System.err.println("VITTU> i="+i+" tmpBoolean1="+tmpBoolean1[i]+" tmpBoolean2="+tmpBoolean2[i]);				
 				p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
 				toBlock=i; nextI=i+1;
 			}
 			else {
+if (readID==54) System.err.println("concatenateBlocks_updateTranslation> 2  i="+i);
 				concatenateBlocks_impl(i,nBlocks,distanceThreshold,tmpBoolean1,tmpBoolean2,tmpArray);
 				if (tmpArray[0]==-1) {
 					p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
@@ -9083,6 +9087,7 @@ System.err.println("VITTU> i="+i+" tmpBoolean1="+tmpBoolean1[i]+" tmpBoolean2="+
 				}
 				else {
 					toBlock=tmpArray[0]; nextI=toBlock+1; p=-1; last=tmpArray[1];
+if (readID==54) System.err.println("concatenateBlocks_updateTranslation> 3  toBlock="+toBlock);					
 					for (j=0; j<=last; j+=4) {
 						tmpCharacter.repeat=stack2[j];
 						tmpCharacter.orientation=stack2[j+1]==1;
@@ -9108,7 +9113,7 @@ System.err.println("VITTU> i="+i+" tmpBoolean1="+tmpBoolean1[i]+" tmpBoolean2="+
 							else tmpCharacter.openStart=false;
 						}
 						tmpCharacter.quantize(QUANTUM);
-if (tmpCharacter.repeat==0 && tmpCharacter.orientation==false && tmpCharacter.start==1100 && tmpCharacter.end==2000) {
+if (readID==54) {
 	System.err.println("VITTU> 1  block="+i+" toBlock="+toBlock+" query="+tmpCharacter);
 	System.err.println("read2characters_old: "+read2characters_old);
 	System.err.println("read2boundaries_old: "+read2boundaries_old);
@@ -9122,6 +9127,7 @@ if (tmpCharacter.repeat==0 && tmpCharacter.orientation==false && tmpCharacter.st
 			read2characters_new.write(stack[0]+"");
 			for (j=1; j<=p; j++) read2characters_new.write(SEPARATOR_MINOR+""+stack[j]);
 			if (toBlock<nBlocks-1) {
+if (readID==54) System.err.println("concatenateBlocks_updateTranslation> 4  toBlock="+toBlock);				
 				read2characters_new.write(SEPARATOR_MAJOR+"");
 				read2boundaries_new.write(boundaries[toBlock]+(toBlock==nBlocks-2?"":SEPARATOR_MINOR+""));
 				hasBoundary=true;

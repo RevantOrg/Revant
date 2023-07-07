@@ -68,7 +68,7 @@ public class ConcatenateBlocks2 {
 				tmpBoolean1 = new boolean[nBlocks];
 				tmpBoolean2 = new boolean[nBlocks];
 			}
-			RepeatAlphabet.concatenateBlocks_updateTranslation(Integer.parseInt(str1),str2,str3,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,DISTANCE_THRESHOLD,stats,tmpCharacter,tmpArray,tmpBoolean1,tmpBoolean2);
+			RepeatAlphabet.concatenateBlocks_updateTranslation(i,Integer.parseInt(str1),str2,str3,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,DISTANCE_THRESHOLD,stats,tmpCharacter,tmpArray,tmpBoolean1,tmpBoolean2);
 			nBlocks_concatenated+=stats[0]; nBlocks_total+=stats[1];
 			if (i%10000==0) System.err.println("Processed "+i+" reads");
 			i++;

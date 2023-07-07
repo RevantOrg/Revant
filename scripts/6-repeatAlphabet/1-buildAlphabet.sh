@@ -196,10 +196,18 @@ done
 
 
 
-TANDEM_SPACERS_FIXED="0"
-if [ ${FIX_TANDEM_SPACERS} -eq 1 ]; then
-	echo "Trying to fix tandem spacers if needed..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-tspacers-1-
+echo "Trying to fix tandem spacers if needed..."
+TANDEM_SPACERS_ITERATIONS="3"
+if [ ${TANDEM_SPACERS_ITERATIONS} -gt 0 ]; then
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-stash-
+fi
+ITER="1";
+while [ ${ITER} -lt ${TANDEM_SPACERS_ITERATIONS} ]; do
+	rm -f ${TMPFILE_PATH}-tspacers-*
+	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-stash-*"); do
+		SUFFIX=${FILE#${TMPFILE_PATH}-stash-}
+		cp ${FILE} ${TMPFILE_PATH}-tspacers-1-${SUFFIX}
+	done
 	function tandemsThread() {
 		local LOCAL_TRANSLATED_READS_FILE=$1
 		local LOCAL_BOUNDARIES_FILE=$2
@@ -228,7 +236,7 @@ if [ ${FIX_TANDEM_SPACERS} -eq 1 ]; then
 	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 	SPACERS_ARE_CORRECT=$(java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers1 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${TANDEMS_FILE} ${TMPFILE_PATH}-tspacers-4.txt)
 	if [ ${SPACERS_ARE_CORRECT} -ne 0 ]; then
-		TANDEM_SPACERS_FIXED="0"
+		break
 	else
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} ${TMPFILE_PATH}-tspacers-4.txt ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-tspacers-5-
 		echo "Collecting instances of characters induced by solved tandem spacers..."
@@ -290,70 +298,81 @@ if [ ${FIX_TANDEM_SPACERS} -eq 1 ]; then
 		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 		TANDEM_SPACERS_FIXED="1"
 		echo "Tandem spacers fixed"
+		
+		rm -f ${TMPFILE_PATH}-concatenate-*
+		for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-stash-*"); do
+			SUFFIX=${FILE#${TMPFILE_PATH}-stash-}
+			cp ${FILE} ${TMPFILE_PATH}-concatenate-1-${SUFFIX}
+		done
+		echo "Concatenating adjacent blocks from the same non-periodic repeat"
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-concatenate-2- ${TMPFILE_PATH}-concatenate-3-
+		function concatenateThread() {
+			local THREAD_ID=$1
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks1 ${ALPHABET_FILE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt
+			sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt | uniq - ${TMPFILE_PATH}-concatenate-5-${THREAD_ID}.txt
+			rm -f ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt
+		}
+		echo "Collecting new characters from concatenation..."
+		if [ -e ${TMPFILE_PATH}-concatenate-1-lengths-${N_THREADS}.txt ]; then
+			TO=${N_THREADS}
+		else
+			TO=$(( ${N_THREADS} - 1 ))
+		fi
+		for THREAD in $(seq 0 ${TO}); do
+			concatenateThread ${THREAD}  &
+		done
+		wait
+		sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-concatenate-5-*.txt | uniq - ${TMPFILE_PATH}-concatenate-6.txt
+		N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-concatenate-6.txt)
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-concatenate-6.txt ${TMPFILE_PATH}-concatenate-7-
+		echo "Compacting character instances..."
+		for THREAD in $(seq 0 ${TO}); do
+			compactionThread ${THREAD} "${TMPFILE_PATH}-concatenate-7-" "${TMPFILE_PATH}-concatenate-8-" "${TMPFILE_PATH}-concatenate-9-" &
+		done
+		wait
+		head -n 1 ${ALPHABET_FILE} | cut -d , -f 4 > "${TMPFILE_PATH}-concatenate-unique.txt"
+		ALPHABET_FILE_CONCATENATE="${INPUT_DIR}/alphabet-concatenate.txt"
+		rm -f ${ALPHABET_FILE_CONCATENATE}
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "${TMPFILE_NAME}-concatenate-9-" "${TMPFILE_PATH}-concatenate-unique" ${ALPHABET_FILE_CONCATENATE}
+		for THREAD in $(seq 0 ${TO}); do
+			tail -n +2 ${TMPFILE_PATH}-concatenate-9-${THREAD}.txt >> ${ALPHABET_FILE_CONCATENATE}
+		done
+		ALPHABET_SIZE_CONCATENATE=$( wc -l < ${ALPHABET_FILE_CONCATENATE} )
+		ALPHABET_SIZE_CONCATENATE=$(( ${ALPHABET_SIZE_CONCATENATE} - 1 ))
+		echo "Translating reads into the alphabet induced by concatenation..."
+		function translationThread_concatenate() {
+			local THREAD_ID=$1
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks2 ${ALPHABET_FILE} ${ALPHABET_FILE_CONCATENATE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-10-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-11-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-12-${THREAD_ID}.txt
+		}
+		for THREAD in $(seq 0 ${TO}); do
+			translationThread_concatenate ${THREAD} &
+		done
+		wait
+		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-preConcatenation
+		mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-preConcatenation
+		mv ${FULLY_CONTAINED_FILE} ${FULLY_CONTAINED_FILE}-preConcatenation
+		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-preConcatenation
+		for THREAD in $(seq 0 ${TO}); do
+			cat ${TMPFILE_PATH}-concatenate-10-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+			cat ${TMPFILE_PATH}-concatenate-11-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
+			cat ${TMPFILE_PATH}-concatenate-12-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
+		done
+		mv ${ALPHABET_FILE_CONCATENATE} ${ALPHABET_FILE}
+		echo "Concatenation completed"
+		
+		# Next iteration
+		for THREAD in $(seq 0 ${TO}); do
+			mv ${TMPFILE_PATH}-concatenate-10-${THREAD}.txt ${TMPFILE_PATH}-8-${THREAD}.txt
+			mv ${TMPFILE_PATH}-concatenate-11-${THREAD}.txt ${TMPFILE_PATH}-9-${THREAD}.txt
+		done
+		ITER=$(( ${ITER} + 1 ))
 	fi
-fi
+done
 
 
 
 
-if [ ${CONCATENATE_BLOCKS} -eq 1 ]; then
-	echo "Concatenating adjacent blocks from the same non-periodic repeat"
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-concatenate-1-
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-concatenate-2- ${TMPFILE_PATH}-concatenate-3-
-	function concatenateThread() {
-		local THREAD_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks1 ${ALPHABET_FILE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt
-		sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt | uniq - ${TMPFILE_PATH}-concatenate-5-${THREAD_ID}.txt
-		rm -f ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt
-	}
-	echo "Collecting new characters from concatenation..."
-	if [ -e ${TMPFILE_PATH}-concatenate-1-lengths-${N_THREADS}.txt ]; then
-		TO=${N_THREADS}
-	else
-		TO=$(( ${N_THREADS} - 1 ))
-	fi
-	for THREAD in $(seq 0 ${TO}); do
-		concatenateThread ${THREAD}  &
-	done
-	wait
-	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-concatenate-5-*.txt | uniq - ${TMPFILE_PATH}-concatenate-6.txt
-	N_INSTANCES=$(wc -l < ${TMPFILE_PATH}-concatenate-6.txt)
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitCharacterInstances ${N_INSTANCES} ${N_THREADS} ${TMPFILE_PATH}-concatenate-6.txt ${TMPFILE_PATH}-concatenate-7-
-	echo "Compacting character instances..."
-	for THREAD in $(seq 0 ${TO}); do
-		compactionThread ${THREAD} "${TMPFILE_PATH}-concatenate-7-" "${TMPFILE_PATH}-concatenate-8-" "${TMPFILE_PATH}-concatenate-9-" &
-	done
-	wait
-	head -n 1 ${ALPHABET_FILE} | cut -d , -f 4 > "${TMPFILE_PATH}-concatenate-unique.txt"
-	ALPHABET_FILE_CONCATENATE="${INPUT_DIR}/alphabet-concatenate.txt"
-	rm -f ${ALPHABET_FILE_CONCATENATE}
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.MergeAlphabetHeaders ${INPUT_DIR} "${TMPFILE_NAME}-concatenate-9-" "${TMPFILE_PATH}-concatenate-unique" ${ALPHABET_FILE_CONCATENATE}
-	for THREAD in $(seq 0 ${TO}); do
-		tail -n +2 ${TMPFILE_PATH}-concatenate-9-${THREAD}.txt >> ${ALPHABET_FILE_CONCATENATE}
-	done
-	ALPHABET_SIZE_CONCATENATE=$( wc -l < ${ALPHABET_FILE_CONCATENATE} )
-	ALPHABET_SIZE_CONCATENATE=$(( ${ALPHABET_SIZE_CONCATENATE} - 1 ))
-	echo "Translating reads into the alphabet induced by concatenation..."
-	function translationThread_concatenate() {
-		local THREAD_ID=$1
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks2 ${ALPHABET_FILE} ${ALPHABET_FILE_CONCATENATE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-10-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-11-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-12-${THREAD_ID}.txt
-	}
-	for THREAD in $(seq 0 ${TO}); do
-		translationThread_concatenate ${THREAD} &
-	done
-	wait
-	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-preConcatenation
-	mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-preConcatenation
-	mv ${FULLY_CONTAINED_FILE} ${FULLY_CONTAINED_FILE}-preConcatenation
-	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-preConcatenation
-	for THREAD in $(seq 0 ${TO}); do
-		cat ${TMPFILE_PATH}-concatenate-10-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
-		cat ${TMPFILE_PATH}-concatenate-11-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
-		cat ${TMPFILE_PATH}-concatenate-12-${THREAD}.txt >> ${FULLY_CONTAINED_FILE}
-	done
-	mv ${ALPHABET_FILE_CONCATENATE} ${ALPHABET_FILE}
-	echo "Concatenation completed"
-fi
+
 
 
 
