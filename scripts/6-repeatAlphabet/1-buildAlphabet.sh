@@ -202,7 +202,7 @@ if [ ${TANDEM_SPACERS_ITERATIONS} -gt 0 ]; then
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-stash-
 fi
 ITER="1";
-while [ ${ITER} -lt ${TANDEM_SPACERS_ITERATIONS} ]; do
+while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 	rm -f ${TMPFILE_PATH}-tspacers-*
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-stash-*"); do
 		SUFFIX=${FILE#${TMPFILE_PATH}-stash-}
@@ -213,7 +213,7 @@ while [ ${ITER} -lt ${TANDEM_SPACERS_ITERATIONS} ]; do
 		local LOCAL_BOUNDARIES_FILE=$2
 		local LOCAL_READ_LENGTHS_FILE=$3
 		local LOCAL_TANDEMS_FILE=$4
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 0 ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 0 1 2 ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
 		if [ $? -ne 0 ]; then
 			exit
 		fi
