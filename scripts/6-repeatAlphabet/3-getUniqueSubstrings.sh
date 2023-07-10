@@ -21,6 +21,7 @@ N_THREADS=$5
 DELETE_TMP_FILES=$6
 IDENTITY_THRESHOLD=$7
 DISTANCE_THRESHOLD=$8
+CHARACTER_THRESHOLD=$9
 UNIQUE_MODE="1"  # Non-repetitive blocks are allowed in a k-mer, except at the first/last
 # position of the k-mer. Usually a good choice.
 # ----------------------------------------------------------------------------------------
@@ -66,7 +67,7 @@ function intervalsThread() {
 	local LOCAL_UNIQUE_KMERS_FILE=$5
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$6
 	local LOCAL_INTERVALS_FILE=$7
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_UNIQUE_KMERS_FILE} ${HAPLOTYPE_COVERAGE} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${CHARACTER_THRESHOLD} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
 	if [ $? -ne 0 ]; then
 		exit
 	fi

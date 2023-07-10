@@ -30,6 +30,7 @@ CONCATENATE_BLOCKS="1"
 # ------------------------- Properties of genome addresses -------------------------------
 IDENTITY_THRESHOLD="100"  # For ambiguous characters in first/last block. >=WOBBLE_LENGTH.
 DISTANCE_THRESHOLD=$(( ${IDENTITY_THRESHOLD} * 4 ))  # >=IDENTITY_THRESHOLD
+CHARACTER_THRESHOLD="0.8"  # For ambiguous characters in first/last block. Arbitrary.
 MAX_K_UNIQUE="8"  # Use k-mers up to this length as unique addresses
 MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than this n. of
 # bps are not considered trustworthy addresses on the genome.
@@ -55,7 +56,7 @@ fi
 PERIODIC_ENDPOINTS_FIXED=$(cat ${INPUT_DIR}/buildAlphabet-tmp-return.txt)
 MIN_K_FOR_DISAMBIGUATION="2"; MAX_K_FOR_DISAMBIGUATION="4"
 ./2-fixEndBlocks.sh ${INPUT_DIR} ${BROKEN_READS} ${HAPLOTYPE_COVERAGE} ${LOW_QUALITY_TYPE} ${MIN_K_FOR_DISAMBIGUATION} ${MAX_K_FOR_DISAMBIGUATION} ${N_THREADS} ${DELETE_TMP_FILES}
-./3-getUniqueSubstrings.sh ${INPUT_DIR} ${N_HAPLOTYPES} ${HAPLOTYPE_COVERAGE} ${MAX_K_UNIQUE} ${N_THREADS} ${DELETE_TMP_FILES} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD}
+./3-getUniqueSubstrings.sh ${INPUT_DIR} ${N_HAPLOTYPES} ${HAPLOTYPE_COVERAGE} ${MAX_K_UNIQUE} ${N_THREADS} ${DELETE_TMP_FILES} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${CHARACTER_THRESHOLD}
 ./4-filterAlignments.sh ${INPUT_DIR} ${BROKEN_READS} ${PERIODIC_ENDPOINTS_FIXED} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${MAX_K_UNIQUE} ${ALIGNMENT_FILTERING_MODE} ${MIN_INTERSECTION_NONREPETITIVE} ${N_THREADS} ${DELETE_TMP_FILES}
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 N_READS=$(wc -l < ${READ_LENGTHS_FILE})

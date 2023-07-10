@@ -197,7 +197,7 @@ done
 
 
 echo "Trying to fix tandem spacers if needed..."
-TANDEM_SPACERS_ITERATIONS="3"
+TANDEM_SPACERS_ITERATIONS="1"
 if [ ${TANDEM_SPACERS_ITERATIONS} -gt 0 ]; then
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-stash-
 fi
@@ -298,6 +298,8 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 		TANDEM_SPACERS_FIXED="1"
 		echo "Tandem spacers fixed"
+
+		#exit
 		
 		rm -f ${TMPFILE_PATH}-concatenate-*
 		for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-stash-*"); do
@@ -369,7 +371,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 	fi
 done
 
-
+exit
 
 
 

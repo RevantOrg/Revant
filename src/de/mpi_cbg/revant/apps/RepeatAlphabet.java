@@ -2068,7 +2068,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int UNIQUE_MODE = 1;
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
@@ -2105,11 +2105,11 @@ public class RepeatAlphabet {
 				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
 				if (nHaplotypes==-1) continue;
 				if ( (i!=0 && i!=nBlocks-k) ||
-					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,identityThreshold,distanceThreshold)) || 
-					 (i!=0 && i==nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,identityThreshold,distanceThreshold)) ||
+					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)) || 
+					 (i!=0 && i==nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)) ||
 					 ( i==0 && i==nBlocks-k && 
-					   !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,identityThreshold,distanceThreshold) &&
-					   !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,identityThreshold,distanceThreshold)
+					   !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction) &&
+					   !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)
 					 )
 				   ) { 
 					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
@@ -2215,11 +2215,13 @@ public class RepeatAlphabet {
 	 * @param characterID an element of $block$;
 	 * @param identityThreshold used to check if two positions are similar;
 	 * @param distanceThreshold used to check if two positions are different;
-	 * @return TRUE iff another character in $block$ contains $characterID$ as a suffix
-	 * (in the case of first block) or as a prefix (in the case of last block).
+	 * @return TRUE if the length of the block is less than $characterFraction$ times the
+	 * length of $characterID$, or if another character in $block$ contains $characterID$
+	 * as a suffix (for the first block) or as a prefix (for the last block).
 	 */
-	private static final boolean isCharacterAmbiguousInBlock(int characterID, int[] block, int block_last, boolean isFirstBlock, int identityThreshold, int distanceThreshold) {
+	private static final boolean isCharacterAmbiguousInBlock(int characterID, int[] block, int block_last, boolean isFirstBlock, int[] boundaries, int nBlocks, int readLength, int identityThreshold, int distanceThreshold, double characterFraction) {
 		final boolean orientation = alphabet[characterID].orientation;
+		final int blockLength = isFirstBlock?boundaries[0]:(readLength-boundaries[nBlocks-2]);
 		int i, c;
 		int start, end, length;
 		final int repeat = alphabet[characterID].repeat;
@@ -2227,6 +2229,7 @@ public class RepeatAlphabet {
 		
 		if (characterID>lastUnique && characterID<=lastPeriodic) {
 			length=alphabet[characterID].length;
+			if (blockLength<(int)(length*characterFraction)) return true;
 			for (i=0; i<=block_last; i++) {
 				c=block[i];
 				if (c==characterID) continue;
@@ -2237,6 +2240,7 @@ public class RepeatAlphabet {
 		}
 		else {
 			start=alphabet[characterID].start; end=alphabet[characterID].end;
+			if (blockLength<(int)((end-start+1)*characterFraction)) return true;
 			if (isFirstBlock) {
 				for (i=0; i<=block_last; i++) {
 					c=block[i];
@@ -4504,7 +4508,9 @@ public class RepeatAlphabet {
 	 * practice such a sequence is likely noise.
 	 *
 	 * @param bothReads discards an alignment if the conditions above hold on both reads
-	 * (TRUE) or on just one read (FALSE);
+	 * (TRUE) or on just one read (FALSE); if an alignment is contained in a tandem in 
+	 * just one read, it is likely that it covers one unit of the tandem in the other 
+	 * read, and the alignment is not necessarily real;
 	 * @param minIntersection_nonrepetitive min. length of a non-repetitive substring of 
 	 * the alignment, for the alignment not to be considered red; this should not be too 
 	 * small, since short non-repetitive regions might not address a unique locus of the 
@@ -4573,13 +4579,13 @@ public class RepeatAlphabet {
 					isShortPeriod=firstTandemBlockA>=0&&isBlockPeriodic(lastTranslated,firstTandemBlockA);
 					j=filterAlignments_tandem_straddlesShortPeriodTandem(blueIntervals[blueIntervalA][i],blueIntervals[blueIntervalA][i]+blueIntervals[blueIntervalA][i+1]-1,readA,lastTranslated,0,lastTandem[readA]);
 					if (!bothReads) {
-						if ((identicalA && isShortPeriod) || j>=0) {
+						if ((containedA && !identicalA) || (identicalA && isShortPeriod) || j>=0) {
 							bw.write("0\n"); str=br.readLine(); row++;
 							continue;
 						}
 					}
 					else {
-						if ((!identicalA || !isShortPeriod) && j<0) {
+						if ((!containedA || identicalA) && (!identicalA || !isShortPeriod) && j<0) {
 							out[1][type]++;
 							bw.write("1\n"); str=br.readLine(); row++;
 							continue;
@@ -4630,29 +4636,29 @@ public class RepeatAlphabet {
 					else lastTandemPosition=boundaries_all[p][tandems[readB][i+1]];
 					if (Intervals.areApproximatelyIdentical(startB,endB,firstTandemPosition,lastTandemPosition)) identicalB=true;
 					else if (Intervals.isApproximatelyContained(startB,endB,firstTandemPosition,lastTandemPosition)) containedB=true;
-					if (identicalB || containedB) {
+					if (identicalB || containedB) {						
 						firstTandemBlockB=tandems[readB][i];
 						lastTandemBlockB=tandems[readB][i+1];
 						break;
 					}
 				}
 				i=filterAlignments_tandem_isBlue_interval(blueIntervalB,startB,endB,lengthB,p);
-				if (i>=0) {
+				if (i>=0) {	
 					isShortPeriod=firstTandemBlockB>=0&&isBlockPeriodic(p,firstTandemBlockB);
 					j=filterAlignments_tandem_straddlesShortPeriodTandem(blueIntervals[blueIntervalB][i],blueIntervals[blueIntervalB][i]+blueIntervals[blueIntervalB][i+1]-1,readB,p,0,lastTandem[readB]);
 					if (!bothReads) {
-						if ((identicalB && isShortPeriod) || j>=0) {
+						if ((containedB && !identicalB) || (identicalB && isShortPeriod) || j>=0) {
 							bw.write("0\n"); str=br.readLine(); row++;
 							continue;
 						}
 					}
 					else {
-						if ((!identicalB || !isShortPeriod) && j<0) {
+						if ((!containedB || identicalB) && (!identicalB || !isShortPeriod) && j<0) {
 							out[1][type]++;
 							bw.write("1\n"); str=br.readLine(); row++;
 							continue;
 						}
-					}	
+					}
 				}
 				else {
 					if (!bothReads) {
@@ -8674,9 +8680,7 @@ if (spacers[i].read==1090) System.err.println("serializeSpacers> created the fol
 		int i, p;
 		int first, last, lastSolution;
 		Spacer spacer;
-	
-if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 1  readID="+readID+" blockID="+blockID);
-	
+		
 		first=blockID==0?0:boundaries[blockID-1];
 		last=blockID==nBlocks-1?readLength-1:boundaries[blockID];
 		while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<first)) spacersCursor++;
@@ -8685,7 +8689,6 @@ if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBloc
 			System.exit(1);
 		}
 		spacer=spacers[spacersCursor];
-if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 1.5  spacer="+spacer+" solutions: "+spacer.printSolutions());		
 		lastSolution=spacer.lastSolution;
 		p=-1;
 		for (i=0; i<=lastSolution; i+=3) {
@@ -8697,9 +8700,7 @@ if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBloc
 				tmpCharacter.repeat=-1-spacer.solutions[i];
 				tmpCharacter.orientation=false;
 			}
-if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 2  tmpCharacter.repeat="+tmpCharacter.repeat+" tmpCharacter.orientation="+tmpCharacter.orientation);
 			if (spacer.solutions[i+1]!=-1) {
-if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 2.5  lastSolution="+lastSolution);				
 				tmpCharacter.start=spacer.solutions[i+1];
 				tmpCharacter.end=spacer.solutions[i+2];
 				tmpCharacter.length=0;
@@ -8728,9 +8729,7 @@ if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBloc
 				}
 			}
 			tmpCharacter.quantize(quantum);
-if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 3  tmpCharacter="+tmpCharacter);
 			p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p);
-if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 4  p="+p+" tmpCharacter="+tmpCharacter);			
 			out[Math.min((tmpCharacter.start==-1?tmpCharacter.length:tmpCharacter.end-tmpCharacter.start+1)/IO.quantum,out.length-1)]++;
 		}
 		if (p==-1) {  // Spacer with no solution
@@ -8798,8 +8797,7 @@ if (readID==1090) System.err.println("tandemSpacers_updateTranslation_spacerBloc
 			p=tandemSpacers_lookupNonperiodic(character,newAlphabet,lastPeriodic_new,lastAlphabet_new,last);
 			if (p==last) {
 				System.err.println("tandemSpacers_updateTranslation_impl> ERROR: non-periodic character not found in the new alphabet\n query: "+character);
-				throw new RuntimeException();
-				//System.exit(1);
+				System.exit(1);
 			}
 			last=p;
 		}
