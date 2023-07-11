@@ -6637,10 +6637,7 @@ public class RepeatAlphabet {
 		BufferedWriter bw;
 		
 		bw = new BufferedWriter(new FileWriter(outputFile));
-		for (i=0; i<=lastSpacer; i++) {
-if (spacers[i].read==1090) System.err.println("serializeSpacers> created the following spacer on read "+spacers[i].read+": "+spacers[i]+" with solutions "+spacers[i].printSolutions());			
-			spacers[i].serialize(bw);
-		}
+		for (i=0; i<=lastSpacer; i++) spacers[i].serialize(bw);
 		bw.close();
 	}
 	
@@ -8797,7 +8794,8 @@ if (spacers[i].read==1090) System.err.println("serializeSpacers> created the fol
 			p=tandemSpacers_lookupNonperiodic(character,newAlphabet,lastPeriodic_new,lastAlphabet_new,last);
 			if (p==last) {
 				System.err.println("tandemSpacers_updateTranslation_impl> ERROR: non-periodic character not found in the new alphabet\n query: "+character);
-				System.exit(1);
+				throw new RuntimeException();
+				//System.exit(1);
 			}
 			last=p;
 		}
@@ -9055,7 +9053,7 @@ if (spacers[i].read==1090) System.err.println("serializeSpacers> created the fol
 		final int QUANTUM = IO.quantum;
 		boolean hasBoundary;
 		int i, j, k, p, c;
-		int max, nBlocks, nConcatenatedBlocks, last, toBlock, nextI, start, end;
+		int max, nBlocks, nConcatenatedBlocks, last, toBlock, nextI, start, end, blockLength, pPrime;
 		
 		// Allocating memory
 		nBlocks=loadBlocks(read2characters_old);
@@ -9089,6 +9087,59 @@ if (spacers[i].read==1090) System.err.println("serializeSpacers> created the fol
 				concatenateBlocks_impl(i,nBlocks,distanceThreshold,tmpBoolean1,tmpBoolean2,tmpArray);
 				if (tmpArray[0]==-1) {
 					p=concatenateBlocks_updateTranslation_impl(i,QUANTUM,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpCharacter);
+					if (i==0 || i==nBlocks-1) {
+						// Open blocks might also be implied by new characters that have
+						// been added to the alphabet by concatenation and that were not
+						// present in the original translation.
+						if (i==0) blockLength=nBlocks==1?readLength:boundaries[0];
+						else blockLength=readLength-(nBlocks==1?0:boundaries[i-1]);
+						pPrime=p; tmpCharacter.length=0;
+						for (j=0; j<=pPrime; j++) {
+							c=stack[j];
+							tmpCharacter.repeat=alphabet_new[c].repeat;
+							tmpCharacter.orientation=alphabet_new[c].orientation;
+							tmpCharacter.openStart=false; tmpCharacter.openEnd=false;
+							if (i==0) {
+								if (tmpCharacter.orientation) {
+									tmpCharacter.end=alphabet_new[c].end;
+									tmpCharacter.start=tmpCharacter.end-blockLength;
+									if (tmpCharacter.start<0) tmpCharacter.start=0;
+									tmpCharacter.openStart=true;
+								}
+								else {
+									tmpCharacter.start=alphabet_new[c].start;
+									tmpCharacter.end=tmpCharacter.start+blockLength;
+									if (tmpCharacter.end>=repeatLengths[tmpCharacter.repeat]) tmpCharacter.end=repeatLengths[tmpCharacter.repeat]-1;
+									tmpCharacter.openEnd=true;
+								}
+							}
+							if (i==nBlocks-1) {
+								if (tmpCharacter.orientation) {
+									tmpCharacter.start=alphabet_new[c].start;
+									tmpCharacter.end=tmpCharacter.start+blockLength;
+									if (tmpCharacter.end>=repeatLengths[tmpCharacter.repeat]) tmpCharacter.end=repeatLengths[tmpCharacter.repeat]-1;
+									tmpCharacter.openEnd=true;
+								}
+								else {
+									tmpCharacter.end=alphabet_new[c].end;
+									tmpCharacter.start=tmpCharacter.end-blockLength;
+									if (tmpCharacter.start<0) tmpCharacter.start=0;
+									tmpCharacter.openStart=true;
+								}
+							}
+							tmpCharacter.quantize(QUANTUM);
+System.err.println("VITTU> readID="+readID+" readLength="+readLength+" i="+i+" nBlocks="+nBlocks+" blockLength="+blockLength+" repeatLength="+repeatLengths[tmpCharacter.repeat]);							
+							p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,p);
+						}
+						if (p>0) {
+							Arrays.sort(stack,0,p+1);
+							j=0;
+							for (k=1; k<=p; k++) {
+								if (stack[k]!=stack[j]) stack[++j]=stack[k];
+							}
+							p=j;
+						}
+					}
 					toBlock=i; nextI=i+1;
 				}
 				else {
