@@ -30,7 +30,7 @@ CONCATENATE_BLOCKS="1"
 # ------------------------- Properties of genome addresses -------------------------------
 IDENTITY_THRESHOLD="100"  # For ambiguous characters in first/last block. >=WOBBLE_LENGTH.
 DISTANCE_THRESHOLD=$(( ${IDENTITY_THRESHOLD} * 4 ))  # >=IDENTITY_THRESHOLD
-CHARACTER_THRESHOLD="0.8"  # For ambiguous characters in first/last block. Arbitrary.
+CHARACTER_THRESHOLD="0.9"  # For ambiguous characters in first/last block. Arbitrary.
 MAX_K_UNIQUE="8"  # Use k-mers up to this length as unique addresses
 MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than this n. of
 # bps are not considered trustworthy addresses on the genome.
