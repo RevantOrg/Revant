@@ -7983,8 +7983,8 @@ public class RepeatAlphabet {
 	 * sequence of blocks that all have the same nonperiodic character) can be missing 
 	 * read-repeat alignments that are not reported by the aligner. This happens e.g. in 
 	 * daligner, even after increasing memory for read-repeat alignments. This procedure
-	 * loads in global variable $spacers$ all the non-repetitive blocks that are adjacent
-	 * to a tandem.
+	 * loads in global variable $spacers$ the sorted list of all the non-repetitive blocks
+	 * that are adjacent to a tandem.
 	 *
 	 * Remark: this procedure needs a non-periodic-only tandem track. Such a track might
 	 * be different from the non-periodic section of the tandem track that will be used
@@ -8312,34 +8312,21 @@ public class RepeatAlphabet {
 		int length, nBlocks, blockFirst, blockLast, repeatFirst, repeatLast;
 		Character tmpChar;
 		
-boolean fabio = spacer.read==301/* && Math.abs(spacer.first,25798)<=100*/;
-if (fabio) System.err.println("addSpacerSolutions> 1  readB="+readB+" fullyContainedB="+fullyContainedB+" blockB="+blockB+" spacer="+spacer);
-		
 		if (fullyContainedB) {
-if (fabio) System.err.println("addSpacerSolutions> 2");
 			length=fullyContained_translation[readB].length;
 			for (i=0; i<length; i++) {
 				c=fullyContained_translation[readB][i];
-				if (c<=lastPeriodic) {
-					spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
-if (fabio) System.err.println("addSpacerSolutions> 3");
-				}
+				if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
 			}
 		}
 		else {
-if (fabio) System.err.println("addSpacerSolutions> 4");
 			nBlocks=translation_all[readB].length;
 			length=translation_all[readB][blockB].length;
 			for (i=0; i<length; i++) {
 				c=translation_all[readB][blockB][i];
-if (fabio) System.err.println("addSpacerSolutions> 5  c="+c);				
 				if (c<=lastUnique || c>lastAlphabet) continue;
-				else if (c<=lastPeriodic) {
-					spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
-if (fabio) System.err.println("addSpacerSolutions> 6");
-				}
+				else if (c<=lastPeriodic) spacer.addSolution(alphabet[c].repeat,alphabet[c].orientation&Alignments.orientation,-1,-1,true);
 				else {
-if (fabio) System.err.println("addSpacerSolutions> 7");					
 					blockFirst=blockB==0?0:boundaries_all[readB][blockB-1];
 					blockLast=blockB==nBlocks-1?readLengthB-1:boundaries_all[readB][blockB];
 					if (alignmentLastB>blockLast) alignmentLastB=blockLast;
@@ -8370,12 +8357,10 @@ if (fabio) System.err.println("addSpacerSolutions> 7");
 							repeatLast=alphabet[c].end-(alignmentFirstB-blockFirst);
 						}
 					}
-if (fabio) System.err.println("addSpacerSolutions> 8");					
 					if (repeatFirst>=0 && repeatLast>=0 && repeatLast-repeatFirst+1>=MIN_SOLUTION_LENGTH) {
 						// repeat{First,Last} might be negative if the repeat is shorter
 						// than the block used for creating the solution.
-						spacer.addSolution(alphabet[c].repeat,repeatOrientation,repeatFirst,repeatLast,false);				
-if (fabio) System.err.println("addSpacerSolutions> 9");						
+						spacer.addSolution(alphabet[c].repeat,repeatOrientation,repeatFirst,repeatLast,false);
 					}
 				}
 			}
@@ -8452,6 +8437,201 @@ if (fabio) System.err.println("addSpacerSolutions> 9");
 		
 		return nSolved>=(lastSpacer+1)*THRESHOLD; 
 	}
+	
+	
+	/**
+	 * The procedure checks whether every the spacer aligns end-to-end to a sequence of 
+	 * repetitive blocks in another read, and if so it collects the projection of all such
+	 * block endpoints. Block endpoints are then clustered by connected components based
+	 * on distance $distanceThreshold$, as in $recodeRead()$, and the cluster centers are
+	 * used for creating child tandem spacers, which are added to $spacers$. Spacers that
+	 * created children spacers have $lastSplit>=0$; children spacers have $blockID=-1$.
+	 *
+	 * Remark: $spacers$ is sorted after the procedure completes; children spacers follow
+	 * their parent.
+	 *
+	 * Remark: the procedure needs $translation_all,boundaries_all,isBlockUnique_all$.
+	 *
+	 * @param distanceThreshold for building connected components to cluster block
+	 * endpoint projections.
+	 */
+	public static final void loadTandemSpacers_blocks(String alignmentsFile, int distanceThreshold, int[] tmpArray) throws IOException {
+		final int IDENTITY_THRESHOLD = IO.quantum;
+		final int nTranslated = translated.length;
+		boolean found;
+		int i, j, k, p;
+		int row, readA, readB, readBPrime, lengthB, fromB, toB, cell, offset, blockID, lastSplit;
+		int firstSpacer, translatedCursor, nBlocks, firstBlock, lastBlock, component, nComponents;
+		int nSpacersWithSolutions, nSpacersWithSplits, nSpacerChildren;
+		final int lastSpacerPrime = lastSpacer;
+		String str;
+		BufferedReader br;
+		
+		// Collecting splits
+		for (i=0; i<=lastSpacer; i++) spacers[i].lastSplit=-1;
+		br = new BufferedReader(new FileReader(alignmentsFile));
+		str=br.readLine(); str=br.readLine();  // Skipping header
+		str=br.readLine(); firstSpacer=0; translatedCursor=0; row=1;
+		if (str!=null) Alignments.readAlignmentFile(str);
+		while (str!=null && firstSpacer<=lastSpacer) {
+			readA=Alignments.readA-1;
+			if (readA<spacers[firstSpacer].read) {
+				str=br.readLine();
+				if (str!=null) {
+					Alignments.readAlignmentFile(str);
+					if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+				}
+				continue;
+			}
+			if (spacers[firstSpacer].read<readA) {
+				firstSpacer++;
+				continue;
+			}
+			while (translatedCursor<nTranslated && translated[translatedCursor]<readA) translatedCursor++;
+			if (translated[translatedCursor]!=readA) {
+				System.err.println("addSpacerSolutions_blocks> ERROR: readA="+readA+" is not translated but has a tandem spacer?!");
+				throw new RuntimeException();
+			}
+			readB=Alignments.readB-1;
+			if (Arrays.binarySearch(fullyUnique,readB)>=0) {
+				str=br.readLine();
+				if (str!=null) {
+					Alignments.readAlignmentFile(str);
+					if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+				}
+				continue;
+			}
+			if (Arrays.binarySearch(fullyContained,readB)>=0) {
+				str=br.readLine();
+				if (str!=null) {
+					Alignments.readAlignmentFile(str);
+					if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+				}
+				continue;
+			}
+			readBPrime=Arrays.binarySearch(translated,readB);
+			lengthB=Reads.getReadLength(readB);
+			for (i=firstSpacer; i<=lastSpacer; i++) {
+				if (spacers[i].read!=readA) break;
+				if ( !Intervals.isApproximatelyContained(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA) &&
+					 !Intervals.areApproximatelyIdentical(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA)
+				   ) continue;
+				if (!Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray)) continue;
+				fromB=tmpArray[0]; toB=tmpArray[1];
+				nBlocks=boundaries_all[readBPrime].length+1;
+				firstBlock=-1; lastBlock=-1;
+				for (j=0; j<nBlocks; j++) {
+					p=j==0?0:boundaries_all[readBPrime][j-1];
+					if (Math.abs(fromB,p)<=IDENTITY_THRESHOLD) firstBlock=j;
+					p=j==nBlocks-1?lengthB-1:boundaries_all[readBPrime][j];
+					if (Math.abs(toB,p)<=IDENTITY_THRESHOLD) { lastBlock=j; break; }
+				}
+				if (firstBlock==-1 || lastBlock==-1) continue;
+				found=false;
+				for (j=firstBlock; j<=lastBlock; j++) {
+					cell=isBlockUnique_all[readBPrime][j>>3]; offset=j%8;
+					if (cell&(1<<offset)!=0) { found=true; break; }
+				}
+				if (found) continue;
+				for (j=firstBlock; j<lastBlock; j++) spacers[i].addSplit(Alignments.projectIntersectionBA(boundaries_all[readBPrime][j]));
+			}
+			str=br.readLine();
+			if (str!=null) {
+				Alignments.readAlignmentFile(str);
+				if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+			}
+		}
+		br.close();
+		nSpacersWithSolution=0; nSpacersWithSplits=0;
+		for (i=0; i<=lastSpacer; i++) {
+			if (spacers[i].lastSolution>=0) nSpacersWithSolution++;
+			else if (spacers[i].lastSplit>=0) nSpacersWithSplits++;
+		}
+		System.err.println("Tandem spacers with splits: "+nSpacersWithSplits+" ("+((100.0*nSpacersWithSplits)/(lastSpacer+1))+"%)");
+		if (nSpacersWithSplits==0) return 0;
+		
+		// Clustering splits and creating child tandem spacers
+		nSpacerChildren=0;
+		for (i=0; i<=lastSpacerPrime; i++) {
+			// Clustering splits
+			if (spacers[i].lastSplit==-1) continue;
+			if (spacers[i].lastSplit>0) Arrays.sort(spacers[i].splits,0,spacers[i].lastSplit+1);
+			initializeGraph(spacers[i].lastSplit+1);
+			for (j=0; j<spacers[i].lastSplit; j++) {
+				for (k=j+1; k<=spacers[i].lastSplit; k++) {
+					if (spacers[i].splits[k]>spacers[i].splits[j]+distanceThreshold) break;
+					addEdge(j,k); addEdge(k,j);
+				}
+			}
+			nComponents=getConnectedComponent(spacers[i].lastSplit+1);
+			if (stack.length<(nComponents<<1)) stack = new int[nComponents<<1];
+			for (j=0; j<(nComponents<<1); j++) stack[j]=0;
+			for (j=0; j<=spacers[i].lastSplit; j++) {
+				component=connectedComponent[j]<<1;
+				stack[component]+=spacers[i].splits[j];
+				stack[component+1]++;
+			}
+			for (j=0; j<nComponents; j++) spacers[i].splits[j]=stack[j<<1]/stack[(j<<1)+1];
+			spacers[i].lastSplit=nComponents-1;
+			// Creating child tandem spacers
+			blockID=spacers[i].blockID;
+			lastSpacer++;
+			if (lastSpacer==spacers.length) {
+				Spacer[] newArray = new Spacer[spacers.length<<1];
+				System.arraycopy(spacers,0,newArray,0,spacers.length);
+				spacers=newArray;
+			}
+			if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
+			else spacers[lastSpacer].set(readID,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
+			lastSplit=spacers[i].lastSplit;
+			for (j=1; j<lastSplit; j++) {
+				lastSpacer++;
+				if (lastSpacer==spacers.length) {
+					Spacer[] newArray = new Spacer[spacers.length<<1];
+					System.arraycopy(spacers,0,newArray,0,spacers.length);
+					spacers=newArray;
+				}
+				if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,spacers[i].splits[j-1],spacers[i].splits[j],true,true,-1);
+				else spacers[lastSpacer].set(readID,spacers[i].splits[j-1],spacers[i].splits[j],true,true,-1);
+			}
+			lastSpacer++;
+			if (lastSpacer==spacers.length) {
+				Spacer[] newArray = new Spacer[spacers.length<<1];
+				System.arraycopy(spacers,0,newArray,0,spacers.length);
+				spacers=newArray;
+			}
+			if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,spacers[i].splits[lastSplit],spacers[i].last,false,blockID!=nBlocks-1,-1);
+			else spacers[lastSpacer].set(readID,spacers[i].splits[lastSplit],spacers[i].last,false,blockID!=nBlocks-1,-1);
+			nSpacerChildren+=lastSplit+1;
+		}
+		if (nSpacerChildren>0) {
+			// $Spacer.compareTo()$ guarantees that every parent spacer occurs before all
+			// its children.
+			Arrays.sort(spacers,0,lastSpacer+1);
+		}
+		System.err.println("Created "+nSpacerChildren+" tandem spacer children ("+((100.0*nSpacerChildren)/(lastSpacer+1))+"% of all spacers)");
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	/**
@@ -9925,12 +10105,17 @@ if (fabio) System.err.println("addSpacerSolutions> 9");
 		}
 		
 		/**
-		 * By $read$ only.
+		 * By increasing $read,first$, decreasing $last$. This is to make a parent spacer
+		 * occur before all its children in $loadTandemSpacers_blocks()$.
 		 */
 		public int compareTo(Object other) {
 			Spacer otherSpacer = (Spacer)other;
 			if (read<otherSpacer.read) return -1;
 			else if (read>otherSpacer.read) return 1;
+			if (first<otherSpacer.first) return -1;
+			else if (first>otherSpacer.first) return 1;
+			if (last>otherSpacer.last) return -1;
+			else if (last<otherSpacer.last) return 1;
 			return 0;
 		}
 		

@@ -808,5 +808,14 @@ public class Alignments {
 		return true;
 	}
 	
+	
+	/**
+	 * Same as $projectIntersectionBA()$, but projects a point.
+	 */
+	public static final int projectIntersectionBA(int x) {
+		final int fromB = x>startB?x:startB;
+		final double ratio = ((double)(endA-startA+1))/(endB-startB+1);
+		return orientation?startA+(int)(ratio*(fromB-startB)):endA-(int)(ratio*(fromB-startB));
+	}
 
 }
