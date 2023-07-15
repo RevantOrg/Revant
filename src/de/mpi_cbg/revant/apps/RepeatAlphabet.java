@@ -8440,26 +8440,35 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * The procedure checks whether every the spacer aligns end-to-end to a sequence of 
-	 * repetitive blocks in another read, and if so it collects the projection of all such
-	 * block endpoints. Block endpoints are then clustered by connected components based
-	 * on distance $distanceThreshold$, as in $recodeRead()$, and the cluster centers are
-	 * used for creating child tandem spacers, which are added to $spacers$. Spacers that
-	 * created children spacers have $lastSplit>=0$; children spacers have $blockID=-1$.
+	 * The procedure checks whether every spacer aligns to a sequence of repetitive blocks
+	 * in another read, and if so it collects the projection of all such block endpoints.
+	 * Block endpoints are then clustered by connected component based on distance
+	 * $distanceThreshold$, as in $recodeRead()$, and the cluster centers are used for
+	 * creating child tandem spacers, which are added to $spacers$. Spacers that spawn
+	 * children spacers are marked with $lastSplit>=0$; children spacers are marked with
+	 * $blockID=-1$.
+	 * 
+	 * Remark: every block boundary is projected onto a spacer, including those of non-
+	 * repetitive blocks. So, in the end, only parts of a spacer might get filled in with
+	 * resolved child blocks.
+	 *
+	 * Remark: using read-read alignment boundaries, instead of block boundaries, does not
+	 * give a clear signal in practice.
 	 *
 	 * Remark: $spacers$ is sorted after the procedure completes; children spacers follow
 	 * their parent.
 	 *
-	 * Remark: the procedure needs $translation_all,boundaries_all,isBlockUnique_all$.
+	 * Remark: the procedure needs global arrays $translation_all,boundaries_all,
+	 * isBlockUnique_all,translated$.
 	 *
 	 * @param distanceThreshold for building connected components to cluster block
-	 * endpoint projections.
+	 * endpoint projections;
+	 * @param tmpArray of size at least two.
 	 */
 	public static final void loadTandemSpacers_blocks(String alignmentsFile, int distanceThreshold, int[] tmpArray) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int nTranslated = translated.length;
-		boolean found;
-		int i, j, k, p;
+		int i, j, k, p, q;
 		int row, readA, readB, readBPrime, lengthB, fromB, toB, cell, offset, blockID, lastSplit;
 		int firstSpacer, translatedCursor, nBlocks, firstBlock, lastBlock, component, nComponents;
 		int nSpacersWithSolutions, nSpacersWithSplits, nSpacerChildren;
@@ -8522,18 +8531,13 @@ public class RepeatAlphabet {
 				firstBlock=-1; lastBlock=-1;
 				for (j=0; j<nBlocks; j++) {
 					p=j==0?0:boundaries_all[readBPrime][j-1];
-					if (Math.abs(fromB,p)<=IDENTITY_THRESHOLD) firstBlock=j;
-					p=j==nBlocks-1?lengthB-1:boundaries_all[readBPrime][j];
-					if (Math.abs(toB,p)<=IDENTITY_THRESHOLD) { lastBlock=j; break; }
+					q=j==nBlocks-1?lengthB-1:boundaries_all[readBPrime][j];
+					if (fromB>=p-IDENTITY_THRESHOLD && fromB<=q+IDENTITY_THRESHOLD) firstBlock=j;
+					if (toB>=p-IDENTITY_THRESHOLD && toB<=q+IDENTITY_THRESHOLD) { lastBlock=j; break; }
 				}
-				if (firstBlock==-1 || lastBlock==-1) continue;
-				found=false;
-				for (j=firstBlock; j<=lastBlock; j++) {
-					cell=isBlockUnique_all[readBPrime][j>>3]; offset=j%8;
-					if (cell&(1<<offset)!=0) { found=true; break; }
+				for (j=firstBlock; j<lastBlock; j++) {
+					spacers[i].addSplit(Alignments.projectIntersectionBA(boundaries_all[readBPrime][j]));
 				}
-				if (found) continue;
-				for (j=firstBlock; j<lastBlock; j++) spacers[i].addSplit(Alignments.projectIntersectionBA(boundaries_all[readBPrime][j]));
 			}
 			str=br.readLine();
 			if (str!=null) {
@@ -8542,16 +8546,15 @@ public class RepeatAlphabet {
 			}
 		}
 		br.close();
-		nSpacersWithSolution=0; nSpacersWithSplits=0;
+		nSpacersWithSolutions=0; nSpacersWithSplits=0;
 		for (i=0; i<=lastSpacer; i++) {
-			if (spacers[i].lastSolution>=0) nSpacersWithSolution++;
-			else if (spacers[i].lastSplit>=0) nSpacersWithSplits++;
+			if (spacers[i].lastSplit>=0) nSpacersWithSplits++;
 		}
 		System.err.println("Tandem spacers with splits: "+nSpacersWithSplits+" ("+((100.0*nSpacersWithSplits)/(lastSpacer+1))+"%)");
-		if (nSpacersWithSplits==0) return 0;
+		if (nSpacersWithSplits==0) return;
 		
 		// Clustering splits and creating child tandem spacers
-		nSpacerChildren=0;
+		nSpacerChildren=0; translatedCursor=0;
 		for (i=0; i<=lastSpacerPrime; i++) {
 			// Clustering splits
 			if (spacers[i].lastSplit==-1) continue;
@@ -8565,7 +8568,7 @@ public class RepeatAlphabet {
 			}
 			nComponents=getConnectedComponent(spacers[i].lastSplit+1);
 			if (stack.length<(nComponents<<1)) stack = new int[nComponents<<1];
-			for (j=0; j<(nComponents<<1); j++) stack[j]=0;
+			Math.set(stack,(nComponents<<1)-1,0);
 			for (j=0; j<=spacers[i].lastSplit; j++) {
 				component=connectedComponent[j]<<1;
 				stack[component]+=spacers[i].splits[j];
@@ -8581,8 +8584,8 @@ public class RepeatAlphabet {
 				System.arraycopy(spacers,0,newArray,0,spacers.length);
 				spacers=newArray;
 			}
-			if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
-			else spacers[lastSpacer].set(readID,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
+			if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(spacers[i].read,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
+			else spacers[lastSpacer].set(spacers[i].read,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
 			lastSplit=spacers[i].lastSplit;
 			for (j=1; j<lastSplit; j++) {
 				lastSpacer++;
@@ -8591,8 +8594,8 @@ public class RepeatAlphabet {
 					System.arraycopy(spacers,0,newArray,0,spacers.length);
 					spacers=newArray;
 				}
-				if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,spacers[i].splits[j-1],spacers[i].splits[j],true,true,-1);
-				else spacers[lastSpacer].set(readID,spacers[i].splits[j-1],spacers[i].splits[j],true,true,-1);
+				if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(spacers[i].read,spacers[i].splits[j-1],spacers[i].splits[j],true,true,-1);
+				else spacers[lastSpacer].set(spacers[i].read,spacers[i].splits[j-1],spacers[i].splits[j],true,true,-1);
 			}
 			lastSpacer++;
 			if (lastSpacer==spacers.length) {
@@ -8600,13 +8603,14 @@ public class RepeatAlphabet {
 				System.arraycopy(spacers,0,newArray,0,spacers.length);
 				spacers=newArray;
 			}
-			if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,spacers[i].splits[lastSplit],spacers[i].last,false,blockID!=nBlocks-1,-1);
-			else spacers[lastSpacer].set(readID,spacers[i].splits[lastSplit],spacers[i].last,false,blockID!=nBlocks-1,-1);
+			while (translatedCursor<nTranslated && translated[translatedCursor]<spacers[i].read) translatedCursor++;
+			if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(spacers[i].read,spacers[i].splits[lastSplit],spacers[i].last,false,blockID!=translation_all[translatedCursor].length-1,-1);
+			else spacers[lastSpacer].set(spacers[i].read,spacers[i].splits[lastSplit],spacers[i].last,false,blockID!=translation_all[translatedCursor].length-1,-1);
 			nSpacerChildren+=lastSplit+1;
 		}
 		if (nSpacerChildren>0) {
 			// $Spacer.compareTo()$ guarantees that every parent spacer occurs before all
-			// its children.
+			// of its children.
 			Arrays.sort(spacers,0,lastSpacer+1);
 		}
 		System.err.println("Created "+nSpacerChildren+" tandem spacer children ("+((100.0*nSpacerChildren)/(lastSpacer+1))+"% of all spacers)");
@@ -9929,6 +9933,8 @@ public class RepeatAlphabet {
 		private static final int CAPACITY = 12;  // Arbitrary, multiple of 3.
 		public int[] solutions;
 		public int lastSolution;
+		public int[] splits;
+		public int lastSplit;
 		
 		/**
 		 * Index of the non-repetitive block (if any) in the translation of $read$.
@@ -9951,6 +9957,7 @@ public class RepeatAlphabet {
 			this.rigidLeft=fl; this.rigidRight=fr;
 			this.blockID=b;
 			breakpoint=-1;
+			lastSplit=-1;
 		}
 		
 		public boolean isRigid() { return rigidLeft||rigidRight; }
@@ -10106,7 +10113,7 @@ public class RepeatAlphabet {
 		
 		/**
 		 * By increasing $read,first$, decreasing $last$. This is to make a parent spacer
-		 * occur before all its children in $loadTandemSpacers_blocks()$.
+		 * occur before all of its children in $loadTandemSpacers_blocks()$.
 		 */
 		public int compareTo(Object other) {
 			Spacer otherSpacer = (Spacer)other;
@@ -10127,7 +10134,24 @@ public class RepeatAlphabet {
 			return out;
 		}
 		
+		/**
+		 * @param p absolute position in the read.
+		 */
+		public void addSplit(int p) {
+			final int CAPACITY = 5;  // Arbitrary
+			
+			if (splits==null) splits = new int[CAPACITY];
+			else if (lastSplit+1==splits.length) {
+				int[] newArray = new int[splits.length<<1];
+				System.arraycopy(splits,0,newArray,0,splits.length);
+				splits=newArray;
+			}
+			splits[++lastSplit]=p;
+		}
+		
 		public void serialize(BufferedWriter bw) throws IOException {
+			int i;
+			
 			bw.write(read+""+SEPARATOR_MINOR);
 			bw.write(first+""+SEPARATOR_MINOR);
 			bw.write(last+""+SEPARATOR_MINOR);
@@ -10135,14 +10159,16 @@ public class RepeatAlphabet {
 			bw.write(blockID+""+SEPARATOR_MINOR);
 			bw.write((rigidLeft?"1":"0")+SEPARATOR_MINOR);
 			bw.write((rigidRight?"1":"0")+SEPARATOR_MINOR);
-			bw.write(lastSolution+""+SEPARATOR_MINOR);
-			if (lastSolution==-1) { bw.newLine(); return; }
-			bw.write(solutions[0]+"");
-			for (int i=1; i<=lastSolution; i++) bw.write(SEPARATOR_MINOR+""+solutions[i]);
+			bw.write(lastSolution+"");
+			for (i=0; i<=lastSolution; i++) bw.write(SEPARATOR_MINOR+""+solutions[i]);
+			bw.write(SEPARATOR_MINOR+""+lastSplit);
+			for (i=0; i<=lastSplit; i++) bw.write(SEPARATOR_MINOR+""+splits[i]);
 			bw.newLine();
 		}
 		
 		public void deserialize(String str) throws IOException {
+			int i, j;
+			
 			String[] tokens = str.split(SEPARATOR_MINOR+"");
 			read=Integer.parseInt(tokens[0]);
 			first=Integer.parseInt(tokens[1]);
@@ -10152,9 +10178,17 @@ public class RepeatAlphabet {
 			rigidLeft=Integer.parseInt(tokens[5])==1;
 			rigidRight=Integer.parseInt(tokens[6])==1;
 			lastSolution=Integer.parseInt(tokens[7]);
-			if (lastSolution==-1) return;
-			solutions = new int[lastSolution+1];
-			for (int i=0; i<=lastSolution; i++) solutions[i]=Integer.parseInt(tokens[8+i]);
+			if (lastSolution>=0) {
+				solutions = new int[lastSolution+1];
+				i=8;
+				for (j=0; j<=lastSolution; j++) solutions[j]=Integer.parseInt(tokens[i++]);
+			}
+			else i=8;
+			lastSplit=Integer.parseInt(tokens[i]);
+			if (lastSplit>=0) {
+				splits = new int[lastSplit+1];
+				for (j=0; j<=lastSplit; j++) splits[j]=Integer.parseInt(tokens[++i]);
+			}
 		}
 	}
 	
