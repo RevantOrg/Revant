@@ -21,9 +21,10 @@ public class FixTandemSpacers3 {
 		final String READ2CHARACTERS_FILE_OLD = args[6];  // Of a chunk of reads
 		final String READ2BOUNDARIES_FILE_OLD = args[7];  // Of a chunk of reads
 		final String READ2CHARACTERS_FILE_NEW = args[8];  // Of a chunk of reads
-		final String TANDEMS_FILE = args[9];  // Of a chunk of reads
-		final String REPEAT_LENGTHS_FILE = args[10];
-		final int N_REPEATS = Integer.parseInt(args[11]);
+		final String READ2BOUNDARIES_FILE_NEW = args[9];  // Of a chunk of reads
+		final String TANDEMS_FILE = args[10];  // Of a chunk of reads
+		final String REPEAT_LENGTHS_FILE = args[11];
+		final int N_REPEATS = Integer.parseInt(args[12]);
 		
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		
@@ -31,7 +32,7 @@ public class FixTandemSpacers3 {
 		int sum, lastUnique_old, lastPeriodic_old, lastAlphabet_old, lastUnique_new, lastPeriodic_new, lastAlphabet_new, nBlocks;
 		String str1, str2, str3, str4, str5;
 		BufferedReader br1, br2, br3, br4, br5;
-		BufferedWriter bw;
+		BufferedWriter bw1, bw2;
 		RepeatAlphabet.Character tmpCharacter = new RepeatAlphabet.Character();
 		int[] histogram;
 		RepeatAlphabet.Character[] oldAlphabet, newAlphabet;
@@ -58,14 +59,15 @@ public class FixTandemSpacers3 {
 		br3 = new BufferedReader(new FileReader(READ2CHARACTERS_FILE_OLD));
 		br4 = new BufferedReader(new FileReader(READ2BOUNDARIES_FILE_OLD));
 		br5 = new BufferedReader(new FileReader(TANDEMS_FILE));
-		bw = new BufferedWriter(new FileWriter(READ2CHARACTERS_FILE_NEW));
+		bw1 = new BufferedWriter(new FileWriter(READ2CHARACTERS_FILE_NEW));
+		bw2 = new BufferedWriter(new FileWriter(READ2BOUNDARIES_FILE_NEW));
 		i=0; j=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		while (str1!=null) {
-			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw,DISTANCE_THRESHOLD,histogram,tmpCharacter);
+			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,DISTANCE_THRESHOLD,histogram,tmpCharacter);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		}
-		br1.close(); br2.close(); br3.close(); br4.close(); br5.close(); bw.close();
+		br1.close(); br2.close(); br3.close(); br4.close(); br5.close(); bw1.close(); bw2.close();
 		sum=0;
 		for (i=0; i<histogram.length; i++) sum+=histogram[i];
 		System.err.println("Fixed "+sum+" tandem spacers. Histogram of fixed tandem spacers lengths:");

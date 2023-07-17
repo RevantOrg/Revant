@@ -194,7 +194,7 @@ for THREAD in $(seq 0 ${TO}); do
 done
 
 
-#exit
+
 
 echo "Trying to fix tandem spacers if needed..."
 TANDEM_SPACERS_ITERATIONS="1"
@@ -279,21 +279,24 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		function translationThread_tspacers() {
 			local THREAD_ID=$1
 			local READ2CHARACTERS_FILE_NEW=$2
+			local READ2BOUNDARIES_FILE_NEW=$3
 			local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-tspacers-5-${THREAD_ID}.txt"
 			local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
-			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers3 ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-tspacers-5-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-5-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-2-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS}
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers3 ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-tspacers-5-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-5-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-2-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS}
 			if [ $? -ne 0 ]; then
 				exit
 			fi
 		}
 		for THREAD in $(seq 0 ${TO}); do
-			translationThread_tspacers ${THREAD} "${TMPFILE_PATH}-tspacers-12-" &
+			translationThread_tspacers ${THREAD} "${TMPFILE_PATH}-tspacers-12-" "${TMPFILE_PATH}-tspacers-13-" &
 		done
 		wait
 		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-preTspacers
+		mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-preTspacers
 		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-preTspacers
 		for THREAD in $(seq 0 ${TO}); do
 			cat ${TMPFILE_PATH}-tspacers-12-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+			cat ${TMPFILE_PATH}-tspacers-13-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
 		done
 		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 		TANDEM_SPACERS_FIXED="1"
