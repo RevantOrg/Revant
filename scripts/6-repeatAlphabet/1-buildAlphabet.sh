@@ -301,7 +301,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 		TANDEM_SPACERS_FIXED="1"
 		echo "Tandem spacers fixed"
-
+		
 		exit
 		
 		rm -f ${TMPFILE_PATH}-concatenate-*
@@ -374,7 +374,6 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 	fi
 done
 
-#exit
 
 
 

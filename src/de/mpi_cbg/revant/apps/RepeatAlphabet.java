@@ -8786,6 +8786,9 @@ public class RepeatAlphabet {
 	 * every existing and new character induced by solving a tandem spacer, and keeps a 
 	 * tandem spacer with no solution intact.
 	 *
+	 * Remark: this procedure might put extra separators in $read2boundaries_new$. This
+	 * does not cause harm and is left like this just to make the code simpler.
+	 *
 	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded, and 
 	 * that global variable $alphabet$ contains the old alphabet.
 	 *
@@ -8875,7 +8878,7 @@ public class RepeatAlphabet {
 			}
 			if (i<nBlocks-1) {
 				read2characters_new.write(SEPARATOR_MAJOR+"");
-				read2boundaries_new.write(boundaries[i]+""+(i<nBlocks-2?SEPARATOR_MINOR:""));
+				read2boundaries_new.write(boundaries[i]+""+SEPARATOR_MINOR);
 			}
 		}
 		read2characters_new.newLine(); read2boundaries_new.newLine();
@@ -8954,6 +8957,8 @@ public class RepeatAlphabet {
 				tmpCharacter.openEnd=blockID==nBlocks-1&&spacersCursor==to;
 				tmpCharacter.quantize(quantum);
 				p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,p,true);
+				read2characters_new.write(stack[0]+"");
+				for (i=1; i<=p; i++) read2characters_new.write(SEPARATOR_MINOR+""+stack[i]);			
 				if (spacersCursor<to) {
 					read2characters_new.write(SEPARATOR_MAJOR+"");
 					read2boundaries_new.write(spacer.last+""+(spacersCursor<=to-2||(spacersCursor==to-1&&blockID<nBlocks-1)?SEPARATOR_MINOR:""));
