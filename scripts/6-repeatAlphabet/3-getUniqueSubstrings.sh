@@ -123,12 +123,13 @@ rm -f ${INTERVAL_STATS_FILE}
 java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.UniqueIntervalsStats ${FINAL_INTERVALS_FILE} ${READS_TRANSLATED_BOUNDARIES} ${INTERVAL_STATS_FILE}
 
 # Collecting tandem intervals
+NONPERIODIC_MODE="0"  # Tightest definition of non-periodic tandem
 function tandemsThread() {
 	local LOCAL_TRANSLATED_READS_FILE=$1
 	local LOCAL_BOUNDARIES_FILE=$2
 	local LOCAL_READ_LENGTHS_FILE=$3
 	local LOCAL_TANDEMS_FILE=$4
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 1 1 0 ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 1 1 ${NONPERIODIC_MODE} ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
 	if [ $? -ne 0 ]; then
 		exit
 	fi

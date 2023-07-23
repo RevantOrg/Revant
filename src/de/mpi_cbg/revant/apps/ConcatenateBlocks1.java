@@ -23,12 +23,12 @@ public class ConcatenateBlocks1 {
 		final String TRANSLATED_READS_CHARACTERS_FILE = args[2];  // Of a chunk of reads
 		final String TRANSLATED_READS_BOUNDARIES_FILE = args[3];  // Of a chunk of reads
 		final String REPEAT_LENGTHS_FILE = args[4];
-		final int N_REPEATS = Integer.parseInt(args[5]);		
-		final String OUTPUT_FILE = args[6];  // Of a chunk of reads
+		final int N_REPEATS = Integer.parseInt(args[5]);
+		final int DISTANCE_THRESHOLD = Integer.parseInt(args[6]);
+		final String OUTPUT_FILE = args[7];  // Of a chunk of reads
 		
 		final int CAPACITY = 100;  // Arbitrary
 		final int QUANTUM = IO.quantum;
-		final int DISTANCE_THRESHOLD = QUANTUM;
 		
 		int i;
 		int nBlocks;

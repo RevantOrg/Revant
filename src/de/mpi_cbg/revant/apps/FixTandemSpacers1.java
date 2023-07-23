@@ -17,6 +17,9 @@ import de.mpi_cbg.revant.factorize.Reads;
  */
 public class FixTandemSpacers1 {
 	
+	/**
+	 * @param args 12 TRUE=use all non-repetitive blocks in a read.
+	 */
 	public static void main(String[] args) throws IOException {
 		final int N_READS = Integer.parseInt(args[0]);
 		final String READ_IDS_FILE = args[1];
@@ -30,7 +33,8 @@ public class FixTandemSpacers1 {
 		final int N_FULLY_CONTAINED = Integer.parseInt(args[9]);
 		final String READ_READ_ALIGNMENTS_FILE = args[10];
 		final String TANDEMS_FILE = args[11];
-		final String OUTPUT_FILE = args[12];
+		final int NONREPETITIVE_BLOCKS_MODE = Integer.parseInt(args[12]);
+		final String OUTPUT_FILE = args[13];
 		
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		
@@ -44,7 +48,7 @@ public class FixTandemSpacers1 {
 		maxBlockLength=RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_CHARACTERS_FILE,true,true,TRANSLATED_READS_BOUNDARIES_FILE);
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadTandemIntervals(TANDEMS_FILE,N_READS);
-		RepeatAlphabet.loadTandemSpacers();
+		RepeatAlphabet.loadTandemSpacers(NONREPETITIVE_BLOCKS_MODE);
 		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,tmpArray);
 		if (RepeatAlphabet.lastSpacer==-1) { System.out.println("1"); return; }
 		RepeatAlphabet.loadFullyContainedTranslation(TRANSLATED_READS_CHARACTERS_FILE,N_FULLY_CONTAINED);

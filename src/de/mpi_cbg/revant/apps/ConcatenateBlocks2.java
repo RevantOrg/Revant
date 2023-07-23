@@ -19,12 +19,12 @@ public class ConcatenateBlocks2 {
 		final int N_REPEATS = Integer.parseInt(args[4]);
 		final String READ2CHARACTERS_FILE_OLD = args[5];  // Of a chunk of reads
 		final String READ2BOUNDARIES_FILE_OLD = args[6];  // Of a chunk of reads
-		final String READ2CHARACTERS_FILE_NEW = args[7];  // Of a chunk of reads
-		final String READ2BOUNDARIES_FILE_NEW = args[8];  // Of a chunk of reads
-		final String FULLYCONTAINED_FILE_NEW = args[9];  // Of a chunk of reads
+		final int DISTANCE_THRESHOLD = Integer.parseInt(args[7]);
+		final String READ2CHARACTERS_FILE_NEW = args[8];  // Of a chunk of reads
+		final String READ2BOUNDARIES_FILE_NEW = args[9];  // Of a chunk of reads
+		final String FULLYCONTAINED_FILE_NEW = args[10];  // Of a chunk of reads
 		
 		final int CAPACITY = 100;  // Arbitrary
-		final int DISTANCE_THRESHOLD = IO.quantum;
 		
 		int i;
 		int lastUnique_old, lastPeriodic_old, lastAlphabet_old, lastUnique_new, lastPeriodic_new, lastAlphabet_new, nBlocks;

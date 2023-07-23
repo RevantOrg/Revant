@@ -25,6 +25,7 @@ public class FixTandemSpacers3 {
 		final String TANDEMS_FILE = args[10];  // Of a chunk of reads
 		final String REPEAT_LENGTHS_FILE = args[11];
 		final int N_REPEATS = Integer.parseInt(args[12]);
+		final int NONREPETITIVE_BLOCKS_MODE = Integer.parseInt(args[13]);
 		
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		
@@ -64,7 +65,7 @@ public class FixTandemSpacers3 {
 		i=0; j=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		while (str1!=null) {
-			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,DISTANCE_THRESHOLD,histogram,tmpCharacter);
+			j=RepeatAlphabet.tandemSpacers_updateTranslation(Integer.parseInt(str1),Integer.parseInt(str2),j,str3,str4,str5,NONREPETITIVE_BLOCKS_MODE,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,DISTANCE_THRESHOLD,histogram,tmpCharacter);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		}
 		br1.close(); br2.close(); br3.close(); br4.close(); br5.close(); bw1.close(); bw2.close();

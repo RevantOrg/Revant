@@ -82,7 +82,7 @@ public class RepeatAlphabet {
 	/**
 	 * Data structures for fixing inaccurate periodic endpoints.
 	 */
-	private static Spacer[] spacers;
+	public static Spacer[] spacers;
 	public static int lastSpacer, nRigidSpacers, nBridgingSpacers, nInactiveSpacers;
 	private static double[][] spacerNeighbors;
 	private static int[] lastSpacerNeighbor;
@@ -2216,50 +2216,67 @@ public class RepeatAlphabet {
 	 * @param identityThreshold used to check if two positions are similar;
 	 * @param distanceThreshold used to check if two positions are different;
 	 * @return TRUE if the length of the block is less than $characterFraction$ times the
-	 * length of $characterID$, or if another character in $block$ contains $characterID$
-	 * as a suffix (for the first block) or as a prefix (for the last block).
+	 * length of $characterID$, or if another character in the alphabet contains 
+	 * $characterID$ as a suffix (for the first block) or as a prefix (for the last
+	 * block), or is similar to $characterID$.
 	 */
 	private static final boolean isCharacterAmbiguousInBlock(int characterID, int[] block, int block_last, boolean isFirstBlock, int[] boundaries, int nBlocks, int readLength, int identityThreshold, int distanceThreshold, double characterFraction) {
-		final boolean orientation = alphabet[characterID].orientation;
+		final Character currentCharacter = alphabet[characterID];
+		final int repeat = currentCharacter.repeat;
+		final boolean orientation = currentCharacter.orientation;
+		final int start = currentCharacter.start;
+		final int end = currentCharacter.end;
+		final int length = currentCharacter.getLength();
 		final int blockLength = isFirstBlock?boundaries[0]:(readLength-boundaries[nBlocks-2]);
 		int i, c;
-		int start, end, length;
-		final int repeat = alphabet[characterID].repeat;
 		Character character;
 		
 		if (characterID>lastUnique && characterID<=lastPeriodic) {
-			length=alphabet[characterID].length;
 			if (blockLength<(int)(length*characterFraction)) return true;
-			for (i=0; i<=block_last; i++) {
-				c=block[i];
-				if (c==characterID) continue;
-				character=alphabet[c];
-				if (character.repeat!=repeat || character.orientation!=orientation) continue;
-				if (character.length>length+distanceThreshold) return true;
+			for (i=characterID-1; i>lastUnique; i--) {
+				character=alphabet[i];
+				if (character.repeat!=repeat || character.orientation!=orientation || character.length<length-identityThreshold) break;
+				return true;
+			}
+			for (i=characterID+1; i<=lastPeriodic; i++) {
+				character=alphabet[i];
+				if (character.repeat!=repeat || character.orientation!=orientation) break;
+				if (character.length<=length+identityThreshold || character.implies(currentCharacter)) return true;
 			}
 		}
 		else {
-			start=alphabet[characterID].start; end=alphabet[characterID].end;
-			if (blockLength<(int)((end-start+1)*characterFraction)) return true;
+			if (blockLength<(int)(length*characterFraction)) return true;
 			if (isFirstBlock) {
-				for (i=0; i<=block_last; i++) {
-					c=block[i];
-					if (c==characterID) continue;
-					character=alphabet[c];
+				for (i=characterID-1; i>lastPeriodic; i--) {
+					character=alphabet[i];
 					if (character.repeat!=repeat || character.orientation!=orientation) continue;
-					if ( (orientation && Math.abs(character.end,end)<=identityThreshold && character.start<start-distanceThreshold) ||
+					if ( (Math.abs(character.start,start)<=identityThreshold && Math.abs(character.end,end)<=identityThreshold && Math.abs(character.getLength(),length)<=identityThreshold) ||
+						 (orientation && Math.abs(character.end,end)<=identityThreshold && character.start<start-distanceThreshold) ||
+						 (!orientation && Math.abs(character.start,start)<=identityThreshold && character.end>end+distanceThreshold)	 
+					   ) return true;
+				}
+				for (i=characterID+1; i<=lastAlphabet; i++) {
+					character=alphabet[i];
+					if (character.repeat!=repeat || character.orientation!=orientation) continue;
+					if ( (Math.abs(character.start,start)<=identityThreshold && Math.abs(character.end,end)<=identityThreshold && Math.abs(character.getLength(),length)<=identityThreshold) ||
 						 (!orientation && Math.abs(character.start,start)<=identityThreshold && character.end>end+distanceThreshold)	 
 					   ) return true;
 				}
 			}
 			else {
-				for (i=0; i<=block_last; i++) {
-					c=block[i];
-					if (c==characterID) continue;
-					character=alphabet[c];
+				for (i=characterID-1; i>lastPeriodic; i--) {
+					character=alphabet[i];
 					if (character.repeat!=repeat || character.orientation!=orientation) continue;
-					if ( (orientation && Math.abs(character.start,start)<=identityThreshold && character.end>end+distanceThreshold) ||
+					if ( (Math.abs(character.start,start)<=identityThreshold && Math.abs(character.end,end)<=identityThreshold && Math.abs(character.getLength(),length)<=identityThreshold) ||
+						 (orientation && Math.abs(character.start,start)<=identityThreshold && character.end>end+distanceThreshold) ||
 						 (!orientation && Math.abs(character.end,end)<=identityThreshold && character.start<start-distanceThreshold)
+					   ) return true;
+				}
+				for (i=characterID+1; i<=lastAlphabet; i++) {
+					character=alphabet[i];
+					if (character.repeat!=repeat || character.orientation!=orientation) continue;
+					if ( (Math.abs(character.start,start)<=identityThreshold && Math.abs(character.end,end)<=identityThreshold && Math.abs(character.getLength(),length)<=identityThreshold) ||
+						 (orientation && Math.abs(character.start,start)<=identityThreshold && character.end>end+distanceThreshold)
 					   ) return true;
 				}
 			}
@@ -2789,6 +2806,10 @@ public class RepeatAlphabet {
 	 * both in the original factorization and as a result of spacers resolution). Tandem
 	 * intervals that intersect are merged (adjacent tandem intervals are not merged).
 	 *
+	 * Remark: relaxing the definition of non-periodic tandem too much makes alignment 
+	 * filtering more aggressive, but makes it difficult to detect unique signatures, e.g.
+	 * where a transposon inserts into itself multiple times in the same orientation.
+	 * 
 	 * Remark: the procedure assumes that array $repeatLength$ has already been loaded, 
 	 * and it uses global arrays $stack,stack2$.
 	 *
@@ -2799,7 +2820,7 @@ public class RepeatAlphabet {
 	 * might be a bit off and give rise to a different character); (1) a loose definition
 	 * of non-periodic tandem, where adjacent characters must just have the same repeat 
 	 * and orientation (as for periodic tandems); (2) an even looser definition, where
-	 * every non-periodic block between two blocks with the same repeat and orientation
+	 * every non-repetitive block between two blocks with the same repeat and orientation
 	 * is included in the tandem;
 	 * @param tmpChar temporary space;
 	 * @param tmpBoolean* temporary space of size at least $nBlocks$;
@@ -2807,10 +2828,11 @@ public class RepeatAlphabet {
 	 */
 	private static final int getTandemIntervals_impl(int nBlocks, int[] boundaries, int readLength, int distanceThreshold, boolean getPeriodicTandems, boolean getNonperiodicTandems, int nonperiodicMode, Character tmpChar, boolean[] tmpBoolean1, boolean[] tmpBoolean2) {
 		final int IDENTITY_THRESHOLD = IO.quantum;
-		boolean found, processFirstBlock, processLastBlock;
+		boolean found, processFirstBlock, processLastBlock, orientation;
 		int i, j, k, h, c, d;
 		int max, last1, last2, last3, lastInterval, tandemLength, from, to, toPrime, length, repeatLength;
 		Pair tmpInterval;
+		Character previousChar, nextChar;
 		int[] tmpArray;
 		
 		// Allocating memory
@@ -2872,8 +2894,8 @@ public class RepeatAlphabet {
 							tmpChar.copyFrom(alphabet[intBlocks[i-1][j]]);
 							repeatLength=repeatLengths[tmpChar.repeat];
 							length=boundaries[i-1]-(i==1?0:boundaries[i-2]);
-							if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
-							else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+							if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>=0?tmpChar.end-length+1:0;
+							else tmpChar.end=tmpChar.start+length-1<=repeatLength-1?tmpChar.start+length-1:repeatLength-1;
 							for (k=0; k<=last1; k++) {
 								if (alphabet[stack[k]].orientation?tmpChar.isSuffixOf(alphabet[stack[k]],distanceThreshold):tmpChar.isPrefixOf(alphabet[stack[k]],distanceThreshold)) {
 									found=true;
@@ -2891,8 +2913,8 @@ public class RepeatAlphabet {
 							tmpChar.openEnd=true;
 							repeatLength=repeatLengths[tmpChar.repeat];
 							length=(to+1==nBlocks-1?readLength:boundaries[to+1])-boundaries[to];
-							if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
-							else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+							if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<=repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+							else tmpChar.start=tmpChar.end-length+1>=0?tmpChar.end-length+1:0;
 							for (k=0; k<=last1; k++) {
 								if (alphabet[stack[k]].orientation?tmpChar.isPrefixOf(alphabet[stack[k]],distanceThreshold):tmpChar.isSuffixOf(alphabet[stack[k]],distanceThreshold)) {
 									found=true;
@@ -2919,13 +2941,19 @@ public class RepeatAlphabet {
 				if (processFirstBlock && !tmpBoolean1[0] && !tmpBoolean2[0] && !tmpBoolean1[1] && !tmpBoolean2[1]) {
 					found=false;
 					for (i=0; i<=lastInBlock_int[0]; i++) {
-						tmpChar.copyFrom(alphabet[intBlocks[0][i]]);
+						previousChar=alphabet[intBlocks[0][i]];
+						orientation=previousChar.orientation;
+						tmpChar.copyFrom(previousChar);
 						repeatLength=repeatLengths[tmpChar.repeat];
 						length=boundaries[0];
-						if (tmpChar.orientation) tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
-						else tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+						if (orientation) tmpChar.start=tmpChar.end-length+1>=0?tmpChar.end-length+1:0;
+						else tmpChar.end=tmpChar.start+length-1<=repeatLength-1?tmpChar.start+length-1:repeatLength-1;
 						for (j=0; j<=lastInBlock_int[1]; j++) {
-							if (alphabet[intBlocks[1][j]].orientation?tmpChar.isSuffixOf(alphabet[intBlocks[1][j]],distanceThreshold):tmpChar.isPrefixOf(alphabet[intBlocks[1][j]],distanceThreshold)) {
+							nextChar=alphabet[intBlocks[1][j]];
+							if (nextChar.orientation!=orientation) continue;
+							if ( (orientation?nextChar.isPrefixOf(previousChar,distanceThreshold):nextChar.isSuffixOf(previousChar,distanceThreshold)) ||
+							     (orientation?tmpChar.isSuffixOf(nextChar,distanceThreshold):tmpChar.isPrefixOf(nextChar,distanceThreshold))
+							   ) {
 								found=true;
 								break;
 							}
@@ -2949,13 +2977,19 @@ public class RepeatAlphabet {
 				if (processLastBlock && !tmpBoolean1[nBlocks-1] && !tmpBoolean2[nBlocks-1] && !tmpBoolean1[nBlocks-2] && !tmpBoolean2[nBlocks-2]) {
 					found=false;
 					for (i=0; i<=lastInBlock_int[nBlocks-1]; i++) {
-						tmpChar.copyFrom(alphabet[intBlocks[nBlocks-1][i]]);
+						nextChar=alphabet[intBlocks[nBlocks-1][i]]; 
+						orientation=nextChar.orientation;
+						tmpChar.copyFrom(nextChar);
 						repeatLength=repeatLengths[tmpChar.repeat];
 						length=readLength-boundaries[nBlocks-2];
-						if (tmpChar.orientation) tmpChar.end=tmpChar.start+length-1<repeatLength-1?tmpChar.start+length-1:repeatLength-1;
-						else tmpChar.start=tmpChar.end-length+1>0?tmpChar.end-length+1:0;
+						if (orientation) tmpChar.end=tmpChar.start+length-1<=repeatLength-1?tmpChar.start+length-1:repeatLength-1;
+						else tmpChar.start=tmpChar.end-length+1>=0?tmpChar.end-length+1:0;
 						for (j=0; j<=lastInBlock_int[nBlocks-2]; j++) {
-							if (alphabet[intBlocks[nBlocks-2][j]].orientation?tmpChar.isPrefixOf(alphabet[intBlocks[nBlocks-2][j]],distanceThreshold):tmpChar.isSuffixOf(alphabet[intBlocks[nBlocks-2][j]],distanceThreshold)) {
+							previousChar=alphabet[intBlocks[nBlocks-2][j]];
+							if (previousChar.orientation!=orientation) continue;
+							if ( (orientation?previousChar.isSuffixOf(nextChar,distanceThreshold):previousChar.isPrefixOf(nextChar,distanceThreshold)) ||
+								 (orientation?tmpChar.isPrefixOf(previousChar,distanceThreshold):tmpChar.isSuffixOf(previousChar,distanceThreshold))
+							   ) {
 								found=true;
 								break;
 							}
@@ -7994,12 +8028,16 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure assumes that $loadTandemIntervals()$ has already been called,
 	 * ands that $tandems$ is sorted and contains only non-periodic tandems.
+	 *
+	 * @param nonrepetitiveBlocksMode 1=if a read contains a tandem, build a spacer from 
+	 * every non-repetitive block; 2=build a spacer from every non-repetitive block, even
+	 * if the read does not contain any tandem; 0=build spacers only from non-repetitive
+	 * blocks adjacent to tandems.
 	 */
-	public static final void loadTandemSpacers() {
-		final int LAST_THREE_BITS = 0x00000007;
+	public static final void loadTandemSpacers(int nonrepetitiveBlocksMode) {
 		final int CAPACITY = 100;  // Arbitrary
-		int i, j, k;
-		int nBlocks, readID, cell, mask, first, last, length, fromBlock, toBlock;
+		int i, j;
+		int nBlocks, readID, fromBlock, toBlock;
 		final int nTranslatedReads = translated.length;
 		int[] lengthHistogram;
 		
@@ -8011,33 +8049,52 @@ public class RepeatAlphabet {
 			nBlocks=translation_all[i].length;
 			if (nBlocks<2) continue;
 			readID=translated[i];
-			for (j=0; j<lastTandem[readID]; j+=2) {
-				fromBlock=tandems[i][j]-1>=0?tandems[i][j]-1:tandems[i][j];
-				toBlock=tandems[i][j+1]+1<nBlocks?tandems[i][j+1]+1:tandems[i][j+1];
-				for (k=fromBlock; k<=toBlock; k++) {
-					cell=k>>>3; mask=1<<(k&LAST_THREE_BITS);
-					if ((isBlockUnique_all[i][cell]&mask)!=0) {
-						first=k==0?0:boundaries_all[i][k-1];
-						last=k==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[i][k];
-						length=last-first+1;
-						lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
-						if (lastSpacer==-1 || spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=k) {
-							lastSpacer++;
-							if (lastSpacer==spacers.length) {
-								Spacer[] newArray = new Spacer[spacers.length<<1];
-								System.arraycopy(spacers,0,newArray,0,spacers.length);
-								spacers=newArray;
-							}
-							if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,k!=0,k!=nBlocks-1,k);
-							else spacers[lastSpacer].set(readID,first,last,k!=0,k!=nBlocks-1,k);
-						}
-					}
+			if (nonrepetitiveBlocksMode==2 || (nonrepetitiveBlocksMode==1&&lastTandem[readID]>=0)) loadTandemSpacers_impl(readID,i,0,nBlocks-1,nBlocks,lengthHistogram);
+			else if (nonrepetitiveBlocksMode==0) {
+				for (j=0; j<lastTandem[readID]; j+=2) {
+					fromBlock=tandems[i][j]-1>=0?tandems[i][j]-1:tandems[i][j];
+					toBlock=tandems[i][j+1]+1<nBlocks?tandems[i][j+1]+1:tandems[i][j+1];
+					loadTandemSpacers_impl(readID,i,fromBlock,toBlock,nBlocks,lengthHistogram);
 				}
 			}
 		}
 		System.err.println("Loaded "+(lastSpacer+1)+" tandem spacers ("+(((double)(lastSpacer+1))/nTranslatedReads)+" per translated read).");
 		System.err.println("Histogram of all observed tandem spacer lengths:");
 		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);		
+	}
+	
+	
+	/**
+	 * @param translatedIndex position in $translation_all$.
+	 */
+	private static final void loadTandemSpacers_impl(int readID, int translatedIndex, int fromBlock, int toBlock, int nBlocks, int[] lengthHistogram) {
+		final int LAST_THREE_BITS = 0x00000007;
+		int i;
+		int cell, mask, first, last, length;
+		
+		for (i=fromBlock; i<=toBlock; i++) {
+boolean fabio = readID==816;
+if (fabio) System.err.println("loadTandemSpacers_impl> 1  considering block "+i);			
+			cell=i>>>3; mask=1<<(i&LAST_THREE_BITS);
+			if ((isBlockUnique_all[translatedIndex][cell]&mask)!=0) {
+if (fabio) System.err.println("loadTandemSpacers_impl> 2");				
+				first=i==0?0:boundaries_all[translatedIndex][i-1];
+				last=i==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[translatedIndex][i];
+				length=last-first+1;
+				lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
+				if (lastSpacer==-1 || spacers[lastSpacer].read!=readID || spacers[lastSpacer].blockID!=i) {
+					lastSpacer++;
+					if (lastSpacer==spacers.length) {
+						Spacer[] newArray = new Spacer[spacers.length<<1];
+						System.arraycopy(spacers,0,newArray,0,spacers.length);
+						spacers=newArray;
+					}
+					if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,i!=0,i!=nBlocks-1,i);
+					else spacers[lastSpacer].set(readID,first,last,i!=0,i!=nBlocks-1,i);
+if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers[lastSpacer]);
+				}
+			}
+		}
 	}
 	
 	
@@ -8626,13 +8683,17 @@ public class RepeatAlphabet {
 	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
 	 * 
 	 * @param read2tandems non-periodic tandems only;
+	 * @param nonrepetitiveBlocksMode 1=if a read contains a tandem, there is a spacer for
+	 * every non-repetitive block; 2=there is a spacer for every non-repetitive block,
+	 * even if the read does not contain any tandem; 0=there is a spacer only for every
+	 * non-repetitive block adjacent to tandems;
 	 * @param used same size as $alphabet$;
 	 * @param spacersCursor first unused position in $spacers$;
 	 * @param tmpArray temporary space, with a number of cells at least equal to the
 	 * number of blocks in the translation;
 	 * @return the new value of $spacersCursor$.
 	 */
-	public static final int tandemSpacers_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, String read2tandems, int readLength, int distanceThreshold, boolean[] used, BufferedWriter bw, Character tmpCharacter, int[] tmpArray) throws IOException {
+	public static final int tandemSpacers_collectCharacterInstances(int readID, int spacersCursor, String read2characters, String read2boundaries, String read2tandems, int nonrepetitiveBlocksMode, int readLength, int distanceThreshold, boolean[] used, BufferedWriter bw, Character tmpCharacter, int[] tmpArray) throws IOException {
 		final int QUANTUM = IO.quantum;
 		final String SEPARATOR = ",";
 		int i, j, p, q;
@@ -8641,36 +8702,49 @@ public class RepeatAlphabet {
 		// Loading the input
 		nBlocks=loadBlocks(read2characters);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
-		if (read2tandems.length()==0) {
+		if (read2tandems.length()==0 && nonrepetitiveBlocksMode!=2) {
 			for (i=0; i<nBlocks; i++) {
 				for (j=0; j<=lastInBlock_int[i]; j++) used[intBlocks[i][j]]=true;
 			}
 			return spacersCursor;
 		}
 		loadBoundaries(read2boundaries);
-		i=0; p=read2tandems.indexOf(SEPARATOR);
-		while (p>=0) {
-			i++;
-			p=read2tandems.indexOf(SEPARATOR,p+1);
+		lastTandem=-1;
+		if (read2tandems.length()>0) {
+			i=0; p=read2tandems.indexOf(SEPARATOR);
+			while (p>=0) {
+				i++;
+				p=read2tandems.indexOf(SEPARATOR,p+1);
+			}
+			lastTandem=i;
+			i=-1; p=0; q=read2tandems.indexOf(SEPARATOR);
+			while (q>=0) {
+				tmpArray[++i]=Integer.parseInt(read2tandems.substring(p,q));
+				p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+			}
+			tmpArray[++i]=Integer.parseInt(read2tandems.substring(p));
 		}
-		lastTandem=i;
-		i=-1; p=0; q=read2tandems.indexOf(SEPARATOR);
-		while (q>=0) {
-			tmpArray[++i]=Integer.parseInt(read2tandems.substring(p,q));
-			p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
-		}
-		tmpArray[++i]=Integer.parseInt(read2tandems.substring(p));
 		if (tmpBoolean==null || tmpBoolean.length<nBlocks) tmpBoolean = new boolean[nBlocks];
 		Math.set(tmpBoolean,nBlocks-1,false);
 		
 		// Building characters from spacers
-		for (i=0; i<=lastTandem; i+=2) {
-			fromBlock=tmpArray[i]-1>=0?tmpArray[i]-1:tmpArray[i];
-			toBlock=tmpArray[i+1]+1<nBlocks?tmpArray[i+1]+1:tmpArray[i+1];
-			for (j=fromBlock; j<=toBlock; j++) {
-				if (isBlockUnique[j] && !tmpBoolean[j]) {
+		if (nonrepetitiveBlocksMode==2 || (nonrepetitiveBlocksMode==1&&lastTandem>=0)) {
+			for (j=0; j<=nBlocks-1; j++) {
+				if (isBlockUnique[j]) {
 					spacersCursor=tandemSpacers_collectCharacterInstances_impl(readID,j,nBlocks,readLength,spacersCursor,distanceThreshold,QUANTUM,used,bw,tmpCharacter);
 					tmpBoolean[j]=true;
+				}
+			}
+		}
+		else if (nonrepetitiveBlocksMode==0) {
+			for (i=0; i<=lastTandem; i+=2) {
+				fromBlock=tmpArray[i]-1>=0?tmpArray[i]-1:tmpArray[i];
+				toBlock=tmpArray[i+1]+1<nBlocks?tmpArray[i+1]+1:tmpArray[i+1];
+				for (j=fromBlock; j<=toBlock; j++) {
+					if (isBlockUnique[j] && !tmpBoolean[j]) {
+						spacersCursor=tandemSpacers_collectCharacterInstances_impl(readID,j,nBlocks,readLength,spacersCursor,distanceThreshold,QUANTUM,used,bw,tmpCharacter);
+						tmpBoolean[j]=true;
+					}
 				}
 			}
 		}
@@ -8795,11 +8869,15 @@ public class RepeatAlphabet {
 	 * Remark: the procedure uses global arrays $stack,tmpBoolean$.
 	 *
 	 * @param read2tandems_old non-periodic tandems only;
+	 * @param nonrepetitiveBlocksMode 1=if a read contains a tandem, there is a spacer for
+	 * every non-repetitive block; 2=there is a spacer for every non-repetitive block,
+	 * even if the read does not contain any tandem; 0=there is a spacer only for every
+	 * non-repetitive block adjacent to tandems;
 	 * @param out the procedure cumulates the number of spacers fixed at every length 
 	 * (multiple of $IO.quantum$);
 	 * @return the new value of $spacersCursor$.
 	 */
-	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int distanceThreshold, int[] out, Character tmpCharacter) throws IOException {
+	public static final int tandemSpacers_updateTranslation(int readID, int readLength, int spacersCursor, String read2characters_old, String read2boundaries_old, String read2tandems_old, int nonrepetitiveBlocksMode, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, int distanceThreshold, int[] out, Character tmpCharacter) throws IOException {
 		final int CAPACITY = 100;  // Arbitrary
 		final int QUANTUM = IO.quantum;
 		final String SEPARATOR = ",";
@@ -8818,25 +8896,37 @@ public class RepeatAlphabet {
 		Math.set(tmpBoolean,nBlocks-1,false);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
 		if (read2tandems_old.length()>0) {
-			i=-1; p=0; q=read2tandems_old.indexOf(SEPARATOR); fromBlock=-1; toBlock=-1;
-			while (q>=0) {
-				i++;
-				if (i%2==0) {
-					fromBlock=Integer.parseInt(read2tandems_old.substring(p,q));
-					if (fromBlock>0) fromBlock--;
-				}
-				else {
-					toBlock=Integer.parseInt(read2tandems_old.substring(p,q));
-					if (toBlock<nBlocks-1) toBlock++;
-					for (j=fromBlock; j<=toBlock; j++) {
-						if (isBlockUnique[j]) tmpBoolean[j]=true;
+			if (nonrepetitiveBlocksMode==0) {
+				i=-1; p=0; q=read2tandems_old.indexOf(SEPARATOR); fromBlock=-1; toBlock=-1;
+				while (q>=0) {
+					i++;
+					if (i%2==0) {
+						fromBlock=Integer.parseInt(read2tandems_old.substring(p,q));
+						if (fromBlock>0) fromBlock--;
 					}
+					else {
+						toBlock=Integer.parseInt(read2tandems_old.substring(p,q));
+						if (toBlock<nBlocks-1) toBlock++;
+						for (j=fromBlock; j<=toBlock; j++) {
+							if (isBlockUnique[j]) tmpBoolean[j]=true;
+						}
+					}
+					p=q+1; q=read2tandems_old.indexOf(SEPARATOR,p);
 				}
-				p=q+1; q=read2tandems_old.indexOf(SEPARATOR,p);
+				toBlock=Integer.parseInt(read2tandems_old.substring(p));
+				if (toBlock<nBlocks-1) toBlock++;
+				for (j=fromBlock; j<=toBlock; j++) {
+					if (isBlockUnique[j]) tmpBoolean[j]=true;
+				}
 			}
-			toBlock=Integer.parseInt(read2tandems_old.substring(p));
-			if (toBlock<nBlocks-1) toBlock++;
-			for (j=fromBlock; j<=toBlock; j++) {
+			else {
+				for (j=0; j<=nBlocks-1; j++) {
+					if (isBlockUnique[j]) tmpBoolean[j]=true;
+				}
+			}
+		}
+		else if (nonrepetitiveBlocksMode==2) {
+			for (j=0; j<=nBlocks-1; j++) {
 				if (isBlockUnique[j]) tmpBoolean[j]=true;
 			}
 		}
@@ -9162,14 +9252,18 @@ public class RepeatAlphabet {
 	 * their frequency might be low and they might get deleted in later stages, or they
 	 * might get erroneously included in unique k-mers (in the worst case, an entire 
 	 * broken tandem might get replaced with a non-repetitive block, since the characters
-	 * in the corrected blocks might be too infrequent). The alphabet might also get
-	 * slightly smaller, which might speed up all procedures downstream.
+	 * in the corrected blocks might be too infrequent). As a result of this procedure,
+	 * the alphabet might also get slightly smaller, which might speed up all procedures
+	 * downstream.
 	 *
 	 * Remark: the utility of this function beyond tandems is not clear.
 	 *
 	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
 	 * 
 	 * @param distanceThreshold decides if two characters are adjacent in the repeat;
+	 * this should not be set too tight, since the boundaries of a character in its repeat
+	 * are affected by read-repeat alignment, non-repetitive block reconstruction by non-
+	 * periodic tandems (see above), and quantization;
 	 * @param used same size as $alphabet$;
 	 * @param tmpBoolean* temporary space, with a number of cells at least equal to the
 	 * number of blocks in the translation;

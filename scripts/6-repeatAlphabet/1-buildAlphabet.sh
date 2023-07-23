@@ -198,6 +198,8 @@ done
 
 echo "Trying to fix tandem spacers if needed..."
 TANDEM_SPACERS_ITERATIONS="1"
+NONREPETITIVE_BLOCKS_MODE="2"
+CONCATENATE_THRESHOLD="200"
 if [ ${TANDEM_SPACERS_ITERATIONS} -gt 0 ]; then
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-stash-
 fi
@@ -234,7 +236,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 	N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
 	N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
 	READ_READ_ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
-	SPACERS_ARE_CORRECT=$(java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers1 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${TANDEMS_FILE} ${TMPFILE_PATH}-tspacers-4.txt)
+	SPACERS_ARE_CORRECT=$(java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers1 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${TANDEMS_FILE} ${NONREPETITIVE_BLOCKS_MODE} ${TMPFILE_PATH}-tspacers-4.txt)
 	if [ ${SPACERS_ARE_CORRECT} -ne 0 ]; then
 		break
 	else
@@ -243,7 +245,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		function collectionThread_tspacers() {
 			local SPACERS_FILE_ID=$1
 			local LOCAL_N_SPACERS=$(wc -l < ${TMPFILE_PATH}-tspacers-5-${SPACERS_FILE_ID}.txt)
-			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers2 ${TMPFILE_PATH}-tspacers-5-${SPACERS_FILE_ID}.txt ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-tspacers-5-ids-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-tspacers-5-lengths-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-8-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-9-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-tspacers-2-${SPACERS_FILE_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-tspacers-6-${SPACERS_FILE_ID}.txt
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers2 ${TMPFILE_PATH}-tspacers-5-${SPACERS_FILE_ID}.txt ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${TMPFILE_PATH}-tspacers-5-ids-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-tspacers-5-lengths-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-8-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-9-${SPACERS_FILE_ID}.txt ${TMPFILE_PATH}-tspacers-2-${SPACERS_FILE_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${NONREPETITIVE_BLOCKS_MODE} ${TMPFILE_PATH}-tspacers-6-${SPACERS_FILE_ID}.txt
 			if [ $? -ne 0 ]; then
 				exit
 			fi
@@ -282,7 +284,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 			local READ2BOUNDARIES_FILE_NEW=$3
 			local LOCAL_SPACERS_FILE="${TMPFILE_PATH}-tspacers-5-${THREAD_ID}.txt"
 			local LOCAL_N_SPACERS=$(wc -l < ${LOCAL_SPACERS_FILE})
-			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers3 ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-tspacers-5-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-5-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-2-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS}
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixTandemSpacers3 ${LOCAL_SPACERS_FILE} ${LOCAL_N_SPACERS} ${ALPHABET_FILE} ${ALPHABET_FILE_SPACERS} ${TMPFILE_PATH}-tspacers-5-ids-${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-5-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-8-${THREAD_ID}.txt ${TMPFILE_PATH}-9-${THREAD_ID}.txt ${READ2CHARACTERS_FILE_NEW}${THREAD_ID}.txt ${READ2BOUNDARIES_FILE_NEW}${THREAD_ID}.txt ${TMPFILE_PATH}-tspacers-2-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${NONREPETITIVE_BLOCKS_MODE}
 			if [ $? -ne 0 ]; then
 				exit
 			fi
@@ -302,7 +304,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		TANDEM_SPACERS_FIXED="1"
 		echo "Tandem spacers fixed"
 		
-		exit
+		#exit
 		
 		rm -f ${TMPFILE_PATH}-concatenate-*
 		for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-stash-*"); do
@@ -313,7 +315,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-concatenate-2- ${TMPFILE_PATH}-concatenate-3-
 		function concatenateThread() {
 			local THREAD_ID=$1
-			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks1 ${ALPHABET_FILE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks1 ${ALPHABET_FILE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${CONCATENATE_THRESHOLD} ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt
 			sort --parallel=1 -t , ${SORT_OPTIONS} ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt | uniq - ${TMPFILE_PATH}-concatenate-5-${THREAD_ID}.txt
 			rm -f ${TMPFILE_PATH}-concatenate-4-${THREAD_ID}.txt
 		}
@@ -347,7 +349,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		echo "Translating reads into the alphabet induced by concatenation..."
 		function translationThread_concatenate() {
 			local THREAD_ID=$1
-			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks2 ${ALPHABET_FILE} ${ALPHABET_FILE_CONCATENATE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-10-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-11-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-12-${THREAD_ID}.txt
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.ConcatenateBlocks2 ${ALPHABET_FILE} ${ALPHABET_FILE_CONCATENATE} ${TMPFILE_PATH}-concatenate-1-lengths-${THREAD_ID}.txt ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-concatenate-2-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-3-${THREAD_ID}.txt ${CONCATENATE_THRESHOLD} ${TMPFILE_PATH}-concatenate-10-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-11-${THREAD_ID}.txt ${TMPFILE_PATH}-concatenate-12-${THREAD_ID}.txt
 		}
 		for THREAD in $(seq 0 ${TO}); do
 			translationThread_concatenate ${THREAD} &
