@@ -3656,6 +3656,7 @@ public class RepeatAlphabet {
 	 */
 	public static final void filterAlignments_loose(String alignmentsFile, String outputFile, int minIntersection_nonrepetitive, int minBlueIntervalLength, long[][] out) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
+		final int DIFFERENCE_THRESHOLD = (IDENTITY_THRESHOLD*3)>>1;  // Arbitrary
 		final int CAPACITY = 100;  // Arbitrary
 		int p;
 		int row, readA, readB, type, value, isRepetitive;
@@ -3692,7 +3693,7 @@ public class RepeatAlphabet {
 			else {
 				while (lastTranslated<nTranslated && translated[lastTranslated]<readA) lastTranslated++;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection_nonrepetitive,minBlueIntervalLength,IDENTITY_THRESHOLD);
+				isRepetitive=inRedRegion(readA,Alignments.startA,Alignments.endA,lastTranslated,lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA?lastBlueInterval:-1,-1,Reads.getReadLength(readA),minIntersection_nonrepetitive,minBlueIntervalLength,IDENTITY_THRESHOLD,DIFFERENCE_THRESHOLD);
 			}
 			if (isRepetitive!=0) {
 				bw.write("1\n"); str=br.readLine(); row++;
@@ -3716,7 +3717,7 @@ public class RepeatAlphabet {
 				System.err.println("filterAlignments_loose> ERROR: read "+readB+" is neither translated, nor fully unique, nor fully contained in a repeat.");
 				throw new RuntimeException();
 			}
-			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minBlueIntervalLength,IDENTITY_THRESHOLD);
+			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minBlueIntervalLength,IDENTITY_THRESHOLD,DIFFERENCE_THRESHOLD);
 			if (isRepetitive==0) bw.write("0\n"); 
 			else {
 				bw.write("1\n");
@@ -3748,13 +3749,17 @@ public class RepeatAlphabet {
 	 * the search when $blueIntervalsID=-2$;
 	 * @param minIntersection_nonrepetitive min. length of a non-repetitive substring of 
 	 * the alignment, for the alignment to be considered non-repetitive;
+	 * @param differenceThreshold min number of bps before the start and after the end of
+	 * a blue interval for it to be considered observed; this is useful, since an
+	 * alignment that e.g. ends precisely at the end of a blue interval does not guarantee
+	 * that the other read was sampled from the same region of the genome;
 	 * @return interval $readID[intervalStart..intervalEnd]$:
 	 * -1: belongs to or straddles a non-repetitive region;
-	 * -2: contains a sequence of $>=minBlueIntervalLength$ repeat characters that likely
-	 *     occurs <=H times in the genome;
+	 * -2: contains a sequence of repeat characters with $>=minBlueIntervalLength$ bps and
+	 *     that likely occurs <=H times in the genome;
 	 *  0: none of the above is true.
 	 */
-	private static final int inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minBlueIntervalLength, int identityThreshold) {
+	private static final int inRedRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minBlueIntervalLength, int identityThreshold, int differenceThreshold) {
 		int i, j;
 		int mask, cell, start, end, blockStart, blockEnd, firstBlock, lastBlock;
 		final int nBlocks = boundaries_all[boundariesAllID].length+1;
@@ -3822,14 +3827,15 @@ public class RepeatAlphabet {
 		if (blueIntervalsID==-2) blueIntervalsID=readInArray(readID,blueIntervals_reads,blueIntervals_reads.length-1,blueIntervalsStart);
 		if (blueIntervalsID!=-1) {
 			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
-				if (blueIntervals[blueIntervalsID][i+1]<minBlueIntervalLength) continue;		
 				firstBlock=blueIntervals[blueIntervalsID][i];
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
+				if (end-start+1<minBlueIntervalLength) continue;				
 				if ( ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					   Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
 					 ) &&
+				     (intervalStart<=start-differenceThreshold && intervalEnd>=end+differenceThreshold) &&
 					 (!isBlockPeriodic(boundariesAllID,firstBlock) || isShortPeriodBlockTrustworthy(firstBlock,false,readID,boundariesAllID,identityThreshold)==1) &&
 				     (!isBlockPeriodic(boundariesAllID,lastBlock) || isShortPeriodBlockTrustworthy(lastBlock,true,readID,boundariesAllID,identityThreshold)==1)
 				   ) return -2;
@@ -4064,6 +4070,7 @@ public class RepeatAlphabet {
 	public static final void filterAlignments_tight(String alignmentsFile, String outputFile, boolean mode, boolean suffixPrefixMode, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength, long[][] out) throws IOException {
 		final int DISTANCE_THRESHOLD = IO.quantum;
 		final int IDENTITY_THRESHOLD = IO.quantum;
+		final int DIFFERENCE_THRESHOLD = (IDENTITY_THRESHOLD*3)>>1;  // Arbitrary
 		boolean orientation, overlapsUniqueA, straddlesLeftA, straddlesRightA;
 		int p, q;
 		int row, readA, readB, startA, endA, startB, endB, lengthA, lengthB, type;
@@ -4108,7 +4115,7 @@ public class RepeatAlphabet {
 				}
 				readAInTranslated=lastTranslated;
 				while (lastBlueInterval<=blueIntervals_last && blueIntervals_reads[lastBlueInterval]<readA) lastBlueInterval++;
-				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength,IDENTITY_THRESHOLD);
+				q=inBlueRegion(readA,startA,endA,lastTranslated,(lastBlueInterval<=blueIntervals_last&&blueIntervals_reads[lastBlueInterval]==readA)?lastBlueInterval:-1,-1,lengthA,minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength,IDENTITY_THRESHOLD,DIFFERENCE_THRESHOLD);
 				if (q==-1) {
 					bw.write("0\n"); str=br.readLine(); row++;
 					continue;
@@ -4147,7 +4154,7 @@ public class RepeatAlphabet {
 				continue;
 			}
 			p=readInArray(readB,translated,nTranslated-1,lastTranslated);
-			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength,IDENTITY_THRESHOLD);
+			q=inBlueRegion(readB,startB,endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minIntersection_repetitive,minBlueIntervalLength,IDENTITY_THRESHOLD,DIFFERENCE_THRESHOLD);
 			if (q==-1) bw.write("0\n");
 			else if (q==0 || q==1) {
 				if (mode) {
@@ -4281,14 +4288,18 @@ public class RepeatAlphabet {
 	 * The dual of $inRedRegion()$. The procedure needs the following arrays: 
 	 * boundaries_all, translation_all, blueIntervals, blueIntervals_reads.
 	 *
-	 * @param minBlueIntervalLength in blocks, not characters;
+	 * @param minBlueIntervalLength in bps;
+	 * @param differenceThreshold as defined in $inRedRegion()$; it is useful here as 
+	 * well, since the same blue sequence of characters might be marked as unique in both
+	 * reads, but it might e.g. start at the beginning of readA and end at the end of
+	 * readB;
 	 * @return interval $readID[intervalStart..intervalEnd]$:
 	 * 0: is fully contained in a non-repetitive region, or fully contains a non-
 	 *    repetitive region, and the overlap with the non-repetitive region has length 
 	 *    $>=minIntersection_nonrepetitive$;
 	 * 1: straddles a non-repetitive region by $>=minIntersection_nonrepetitive$ bps;
-	 * 2: contains a sequence of $>=minBlueIntervalLength$ repeat characters that is 
-	 *    likely to occur <=H times in the genome, where H is the number of haplotypes;
+	 * 2: contains a sequence of repeat characters with $>=minBlueIntervalLength$ bps that
+	 *    is likely to occur <=H times in the genome, where H is the number of haplotypes;
 	 * 3: straddles, but does not fully contain, a sequence in point (2), on the left side
 	 *    of the interval;
 	 * 4: straddles, but does not fully contain, a sequence in point (2), on the right
@@ -4296,7 +4307,7 @@ public class RepeatAlphabet {
 	 * 5: both (3) and (4) are true;
 	 * -1: none of the above is true.
 	 */
-	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength, int identityThreshold) {
+	private static final int inBlueRegion(int readID, int intervalStart, int intervalEnd, int boundariesAllID, int blueIntervalsID, int blueIntervalsStart, int readLength, int minIntersection_nonrepetitive, int minIntersection_repetitive, int minBlueIntervalLength, int identityThreshold, int differenceThreshold) {
 		boolean straddlesLeft, straddlesRight;
 		int i, j;
 		int start, end, blockStart, blockEnd, firstBlock, lastBlock;
@@ -4344,16 +4355,18 @@ public class RepeatAlphabet {
 		if (blueIntervalsID!=-1) {
 			straddlesLeft=false; straddlesRight=false;
 			for (i=0; i<blueIntervals[blueIntervalsID].length; i+=3) {
-				if (blueIntervals[blueIntervalsID][i+1]<minBlueIntervalLength) continue;
 				firstBlock=blueIntervals[blueIntervalsID][i];
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
+				if (end-start+1<minBlueIntervalLength) continue;
 				if ( (!isBlockPeriodic(boundariesAllID,firstBlock) || isShortPeriodBlockTrustworthy(firstBlock,false,readID,boundariesAllID,identityThreshold)!=0) &&
 			  		 (!isBlockPeriodic(boundariesAllID,lastBlock) || isShortPeriodBlockTrustworthy(lastBlock,true,readID,boundariesAllID,identityThreshold)!=0) 
 				   ) {
-	   				if ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
-	   					 Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
+	   				if ( ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
+	   					   Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
+						 ) &&
+						 (intervalStart<=start-differenceThreshold && intervalEnd>=end+differenceThreshold)	 
 	   				   ) return 2;
 	   				else if (intervalEnd>=start+minIntersection_repetitive && intervalEnd<end && intervalStart<start) straddlesRight=true;
 	   				else if (end>=intervalStart+minIntersection_repetitive && end<intervalEnd && start<intervalStart) straddlesLeft=true;
@@ -8037,8 +8050,9 @@ public class RepeatAlphabet {
 	public static final void loadTandemSpacers(int nonrepetitiveBlocksMode) {
 		final int CAPACITY = 100;  // Arbitrary
 		int i, j;
-		int nBlocks, readID, fromBlock, toBlock;
+		int nBlocks, readID, fromBlock, toBlock, lastSpacerPrime, length;
 		final int nTranslatedReads = translated.length;
+		final int nFullyUnique = fullyUnique.length;
 		int[] lengthHistogram;
 		
 		if (spacers==null) spacers = new Spacer[CAPACITY];
@@ -8058,7 +8072,25 @@ public class RepeatAlphabet {
 				}
 			}
 		}
-		System.err.println("Loaded "+(lastSpacer+1)+" tandem spacers ("+(((double)(lastSpacer+1))/nTranslatedReads)+" per translated read).");
+		if (nonrepetitiveBlocksMode==2) {  // Adding fully-nonrepetitive reads
+			lastSpacerPrime=lastSpacer;
+			for (i=0; i<nFullyUnique; i++) {
+				length=Reads.getReadLength(fullyUnique[i]);
+				lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
+				if (lastSpacer==-1) {
+					lastSpacer++;
+					if (lastSpacer==spacers.length) {
+						Spacer[] newArray = new Spacer[spacers.length<<1];
+						System.arraycopy(spacers,0,newArray,0,spacers.length);
+						spacers=newArray;
+					}
+					if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(fullyUnique[i],0,length-1,false,false,0);
+					else spacers[lastSpacer].set(fullyUnique[i],0,length-1,false,false,0);
+				}
+			}
+			if (lastSpacer>lastSpacerPrime) Arrays.sort(spacers,0,lastSpacer+1);
+		}
+		System.err.println("Loaded "+(lastSpacer+1)+" tandem spacers ("+(((double)(lastSpacer+1))/(nTranslatedReads+(nonrepetitiveBlocksMode==2?nFullyUnique:0)))+" per eligible read).");
 		System.err.println("Histogram of all observed tandem spacer lengths:");
 		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);		
 	}
@@ -8073,11 +8105,8 @@ public class RepeatAlphabet {
 		int cell, mask, first, last, length;
 		
 		for (i=fromBlock; i<=toBlock; i++) {
-boolean fabio = readID==816;
-if (fabio) System.err.println("loadTandemSpacers_impl> 1  considering block "+i);			
 			cell=i>>>3; mask=1<<(i&LAST_THREE_BITS);
 			if ((isBlockUnique_all[translatedIndex][cell]&mask)!=0) {
-if (fabio) System.err.println("loadTandemSpacers_impl> 2");				
 				first=i==0?0:boundaries_all[translatedIndex][i-1];
 				last=i==nBlocks-1?Reads.getReadLength(readID)-1:boundaries_all[translatedIndex][i];
 				length=last-first+1;
@@ -8091,7 +8120,6 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 2");
 					}
 					if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(readID,first,last,i!=0,i!=nBlocks-1,i);
 					else spacers[lastSpacer].set(readID,first,last,i!=0,i!=nBlocks-1,i);
-if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers[lastSpacer]);
 				}
 			}
 		}
@@ -8122,14 +8150,15 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers
 	 * @param tmpArray temporary space, of size at least two;
 	 * @return the total number of spacers with a solution.
 	 */
-	public static final int loadTandemSpacerNeighbors(String alignmentsFile, int[] tmpArray) throws IOException {
+	public static final int loadTandemSpacerNeighbors(String alignmentsFile, int nonrepetitiveBlocksMode, int[] tmpArray) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int CAPACITY = 12;  // Arbitrary, multiple of 4.
 		final int nTranslated = translated.length;
+		final int nFullyUnique = fullyUnique.length;
 		boolean fullyContainedB;
 		int i, j, k, n, p;
 		int row, readA, readB, readBPrime, lengthB, fromB, toB, max, last, nEdges;
-		int firstSpacer, translatedCursor;
+		int firstSpacer, translatedCursor, fullyUniqueCursor;
 		int nEdgesTotal, nSingletonSpacers, nSpacersWithSolution;
 		double avgDiffs;
 		String str;
@@ -8145,7 +8174,8 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers
 		Math.set(lastSpacerNeighbor,lastSpacer,-1);
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
-		str=br.readLine(); firstSpacer=0; translatedCursor=0; row=1;
+		str=br.readLine(); firstSpacer=0; row=1;
+		translatedCursor=0; fullyUniqueCursor=0;
 		if (str!=null) Alignments.readAlignmentFile(str);
 		while (str!=null && firstSpacer<=lastSpacer) {
 			readA=Alignments.readA-1;
@@ -8162,8 +8192,11 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers
 				continue;
 			}
 			while (translatedCursor<nTranslated && translated[translatedCursor]<readA) translatedCursor++;
-			if (translated[translatedCursor]!=readA) {
-				System.err.println("loadTandemSpacerNeighbors> ERROR: readA="+readA+" is not translated but has a tandem spacer?!");
+			if (nonrepetitiveBlocksMode==2) {
+				while (fullyUniqueCursor<nFullyUnique && fullyUnique[fullyUniqueCursor]<readA) fullyUniqueCursor++;
+			}
+			if (translated[translatedCursor]!=readA && (nonrepetitiveBlocksMode!=2 || fullyUnique[fullyUniqueCursor]!=readA)) {
+				System.err.println("loadTandemSpacerNeighbors> ERROR: readA="+readA+" is neither translated nor fully unique, but has a tandem spacer?!");
 				throw new RuntimeException();
 			}
 			readB=Alignments.readB-1;
@@ -8522,12 +8555,13 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers
 	 * endpoint projections;
 	 * @param tmpArray of size at least two.
 	 */
-	public static final void loadTandemSpacers_blocks(String alignmentsFile, int distanceThreshold, int[] tmpArray) throws IOException {
+	public static final void loadTandemSpacers_blocks(String alignmentsFile, int distanceThreshold, int nonrepetitiveBlocksMode, int[] tmpArray) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int nTranslated = translated.length;
+		final int nFullyUnique = fullyUnique.length;
 		int i, j, k, p, q;
 		int row, readA, readB, readBPrime, lengthB, fromB, toB, cell, offset, blockID, lastSplit;
-		int firstSpacer, translatedCursor, nBlocks, firstBlock, lastBlock, component, nComponents;
+		int firstSpacer, translatedCursor, fullyUniqueCursor, nBlocks, firstBlock, lastBlock, component, nComponents;
 		int nSpacersWithSolutions, nSpacersWithSplits, nSpacerChildren;
 		final int lastSpacerPrime = lastSpacer;
 		String str;
@@ -8537,7 +8571,8 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers
 		for (i=0; i<=lastSpacer; i++) spacers[i].lastSplit=-1;
 		br = new BufferedReader(new FileReader(alignmentsFile));
 		str=br.readLine(); str=br.readLine();  // Skipping header
-		str=br.readLine(); firstSpacer=0; translatedCursor=0; row=1;
+		str=br.readLine(); firstSpacer=0; row=1;
+		translatedCursor=0; fullyUniqueCursor=0;
 		if (str!=null) Alignments.readAlignmentFile(str);
 		while (str!=null && firstSpacer<=lastSpacer) {
 			readA=Alignments.readA-1;
@@ -8554,20 +8589,15 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers
 				continue;
 			}
 			while (translatedCursor<nTranslated && translated[translatedCursor]<readA) translatedCursor++;
-			if (translated[translatedCursor]!=readA) {
+			if (nonrepetitiveBlocksMode==2) {
+				while (fullyUniqueCursor<nFullyUnique && fullyUnique[fullyUniqueCursor]<readA) fullyUniqueCursor++;
+			}
+			if (translated[translatedCursor]!=readA && (nonrepetitiveBlocksMode!=2 || fullyUnique[fullyUniqueCursor]!=readA)) {
 				System.err.println("addSpacerSolutions_blocks> ERROR: readA="+readA+" is not translated but has a tandem spacer?!");
 				throw new RuntimeException();
 			}
 			readB=Alignments.readB-1;
-			if (Arrays.binarySearch(fullyUnique,readB)>=0) {
-				str=br.readLine();
-				if (str!=null) {
-					Alignments.readAlignmentFile(str);
-					if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
-				}
-				continue;
-			}
-			if (Arrays.binarySearch(fullyContained,readB)>=0) {
+			if (Arrays.binarySearch(fullyUnique,readB)>=0 || Arrays.binarySearch(fullyContained,readB)>=0) {
 				str=br.readLine();
 				if (str!=null) {
 					Alignments.readAlignmentFile(str);
@@ -9204,7 +9234,7 @@ if (fabio) System.err.println("loadTandemSpacers_impl> 3  added spacer "+spacers
 					stack[last]=i;
 				}
 			}
-			for (i=p-1; i>lastPeriodic; i--) {
+			for (i=p-1; i>lastPeriodic_new; i--) {
 				if (newAlphabet[i].repeat!=repeat || newAlphabet[i].orientation!=orientation) break;
 				if (newAlphabet[i].implies(character)) {
 					last++;

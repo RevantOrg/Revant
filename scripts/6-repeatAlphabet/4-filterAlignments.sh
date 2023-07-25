@@ -29,8 +29,8 @@ SUFFIX_PREFIX_MODE="0"  # 1=in tight mode, keep suffix-prefix alignments that co
 # repeats on the other read.
 BOTH_READS_TANDEM="0"  # Discards an alignment affected by tandems in both reads (1) or
 # in a single read (0).
-MIN_BLUE_INTERVAL_LENGTH="1"  # Blue intervals with fewer blocks than this are not
-# considered trustworthy. Leaving it to one works best in practice.
+MIN_BLUE_INTERVAL_LENGTH="300"  # Blue intervals with fewer bps than this are not
+# considered trustworthy.
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u

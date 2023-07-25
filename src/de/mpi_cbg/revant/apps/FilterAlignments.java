@@ -60,8 +60,8 @@ public class FilterAlignments {
 	 * @param args 
 	 * 14: discards alignments thar are not trustworthy in terms of tandems on both reads 
 	 *     (1) or on just one read (0);
-	 * 20: only blue intervals with at least this number of \emph{blocks} are considered
-	 *     trustworthy addresses on the genome;
+	 * 20: only blue intervals with at least this number of bps are considered trustworthy
+     *     addresses on the genome;
 	 * 21: non-repetitive regions shorter than this are not considered trustworthy 
 	 *     addresses on the genome (e.g. they might be occurrences of repeats that never
 	 *     got aligned to the repeat database because of heuristics of the aligner).

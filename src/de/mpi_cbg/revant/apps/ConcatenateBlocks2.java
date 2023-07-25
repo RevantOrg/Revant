@@ -63,13 +63,16 @@ public class ConcatenateBlocks2 {
 		nBlocks_total=0; nBlocks_concatenated=0;
 		str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); i=0;
 		while (str1!=null) {
-			nBlocks=1+((str3.length()+1)>>1);  // Loose upper bound
-			if (tmpBoolean1.length<nBlocks) {
-				tmpBoolean1 = new boolean[nBlocks];
-				tmpBoolean2 = new boolean[nBlocks];
-			}
-			RepeatAlphabet.concatenateBlocks_updateTranslation(i,Integer.parseInt(str1),str2,str3,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,DISTANCE_THRESHOLD,stats,tmpCharacter,tmpArray,tmpBoolean1,tmpBoolean2);
-			nBlocks_concatenated+=stats[0]; nBlocks_total+=stats[1];
+            if (str2.length()>0) {
+    			nBlocks=1+((str3.length()+1)>>1);  // Loose upper bound
+    			if (tmpBoolean1.length<nBlocks) {
+    				tmpBoolean1 = new boolean[nBlocks];
+    				tmpBoolean2 = new boolean[nBlocks];
+    			}
+    			RepeatAlphabet.concatenateBlocks_updateTranslation(i,Integer.parseInt(str1),str2,str3,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,bw1,bw2,bw3,DISTANCE_THRESHOLD,stats,tmpCharacter,tmpArray,tmpBoolean1,tmpBoolean2);
+    			nBlocks_concatenated+=stats[0]; nBlocks_total+=stats[1];
+            }
+            else { bw1.newLine(); bw2.newLine(); }
 			if (i%10000==0) System.err.println("Processed "+i+" reads");
 			i++;
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();

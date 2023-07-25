@@ -49,10 +49,10 @@ public class FixTandemSpacers1 {
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadTandemIntervals(TANDEMS_FILE,N_READS);
 		RepeatAlphabet.loadTandemSpacers(NONREPETITIVE_BLOCKS_MODE);
-		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,tmpArray);
+		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,NONREPETITIVE_BLOCKS_MODE,tmpArray);
 		if (RepeatAlphabet.lastSpacer==-1) { System.out.println("1"); return; }
 		RepeatAlphabet.loadFullyContainedTranslation(TRANSLATED_READS_CHARACTERS_FILE,N_FULLY_CONTAINED);
-		if (RepeatAlphabet.loadTandemSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,tmpArray)==0) { System.out.println("2"); return; }
+		if (RepeatAlphabet.loadTandemSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,NONREPETITIVE_BLOCKS_MODE,tmpArray)==0) { System.out.println("2"); return; }
 		if (!RepeatAlphabet.propagateSolutions(DISTANCE_THRESHOLD)) { System.out.println("3"); return; }
 		RepeatAlphabet.serializeSpacers(OUTPUT_FILE);
 		System.out.println("0");
