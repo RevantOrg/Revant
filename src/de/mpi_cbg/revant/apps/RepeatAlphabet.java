@@ -8077,16 +8077,14 @@ public class RepeatAlphabet {
 			for (i=0; i<nFullyUnique; i++) {
 				length=Reads.getReadLength(fullyUnique[i]);
 				lengthHistogram[length/IO.quantum<lengthHistogram.length?length/IO.quantum:lengthHistogram.length-1]++;
-				if (lastSpacer==-1) {
-					lastSpacer++;
-					if (lastSpacer==spacers.length) {
-						Spacer[] newArray = new Spacer[spacers.length<<1];
-						System.arraycopy(spacers,0,newArray,0,spacers.length);
-						spacers=newArray;
-					}
-					if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(fullyUnique[i],0,length-1,false,false,0);
-					else spacers[lastSpacer].set(fullyUnique[i],0,length-1,false,false,0);
+				lastSpacer++;
+				if (lastSpacer==spacers.length) {
+					Spacer[] newArray = new Spacer[spacers.length<<1];
+					System.arraycopy(spacers,0,newArray,0,spacers.length);
+					spacers=newArray;
 				}
+				if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(fullyUnique[i],0,length-1,false,false,0);
+				else spacers[lastSpacer].set(fullyUnique[i],0,length-1,false,false,0);
 			}
 			if (lastSpacer>lastSpacerPrime) Arrays.sort(spacers,0,lastSpacer+1);
 		}
@@ -8155,7 +8153,7 @@ public class RepeatAlphabet {
 		final int CAPACITY = 12;  // Arbitrary, multiple of 4.
 		final int nTranslated = translated.length;
 		final int nFullyUnique = fullyUnique.length;
-		boolean fullyContainedB;
+		boolean fullyUniqueB, fullyContainedB;
 		int i, j, k, n, p;
 		int row, readA, readB, readBPrime, lengthB, fromB, toB, max, last, nEdges;
 		int firstSpacer, translatedCursor, fullyUniqueCursor;
@@ -8200,22 +8198,29 @@ public class RepeatAlphabet {
 				throw new RuntimeException();
 			}
 			readB=Alignments.readB-1;
-			if (Arrays.binarySearch(fullyUnique,readB)>=0) {
-				str=br.readLine();
-				if (str!=null) {
-					Alignments.readAlignmentFile(str);
-					if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+			readBPrime=Arrays.binarySearch(fullyUnique,readB);
+			if (readBPrime>=0) {
+				if (nonrepetitiveBlocksMode!=2) {
+					str=br.readLine();
+					if (str!=null) {
+						Alignments.readAlignmentFile(str);
+						if ((++row)%1000000==0) System.err.println("Processed "+row+" alignments");
+					}
+					continue;
 				}
-				continue;
+				fullyUniqueB=true; fullyContainedB=false;
 			}
-			readBPrime=Arrays.binarySearch(fullyContained,readB);
-			if (readBPrime>=0) fullyContainedB=true;
 			else {
-				fullyContainedB=false;
-				readBPrime=Arrays.binarySearch(translated,readB);
-				if (readBPrime<0) {
-					System.err.println("loadTandemSpacerNeighbors> ERROR: readB="+readB+" is neither fully-unique, nor fully-contained, nor translated?!");
-					throw new RuntimeException();
+				fullyUniqueB=false;
+				readBPrime=Arrays.binarySearch(fullyContained,readB);
+				if (readBPrime>=0) fullyContainedB=true;
+				else {
+					fullyContainedB=false;
+					readBPrime=Arrays.binarySearch(translated,readB);
+					if (readBPrime<0) {
+						System.err.println("loadTandemSpacerNeighbors> ERROR: readB="+readB+" is neither fully-unique, nor fully-contained, nor translated?!");
+						throw new RuntimeException();
+					}
 				}
 			}
 			lengthB=Reads.getReadLength(readB);
@@ -8239,6 +8244,7 @@ public class RepeatAlphabet {
 				}
 				// Adding solutions
 				if (fullyContainedB) addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
+				else if (fullyUniqueB) { /* NOP */ }
 				else {
 					last=translation_all[readBPrime].length-2;	
 					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
@@ -8593,7 +8599,7 @@ public class RepeatAlphabet {
 				while (fullyUniqueCursor<nFullyUnique && fullyUnique[fullyUniqueCursor]<readA) fullyUniqueCursor++;
 			}
 			if (translated[translatedCursor]!=readA && (nonrepetitiveBlocksMode!=2 || fullyUnique[fullyUniqueCursor]!=readA)) {
-				System.err.println("addSpacerSolutions_blocks> ERROR: readA="+readA+" is not translated but has a tandem spacer?!");
+				System.err.println("addSpacerSolutions_blocks> ERROR: readA="+readA+" is not translated or unique but has a tandem spacer?!");
 				throw new RuntimeException();
 			}
 			readB=Alignments.readB-1;
@@ -8609,7 +8615,9 @@ public class RepeatAlphabet {
 			lengthB=Reads.getReadLength(readB);
 			for (i=firstSpacer; i<=lastSpacer; i++) {
 				if (spacers[i].read!=readA) break;
-				if ( !Intervals.isApproximatelyContained(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA) &&
+				if ( translated[translatedCursor]==readA &&
+					 // Allowing partial alignments for fully-unique reads
+					 !Intervals.isApproximatelyContained(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA) &&
 					 !Intervals.areApproximatelyIdentical(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA)
 				   ) continue;
 				if (!Alignments.projectIntersection(spacers[i].first,spacers[i].last,tmpArray)) continue;
@@ -8730,6 +8738,14 @@ public class RepeatAlphabet {
 		int nBlocks, fromBlock, toBlock, lastTandem;
 		
 		// Loading the input
+		if (read2characters.length()==0) {
+			if (nonrepetitiveBlocksMode==2) {
+				if (lastInBlock_int==null || lastInBlock_int.length==0) lastInBlock_int = new int[1];
+				lastInBlock_int[0]=-1;
+				spacersCursor=tandemSpacers_collectCharacterInstances_impl(readID,0,1,readLength,spacersCursor,distanceThreshold,QUANTUM,used,bw,tmpCharacter);
+			}
+			return spacersCursor;
+		}
 		nBlocks=loadBlocks(read2characters);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
 		if (read2tandems.length()==0 && nonrepetitiveBlocksMode!=2) {
@@ -8916,8 +8932,12 @@ public class RepeatAlphabet {
 		
 		// Loading the input and marking spacer blocks
 		if (read2characters_old.length()==0) {
-			read2characters_new.newLine();
-			read2boundaries_new.newLine();
+			if (nonrepetitiveBlocksMode==2) {
+				if (lastInBlock==null || lastInBlock.length==0) lastInBlock = new int[1];
+				lastInBlock[0]=-1;
+				spacersCursor=tandemSpacers_updateTranslation_spacerBlock(readID,0,1,readLength,spacersCursor,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,distanceThreshold,QUANTUM,read2characters_new,read2boundaries_new,out,tmpCharacter);
+			}
+			read2characters_new.newLine(); read2boundaries_new.newLine();
 			return spacersCursor;
 		}
 		loadBoundaries(read2boundaries_old);
@@ -9015,6 +9035,8 @@ public class RepeatAlphabet {
 		int from, to, first, last, lastSolution, returnValue;
 		Spacer spacer;
 		
+System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID+" blockID="+blockID);		
+		
 		first=blockID==0?0:boundaries[blockID-1];
 		last=blockID==nBlocks-1?readLength-1:boundaries[blockID];
 		while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<first)) spacersCursor++;
@@ -9052,10 +9074,12 @@ public class RepeatAlphabet {
 						p=q;
 					}
 				}
-				if (p>0) Arrays.sort(stack,0,p+1);
-				read2characters_new.write(stack[0]+"");
-				for (j=1; j<=p; j++) {
-					if (stack[j]!=stack[j-1]) read2characters_new.write(SEPARATOR_MINOR+""+stack[j]);
+				if (p>=0) {
+					if (p>0) Arrays.sort(stack,0,p+1);
+					read2characters_new.write(stack[0]+"");
+					for (j=1; j<=p; j++) {
+						if (stack[j]!=stack[j-1]) read2characters_new.write(SEPARATOR_MINOR+""+stack[j]);
+					}
 				}
 				return spacersCursor+1;
 			}

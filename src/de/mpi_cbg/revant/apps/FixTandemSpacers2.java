@@ -60,9 +60,9 @@ public class FixTandemSpacers2 {
 		while (str1!=null) {
             if (str3.length()>0) {
     			nBlocks=1+((str4.length()+1)>>1);  // Loose upper bound
-    			if (tmpArray.length<nBlocks) tmpArray = new int[nBlocks];			
-    			j=RepeatAlphabet.tandemSpacers_collectCharacterInstances(Integer.parseInt(str1),j,str3,str4,str5,NONREPETITIVE_BLOCKS_MODE,Integer.parseInt(str2),DISTANCE_THRESHOLD,used,bw,tmpCharacter,tmpArray);
+    			if (tmpArray.length<nBlocks) tmpArray = new int[nBlocks];
             }
+    		j=RepeatAlphabet.tandemSpacers_collectCharacterInstances(Integer.parseInt(str1),j,str3,str4,str5,NONREPETITIVE_BLOCKS_MODE,Integer.parseInt(str2),DISTANCE_THRESHOLD,used,bw,tmpCharacter,tmpArray);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine(); str4=br4.readLine(); str5=br5.readLine();
 		}
 		br1.close(); br2.close(); br3.close(); br4.close(); br5.close();
