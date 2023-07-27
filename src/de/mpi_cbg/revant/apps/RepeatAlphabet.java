@@ -8243,18 +8243,44 @@ public class RepeatAlphabet {
 					}
 				}
 				// Adding solutions
-				if (fullyContainedB) addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
-				else if (fullyUniqueB) { /* NOP */ }
+boolean fabio = spacers[i].read==341 && Math.abs(spacers[i].first,6025)<=100;
+if (fabio) System.err.println("VITTU> 1");
+				if (fullyContainedB) {
+if (fabio) System.err.println("VITTU> 2  readB="+readB);					
+					addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
+				}
+				else if (fullyUniqueB) { /* NOP */ 
+if (fabio) System.err.println("VITTU> 3");					
+				}
 				else {
+if (fabio) {
+	System.err.println("VITTU> 4  readB="+readB);	
+	for (int x=0; x<translation_all[readB].length; x++) {
+		for (int y=0; y<translation_all[readB][x].length; y++) System.err.print(translation_all[readB][x][y]+",");
+		System.err.println(":");
+	}
+	System.err.println("character 1050: "+alphabet[1050]);
+}
+				
 					last=translation_all[readBPrime].length-2;	
-					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
-					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
+					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) {
+if (fabio) System.err.println("VITTU> 5");						
+						addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
+					}
+					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) {
+if (fabio) System.err.println("VITTU> 6");						
+						addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
+					}
 					else {
+if (fabio) System.err.println("VITTU> 7");						
 						for (j=1; j<=last; j++) {
+if (fabio) System.err.println("VITTU> 8  j="+j);							
 							if ( Intervals.isApproximatelyContained(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j]) ||
 								 Intervals.areApproximatelyIdentical(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j])
 							   ) {
+if (fabio) System.err.println("VITTU> 9  fromB="+fromB+" toB="+toB);								   
 								addSpacerSolutions(spacers[i],false,readBPrime,j,fromB,toB,lengthB);
+if (fabio) System.err.println("VITTU> 10  solutions now: "+spacers[i].printSolutions());								
 								break;
 							}
 						}
@@ -8320,6 +8346,17 @@ public class RepeatAlphabet {
 		System.err.println("Tandem spacers: "+(lastSpacer+1));
 		System.err.println("Tandem spacers, singleton: "+nSingletonSpacers+" ("+(100.0*nSingletonSpacers/(lastSpacer+1))+"%)");
 		System.err.println("Tandem spacers with solution: "+nSpacersWithSolution+" ("+(100.0*nSpacersWithSolution/(lastSpacer+1))+"%)");
+		
+		
+for (int x=0; x<=lastSpacer; x++) {
+	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
+		System.err.println("VITTU> found spacer "+spacers[x]+" with solutions: "+spacers[x].printSolutions());
+		break;
+	}
+}
+
+		
+		
 		return nSpacersWithSolution;
 	}
 	
@@ -8465,17 +8502,30 @@ public class RepeatAlphabet {
 	
 	
 	/**
+	 * Remark: in practice propagation adds solutions to just a few spacers that
+	 * previously had no solution. 
+	 *
 	 * @param distanceThreshold used only by calls to $Spacer.solutionsAreConsistent()$;
 	 * @return TRUE iff most spacers have a solution after propagation.
 	 */
 	public static final boolean propagateSolutions(int distanceThreshold) {
 		final int CAPACITY = 10;  // Arbitrary
 		final double THRESHOLD = 0.5;  // Arbitrary
+		final int MAX_SOLUTIONS_PER_SPACER = 1000;  // Arbitrary
 		
 		boolean orientation;
 		int i, j;
 		int top, last, currentSpacer, neighbor, nPropagated, nSolved;
 		SpacerSolution[] tmpArray;
+		
+		
+for (int x=0; x<=lastSpacer; x++) {
+	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
+		System.err.println("propagateSolutions> 0  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
+		break;
+	}
+}		
+		
 		
 		// Computing consistent solutions
 		tmpArray = new SpacerSolution[CAPACITY];
@@ -8491,6 +8541,16 @@ public class RepeatAlphabet {
 			spacers[i].flag=spacers[i].lastSolution!=-1;
 			spacers[i].breakpoint=-1;  // Used as a flag
 		}
+
+		
+for (int x=0; x<=lastSpacer; x++) {
+	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
+		System.err.println("propagateSolutions> 1  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
+		break;
+	}
+}
+		
+		
 		
 		// Propagating solutions to spacers without solutions
 		nPropagated=0;
@@ -8502,17 +8562,26 @@ public class RepeatAlphabet {
 				currentSpacer=stack[top--];
 				last=lastSpacerNeighbor[currentSpacer];
 				for (j=0; j<=last; j+=4) {
-					neighbor=(int)spacerNeighbors[currentSpacer][j];
+					neighbor=(int)spacerNeighbors[currentSpacer][j];					
 					if (neighbor<0) { orientation=false; neighbor=-1-neighbor; }
 					else orientation=true;
 					if (spacers[neighbor].flag || spacers[neighbor].breakpoint==i) continue;
 					spacers[neighbor].breakpoint=i;
-					if (spacers[neighbor].addSolutions(spacers[currentSpacer],(int)spacerNeighbors[currentSpacer][j+1],(int)spacerNeighbors[currentSpacer][j+2],orientation)) nPropagated++;
+					if (spacers[neighbor].addSolutions(spacers[currentSpacer],(int)spacerNeighbors[currentSpacer][j+1],(int)spacerNeighbors[currentSpacer][j+2],orientation,tmpArray)) nPropagated++;
 					stack[++top]=neighbor;
 				}
 			}
 		}
 		System.err.println(nPropagated+" tandem spacers with no solution, acquired a solution after propagation ("+((100.0*nPropagated)/(lastSpacer+1))+"%).");
+		
+
+for (int x=0; x<=lastSpacer; x++) {
+	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
+		System.err.println("propagateSolutions> 2  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
+		break;
+	}
+}		
+		
 		
 		// Making propagated solutions consistent
 		nSolved=0;
@@ -8530,6 +8599,15 @@ public class RepeatAlphabet {
 			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
 			if (spacers[i].lastSolution!=-1) nSolved++;
 		}
+		
+		
+for (int x=0; x<=lastSpacer; x++) {
+	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
+		System.err.println("propagateSolutions> 3  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
+		break;
+	}
+}		
+		
 		
 		return nSolved>=(lastSpacer+1)*THRESHOLD; 
 	}
@@ -9034,9 +9112,7 @@ public class RepeatAlphabet {
 		int i, j, p, q, c;
 		int from, to, first, last, lastSolution, returnValue;
 		Spacer spacer;
-		
-System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID+" blockID="+blockID);		
-		
+				
 		first=blockID==0?0:boundaries[blockID-1];
 		last=blockID==nBlocks-1?readLength-1:boundaries[blockID];
 		while (spacersCursor<=lastSpacer && (spacers[spacersCursor].read<readID || spacers[spacersCursor].first<first)) spacersCursor++;
@@ -9090,6 +9166,13 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 		}
 		for (spacersCursor=from; spacersCursor<=to; spacersCursor++) {
 			spacer=spacers[spacersCursor];
+			
+			
+boolean fabio = spacer.read==341 && Math.abs(spacer.first,6025)<=100;
+if (fabio) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 1  spacer="+spacer+" solutions: "+spacer.printSolutions());	
+			
+			
+			
 			lastSolution=spacer.lastSolution;
 			p=-1;
 			if (lastSolution==-1) {
@@ -10218,9 +10301,13 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 		 * Adds to $solutions$ all the elements of $from.solutions$.
 		 *
 		 * @param from assumed to contain some solution;
+		 * @param tmpArray temporary space, assumed to be large enough, used just by
+		 * $compactSolutions()$;
 		 * @return TRUE iff $solutions$ changes from empty to nonempty.
 		 */
-		public final boolean addSolutions(Spacer from, int fromOffsetFirst, int fromOffsetLast, boolean orientation) {
+		public final boolean addSolutions(Spacer from, int fromOffsetFirst, int fromOffsetLast, boolean orientation, SpacerSolution[] tmpArray) {
+			final int MAX_N_SOLUTIONS = 1000;  // Arbitrary
+			final int COMPACT_THRESHOLD = IO.quantum;  // Arbitrary. Small is ok.
 			final boolean out = solutions==null||lastSolution==-1;
 			boolean fromOrientation;
 			int i;
@@ -10238,6 +10325,7 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 				if (from.solutions[i+1]==-1) addSolution(fromRepeat,fromOrientation&orientation,-1,-1,true);
 				else addSolution(fromRepeat,fromOrientation&orientation,from.solutions[i+1]+fromOffsetFirst,from.solutions[i+1]+fromOffsetLast,false);
 			}
+			if ((lastSolution+1)/3>=MAX_N_SOLUTIONS) compactSolutions(COMPACT_THRESHOLD,tmpArray);
 			return out;
 		}
 		
@@ -10278,14 +10366,21 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 			}
 			Arrays.sort(tmpArray,0,nSolutions);
 			
+			
+boolean fabio = read==341 && Math.abs(first,6025)<=100;
+
+			
 			// Merging solutions
 			j=0; n=1; isConsistent=true;
 			repeat=tmpArray[0].repeat; orientation=tmpArray[0].orientation;
 			isShortPeriod=tmpArray[0].isShortPeriod;
 			min1=tmpArray[0].first; max1=min1; sum1=min1;
 			min2=tmpArray[0].last; max2=min2; sum2=min2;
+if (fabio) System.err.println("solutionsAreConsistent> 1  repeat="+repeat);
 			for (i=1; i<nSolutions; i++) {
+if (fabio) System.err.println("solutionsAreConsistent> 2");
 				if (tmpArray[i].repeat!=repeat) {
+if (fabio) System.err.println("solutionsAreConsistent> 3");					
 					if (!isShortPeriod) {
 						if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
 						if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
@@ -10293,6 +10388,7 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 					if (isConsistent) {
 						tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
 						tmpArray[j].isShortPeriod=isShortPeriod;
+if (fabio) System.err.println("solutionsAreConsistent> 4  repeat="+repeat);						
 						j++;
 					}
 					n=1; isConsistent=true;
@@ -10300,8 +10396,10 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 					isShortPeriod=tmpArray[i].isShortPeriod;
 					min1=tmpArray[i].first; max1=min1; sum1=min1;
 					min2=tmpArray[i].last; max2=min2; sum2=min2;
+if (fabio) System.err.println("solutionsAreConsistent> 5  repeat="+repeat);					
 					continue;
 				}
+if (fabio) System.err.println("solutionsAreConsistent> 6");				
 				if (tmpArray[i].orientation!=orientation) isConsistent=false;
 				if (tmpArray[i].first<min1) min1=tmpArray[i].first;
 				if (tmpArray[i].first>max1) max1=tmpArray[i].first;
@@ -10311,14 +10409,17 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 				sum2+=tmpArray[i].last;
 				n++;
 			}
+if (fabio) System.err.println("solutionsAreConsistent> 7  max1="+max1+" min1="+min1+" max2="+max2+" min2="+min2+" threshold="+threshold);			
 			if (!isShortPeriod) {
 				if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
 				if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
 			}
 			if (isConsistent) {
+if (fabio) System.err.println("solutionsAreConsistent> 8  repeat="+repeat);				
 				tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
 				tmpArray[j].isShortPeriod=isShortPeriod;
 			}
+			else j--;
 			
 			// Storing the result of the merge
 			k=-1;
@@ -10330,6 +10431,68 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 			lastSolution=k;
 			return true;
 		}
+		
+		
+		/**
+		 * Used only by tandem spacers.
+		 * Performs a simple clustering just to reduce the number of solutions when too
+		 * many of them get propagated to a node.
+		 *
+		 * @param tmpArray temporary space, assumed to be large enough.
+		 */
+		private void compactSolutions(int threshold, SpacerSolution[] tmpArray) {
+			boolean orientation, isShortPeriod;
+			int i, j, n;
+			int repeat, sum1, sum2;
+			final int nSolutions = (lastSolution+1)/3;
+			SpacerSolution tmpSolution;
+			
+			// Sorting solutions
+			for (i=0; i<=lastSolution; i+=3) {
+				j=i/3;
+				if (solutions[i]<0)	{
+					tmpArray[j].repeat=-1-solutions[i];
+					tmpArray[j].orientation=false;
+				}
+				else {
+					tmpArray[j].repeat=solutions[i];
+					tmpArray[j].orientation=true;
+				}
+				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
+				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
+			}
+			Arrays.sort(tmpArray,0,nSolutions);
+			
+			// Clustering solutions
+			for (i=0; i<nSolutions; i++) tmpArray[i].component=-1;
+			for (i=0; i<nSolutions; i++) {
+				if (tmpArray[i].component!=-1) continue;
+				tmpArray[i].component=i; n=1;
+				repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
+				isShortPeriod=tmpArray[i].isShortPeriod;
+				sum1=tmpArray[i].first; sum2=tmpArray[i].last;
+				for (j=i+1; j<nSolutions; j++) {
+					if (tmpArray[j].repeat!=repeat || tmpArray[j].orientation!=orientation || tmpArray[j].first>tmpArray[i].first+threshold) break;
+					if (isShortPeriod) {
+						if (tmpArray[j].isShortPeriod) { tmpArray[j].component=i; n++; }
+					}
+					else if (Math.abs(tmpArray[i].last,tmpArray[j].last)<=threshold) { 
+						sum1+=tmpArray[j].first; sum2+=tmpArray[j].last; 
+						tmpArray[j].component=i; n++;
+					}
+				}
+				if (!isShortPeriod) tmpArray[i].first=sum1/n; tmpArray[i].last=sum2/n;
+			}
+			j=-1;
+			for (i=0; i<nSolutions; i++) {
+				if (tmpArray[i].component!=i) continue;
+				solutions[++j]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
+				solutions[++j]=tmpArray[i].first;
+				solutions[++j]=tmpArray[i].last;
+			}
+			lastSolution=j;
+		}
+		
 		
 		/**
 		 * By increasing $read,first$, decreasing $last$. This is to make a parent spacer
@@ -10417,6 +10580,7 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 		public boolean orientation, isShortPeriod;
 		public int repeat;
 		public int first, last;  // -1 if short-period
+		public int component;
 		
 		public SpacerSolution() { }
 		
@@ -10424,6 +10588,12 @@ System.err.println("tandemSpacers_updateTranslation_spacerBlock> readID="+readID
 			SpacerSolution otherSolution = (SpacerSolution)other;
 			if (repeat<otherSolution.repeat) return -1;
 			else if (repeat>otherSolution.repeat) return 1;
+			if (orientation && !otherSolution.orientation) return -1;
+			else if (!orientation && otherSolution.orientation) return 1;			
+			if (first<otherSolution.first) return -1;
+			else if (first>otherSolution.first) return 1;
+			if (last<otherSolution.last) return -1;
+			else if (last>otherSolution.last) return 1;			
 			else return 0;
 		}
 	}
