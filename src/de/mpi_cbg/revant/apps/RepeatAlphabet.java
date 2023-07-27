@@ -8243,44 +8243,18 @@ public class RepeatAlphabet {
 					}
 				}
 				// Adding solutions
-boolean fabio = spacers[i].read==341 && Math.abs(spacers[i].first,6025)<=100;
-if (fabio) System.err.println("VITTU> 1");
-				if (fullyContainedB) {
-if (fabio) System.err.println("VITTU> 2  readB="+readB);					
-					addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
-				}
-				else if (fullyUniqueB) { /* NOP */ 
-if (fabio) System.err.println("VITTU> 3");					
-				}
+				if (fullyContainedB) addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
+				else if (fullyUniqueB) { /* NOP */ }
 				else {
-if (fabio) {
-	System.err.println("VITTU> 4  readB="+readB);	
-	for (int x=0; x<translation_all[readB].length; x++) {
-		for (int y=0; y<translation_all[readB][x].length; y++) System.err.print(translation_all[readB][x][y]+",");
-		System.err.println(":");
-	}
-	System.err.println("character 1050: "+alphabet[1050]);
-}
-				
 					last=translation_all[readBPrime].length-2;	
-					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) {
-if (fabio) System.err.println("VITTU> 5");						
-						addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
-					}
-					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) {
-if (fabio) System.err.println("VITTU> 6");						
-						addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
-					}
-					else {
-if (fabio) System.err.println("VITTU> 7");						
+					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
+					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
+					else {				
 						for (j=1; j<=last; j++) {
-if (fabio) System.err.println("VITTU> 8  j="+j);							
 							if ( Intervals.isApproximatelyContained(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j]) ||
 								 Intervals.areApproximatelyIdentical(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j])
 							   ) {
-if (fabio) System.err.println("VITTU> 9  fromB="+fromB+" toB="+toB);								   
 								addSpacerSolutions(spacers[i],false,readBPrime,j,fromB,toB,lengthB);
-if (fabio) System.err.println("VITTU> 10  solutions now: "+spacers[i].printSolutions());								
 								break;
 							}
 						}
@@ -8345,17 +8319,7 @@ if (fabio) System.err.println("VITTU> 10  solutions now: "+spacers[i].printSolut
 		System.err.println("Tandem spacer edges: "+(nEdgesTotal>>1));
 		System.err.println("Tandem spacers: "+(lastSpacer+1));
 		System.err.println("Tandem spacers, singleton: "+nSingletonSpacers+" ("+(100.0*nSingletonSpacers/(lastSpacer+1))+"%)");
-		System.err.println("Tandem spacers with solution: "+nSpacersWithSolution+" ("+(100.0*nSpacersWithSolution/(lastSpacer+1))+"%)");
-		
-		
-for (int x=0; x<=lastSpacer; x++) {
-	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
-		System.err.println("VITTU> found spacer "+spacers[x]+" with solutions: "+spacers[x].printSolutions());
-		break;
-	}
-}
-
-		
+		System.err.println("Tandem spacers with solution: "+nSpacersWithSolution+" ("+(100.0*nSpacersWithSolution/(lastSpacer+1))+"%)");		
 		
 		return nSpacersWithSolution;
 	}
@@ -8512,20 +8476,10 @@ for (int x=0; x<=lastSpacer; x++) {
 		final int CAPACITY = 10;  // Arbitrary
 		final double THRESHOLD = 0.5;  // Arbitrary
 		final int MAX_SOLUTIONS_PER_SPACER = 1000;  // Arbitrary
-		
 		boolean orientation;
 		int i, j;
 		int top, last, currentSpacer, neighbor, nPropagated, nSolved;
-		SpacerSolution[] tmpArray;
-		
-		
-for (int x=0; x<=lastSpacer; x++) {
-	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
-		System.err.println("propagateSolutions> 0  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
-		break;
-	}
-}		
-		
+		SpacerSolution[] tmpArray;		
 		
 		// Computing consistent solutions
 		tmpArray = new SpacerSolution[CAPACITY];
@@ -8541,16 +8495,6 @@ for (int x=0; x<=lastSpacer; x++) {
 			spacers[i].flag=spacers[i].lastSolution!=-1;
 			spacers[i].breakpoint=-1;  // Used as a flag
 		}
-
-		
-for (int x=0; x<=lastSpacer; x++) {
-	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
-		System.err.println("propagateSolutions> 1  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
-		break;
-	}
-}
-		
-		
 		
 		// Propagating solutions to spacers without solutions
 		nPropagated=0;
@@ -8574,15 +8518,6 @@ for (int x=0; x<=lastSpacer; x++) {
 		}
 		System.err.println(nPropagated+" tandem spacers with no solution, acquired a solution after propagation ("+((100.0*nPropagated)/(lastSpacer+1))+"%).");
 		
-
-for (int x=0; x<=lastSpacer; x++) {
-	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
-		System.err.println("propagateSolutions> 2  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
-		break;
-	}
-}		
-		
-		
 		// Making propagated solutions consistent
 		nSolved=0;
 		for (i=0; i<=lastSpacer; i++) {
@@ -8599,15 +8534,6 @@ for (int x=0; x<=lastSpacer; x++) {
 			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
 			if (spacers[i].lastSolution!=-1) nSolved++;
 		}
-		
-		
-for (int x=0; x<=lastSpacer; x++) {
-	if (spacers[x].read==341 && Math.abs(spacers[x].first,6025)<=100) {
-		System.err.println("propagateSolutions> 3  found spacer: "+spacers[x]+" solutions: "+spacers[x].printSolutions());
-		break;
-	}
-}		
-		
 		
 		return nSolved>=(lastSpacer+1)*THRESHOLD; 
 	}
@@ -9166,13 +9092,6 @@ for (int x=0; x<=lastSpacer; x++) {
 		}
 		for (spacersCursor=from; spacersCursor<=to; spacersCursor++) {
 			spacer=spacers[spacersCursor];
-			
-			
-boolean fabio = spacer.read==341 && Math.abs(spacer.first,6025)<=100;
-if (fabio) System.err.println("tandemSpacers_updateTranslation_spacerBlock> 1  spacer="+spacer+" solutions: "+spacer.printSolutions());	
-			
-			
-			
 			lastSolution=spacer.lastSolution;
 			p=-1;
 			if (lastSolution==-1) {
