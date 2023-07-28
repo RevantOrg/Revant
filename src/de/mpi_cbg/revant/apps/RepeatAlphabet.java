@@ -2887,7 +2887,10 @@ public class RepeatAlphabet {
 							else if (toPrime==to) stack[++last1]=c;
 						}
 					}
-					if (to==-1) continue;
+					if (to==-1) {
+						to=i; last1=-1;
+						for (j=0; j<=lastInBlock_int[i]; j++) stack[++last1]=intBlocks[i][j];
+					}
 					found=false;
 					if (i>0 && !tmpBoolean1[i-1] && !tmpBoolean2[i-1]) {
 						for (j=0; j<=lastInBlock_int[i-1]; j++) {
@@ -2925,6 +2928,7 @@ public class RepeatAlphabet {
 						}
 					}
 					if (found) to++;
+					if (from==i && to==i) continue;
 					lastInterval++;
 					if (lastInterval>=tandemIntervals.length) {
 						Pair[] newArray = new Pair[tandemIntervals.length<<1];
@@ -8243,18 +8247,33 @@ public class RepeatAlphabet {
 					}
 				}
 				// Adding solutions
-				if (fullyContainedB) addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
-				else if (fullyUniqueB) { /* NOP */ }
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 0  spacer: "+spacers[i]);
+				if (fullyContainedB) {
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 1");					
+					addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
+				}
+				else if (fullyUniqueB) { /* NOP */ 
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 2");				
+				}
 				else {
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 3");					
 					last=translation_all[readBPrime].length-2;	
-					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
-					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
-					else {				
+					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) {
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 4");						
+						addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
+					}
+					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) {
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 5");						
+						addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
+					}
+					else {
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 6");						
 						for (j=1; j<=last; j++) {
 							if ( Intervals.isApproximatelyContained(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j]) ||
 								 Intervals.areApproximatelyIdentical(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j])
 							   ) {
 								addSpacerSolutions(spacers[i],false,readBPrime,j,fromB,toB,lengthB);
+if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 7");								
 								break;
 							}
 						}
@@ -8274,6 +8293,19 @@ public class RepeatAlphabet {
 			if (lastSpacerNeighbor[i]==-1) nSingletonSpacers++;
 		}
 		if (nSpacersWithSolution==0) return 0;
+		
+		
+		
+		
+		
+for (int x=0; x<=lastSpacer; x++) {
+	if (spacers[x].read==468) {
+		System.err.println("loadTandemSpacerNeighbors> spacer "+spacers[x]+" readLength="+Reads.getReadLength(spacers[x].read)+" solutions: "+spacers[x].printSolutions());
+		break;
+	}
+}		
+		
+		
 		
 		// Removing duplicates and sorting edges
 		nEdgesTotal=0; max=0;
@@ -9456,7 +9488,9 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Like $concatenateBlocks_collectCharacterInstances()$, but looks up in the new 
-	 * alphabet every existing and new character induced by concatenation.
+	 * alphabet every existing and new character induced by concatenation. If a set of 
+	 * blocks is concatenated, the characters that did not contribute to the concatenation
+	 * are discarded.
 	 *
 	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded, and 
 	 * that global variable $alphabet$ contains the old alphabet.
@@ -10285,21 +10319,14 @@ public class RepeatAlphabet {
 			}
 			Arrays.sort(tmpArray,0,nSolutions);
 			
-			
-boolean fabio = read==341 && Math.abs(first,6025)<=100;
-
-			
 			// Merging solutions
 			j=0; n=1; isConsistent=true;
 			repeat=tmpArray[0].repeat; orientation=tmpArray[0].orientation;
 			isShortPeriod=tmpArray[0].isShortPeriod;
 			min1=tmpArray[0].first; max1=min1; sum1=min1;
 			min2=tmpArray[0].last; max2=min2; sum2=min2;
-if (fabio) System.err.println("solutionsAreConsistent> 1  repeat="+repeat);
 			for (i=1; i<nSolutions; i++) {
-if (fabio) System.err.println("solutionsAreConsistent> 2");
 				if (tmpArray[i].repeat!=repeat) {
-if (fabio) System.err.println("solutionsAreConsistent> 3");					
 					if (!isShortPeriod) {
 						if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
 						if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
@@ -10307,7 +10334,6 @@ if (fabio) System.err.println("solutionsAreConsistent> 3");
 					if (isConsistent) {
 						tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
 						tmpArray[j].isShortPeriod=isShortPeriod;
-if (fabio) System.err.println("solutionsAreConsistent> 4  repeat="+repeat);						
 						j++;
 					}
 					n=1; isConsistent=true;
@@ -10315,10 +10341,8 @@ if (fabio) System.err.println("solutionsAreConsistent> 4  repeat="+repeat);
 					isShortPeriod=tmpArray[i].isShortPeriod;
 					min1=tmpArray[i].first; max1=min1; sum1=min1;
 					min2=tmpArray[i].last; max2=min2; sum2=min2;
-if (fabio) System.err.println("solutionsAreConsistent> 5  repeat="+repeat);					
 					continue;
 				}
-if (fabio) System.err.println("solutionsAreConsistent> 6");				
 				if (tmpArray[i].orientation!=orientation) isConsistent=false;
 				if (tmpArray[i].first<min1) min1=tmpArray[i].first;
 				if (tmpArray[i].first>max1) max1=tmpArray[i].first;
@@ -10328,13 +10352,11 @@ if (fabio) System.err.println("solutionsAreConsistent> 6");
 				sum2+=tmpArray[i].last;
 				n++;
 			}
-if (fabio) System.err.println("solutionsAreConsistent> 7  max1="+max1+" min1="+min1+" max2="+max2+" min2="+min2+" threshold="+threshold);			
 			if (!isShortPeriod) {
 				if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
 				if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
 			}
 			if (isConsistent) {
-if (fabio) System.err.println("solutionsAreConsistent> 8  repeat="+repeat);				
 				tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
 				tmpArray[j].isShortPeriod=isShortPeriod;
 			}

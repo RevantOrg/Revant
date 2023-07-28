@@ -304,7 +304,7 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		TANDEM_SPACERS_FIXED="1"
 		echo "Tandem spacers fixed"
 		
-		#exit
+		exit
 		
 		rm -f ${TMPFILE_PATH}-concatenate-*
 		for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-stash-*"); do

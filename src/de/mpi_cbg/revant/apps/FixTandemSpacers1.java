@@ -37,7 +37,7 @@ public class FixTandemSpacers1 {
 		final String OUTPUT_FILE = args[13];
 		
 		final int DISTANCE_THRESHOLD = IO.quantum;
-        final int DISTANCE_THRESHOLD_CONSISTENCY = IO.quantum*3;  // Arbitrary. Using a large threshold for consistency is ok, since it is just checking whether a spacer is assigned very different substrings of the same repeat.
+        final int DISTANCE_THRESHOLD_CONSISTENCY = IO.quantum<<2;  // Arbitrary. Using a large threshold for consistency is ok, since it is just checking whether a spacer is assigned very different substrings of the same repeat.
 		
 		int maxBlockLength;
 		int[] tmpArray = new int[2];
