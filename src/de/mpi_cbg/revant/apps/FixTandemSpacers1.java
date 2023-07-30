@@ -34,7 +34,8 @@ public class FixTandemSpacers1 {
 		final String READ_READ_ALIGNMENTS_FILE = args[10];
 		final String TANDEMS_FILE = args[11];
 		final int NONREPETITIVE_BLOCKS_MODE = Integer.parseInt(args[12]);
-		final String OUTPUT_FILE = args[13];
+        final int LONG_SPACER_LENGTH = Integer.parseInt(args[13]);
+		final String OUTPUT_FILE = args[14];
 		
 		final int DISTANCE_THRESHOLD = IO.quantum;
         final int DISTANCE_THRESHOLD_CONSISTENCY = IO.quantum<<2;  // Arbitrary. Using a large threshold for consistency is ok, since it is just checking whether a spacer is assigned very different substrings of the same repeat.
@@ -50,7 +51,7 @@ public class FixTandemSpacers1 {
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadTandemIntervals(TANDEMS_FILE,N_READS);
 		RepeatAlphabet.loadTandemSpacers(NONREPETITIVE_BLOCKS_MODE);
-		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,NONREPETITIVE_BLOCKS_MODE,tmpArray);
+		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,LONG_SPACER_LENGTH,NONREPETITIVE_BLOCKS_MODE,tmpArray);
 		if (RepeatAlphabet.lastSpacer==-1) { System.out.println("1"); return; }
 		RepeatAlphabet.loadFullyContainedTranslation(TRANSLATED_READS_CHARACTERS_FILE,N_FULLY_CONTAINED);
 		if (RepeatAlphabet.loadTandemSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,NONREPETITIVE_BLOCKS_MODE,tmpArray)==0) { System.out.println("2"); return; }

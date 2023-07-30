@@ -8247,33 +8247,18 @@ public class RepeatAlphabet {
 					}
 				}
 				// Adding solutions
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 0  spacer: "+spacers[i]);
-				if (fullyContainedB) {
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 1");					
-					addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
-				}
-				else if (fullyUniqueB) { /* NOP */ 
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 2");				
-				}
+				if (fullyContainedB) addSpacerSolutions(spacers[i],true,readBPrime,-1,fromB,toB,lengthB);
+				else if (fullyUniqueB) { /* NOP */ }
 				else {
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 3");					
 					last=translation_all[readBPrime].length-2;	
-					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) {
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 4");						
-						addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
-					}
-					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) {
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 5");						
-						addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
-					}
+					if (toB<=boundaries_all[readBPrime][0]+IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,0,fromB,toB,lengthB);
+					else if (fromB>=boundaries_all[readBPrime][last]-IDENTITY_THRESHOLD) addSpacerSolutions(spacers[i],false,readBPrime,last+1,fromB,toB,lengthB);
 					else {
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 6");						
 						for (j=1; j<=last; j++) {
 							if ( Intervals.isApproximatelyContained(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j]) ||
 								 Intervals.areApproximatelyIdentical(fromB,toB,boundaries_all[readBPrime][j-1],boundaries_all[readBPrime][j])
 							   ) {
 								addSpacerSolutions(spacers[i],false,readBPrime,j,fromB,toB,lengthB);
-if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 7");								
 								break;
 							}
 						}
@@ -8293,19 +8278,6 @@ if (spacers[i].read==468) System.err.println("loadTandemSpacerNeighbors> 7");
 			if (lastSpacerNeighbor[i]==-1) nSingletonSpacers++;
 		}
 		if (nSpacersWithSolution==0) return 0;
-		
-		
-		
-		
-		
-for (int x=0; x<=lastSpacer; x++) {
-	if (spacers[x].read==468) {
-		System.err.println("loadTandemSpacerNeighbors> spacer "+spacers[x]+" readLength="+Reads.getReadLength(spacers[x].read)+" solutions: "+spacers[x].printSolutions());
-		break;
-	}
-}		
-		
-		
 		
 		// Removing duplicates and sorting edges
 		nEdgesTotal=0; max=0;
@@ -8352,7 +8324,6 @@ for (int x=0; x<=lastSpacer; x++) {
 		System.err.println("Tandem spacers: "+(lastSpacer+1));
 		System.err.println("Tandem spacers, singleton: "+nSingletonSpacers+" ("+(100.0*nSingletonSpacers/(lastSpacer+1))+"%)");
 		System.err.println("Tandem spacers with solution: "+nSpacersWithSolution+" ("+(100.0*nSpacersWithSolution/(lastSpacer+1))+"%)");		
-		
 		return nSpacersWithSolution;
 	}
 	
@@ -8435,7 +8406,7 @@ for (int x=0; x<=lastSpacer; x++) {
 	 * @param blockB ID of a block in $translation_all[readB]$.
 	 */
 	private static final void addSpacerSolutions(Spacer spacer, boolean fullyContainedB, int readB, int blockB, int alignmentFirstB, int alignmentLastB, int readLengthB) {
-		final int MIN_SOLUTION_LENGTH = (spacer.last-spacer.first+1)-IO.quantum;
+		final int MIN_SOLUTION_LENGTH = (spacer.last-spacer.first+1)-(IO.quantum<<1);
 		boolean repeatOrientation;
 		int i, c;
 		int length, nBlocks, blockFirst, blockLast, repeatFirst, repeatLast;
@@ -8595,9 +8566,11 @@ for (int x=0; x<=lastSpacer; x++) {
 	 *
 	 * @param distanceThreshold for building connected components to cluster block
 	 * endpoint projections;
+	 * @param longSpacerLength to resolve spacers that are at least this long, the 
+	 * procedure uses all alignments, not just those that cover the spacer;
 	 * @param tmpArray of size at least two.
 	 */
-	public static final void loadTandemSpacers_blocks(String alignmentsFile, int distanceThreshold, int nonrepetitiveBlocksMode, int[] tmpArray) throws IOException {
+	public static final void loadTandemSpacers_blocks(String alignmentsFile, int distanceThreshold, int longSpacerLength, int nonrepetitiveBlocksMode, int[] tmpArray) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int nTranslated = translated.length;
 		final int nFullyUnique = fullyUnique.length;
@@ -8635,7 +8608,7 @@ for (int x=0; x<=lastSpacer; x++) {
 				while (fullyUniqueCursor<nFullyUnique && fullyUnique[fullyUniqueCursor]<readA) fullyUniqueCursor++;
 			}
 			if (translated[translatedCursor]!=readA && (nonrepetitiveBlocksMode!=2 || fullyUnique[fullyUniqueCursor]!=readA)) {
-				System.err.println("addSpacerSolutions_blocks> ERROR: readA="+readA+" is not translated or unique but has a tandem spacer?!");
+				System.err.println("loadTandemSpacers_blocks> ERROR: readA="+readA+" is not translated or unique but has a tandem spacer?!");
 				throw new RuntimeException();
 			}
 			readB=Alignments.readB-1;
@@ -8651,8 +8624,8 @@ for (int x=0; x<=lastSpacer; x++) {
 			lengthB=Reads.getReadLength(readB);
 			for (i=firstSpacer; i<=lastSpacer; i++) {
 				if (spacers[i].read!=readA) break;
-				if ( translated[translatedCursor]==readA &&
-					 // Allowing partial alignments for fully-unique reads
+				if ( translated[translatedCursor]==readA && spacers[i].last-spacers[i].first+1<longSpacerLength &&
+					 // Using any alignment with fully-unique reads and with long spacers
 					 !Intervals.isApproximatelyContained(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA) &&
 					 !Intervals.areApproximatelyIdentical(spacers[i].first,spacers[i].last,Alignments.startA,Alignments.endA)
 				   ) continue;
@@ -8666,9 +8639,7 @@ for (int x=0; x<=lastSpacer; x++) {
 					if (fromB>=p-IDENTITY_THRESHOLD && fromB<=q+IDENTITY_THRESHOLD) firstBlock=j;
 					if (toB>=p-IDENTITY_THRESHOLD && toB<=q+IDENTITY_THRESHOLD) { lastBlock=j; break; }
 				}
-				for (j=firstBlock; j<lastBlock; j++) {
-					spacers[i].addSplit(Alignments.projectIntersectionBA(boundaries_all[readBPrime][j]));
-				}
+				for (j=firstBlock; j<lastBlock; j++) spacers[i].addSplit(Alignments.projectIntersectionBA(boundaries_all[readBPrime][j]));
 			}
 			str=br.readLine();
 			if (str!=null) {
@@ -8718,7 +8689,7 @@ for (int x=0; x<=lastSpacer; x++) {
 			if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(spacers[i].read,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
 			else spacers[lastSpacer].set(spacers[i].read,spacers[i].first,spacers[i].splits[0],blockID!=0,false,-1);
 			lastSplit=spacers[i].lastSplit;
-			for (j=1; j<lastSplit; j++) {
+			for (j=1; j<=lastSplit; j++) {
 				lastSpacer++;
 				if (lastSpacer==spacers.length) {
 					Spacer[] newArray = new Spacer[spacers.length<<1];
