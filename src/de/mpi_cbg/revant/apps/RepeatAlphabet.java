@@ -3722,7 +3722,7 @@ public class RepeatAlphabet {
 				throw new RuntimeException();
 			}
 			isRepetitive=inRedRegion(readB,Alignments.startB,Alignments.endB,p,-2,lastBlueInterval,Reads.getReadLength(readB),minIntersection_nonrepetitive,minBlueIntervalLength,IDENTITY_THRESHOLD,DIFFERENCE_THRESHOLD);
-			if (isRepetitive==0) bw.write("0\n"); 
+			if (isRepetitive==0) bw.write("0\n");
 			else {
 				bw.write("1\n");
 				out[1][type]++;
@@ -3835,7 +3835,7 @@ public class RepeatAlphabet {
 				start=firstBlock==0?0:boundaries_all[boundariesAllID][firstBlock-1];
 				lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
 				end=lastBlock==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][lastBlock];
-				if (end-start+1<minBlueIntervalLength) continue;				
+				if (end-start+1<minBlueIntervalLength) continue;
 				if ( ( Intervals.areApproximatelyIdentical(start,end,intervalStart,intervalEnd) ||
 					   Intervals.isApproximatelyContained(start,end,intervalStart,intervalEnd)
 					 ) &&
@@ -4574,6 +4574,7 @@ public class RepeatAlphabet {
 	public static final void filterAlignments_tandem(String alignmentsFile, boolean bothReads, int minIntersection_nonrepetitive, int minAlignmentLength_readRepeat, String outputFile, long[][] out) throws IOException {
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int TANDEM_DISTANCE_THRESHOLD = minAlignmentLength_readRepeat>>2;  // Arbitrary
+		final int DIFFERENCE_THRESHOLD = (IDENTITY_THRESHOLD*3)>>1;  // Arbitrary
 		boolean found, containedA, identicalA, containedB, identicalB, isShortPeriod;
 		int i, j, p;
 		int length, lengthA, lengthB, row, type, nBlocks, readA, readB, startA, endA, startB, endB;
@@ -4647,7 +4648,7 @@ public class RepeatAlphabet {
 					if (!bothReads) {
 						if ( containedA || identicalA ||
 						     ( !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) &&
-							   filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
+							   filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
 							 )
 						   ) {
 							bw.write("0\n"); str=br.readLine(); row++;
@@ -4657,7 +4658,7 @@ public class RepeatAlphabet {
 					else {
 						if ( !identicalA && !containedA && 
 							 ( filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) ||
-							   !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD)
+							   !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
 							 )
 						   ) {
 							out[1][type]++;
@@ -4715,7 +4716,7 @@ public class RepeatAlphabet {
 					if (!bothReads) {
 						if ( containedB || identicalB ||
 						     ( !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) &&
-							   filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
+							   filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
 							 )
 						   ) {
 							bw.write("0\n"); str=br.readLine(); row++;
@@ -4725,7 +4726,7 @@ public class RepeatAlphabet {
 					else {
 						if ( !containedB && !identicalB &&
 							 ( filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) ||
-							   !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD)
+							   !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
 							 )
 						   ) {
 							out[1][type]++;
@@ -4827,9 +4828,10 @@ public class RepeatAlphabet {
 	 *
 	 * @param distanceThreshold a contained blue interval that coincides with a tandem 
 	 * interval, but that is at most this far from the read start/end, is considered
-	 * strictly contained in the tandem interval.
+	 * strictly contained in the tandem interval;
+	 * @param differenceThreshold as defined in $inRedRegion()$.
 	 */
-	private static final boolean filterAlignments_tandem_allContainedBlueInTandem(int readID, int boundariesAllID, int blueIntervalsID, int intervalStart, int intervalEnd, int nBlocks, int readLength, int distanceThreshold) {
+	private static final boolean filterAlignments_tandem_allContainedBlueInTandem(int readID, int boundariesAllID, int blueIntervalsID, int intervalStart, int intervalEnd, int nBlocks, int readLength, int distanceThreshold, int differenceThreshold) {
 		boolean containsBlue, found;
 		int i, j, k;
 		int firstBlock, lastBlock, firstPosition, lastPosition, lastBlueInterval, lastTandemInterval;
@@ -4849,7 +4851,8 @@ public class RepeatAlphabet {
 			else lastPosition=boundaries_all[boundariesAllID][lastBlock];
 			if (lastPosition<=intervalStart) continue;
 			if ( Intervals.isApproximatelyContained(firstPosition,lastPosition,intervalStart,intervalEnd) &&
-				 !Intervals.areApproximatelyIdentical(firstPosition,lastPosition,intervalStart,intervalEnd)
+				 !Intervals.areApproximatelyIdentical(firstPosition,lastPosition,intervalStart,intervalEnd) &&
+				 (intervalStart<=firstPosition-differenceThreshold && intervalEnd>=lastPosition+differenceThreshold)
 			   ) {
 				containsBlue=true; found=false;
 				while (j<lastTandemInterval) {
