@@ -4648,7 +4648,7 @@ public class RepeatAlphabet {
 					if (!bothReads) {
 						if ( containedA || identicalA ||
 						     ( !filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) &&
-							   filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
+							   filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD,IDENTITY_THRESHOLD)
 							 )
 						   ) {
 							bw.write("0\n"); str=br.readLine(); row++;
@@ -4658,7 +4658,7 @@ public class RepeatAlphabet {
 					else {
 						if ( !identicalA && !containedA && 
 							 ( filterAlignments_tandem_containsUnique(lastTranslated,startA,endA,nBlocks,lengthA,minIntersection_nonrepetitive) ||
-							   !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
+							   !filterAlignments_tandem_allContainedBlueInTandem(readA,lastTranslated,blueIntervalA,startA,endA,nBlocks,lengthA,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD,IDENTITY_THRESHOLD)
 							 )
 						   ) {
 							out[1][type]++;
@@ -4716,7 +4716,7 @@ public class RepeatAlphabet {
 					if (!bothReads) {
 						if ( containedB || identicalB ||
 						     ( !filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) &&
-							   filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
+							   filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD,IDENTITY_THRESHOLD)
 							 )
 						   ) {
 							bw.write("0\n"); str=br.readLine(); row++;
@@ -4726,7 +4726,7 @@ public class RepeatAlphabet {
 					else {
 						if ( !containedB && !identicalB &&
 							 ( filterAlignments_tandem_containsUnique(p,startB,endB,nBlocks,lengthB,minIntersection_nonrepetitive) ||
-							   !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD)
+							   !filterAlignments_tandem_allContainedBlueInTandem(readB,p,blueIntervalB,startB,endB,nBlocks,lengthB,TANDEM_DISTANCE_THRESHOLD,DIFFERENCE_THRESHOLD,IDENTITY_THRESHOLD)
 							 )
 						   ) {
 							out[1][type]++;
@@ -4826,15 +4826,21 @@ public class RepeatAlphabet {
 	 * reliable instead, since the boundaries between the units of such a tandem are
 	 * assumed to be clearly defined.
 	 *
+	 * Remark: a blue interval that uses the first or last block of a long-period tandem,
+	 * where the length of such a block is shorter than the length of an interior block, 
+	 * is considered reliable instead, since that terminal block might indeed be the 
+	 * result of a unique fragmentation process in the genome.
+	 *
 	 * @param distanceThreshold a contained blue interval that coincides with a tandem 
 	 * interval, but that is at most this far from the read start/end, is considered
 	 * strictly contained in the tandem interval;
 	 * @param differenceThreshold as defined in $inRedRegion()$.
 	 */
-	private static final boolean filterAlignments_tandem_allContainedBlueInTandem(int readID, int boundariesAllID, int blueIntervalsID, int intervalStart, int intervalEnd, int nBlocks, int readLength, int distanceThreshold, int differenceThreshold) {
+	private static final boolean filterAlignments_tandem_allContainedBlueInTandem(int readID, int boundariesAllID, int blueIntervalsID, int intervalStart, int intervalEnd, int nBlocks, int readLength, int distanceThreshold, int differenceThreshold, int identityThreshold) {
 		boolean containsBlue, found;
 		int i, j, k;
 		int firstBlock, lastBlock, firstPosition, lastPosition, lastBlueInterval, lastTandemInterval;
+		int from, to, block, firstLength, lastLength, middleLength;
 		
 		if (blueIntervalsID==-1) return false;
 		lastBlueInterval=blueIntervals[blueIntervalsID].length-1;
@@ -4847,7 +4853,7 @@ public class RepeatAlphabet {
 			else firstPosition=boundaries_all[boundariesAllID][firstBlock-1];
 			if (firstPosition>=intervalEnd) break;
 			lastBlock=firstBlock+blueIntervals[blueIntervalsID][i+1]-1;
-			if (lastBlock==nBlocks-1) lastPosition=Reads.getReadLength(readID)-1;
+			if (lastBlock==nBlocks-1) lastPosition=readLength-1;
 			else lastPosition=boundaries_all[boundariesAllID][lastBlock];
 			if (lastPosition<=intervalStart) continue;
 			if ( Intervals.isApproximatelyContained(firstPosition,lastPosition,intervalStart,intervalEnd) &&
@@ -4861,8 +4867,37 @@ public class RepeatAlphabet {
 						continue;
 					}
 					if (tandems[readID][j]>firstBlock) break;
-					if ( tandems[readID][j]<firstBlock || tandems[readID][j+1]>lastBlock ||
-						 (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (isBlockPeriodic(boundariesAllID,firstBlock) || firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
+					block=tandems[readID][j];
+					from=block==0?0:boundaries_all[boundariesAllID][block-1];
+					to=block==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][block];
+					firstLength=to-from+1;
+					if (tandems[readID][j+1]!=tandems[readID][j]) {
+						block=tandems[readID][j+1];
+						from=block==0?0:boundaries_all[boundariesAllID][block-1];
+						to=block==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][block];
+						lastLength=to-from+1;
+						if (tandems[readID][j+1]==tandems[readID][j]+1) middleLength=0;
+						else {
+							block=tandems[readID][j]+1;
+							from=block==0?0:boundaries_all[boundariesAllID][block-1];
+							block=tandems[readID][j+1]-1;
+							to=block==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][block];
+							middleLength=(to-from+1)/(tandems[readID][j+1]-tandems[readID][j]-1);
+						}
+					}
+					else { lastLength=firstLength; middleLength=0; }
+					if ( ( isBlockPeriodic(boundariesAllID,tandems[readID][j]) &&
+						   ( tandems[readID][j]<firstBlock || tandems[readID][j+1]>lastBlock ||
+						     (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
+						   )
+						 ) ||
+						 ( !isBlockPeriodic(boundariesAllID,tandems[readID][j]) &&
+						   ( (tandems[readID][j]==firstBlock && tandems[readID][j+1]>lastBlock && firstLength>=middleLength-identityThreshold) ||
+							 (tandems[readID][j+1]==lastBlock && tandems[readID][j]<firstBlock && lastLength>=middleLength-identityThreshold) ||
+							 (tandems[readID][j]<firstBlock && tandems[readID][j+1]>lastBlock) ||
+							 (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
+						   )
+						 )
 					   ) {
 						found=true;
 						break;
