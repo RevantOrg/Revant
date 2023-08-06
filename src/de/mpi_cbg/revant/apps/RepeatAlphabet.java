@@ -9809,18 +9809,18 @@ public class RepeatAlphabet {
 	
 	/**
 	 * Builds the new alphabet that results from wobbling the characters of the current 
-	 * alphabet that are marked in $flags$, as well as every periodic character. Each 
-	 * section of the new alphabet (unique, periodic, non-periodic) might not be sorted 
-	 * and might contain duplicates.
+	 * alphabet that are marked in $flags$. Each section of the new alphabet (unique,
+	 * periodic, non-periodic) might not be sorted and might contain duplicates.
 	 *
 	 * Remark: the procedure assumes that $repeatLengths$ has already been loaded.
 	 *
 	 * @param nFlags number of TRUE elements in $flags$, excluding periodic characters;
+	 * @para wobbleAllPeriodic TRUE=wobble every periodic character;
 	 * @param minAlignmentLength min. length of a read-repeat alignment;
 	 * @param out output array: contains the values of $lastUnique,lastPeriodic,
 	 * lastAlphabet$ for the new alphabet.
 	 */
-	public static final Character[] wobble_extendAlphabet(boolean[] flags, int nFlags, int quantum_wobble, int quantum_alphabet, int minAlignmentLength, int[] out) throws IOException {
+	public static final Character[] wobble_extendAlphabet(boolean[] flags, int nFlags, boolean wobbleAllPeriodic, int quantum_wobble, int quantum_alphabet, int minAlignmentLength, int[] out) throws IOException {
 		final int MAX_NEWCHARS_PER_CHAR = ((quantum_wobble<<1)/quantum_alphabet)*((quantum_wobble<<1)/quantum_alphabet);
 		int i;
 		int lastUnique_new, lastPeriodic_new, lastAlphabet_new;
@@ -9837,7 +9837,7 @@ public class RepeatAlphabet {
 		lastPeriodic_new=lastUnique_new;
 		for (i=lastUnique+1; i<=lastPeriodic; i++) {
 			alphabet_new[++lastPeriodic_new]=alphabet[i];
-			lastPeriodic_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,minAlignmentLength,alphabet_new,lastPeriodic_new,tmpCharacter);
+			if (flags[i] || wobbleAllPeriodic) lastPeriodic_new=wobble_extendAlphabet_impl(i,quantum_wobble,quantum_alphabet,minAlignmentLength,alphabet_new,lastPeriodic_new,tmpCharacter);
 		}
 		lastAlphabet_new=lastPeriodic_new;
 		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
@@ -10186,367 +10186,125 @@ public class RepeatAlphabet {
 		   ) return 0;
 		return Math.abs(alphabet[x].getLength(),reference.getLength())<=quantum_wobble?1:0;
 	}
+
+	
+	/**
+	 * Same as $wobble_markAlphabet()$: sets $out[i]=true$ iff $alphabet[i]$ is a
+	 * character (of any type, including non-repetitive and periodic) that has to be
+	 * wobbled since it belongs to a non-periodic tandem or it occurs adjacent to one.
+	 *
+	 * @param read2tandems non-periodic tandems only.
+	 */
+	public static final void wobble_longPeriod_markAlphabet(String read2characters, String read2tandems, int readLength, boolean[] out, Character tmpCharacter, int[] tmpArray) throws IOException {
+		final String SEPARATOR = ",";
+		int i, j, k, p, q, c;
+		int first, last, lastTandem, nBlocks;
+		
+		if (read2tandems.length()==0) return;
+		nBlocks=loadBlocks(read2characters);
+		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
+		i=-1; p=0; q=read2tandems.indexOf(SEPARATOR);
+		while (q>=0) {	
+			tmpArray[++i]=Integer.parseInt(read2tandems.substring(p,q));
+			p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+			tmpArray[++i]=Integer.parseInt(read2tandems.substring(p,q));
+			p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+		}
+		lastTandem=i;
+		for (i=0; i<=lastTandem; i+=2) {
+			first=tmpArray[i]; 
+			if (first>0) first--;
+			last=tmpArray[i+1];
+			if (last<nBlocks-1) last++;
+			for (j=first; j<=last; j++) {
+				for (k=0; k<=lastInBlock[j]; k++) {
+					c=intBlocks[j][k];
+					if (c<=lastAlphabet) out[c]=true;
+				}
+			}
+		}
+	}
 	
 	
-	public static class Spacer implements Comparable {
-		public boolean rigidLeft, rigidRight;
-		public int read, first, last, breakpoint;
+	/**
+	 * Same as $wobble()$.
+	 *
+	 * @param read2tandems non-periodic tandems only.
+	 */
+	public static final void wobble_longPeriod(String read2characters, String read2tandems, int quantum_wobble, int quantum_alphabet, int[] old2new, Character[] alphabet_new, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, BufferedWriter bw, int[] tmpArray1, int[] tmpArray2, int[] out) throws IOException {
+		final String SEPARATOR = ",";
+		int i, j, p, q, c;
+		int first, last, nBlocks, nTandemBlocks;
 		
-		/**
-		 * Used only by tandem spacers
-		 */
-		private static final int CAPACITY = 12;  // Arbitrary, multiple of 3.
-		public int[] solutions;
-		public int lastSolution;
-		public int[] splits;
-		public int lastSplit;
-		
-		/**
-		 * Index of the non-repetitive block (if any) in the translation of $read$.
-		 */
-		public int blockID;
-		
-		/**
-		 * Temporary space
-		 */
-		public boolean flag;
-		
-		public Spacer() { }
-		
-		public Spacer(int r, int f, int l, boolean fl, boolean fr, int b) {
-			set(r,f,l,fl,fr,b);
+		// Marking blocks to be wobbled
+		if (read2characters.length()==0) {
+			bw.newLine();
+			return;
 		}
-		
-		public void set(int r, int f, int l, boolean fl, boolean fr, int b) {
-			this.read=r; this.first=f; this.last=l;
-			this.rigidLeft=fl; this.rigidRight=fr;
-			this.blockID=b;
-			breakpoint=-1;
-			lastSplit=-1;
-		}
-		
-		public boolean isRigid() { return rigidLeft||rigidRight; }
-		
-		public void setBreakpoint() {
-			if (first==last) breakpoint=first;
-			else if (rigidLeft) breakpoint=first;
-			else if (rigidRight) breakpoint=last;
-			else breakpoint=(first+last)>>1;  // Arbitrary
-		}
-		
-		/**
-		 * Used only by tandem spacers
-		 */
-		public void addSolution(int repeat, boolean orientation, int first, int last, boolean isShortPeriod) {
-			if (solutions==null) {
-				solutions = new int[CAPACITY];
-				lastSolution=-1;
+		nBlocks=loadBlocks(read2characters);
+		out[1]+=nBlocks;
+		Math.set(tmpArray1,nBlocks-1,0);
+		if (nBlocks>1) {
+			i=-1; p=0; q=read2tandems.indexOf(SEPARATOR);
+			nTandemBlocks=0;
+			while (q>=0) {	
+				first=Integer.parseInt(read2tandems.substring(p,q));
+				p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+				last=Integer.parseInt(read2tandems.substring(p,q));
+				p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+				for (i=first; i<=last; i++) tmpArray1[i]=1;
+				nTandemBlocks+=last-first+1;
 			}
-			else if (lastSolution+3>=solutions.length) {
-				int[] newArray = new int[solutions.length<<1];
-				System.arraycopy(solutions,0,newArray,0,solutions.length);
-				solutions=newArray;
+			if (nTandemBlocks>0) {
+				if (tmpArray1[0]==1 && tmpArray1[1]==0) tmpArray1[1]=2;
+				for (i=1; i<nBlocks-1; i++) {
+					if (tmpArray1[i]!=1) continue;
+					if (tmpArray1[i-1]==0) tmpArray1[i-1]=2;
+					if (tmpArray1[i+1]==0) tmpArray1[i+1]=2;
+				}
+				if (tmpArray1[nBlocks-1]==1 && tmpArray1[nBlocks-2]==0) tmpArray1[nBlocks-2]=2;
 			}
-			solutions[++lastSolution]=orientation?repeat:-1-repeat;
-			if (isShortPeriod) {
-				solutions[++lastSolution]=-1;
-				solutions[++lastSolution]=-1;
+		}
+		
+		// Wobbling blocks
+		for (i=0; i<nBlocks; i++) {
+			if (i>0) bw.write(SEPARATOR_MAJOR+"");
+			if (tmpArray1[i]==0) {
+				c=Integer.parseInt(blocks[i][0]);
+				if (c>=0) bw.write(old2new[c]+"");
+				else bw.write((-1-old2new[-1-c])+"");
+				for (j=1; j<=lastInBlock[i]; j++) {
+					c=Integer.parseInt(blocks[i][j]);
+					if (c>=0) bw.write(SEPARATOR_MINOR+""+old2new[c]);
+					else bw.write(SEPARATOR_MINOR+""+(-1-old2new[-1-c]));
+				}
 			}
 			else {
-				solutions[++lastSolution]=first;
-				solutions[++lastSolution]=last;
-			}
-		}
-		
-		/**
-		 * Used only by tandem spacers.
-		 * Adds to $solutions$ all the elements of $from.solutions$.
-		 *
-		 * @param from assumed to contain some solution;
-		 * @param tmpArray temporary space, assumed to be large enough, used just by
-		 * $compactSolutions()$;
-		 * @return TRUE iff $solutions$ changes from empty to nonempty.
-		 */
-		public final boolean addSolutions(Spacer from, int fromOffsetFirst, int fromOffsetLast, boolean orientation, SpacerSolution[] tmpArray) {
-			final int MAX_N_SOLUTIONS = 1000;  // Arbitrary
-			final int COMPACT_THRESHOLD = IO.quantum;  // Arbitrary. Small is ok.
-			final boolean out = solutions==null||lastSolution==-1;
-			boolean fromOrientation;
-			int i;
-			int fromRepeat;
-			
-			for (i=0; i<=from.lastSolution; i+=3) {
-				if (from.solutions[i]<0) {
-					fromRepeat=-1-from.solutions[i];
-					fromOrientation=false;
+				last=-1;
+				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),quantum_wobble,quantum_alphabet,old2new,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpArray2,last);
+				if (last>0) Arrays.sort(tmpArray2,0,last+1);
+				j=0; bw.write(tmpArray2[0]+"");
+				for (j=1; j<=last; j++) {
+					if (tmpArray2[j]!=tmpArray2[j-1]) bw.write(SEPARATOR_MINOR+""+tmpArray2[j]);
 				}
-				else {
-					fromRepeat=from.solutions[i];
-					fromOrientation=true;
-				}
-				if (from.solutions[i+1]==-1) addSolution(fromRepeat,fromOrientation&orientation,-1,-1,true);
-				else addSolution(fromRepeat,fromOrientation&orientation,from.solutions[i+1]+fromOffsetFirst,from.solutions[i+1]+fromOffsetLast,false);
-			}
-			if ((lastSolution+1)/3>=MAX_N_SOLUTIONS) compactSolutions(COMPACT_THRESHOLD,tmpArray);
-			return out;
-		}
-		
-		/**
-		 * Used only by tandem spacers.
-		 *
-		 * Remark: the procedure discards non-periodic repeats such that different 
-		 * substrings of them (possibly in different orientations) are identical.
-		 *
-		 * @param tmpArray temporary space, assumed to be large enough;
-		 * @return TRUE iff there is at least one repeat such that all its solutions use
-		 * the same substring of it (i.e. start/end positions differ by $<=threshold$) in
-		 * the same orientation. At the end of the procedure all such substrings are
-		 * replaced with a single average, and repeats that do not satisfy the condition
-		 * are removed.
-		 */
-		public boolean solutionsAreConsistent(int threshold, SpacerSolution[] tmpArray) {
-			boolean orientation, isShortPeriod, isConsistent;
-			int i, j, k, n;
-			int repeat, min1, max1, min2, max2, sum1, sum2;
-			final int nSolutions = (lastSolution+1)/3;
-			
-			if (nSolutions<=1) return true;
-			
-			// Sorting solutions
-			for (i=0; i<=lastSolution; i+=3) {
-				j=i/3;
-				if (solutions[i]<0)	{
-					tmpArray[j].repeat=-1-solutions[i];
-					tmpArray[j].orientation=false;
-				}
-				else {
-					tmpArray[j].repeat=solutions[i];
-					tmpArray[j].orientation=true;
-				}
-				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
-				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
-			}
-			Arrays.sort(tmpArray,0,nSolutions);
-			
-			// Merging solutions
-			j=0; n=1; isConsistent=true;
-			repeat=tmpArray[0].repeat; orientation=tmpArray[0].orientation;
-			isShortPeriod=tmpArray[0].isShortPeriod;
-			min1=tmpArray[0].first; max1=min1; sum1=min1;
-			min2=tmpArray[0].last; max2=min2; sum2=min2;
-			for (i=1; i<nSolutions; i++) {
-				if (tmpArray[i].repeat!=repeat) {
-					if (!isShortPeriod) {
-						if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
-						if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
-					}
-					if (isConsistent) {
-						tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
-						tmpArray[j].isShortPeriod=isShortPeriod;
-						j++;
-					}
-					n=1; isConsistent=true;
-					repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
-					isShortPeriod=tmpArray[i].isShortPeriod;
-					min1=tmpArray[i].first; max1=min1; sum1=min1;
-					min2=tmpArray[i].last; max2=min2; sum2=min2;
-					continue;
-				}
-				if (tmpArray[i].orientation!=orientation) isConsistent=false;
-				if (tmpArray[i].first<min1) min1=tmpArray[i].first;
-				if (tmpArray[i].first>max1) max1=tmpArray[i].first;
-				sum1+=tmpArray[i].first;
-				if (tmpArray[i].last<min2) min2=tmpArray[i].last;
-				if (tmpArray[i].last>max2) max2=tmpArray[i].last;
-				sum2+=tmpArray[i].last;
-				n++;
-			}
-			if (!isShortPeriod) {
-				if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
-				if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
-			}
-			if (isConsistent) {
-				tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
-				tmpArray[j].isShortPeriod=isShortPeriod;
-			}
-			else j--;
-			
-			// Storing the result of the merge
-			k=-1;
-			for (i=0; i<=j; i++) {
-				solutions[++k]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
-				solutions[++k]=tmpArray[i].first;
-				solutions[++k]=tmpArray[i].last;
-			}
-			lastSolution=k;
-			return true;
-		}
-		
-		
-		/**
-		 * Used only by tandem spacers.
-		 * Performs a simple clustering just to reduce the number of solutions when too
-		 * many of them get propagated to a node.
-		 *
-		 * @param tmpArray temporary space, assumed to be large enough.
-		 */
-		private void compactSolutions(int threshold, SpacerSolution[] tmpArray) {
-			boolean orientation, isShortPeriod;
-			int i, j, n;
-			int repeat, sum1, sum2;
-			final int nSolutions = (lastSolution+1)/3;
-			SpacerSolution tmpSolution;
-			
-			// Sorting solutions
-			for (i=0; i<=lastSolution; i+=3) {
-				j=i/3;
-				if (solutions[i]<0)	{
-					tmpArray[j].repeat=-1-solutions[i];
-					tmpArray[j].orientation=false;
-				}
-				else {
-					tmpArray[j].repeat=solutions[i];
-					tmpArray[j].orientation=true;
-				}
-				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
-				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
-			}
-			Arrays.sort(tmpArray,0,nSolutions);
-			
-			// Clustering solutions
-			for (i=0; i<nSolutions; i++) tmpArray[i].component=-1;
-			for (i=0; i<nSolutions; i++) {
-				if (tmpArray[i].component!=-1) continue;
-				tmpArray[i].component=i; n=1;
-				repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
-				isShortPeriod=tmpArray[i].isShortPeriod;
-				sum1=tmpArray[i].first; sum2=tmpArray[i].last;
-				for (j=i+1; j<nSolutions; j++) {
-					if (tmpArray[j].repeat!=repeat || tmpArray[j].orientation!=orientation || tmpArray[j].first>tmpArray[i].first+threshold) break;
-					if (isShortPeriod) {
-						if (tmpArray[j].isShortPeriod) { tmpArray[j].component=i; n++; }
-					}
-					else if (Math.abs(tmpArray[i].last,tmpArray[j].last)<=threshold) { 
-						sum1+=tmpArray[j].first; sum2+=tmpArray[j].last; 
-						tmpArray[j].component=i; n++;
-					}
-				}
-				if (!isShortPeriod) tmpArray[i].first=sum1/n; tmpArray[i].last=sum2/n;
-			}
-			j=-1;
-			for (i=0; i<nSolutions; i++) {
-				if (tmpArray[i].component!=i) continue;
-				solutions[++j]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
-				solutions[++j]=tmpArray[i].first;
-				solutions[++j]=tmpArray[i].last;
-			}
-			lastSolution=j;
-		}
-		
-		
-		/**
-		 * By increasing $read,first$, decreasing $last$. This is to make a parent spacer
-		 * occur before all of its children in $loadTandemSpacers_blocks()$.
-		 */
-		public int compareTo(Object other) {
-			Spacer otherSpacer = (Spacer)other;
-			if (read<otherSpacer.read) return -1;
-			else if (read>otherSpacer.read) return 1;
-			if (first<otherSpacer.first) return -1;
-			else if (first>otherSpacer.first) return 1;
-			if (last>otherSpacer.last) return -1;
-			else if (last<otherSpacer.last) return 1;
-			return 0;
-		}
-		
-		public String toString() { return read+"["+first+".."+breakpoint+".."+last+"] ("+blockID+")"; }
-		
-		public String printSolutions() {
-			String out = "";
-			for (int i=0; i<=lastSolution; i+=3) out+=solutions[i]+"["+solutions[i+1]+".."+solutions[i+2]+"] ";
-			return out;
-		}
-		
-		/**
-		 * @param p absolute position in the read.
-		 */
-		public void addSplit(int p) {
-			final int CAPACITY = 5;  // Arbitrary
-			
-			if (splits==null) splits = new int[CAPACITY];
-			else if (lastSplit+1==splits.length) {
-				int[] newArray = new int[splits.length<<1];
-				System.arraycopy(splits,0,newArray,0,splits.length);
-				splits=newArray;
-			}
-			splits[++lastSplit]=p;
-		}
-		
-		public void serialize(BufferedWriter bw) throws IOException {
-			int i;
-			
-			bw.write(read+""+SEPARATOR_MINOR);
-			bw.write(first+""+SEPARATOR_MINOR);
-			bw.write(last+""+SEPARATOR_MINOR);
-			bw.write(breakpoint+""+SEPARATOR_MINOR);
-			bw.write(blockID+""+SEPARATOR_MINOR);
-			bw.write((rigidLeft?"1":"0")+SEPARATOR_MINOR);
-			bw.write((rigidRight?"1":"0")+SEPARATOR_MINOR);
-			bw.write(lastSolution+"");
-			for (i=0; i<=lastSolution; i++) bw.write(SEPARATOR_MINOR+""+solutions[i]);
-			bw.write(SEPARATOR_MINOR+""+lastSplit);
-			for (i=0; i<=lastSplit; i++) bw.write(SEPARATOR_MINOR+""+splits[i]);
-			bw.newLine();
-		}
-		
-		public void deserialize(String str) throws IOException {
-			int i, j;
-			
-			String[] tokens = str.split(SEPARATOR_MINOR+"");
-			read=Integer.parseInt(tokens[0]);
-			first=Integer.parseInt(tokens[1]);
-			last=Integer.parseInt(tokens[2]);
-			breakpoint=Integer.parseInt(tokens[3]);
-			blockID=Integer.parseInt(tokens[4]);
-			rigidLeft=Integer.parseInt(tokens[5])==1;
-			rigidRight=Integer.parseInt(tokens[6])==1;
-			lastSolution=Integer.parseInt(tokens[7]);
-			if (lastSolution>=0) {
-				solutions = new int[lastSolution+1];
-				i=8;
-				for (j=0; j<=lastSolution; j++) solutions[j]=Integer.parseInt(tokens[i++]);
-			}
-			else i=8;
-			lastSplit=Integer.parseInt(tokens[i]);
-			if (lastSplit>=0) {
-				splits = new int[lastSplit+1];
-				for (j=0; j<=lastSplit; j++) splits[j]=Integer.parseInt(tokens[++i]);
+				out[0]++;
 			}
 		}
+		bw.newLine();
 	}
 	
 	
-	public static class SpacerSolution implements Comparable {
-		public boolean orientation, isShortPeriod;
-		public int repeat;
-		public int first, last;  // -1 if short-period
-		public int component;
-		
-		public SpacerSolution() { }
-		
-		public int compareTo(Object other) {
-			SpacerSolution otherSolution = (SpacerSolution)other;
-			if (repeat<otherSolution.repeat) return -1;
-			else if (repeat>otherSolution.repeat) return 1;
-			if (orientation && !otherSolution.orientation) return -1;
-			else if (!orientation && otherSolution.orientation) return 1;			
-			if (first<otherSolution.first) return -1;
-			else if (first>otherSolution.first) return 1;
-			if (last<otherSolution.last) return -1;
-			else if (last>otherSolution.last) return 1;			
-			else return 0;
-		}
-	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 
 
@@ -11074,6 +10832,371 @@ public class RepeatAlphabet {
 		public final void reverseComplement() {
 			if (repeat==UNIQUE) return;
 			orientation=!orientation;
+		}
+	}
+	
+	
+	/**
+	 * Non-periodic blocks next to short-period or long-period tandems. The pipeline tries
+	 * to resolve these with methods that depend on their type.
+	 */
+	public static class Spacer implements Comparable {
+		public boolean rigidLeft, rigidRight;
+		public int read, first, last, breakpoint;
+		
+		/**
+		 * Used only by long-period tandem spacers
+		 */
+		private static final int CAPACITY = 12;  // Arbitrary, multiple of 3.
+		public int[] solutions;
+		public int lastSolution;
+		public int[] splits;
+		public int lastSplit;
+		
+		/**
+		 * Index of the non-repetitive block (if any) in the translation of $read$.
+		 */
+		public int blockID;
+		
+		/**
+		 * Temporary space
+		 */
+		public boolean flag;
+		
+		public Spacer() { }
+		
+		public Spacer(int r, int f, int l, boolean fl, boolean fr, int b) {
+			set(r,f,l,fl,fr,b);
+		}
+		
+		public void set(int r, int f, int l, boolean fl, boolean fr, int b) {
+			this.read=r; this.first=f; this.last=l;
+			this.rigidLeft=fl; this.rigidRight=fr;
+			this.blockID=b;
+			breakpoint=-1;
+			lastSplit=-1;
+		}
+		
+		public boolean isRigid() { return rigidLeft||rigidRight; }
+		
+		public void setBreakpoint() {
+			if (first==last) breakpoint=first;
+			else if (rigidLeft) breakpoint=first;
+			else if (rigidRight) breakpoint=last;
+			else breakpoint=(first+last)>>1;  // Arbitrary
+		}
+		
+		/**
+		 * Used only by tandem spacers
+		 */
+		public void addSolution(int repeat, boolean orientation, int first, int last, boolean isShortPeriod) {
+			if (solutions==null) {
+				solutions = new int[CAPACITY];
+				lastSolution=-1;
+			}
+			else if (lastSolution+3>=solutions.length) {
+				int[] newArray = new int[solutions.length<<1];
+				System.arraycopy(solutions,0,newArray,0,solutions.length);
+				solutions=newArray;
+			}
+			solutions[++lastSolution]=orientation?repeat:-1-repeat;
+			if (isShortPeriod) {
+				solutions[++lastSolution]=-1;
+				solutions[++lastSolution]=-1;
+			}
+			else {
+				solutions[++lastSolution]=first;
+				solutions[++lastSolution]=last;
+			}
+		}
+		
+		/**
+		 * Used only by tandem spacers.
+		 * Adds to $solutions$ all the elements of $from.solutions$.
+		 *
+		 * @param from assumed to contain some solution;
+		 * @param tmpArray temporary space, assumed to be large enough, used just by
+		 * $compactSolutions()$;
+		 * @return TRUE iff $solutions$ changes from empty to nonempty.
+		 */
+		public final boolean addSolutions(Spacer from, int fromOffsetFirst, int fromOffsetLast, boolean orientation, SpacerSolution[] tmpArray) {
+			final int MAX_N_SOLUTIONS = 1000;  // Arbitrary
+			final int COMPACT_THRESHOLD = IO.quantum;  // Arbitrary. Small is ok.
+			final boolean out = solutions==null||lastSolution==-1;
+			boolean fromOrientation;
+			int i;
+			int fromRepeat;
+			
+			for (i=0; i<=from.lastSolution; i+=3) {
+				if (from.solutions[i]<0) {
+					fromRepeat=-1-from.solutions[i];
+					fromOrientation=false;
+				}
+				else {
+					fromRepeat=from.solutions[i];
+					fromOrientation=true;
+				}
+				if (from.solutions[i+1]==-1) addSolution(fromRepeat,fromOrientation&orientation,-1,-1,true);
+				else addSolution(fromRepeat,fromOrientation&orientation,from.solutions[i+1]+fromOffsetFirst,from.solutions[i+1]+fromOffsetLast,false);
+			}
+			if ((lastSolution+1)/3>=MAX_N_SOLUTIONS) compactSolutions(COMPACT_THRESHOLD,tmpArray);
+			return out;
+		}
+		
+		/**
+		 * Used only by tandem spacers.
+		 *
+		 * Remark: the procedure discards non-periodic repeats such that different 
+		 * substrings of them (possibly in different orientations) are identical.
+		 *
+		 * @param tmpArray temporary space, assumed to be large enough;
+		 * @return TRUE iff there is at least one repeat such that all its solutions use
+		 * the same substring of it (i.e. start/end positions differ by $<=threshold$) in
+		 * the same orientation. At the end of the procedure all such substrings are
+		 * replaced with a single average, and repeats that do not satisfy the condition
+		 * are removed.
+		 */
+		public boolean solutionsAreConsistent(int threshold, SpacerSolution[] tmpArray) {
+			boolean orientation, isShortPeriod, isConsistent;
+			int i, j, k, n;
+			int repeat, min1, max1, min2, max2, sum1, sum2;
+			final int nSolutions = (lastSolution+1)/3;
+			
+			if (nSolutions<=1) return true;
+			
+			// Sorting solutions
+			for (i=0; i<=lastSolution; i+=3) {
+				j=i/3;
+				if (solutions[i]<0)	{
+					tmpArray[j].repeat=-1-solutions[i];
+					tmpArray[j].orientation=false;
+				}
+				else {
+					tmpArray[j].repeat=solutions[i];
+					tmpArray[j].orientation=true;
+				}
+				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
+				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
+			}
+			Arrays.sort(tmpArray,0,nSolutions);
+			
+			// Merging solutions
+			j=0; n=1; isConsistent=true;
+			repeat=tmpArray[0].repeat; orientation=tmpArray[0].orientation;
+			isShortPeriod=tmpArray[0].isShortPeriod;
+			min1=tmpArray[0].first; max1=min1; sum1=min1;
+			min2=tmpArray[0].last; max2=min2; sum2=min2;
+			for (i=1; i<nSolutions; i++) {
+				if (tmpArray[i].repeat!=repeat) {
+					if (!isShortPeriod) {
+						if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
+						if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
+					}
+					if (isConsistent) {
+						tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
+						tmpArray[j].isShortPeriod=isShortPeriod;
+						j++;
+					}
+					n=1; isConsistent=true;
+					repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
+					isShortPeriod=tmpArray[i].isShortPeriod;
+					min1=tmpArray[i].first; max1=min1; sum1=min1;
+					min2=tmpArray[i].last; max2=min2; sum2=min2;
+					continue;
+				}
+				if (tmpArray[i].orientation!=orientation) isConsistent=false;
+				if (tmpArray[i].first<min1) min1=tmpArray[i].first;
+				if (tmpArray[i].first>max1) max1=tmpArray[i].first;
+				sum1+=tmpArray[i].first;
+				if (tmpArray[i].last<min2) min2=tmpArray[i].last;
+				if (tmpArray[i].last>max2) max2=tmpArray[i].last;
+				sum2+=tmpArray[i].last;
+				n++;
+			}
+			if (!isShortPeriod) {
+				if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
+				if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
+			}
+			if (isConsistent) {
+				tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
+				tmpArray[j].isShortPeriod=isShortPeriod;
+			}
+			else j--;
+			
+			// Storing the result of the merge
+			k=-1;
+			for (i=0; i<=j; i++) {
+				solutions[++k]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
+				solutions[++k]=tmpArray[i].first;
+				solutions[++k]=tmpArray[i].last;
+			}
+			lastSolution=k;
+			return true;
+		}
+		
+		
+		/**
+		 * Used only by tandem spacers.
+		 * Performs a simple clustering just to reduce the number of solutions when too
+		 * many of them get propagated to a node.
+		 *
+		 * @param tmpArray temporary space, assumed to be large enough.
+		 */
+		private void compactSolutions(int threshold, SpacerSolution[] tmpArray) {
+			boolean orientation, isShortPeriod;
+			int i, j, n;
+			int repeat, sum1, sum2;
+			final int nSolutions = (lastSolution+1)/3;
+			SpacerSolution tmpSolution;
+			
+			// Sorting solutions
+			for (i=0; i<=lastSolution; i+=3) {
+				j=i/3;
+				if (solutions[i]<0)	{
+					tmpArray[j].repeat=-1-solutions[i];
+					tmpArray[j].orientation=false;
+				}
+				else {
+					tmpArray[j].repeat=solutions[i];
+					tmpArray[j].orientation=true;
+				}
+				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
+				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
+			}
+			Arrays.sort(tmpArray,0,nSolutions);
+			
+			// Clustering solutions
+			for (i=0; i<nSolutions; i++) tmpArray[i].component=-1;
+			for (i=0; i<nSolutions; i++) {
+				if (tmpArray[i].component!=-1) continue;
+				tmpArray[i].component=i; n=1;
+				repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
+				isShortPeriod=tmpArray[i].isShortPeriod;
+				sum1=tmpArray[i].first; sum2=tmpArray[i].last;
+				for (j=i+1; j<nSolutions; j++) {
+					if (tmpArray[j].repeat!=repeat || tmpArray[j].orientation!=orientation || tmpArray[j].first>tmpArray[i].first+threshold) break;
+					if (isShortPeriod) {
+						if (tmpArray[j].isShortPeriod) { tmpArray[j].component=i; n++; }
+					}
+					else if (Math.abs(tmpArray[i].last,tmpArray[j].last)<=threshold) { 
+						sum1+=tmpArray[j].first; sum2+=tmpArray[j].last; 
+						tmpArray[j].component=i; n++;
+					}
+				}
+				if (!isShortPeriod) tmpArray[i].first=sum1/n; tmpArray[i].last=sum2/n;
+			}
+			j=-1;
+			for (i=0; i<nSolutions; i++) {
+				if (tmpArray[i].component!=i) continue;
+				solutions[++j]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
+				solutions[++j]=tmpArray[i].first;
+				solutions[++j]=tmpArray[i].last;
+			}
+			lastSolution=j;
+		}
+		
+		
+		/**
+		 * By increasing $read,first$, decreasing $last$. This is to make a parent spacer
+		 * occur before all of its children in $loadTandemSpacers_blocks()$.
+		 */
+		public int compareTo(Object other) {
+			Spacer otherSpacer = (Spacer)other;
+			if (read<otherSpacer.read) return -1;
+			else if (read>otherSpacer.read) return 1;
+			if (first<otherSpacer.first) return -1;
+			else if (first>otherSpacer.first) return 1;
+			if (last>otherSpacer.last) return -1;
+			else if (last<otherSpacer.last) return 1;
+			return 0;
+		}
+		
+		public String toString() { return read+"["+first+".."+breakpoint+".."+last+"] ("+blockID+")"; }
+		
+		public String printSolutions() {
+			String out = "";
+			for (int i=0; i<=lastSolution; i+=3) out+=solutions[i]+"["+solutions[i+1]+".."+solutions[i+2]+"] ";
+			return out;
+		}
+		
+		/**
+		 * @param p absolute position in the read.
+		 */
+		public void addSplit(int p) {
+			final int CAPACITY = 5;  // Arbitrary
+			
+			if (splits==null) splits = new int[CAPACITY];
+			else if (lastSplit+1==splits.length) {
+				int[] newArray = new int[splits.length<<1];
+				System.arraycopy(splits,0,newArray,0,splits.length);
+				splits=newArray;
+			}
+			splits[++lastSplit]=p;
+		}
+		
+		public void serialize(BufferedWriter bw) throws IOException {
+			int i;
+			
+			bw.write(read+""+SEPARATOR_MINOR);
+			bw.write(first+""+SEPARATOR_MINOR);
+			bw.write(last+""+SEPARATOR_MINOR);
+			bw.write(breakpoint+""+SEPARATOR_MINOR);
+			bw.write(blockID+""+SEPARATOR_MINOR);
+			bw.write((rigidLeft?"1":"0")+SEPARATOR_MINOR);
+			bw.write((rigidRight?"1":"0")+SEPARATOR_MINOR);
+			bw.write(lastSolution+"");
+			for (i=0; i<=lastSolution; i++) bw.write(SEPARATOR_MINOR+""+solutions[i]);
+			bw.write(SEPARATOR_MINOR+""+lastSplit);
+			for (i=0; i<=lastSplit; i++) bw.write(SEPARATOR_MINOR+""+splits[i]);
+			bw.newLine();
+		}
+		
+		public void deserialize(String str) throws IOException {
+			int i, j;
+			
+			String[] tokens = str.split(SEPARATOR_MINOR+"");
+			read=Integer.parseInt(tokens[0]);
+			first=Integer.parseInt(tokens[1]);
+			last=Integer.parseInt(tokens[2]);
+			breakpoint=Integer.parseInt(tokens[3]);
+			blockID=Integer.parseInt(tokens[4]);
+			rigidLeft=Integer.parseInt(tokens[5])==1;
+			rigidRight=Integer.parseInt(tokens[6])==1;
+			lastSolution=Integer.parseInt(tokens[7]);
+			if (lastSolution>=0) {
+				solutions = new int[lastSolution+1];
+				i=8;
+				for (j=0; j<=lastSolution; j++) solutions[j]=Integer.parseInt(tokens[i++]);
+			}
+			else i=8;
+			lastSplit=Integer.parseInt(tokens[i]);
+			if (lastSplit>=0) {
+				splits = new int[lastSplit+1];
+				for (j=0; j<=lastSplit; j++) splits[j]=Integer.parseInt(tokens[++i]);
+			}
+		}
+	}
+	
+	
+	public static class SpacerSolution implements Comparable {
+		public boolean orientation, isShortPeriod;
+		public int repeat;
+		public int first, last;  // -1 if short-period
+		public int component;
+		
+		public SpacerSolution() { }
+		
+		public int compareTo(Object other) {
+			SpacerSolution otherSolution = (SpacerSolution)other;
+			if (repeat<otherSolution.repeat) return -1;
+			else if (repeat>otherSolution.repeat) return 1;
+			if (orientation && !otherSolution.orientation) return -1;
+			else if (!orientation && otherSolution.orientation) return 1;			
+			if (first<otherSolution.first) return -1;
+			else if (first>otherSolution.first) return 1;
+			if (last<otherSolution.last) return -1;
+			else if (last>otherSolution.last) return 1;			
+			else return 0;
 		}
 	}
 	

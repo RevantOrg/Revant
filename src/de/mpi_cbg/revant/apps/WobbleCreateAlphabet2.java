@@ -45,7 +45,7 @@ public class WobbleCreateAlphabet2 {
 		System.err.println("Wobbling "+(RepeatAlphabet.lastPeriodic-RepeatAlphabet.lastUnique)+" periodic and "+nFlags+" non-periodic characters...");
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		alphabet_old=RepeatAlphabet.alphabet; lastUnique_old=RepeatAlphabet.lastUnique; lastPeriodic_old=RepeatAlphabet.lastPeriodic; lastAlphabet_old=RepeatAlphabet.lastAlphabet;
-		alphabet_new=RepeatAlphabet.wobble_extendAlphabet(flags,nFlags,WOBBLE_LENGTH,IO.quantum,MIN_ALIGNMENT_LENGTH,out);
+		alphabet_new=RepeatAlphabet.wobble_extendAlphabet(flags,nFlags,true,WOBBLE_LENGTH,IO.quantum,MIN_ALIGNMENT_LENGTH,out);
 		lastUnique_new=out[0]; lastPeriodic_new=out[1]; lastAlphabet_new=out[2];
 		RepeatAlphabet.alphabet=alphabet_new;
 		RepeatAlphabet.lastUnique=lastUnique_new; RepeatAlphabet.lastPeriodic=lastPeriodic_new; RepeatAlphabet.lastAlphabet=lastAlphabet_new;
