@@ -5,8 +5,8 @@ import de.mpi_cbg.revant.util.IO;
 import java.io.*;
 
 /**
- * Expands the alphabet by wobbling existing periodic characters, as well as all the non-
- * periodic characters flagged in some input bitvectors. Wobbling means creating a
+ * Expands the alphabet by wobbling all the characters flagged in some input bitvectors, 
+ * as well as all existing periodic characters if needed. Wobbling means creating a
  * character that is similar to an existing one but has slightly different length.
  */
 public class WobbleCreateAlphabet2 {
@@ -19,8 +19,9 @@ public class WobbleCreateAlphabet2 {
 		final int N_REPEATS = Integer.parseInt(args[4]);
 		final String FLAGS_FILE_PREFIX = args[5];
 		final int LAST_FLAG_FILE = Integer.parseInt(args[6]);
-		final String OUTPUT_FILE_ALPHABET = args[7];
-		final String OUTPUT_FILE_OLD2NEW = args[8];
+        final boolean WOBBLE_ALL_PERIODIC = Integer.parseInt(args[7])==1;
+		final String OUTPUT_FILE_ALPHABET = args[8];
+		final String OUTPUT_FILE_OLD2NEW = args[9];
 		
 		int i, j;
 		int nFlags, lastUnique_old, lastPeriodic_old, lastAlphabet_old, lastUnique_new, lastPeriodic_new, lastAlphabet_new;
@@ -45,7 +46,7 @@ public class WobbleCreateAlphabet2 {
 		System.err.println("Wobbling "+(RepeatAlphabet.lastPeriodic-RepeatAlphabet.lastUnique)+" periodic and "+nFlags+" non-periodic characters...");
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		alphabet_old=RepeatAlphabet.alphabet; lastUnique_old=RepeatAlphabet.lastUnique; lastPeriodic_old=RepeatAlphabet.lastPeriodic; lastAlphabet_old=RepeatAlphabet.lastAlphabet;
-		alphabet_new=RepeatAlphabet.wobble_extendAlphabet(flags,nFlags,true,WOBBLE_LENGTH,IO.quantum,MIN_ALIGNMENT_LENGTH,out);
+		alphabet_new=RepeatAlphabet.wobble_extendAlphabet(flags,nFlags,WOBBLE_ALL_PERIODIC,WOBBLE_LENGTH,IO.quantum,MIN_ALIGNMENT_LENGTH,out);
 		lastUnique_new=out[0]; lastPeriodic_new=out[1]; lastAlphabet_new=out[2];
 		RepeatAlphabet.alphabet=alphabet_new;
 		RepeatAlphabet.lastUnique=lastUnique_new; RepeatAlphabet.lastPeriodic=lastPeriodic_new; RepeatAlphabet.lastAlphabet=lastAlphabet_new;

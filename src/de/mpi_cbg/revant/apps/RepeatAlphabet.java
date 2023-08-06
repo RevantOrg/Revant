@@ -10181,8 +10181,10 @@ public class RepeatAlphabet {
 	private static final int isWobbleOf(int x, Character reference, int quantum_wobble, int quantum_alphabet, Character[] alphabet) {
 		if ( alphabet[x].repeat!=reference.repeat || alphabet[x].orientation!=reference.orientation || 
 			 alphabet[x].start<reference.start-quantum_wobble || alphabet[x].start>reference.start+quantum_wobble ) return -1;
-		if ( (alphabet[x].openStart!=reference.openStart && alphabet[x].start>quantum_alphabet && reference.start>quantum_alphabet) || 
-			 (alphabet[x].openEnd!=reference.openEnd && alphabet[x].end<repeatLengths[alphabet[x].repeat]-quantum_alphabet && reference.end<repeatLengths[alphabet[x].repeat]-quantum_alphabet)
+		if ( reference.start!=-1 && reference.end!=-1 &&
+			 ( (alphabet[x].openStart!=reference.openStart && alphabet[x].start>quantum_alphabet && reference.start>quantum_alphabet) || 
+			   (alphabet[x].openEnd!=reference.openEnd && alphabet[x].end<repeatLengths[alphabet[x].repeat]-quantum_alphabet && reference.end<repeatLengths[alphabet[x].repeat]-quantum_alphabet)
+			 )
 		   ) return 0;
 		return Math.abs(alphabet[x].getLength(),reference.getLength())<=quantum_wobble?1:0;
 	}
@@ -10204,9 +10206,10 @@ public class RepeatAlphabet {
 		nBlocks=loadBlocks(read2characters);
 		loadIntBlocks(nBlocks,boundaries,readLength,tmpCharacter);
 		i=-1; p=0; q=read2tandems.indexOf(SEPARATOR);
-		while (q>=0) {	
+		while (q>=0) {
 			tmpArray[++i]=Integer.parseInt(read2tandems.substring(p,q));
 			p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+			if (q<0) q=read2tandems.length();
 			tmpArray[++i]=Integer.parseInt(read2tandems.substring(p,q));
 			p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
 		}
@@ -10250,6 +10253,7 @@ public class RepeatAlphabet {
 			while (q>=0) {	
 				first=Integer.parseInt(read2tandems.substring(p,q));
 				p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
+				if (q<0) q=read2tandems.length();
 				last=Integer.parseInt(read2tandems.substring(p,q));
 				p=q+1; q=read2tandems.indexOf(SEPARATOR,p);
 				for (i=first; i<=last; i++) tmpArray1[i]=1;

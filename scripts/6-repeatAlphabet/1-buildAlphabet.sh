@@ -204,6 +204,16 @@ LONG_SPACER_LENGTH=$(( ${MIN_ALIGNMENT_LENGTH} * 20 ))  # Arbitrary
 if [ ${TANDEM_SPACERS_ITERATIONS} -gt 0 ]; then
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-stash-
 fi
+function tandemsThread() {
+	local LOCAL_TRANSLATED_READS_FILE=$1
+	local LOCAL_BOUNDARIES_FILE=$2
+	local LOCAL_READ_LENGTHS_FILE=$3
+	local LOCAL_TANDEMS_FILE=$4
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 0 1 2 ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
+	if [ $? -ne 0 ]; then
+		exit
+	fi
+}
 ITER="1";
 while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 	rm -f ${TMPFILE_PATH}-tspacers-*
@@ -211,16 +221,6 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		SUFFIX=${FILE#${TMPFILE_PATH}-stash-}
 		cp ${FILE} ${TMPFILE_PATH}-tspacers-1-${SUFFIX}
 	done
-	function tandemsThread() {
-		local LOCAL_TRANSLATED_READS_FILE=$1
-		local LOCAL_BOUNDARIES_FILE=$2
-		local LOCAL_READ_LENGTHS_FILE=$3
-		local LOCAL_TANDEMS_FILE=$4
-		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 0 1 2 ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
-		if [ $? -ne 0 ]; then
-			exit
-		fi
-	}
 	echo "Computing tandem track..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-8-*.txt"); do
 		THREAD_ID=${FILE#${TMPFILE_PATH}-8-}
@@ -376,6 +376,58 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		ITER=$(( ${ITER} + 1 ))
 	fi
 done
+echo "Tandem spacers fixed"
+if [ ${WOBBLE_LENGTH} -ne 0 ]; then
+	echo "Wobbling..."
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitTranslations ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${LAST_READA_FILE} ${TMPFILE_PATH}-wobble-1- ${TMPFILE_PATH}-wobble-2-
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.SplitSpacers ${LAST_READA_FILE} ${N_THREADS} null ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TMPFILE_PATH}-wobble-3-
+	if [ -e ${TMPFILE_PATH}-wobble-1-${N_THREADS}.txt ]; then
+		TO=${N_THREADS}
+	else
+		TO=$(( ${N_THREADS} - 1 ))
+	fi
+	echo "Computing tandem track..."
+	for THREAD in $(seq 0 ${TO}); do		 
+		tandemsThread ${TMPFILE_PATH}-wobble-1-${THREAD_ID}.txt ${TMPFILE_PATH}-wobble-2-${THREAD_ID}.txt ${TMPFILE_PATH}-wobble-3-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-wobble-4-${THREAD_ID}.txt &
+	done
+	wait
+	function wobbleThreadCreate() {
+		local WOBBLE_FILE_ID=$1
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleLongPeriodCreateAlphabet1 ${ALPHABET_FILE} ${TMPFILE_PATH}-wobble-1-${WOBBLE_FILE_ID}.txt ${TMPFILE_PATH}-wobble-4-${WOBBLE_FILE_ID}.txt ${TMPFILE_PATH}-wobble-3-lengths-${WOBBLE_FILE_ID}.txt ${TMPFILE_PATH}-wobble-5-flags-${WOBBLE_FILE_ID}.txt
+		if [ $? -ne 0 ]; then
+			exit
+		fi
+	}
+	for THREAD in $(seq 0 ${TO}); do
+		wobbleThreadCreate ${THREAD} &
+	done
+	wait
+	WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
+	WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-wobble-5-flags ${TO} 0 ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
+	function wobbleThread() {
+		local WOBBLE_FILE_ID=$1
+		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleLongPeriod ${TMPFILE_PATH}-wobble-1-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-wobble-4-${WOBBLE_FILE_ID}.txt ${TMPFILE_PATH}-wobble-6-${WOBBLE_FILE_ID}.txt
+		if [ $? -ne 0 ]; then
+			exit
+		fi
+	}
+	for THREAD in $(seq 0 ${TO}); do
+		wobbleThread ${THREAD} &
+	done
+	wait
+	mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-prewobble
+	for THREAD in $(seq 0 ${TO}); do
+		cat ${TMPFILE_PATH}-wobble-6-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
+	done
+	mv ${ALPHABET_FILE} ${ALPHABET_FILE}-prewobble
+	mv ${WOBBLE_ALPHABET} ${ALPHABET_FILE}
+	echo "Wobbling completed"
+fi
+
+
+
+
 
 
 
@@ -510,7 +562,7 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 			wait
 			WOBBLE_ALPHABET="${INPUT_DIR}/alphabet-wobble.txt"
 			WOBBLE_OLD2NEW="${INPUT_DIR}/alphabet-wobble-old2new.txt"
-			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${WOBBLE_PREFIX}-flags ${TO} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
+			java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.WobbleCreateAlphabet2 ${ALPHABET_FILE} ${WOBBLE_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${WOBBLE_PREFIX}-flags ${TO} 1 ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW}
 			function wobbleThread() {
 				local WOBBLE_FILE_ID=$1
 				java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.Wobble ${WOBBLE_PREFIX}-${WOBBLE_FILE_ID}.txt ${WOBBLE_LENGTH} ${ALPHABET_FILE} ${WOBBLE_ALPHABET} ${WOBBLE_OLD2NEW} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${TMPFILE_PATH}-wobble-3-${WOBBLE_FILE_ID}.txt
