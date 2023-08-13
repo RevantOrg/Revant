@@ -13,8 +13,8 @@
 # This is the only section of the script that needs to be customized.
 #
 INPUT_DIR=$1
-N_HAPLOTYPES=$2
-HAPLOTYPE_COVERAGE=$3  # Of one haplotype
+GENOME_LENGTH=$2
+N_HAPLOTYPES=$3
 MAX_K=$4  # Stops looking for unique k-mers after this length. Should be set using the
 # histogram of recoded lengths.
 N_THREADS=$5
@@ -24,13 +24,16 @@ DISTANCE_THRESHOLD=$8
 CHARACTER_THRESHOLD=$9
 UNIQUE_MODE="1"  # Non-repetitive blocks are allowed in a k-mer, except at the first/last
 # position of the k-mer. Usually a good choice.
+SPANNING_BPS="150"  # Bps before and after a k-mer to consider it observed in a read.
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u
 export LC_ALL=C  # To speed up the $sort$ command.
-READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
+READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
+AVG_READ_LENGTH=$(paste -sd+ ${READ_LENGTHS_FILE} | bc)
+AVG_READ_LENGTH=$(( ${AVG_READ_LENGTH} / ${N_READS} ))
 TMPFILE_NAME="getUniqueSubstrings-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
@@ -101,7 +104,7 @@ for K in $(seq 1 ${MAX_K}); do
 	UNIQUE_KMERS_FILE="${INPUT_DIR}/unique-k${K}.txt"
 	OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding unique ${K}-mers..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} ${MAX_FREQUENCY_UNIQUE} ${UNIQUE_KMERS_FILE} ${MAX_HISTOGRAM_COUNT} 1 ${OUTPUT_FILE_HISTOGRAM}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} 1 ${ALPHABET_FILE} ${MAX_HISTOGRAM_COUNT} ${UNIQUE_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
 	echo "Updating shortest unique intervals file..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}

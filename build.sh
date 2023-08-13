@@ -4,6 +4,7 @@
 #
 SOURCE_DIR="./src"
 SOURCE_DIR_NESTED="${SOURCE_DIR}/de/mpi_cbg/revant"
+LIBRARIES="./lib/commons-statistics-distribution-1.0.jar"
 BUILD_DIR="./bin"
 DEBUGGING_INFO="1"  # 0/1
 
@@ -24,4 +25,4 @@ javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/fr
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/consensus/*.java
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/graphics/*.java
 javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/biology/*.java
-javac ${COMPILER_FLAGS} -cp ${BUILD_DIR} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/apps/*.java
+javac ${COMPILER_FLAGS} -cp ${BUILD_DIR}:${LIBRARIES} -d ${BUILD_DIR} ${SOURCE_DIR_NESTED}/apps/*.java
