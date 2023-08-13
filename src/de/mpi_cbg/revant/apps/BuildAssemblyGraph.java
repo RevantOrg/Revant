@@ -89,6 +89,20 @@ public class BuildAssemblyGraph {
 				continue;
 			}
 			keep=str2.equalsIgnoreCase("1")&&str3.equalsIgnoreCase("1");
+            
+            
+            
+if (Alignments.readA==441) {
+    String type2 = "";
+    if (Alignments.startA<=100) type2="PREFIX";
+    else if (Alignments.endA>=Reads.getReadLength(Alignments.readA-1)-100) type2="SUFFIX";
+    String keep1 = str2.equalsIgnoreCase("1")?"KEEP-N":"-";
+    String keep2 = str3.equalsIgnoreCase("1")?"KEEP-T":"-";
+    System.err.println((keep?"KEEP ":"DELETE ")+" "+keep1+" "+keep2+" "+type2+" "+str1);
+}
+            
+            
+            
 			addEdge(Alignments.readA-1,Alignments.readB-1,keep);
 			addEdge(Alignments.readB-1,Alignments.readA-1,keep);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();

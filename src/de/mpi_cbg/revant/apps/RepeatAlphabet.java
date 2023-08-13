@@ -4842,10 +4842,16 @@ public class RepeatAlphabet {
 		int firstBlock, lastBlock, firstPosition, lastPosition, lastBlueInterval, lastTandemInterval;
 		int from, to, block, firstLength, lastLength, middleLength;
 		
+		
+boolean fabio = readID==957 && Math.abs(intervalStart,4427)<=100 && Math.abs(intervalEnd,24266)<=100;		
+if (fabio) System.err.println("VITTU> 1");
+		
 		if (blueIntervalsID==-1) return false;
+if (fabio) System.err.println("VITTU> 2");		
 		lastBlueInterval=blueIntervals[blueIntervalsID].length-1;
 		lastTandemInterval=lastTandem[readID];
 		if (lastTandemInterval==-1) return false;
+if (fabio) System.err.println("VITTU> 3");		
 		j=0; k=0; containsBlue=false;
 		for (i=0; i<lastBlueInterval; i+=3) {
 			firstBlock=blueIntervals[blueIntervalsID][i];
@@ -4856,10 +4862,12 @@ public class RepeatAlphabet {
 			if (lastBlock==nBlocks-1) lastPosition=readLength-1;
 			else lastPosition=boundaries_all[boundariesAllID][lastBlock];
 			if (lastPosition<=intervalStart) continue;
+if (fabio) System.err.println("VITTU> 4  firstBlock="+firstBlock+" lastBlock="+lastBlock);			
 			if ( Intervals.isApproximatelyContained(firstPosition,lastPosition,intervalStart,intervalEnd) &&
 				 !Intervals.areApproximatelyIdentical(firstPosition,lastPosition,intervalStart,intervalEnd) &&
 				 (intervalStart<=firstPosition-differenceThreshold && intervalEnd>=lastPosition+differenceThreshold)
 			   ) {
+if (fabio) System.err.println("VITTU> 5");				   
 				containsBlue=true; found=false;
 				while (j<lastTandemInterval) {
 					if (tandems[readID][j+1]<lastBlock) {
@@ -4875,6 +4883,7 @@ public class RepeatAlphabet {
 						block=tandems[readID][j+1];
 						from=block==0?0:boundaries_all[boundariesAllID][block-1];
 						to=block==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][block];
+if (fabio) System.err.println("VITTU> 6  tandem from="+from+" to="+to);						
 						lastLength=to-from+1;
 						if (tandems[readID][j+1]==tandems[readID][j]+1) middleLength=0;
 						else {
@@ -4884,26 +4893,44 @@ public class RepeatAlphabet {
 							to=block==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][block];
 							middleLength=(to-from+1)/(tandems[readID][j+1]-tandems[readID][j]-1);
 						}
+if (fabio) System.err.println("VITTU> 7  middleLength="+middleLength);
 					}
 					else { lastLength=firstLength; middleLength=0; }
+if (fabio) {
+	System.err.println("VITTU> 8  isBlockPeriodic: "+isBlockPeriodic(boundariesAllID,tandems[readID][j]));
+	System.err.println("VITTU> 8  firstBlock="+firstBlock+" lastBlock="+lastBlock);
+	System.err.println("VITTU> 8  tandems[readID][j]="+tandems[readID][j]+" tandems[readID][j+1]="+tandems[readID][j+1]);
+	System.err.println("VITTU> 8  firstLength="+firstLength+" middleLength="+middleLength+" lastLength="+lastLength+" identityThreshold="+identityThreshold);
+}
 					if ( ( isBlockPeriodic(boundariesAllID,tandems[readID][j]) &&
 						   ( tandems[readID][j]<firstBlock || tandems[readID][j+1]>lastBlock ||
 						     (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
 						   )
 						 ) ||
 						 ( !isBlockPeriodic(boundariesAllID,tandems[readID][j]) &&
-						   ( (tandems[readID][j]==firstBlock && tandems[readID][j+1]>lastBlock && firstLength>=middleLength-identityThreshold) ||
-							 (tandems[readID][j+1]==lastBlock && tandems[readID][j]<firstBlock && lastLength>=middleLength-identityThreshold) ||
-							 (tandems[readID][j]<firstBlock && tandems[readID][j+1]>lastBlock) ||
-							 (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
+						   ( ( middleLength!=0 &&
+							   ( (tandems[readID][j]==firstBlock && tandems[readID][j+1]>lastBlock && firstLength>=middleLength-identityThreshold) ||
+							     (tandems[readID][j+1]==lastBlock && tandems[readID][j]<firstBlock && lastLength>=middleLength-identityThreshold) ||
+							     (tandems[readID][j]<firstBlock && tandems[readID][j+1]>lastBlock) ||
+							     (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
+							   )
+						     ) ||
+							 ( middleLength==0 &&
+							   ( (tandems[readID][j]==firstBlock && tandems[readID][j+1]>lastBlock && firstLength>=lastLength-identityThreshold) ||
+							     (tandems[readID][j+1]==lastBlock && tandems[readID][j]<firstBlock && lastLength>=firstLength-identityThreshold) ||
+							     (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
+							   )
+						     )			 
 						   )
-						 )
+						 )		   
 					   ) {
+System.err.println("VITTU> 9");
 						found=true;
 						break;
 					}
 					j+=2;
 				}
+System.err.println("VITTU> 10  found="+found);				
 				if (!found) {
 					k=filterAlignments_tandem_straddlesShortPeriodTandem(firstBlock,lastBlock,readID,boundariesAllID,k,lastTandemInterval);
 					if (k<0) k=-1-k;
