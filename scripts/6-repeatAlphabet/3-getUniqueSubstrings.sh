@@ -25,7 +25,10 @@ CHARACTER_THRESHOLD=$9
 UNIQUE_MODE="1"  # Non-repetitive blocks are allowed in a k-mer, except at the first/last
 # position of the k-mer. Usually a good choice.
 SPANNING_BPS="150"  # Bps before and after a k-mer to consider it observed in a read.
+# ------------------------------------ REVANT --------------------------------------------
+REVANT_LIBRARIES="${REVANT_BINARIES}/../lib/*.jar"
 # ----------------------------------------------------------------------------------------
+
 
 set -o pipefail; set -e; set -u
 export LC_ALL=C  # To speed up the $sort$ command.
@@ -42,8 +45,6 @@ ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 TANDEMS_FILE="${INPUT_DIR}/tandems.txt"
 REPEAT_LENGTHS_FILE="${INPUT_DIR}/repeats-lengths.txt"
 N_REPEATS=$(wc -l < ${REPEAT_LENGTHS_FILE})
-MIN_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
-MAX_FREQUENCY_UNIQUE=$(( ${HAPLOTYPE_COVERAGE}*${N_HAPLOTYPES} + ${HAPLOTYPE_COVERAGE}/2 ))
 MAX_HISTOGRAM_COUNT="10000"  # Arbitrary
 rm -f ${TMPFILE_PATH}*
 rm -f ${INPUT_DIR}/unique-*
@@ -104,7 +105,7 @@ for K in $(seq 1 ${MAX_K}); do
 	UNIQUE_KMERS_FILE="${INPUT_DIR}/unique-k${K}.txt"
 	OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding unique ${K}-mers..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} 1 ${ALPHABET_FILE} ${MAX_HISTOGRAM_COUNT} ${UNIQUE_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} 1 ${ALPHABET_FILE} 0 ${MAX_HISTOGRAM_COUNT} ${UNIQUE_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
 	echo "Updating shortest unique intervals file..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}

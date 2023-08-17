@@ -12,7 +12,10 @@ import de.mpi_cbg.revant.util.Math;
  * inside the same read, and it prints a histogram of total counts for all k-mers.
  */
 public class CompactKmers {
-    
+    /**
+     * @param args 9 TRUE=keep every k-mer that passes a one-sided significance test in
+     * the model where it occurs on just one haplotype.
+     */
 	public static void main(String[] args) throws IOException {
 		final String INPUT_FILE = args[0];
 		final int K = Integer.parseInt(args[1]);
@@ -23,9 +26,10 @@ public class CompactKmers {
         final int SPANNING_BPS = Integer.parseInt(args[6]);
 		final boolean DISCARD_SAME_READ_KMERS = Integer.parseInt(args[7])==1;
         final String ALPHABET_FILE = args[8];
-        final int MAX_HISTOGRAM_COUNT = Integer.parseInt(args[9]);
-        final String OUTPUT_FILE_KMERS = args[10];
-		final String OUTPUT_FILE_HISTOGRAM = args[11].equalsIgnoreCase("null")?null:args[11];
+        final boolean KEEP_ALL_FREQUENT = Integer.parseInt(args[9])==1;
+        final int MAX_HISTOGRAM_COUNT = Integer.parseInt(args[10]);
+        final String OUTPUT_FILE_KMERS = args[11];
+		final String OUTPUT_FILE_HISTOGRAM = args[12].equalsIgnoreCase("null")?null:args[12];
 		
         final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
         
@@ -74,7 +78,9 @@ public class CompactKmers {
 				previousSameReadCount=Math.max(previousSameReadCount,sameReadCount);
 			}
 			else {
-                if ((DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && isUnique(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1) {
+                if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
+                     (KEEP_ALL_FREQUENT?isFrequent(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(isUnique(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1))
+                   ) {
 					for (i=0; i<K; i++) bw.write(previous[i]+",");
 					bw.write(previousCount+"\n");
 				}
@@ -85,7 +91,9 @@ public class CompactKmers {
 			str=br.readLine();
 		}
 		br.close();
-		if ((DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && isUnique(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1) {
+		if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
+             (KEEP_ALL_FREQUENT?isFrequent(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(isUnique(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1))
+           ) {
 			for (i=0; i<K; i++) bw.write(previous[i]+",");
 			bw.write(previousCount+"\n");
 		}
@@ -125,6 +133,22 @@ public class CompactKmers {
             if (p>significanceLevel) return i+1;
         }
         return -1;
+    }
+    
+    
+    /**
+     * Just a one-sided test on the model with one haplotype.
+     */
+    private static final boolean isFrequent(int count, int[] kmer, int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, double significanceLevel) {
+        int i, length;
+        PoissonDistribution distribution;
+        
+        length=0;
+        for (i=0; i<k; i++) RepeatAlphabet.alphabet[kmer[i]].getLength();
+        final double base = ((double)(avgReadLength-((spanningBps)<<1)-length))/genomeLength;
+        final int quantum = nReads/nHaplotypes;
+        distribution=PoissonDistribution.of(base*quantum);
+        return distribution.cumulativeProbability(count)>significanceLevel;
     }
 
 }

@@ -23,6 +23,11 @@ MIN_K=$5  # One plus the min length of a context used for disambiguation
 MAX_K=$6  # One plus the max length of a context used for disambiguation
 N_THREADS=$7
 DELETE_TMP_FILES=$8
+GENOME_LENGTH=$9
+N_HAPLOTYPES=${10}
+SPANNING_BPS="150"  # Bps before and after a k-mer to consider it observed in a read.
+# ------------------------------------ REVANT --------------------------------------------
+REVANT_LIBRARIES="${REVANT_BINARIES}/../lib/*.jar"
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u
@@ -32,6 +37,8 @@ TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
+AVG_READ_LENGTH=$(paste -sd+ ${READ_LENGTHS_FILE} | bc)
+AVG_READ_LENGTH=$(( ${AVG_READ_LENGTH} / ${N_READS} ))
 READS_TRANSLATED_FILE="${INPUT_DIR}/reads-translated-new.txt"
 READS_BOUNDARIES_FILE="${INPUT_DIR}/reads-translated-boundaries-new.txt"
 READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
@@ -86,8 +93,9 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 		break
 	fi
 	FREQUENT_KMERS_FILE="${INPUT_DIR}/frequent-k${K}.txt"
+    OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding frequent ${K}-mers..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${MIN_FREQUENCY_UNIQUE} -1 ${FREQUENT_KMERS_FILE} 0 0 null
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} 0 ${ALPHABET_FILE} 1 10000 ${FREQUENT_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
 	echo "Computing $((${K}-1))-mers..."
 	K_MINUS_ONE_MERS_FILE="${INPUT_DIR}/kMinusOne-k${K}.txt"
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetKMinusOneMers ${ALPHABET_FILE} ${FREQUENT_KMERS_FILE} ${K} ${K_MINUS_ONE_MERS_FILE}
