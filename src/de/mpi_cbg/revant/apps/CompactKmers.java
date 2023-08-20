@@ -1,7 +1,6 @@
 package de.mpi_cbg.revant.apps;
 
 import java.io.*;
-import org.apache.commons.statistics.distribution.PoissonDistribution;
 
 import de.mpi_cbg.revant.util.Math;
 
@@ -39,6 +38,7 @@ public class CompactKmers {
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
+        RepeatAlphabet.Kmer kmer = new RepeatAlphabet.Kmer();
 		int[] previous, current, tmpArray;
 		long[] histogram;
 		String[] tokens;
@@ -78,8 +78,9 @@ public class CompactKmers {
 				previousSameReadCount=Math.max(previousSameReadCount,sameReadCount);
 			}
 			else {
+                kmer.set(previous,K,previousCount);
                 if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
-                     (KEEP_ALL_FREQUENT?isFrequent(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(isUnique(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1))
+                     (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1))
                    ) {
 					for (i=0; i<K; i++) bw.write(previous[i]+",");
 					bw.write(previousCount+"\n");
@@ -91,8 +92,9 @@ public class CompactKmers {
 			str=br.readLine();
 		}
 		br.close();
+        kmer.set(previous,K,previousCount);
 		if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
-             (KEEP_ALL_FREQUENT?isFrequent(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(isUnique(previousCount,previous,K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1))
+             (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL)!=-1))
            ) {
 			for (i=0; i<K; i++) bw.write(previous[i]+",");
 			bw.write(previousCount+"\n");
@@ -105,50 +107,5 @@ public class CompactKmers {
 			bw.close();
 		}
 	}
-    
-    
-    /**
-     * @param nReads in the entire dataset;
-     * @param spanningBps basepairs before and after $kmer$ for it to be considered
-     * observed in a read;
-     * @param genomeLength of one haplotype;
-     * @return -1 if the p-value of $count$ fails the two-sided significance test for
-     * every ploidy of $kmer$ (assuming a Poisson distribution for every possible ploidy);
-     * this happens if $kmer$ is noise or a repeat; otherwise, the smallest ploidy of
-     * $kmer$ for which the significance test does not fail.
-     */
-    private static final int isUnique(int count, int[] kmer, int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, double significanceLevel) {
-        int i, length;
-        double p;
-        PoissonDistribution distribution;
-        
-        length=0;
-        for (i=0; i<k; i++) RepeatAlphabet.alphabet[kmer[i]].getLength();
-        final double base = ((double)(avgReadLength-((spanningBps)<<1)-length))/genomeLength;
-        final int quantum = nReads/nHaplotypes;
-        for (i=0; i<nHaplotypes; i++) {
-            distribution=PoissonDistribution.of(base*quantum*(i+1));
-            p=distribution.cumulativeProbability(count);
-            p=2.0*Math.min(p,1.0-p);
-            if (p>significanceLevel) return i+1;
-        }
-        return -1;
-    }
-    
-    
-    /**
-     * Just a one-sided test on the model with one haplotype.
-     */
-    private static final boolean isFrequent(int count, int[] kmer, int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, double significanceLevel) {
-        int i, length;
-        PoissonDistribution distribution;
-        
-        length=0;
-        for (i=0; i<k; i++) RepeatAlphabet.alphabet[kmer[i]].getLength();
-        final double base = ((double)(avgReadLength-((spanningBps)<<1)-length))/genomeLength;
-        final int quantum = nReads/nHaplotypes;
-        distribution=PoissonDistribution.of(base*quantum);
-        return distribution.cumulativeProbability(count)>significanceLevel;
-    }
 
 }

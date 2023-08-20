@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Iterator;
+import org.apache.commons.statistics.distribution.PoissonDistribution;
 
 import de.mpi_cbg.revant.util.Math;
 import de.mpi_cbg.revant.util.IO;
@@ -2041,8 +2042,8 @@ public class RepeatAlphabet {
 	 *
 	 * If $newKmers$ is null, the procedure checks instead if any window (including the
 	 * first/last above) contains a k-mer in $oldKmers$, and if so it appends a (position,
-	 * length,nHaplotypes) tuple to $avoidedIntervals$ ($nHaplotypes$ is decided according
-	 * to $haplotypeCoverage$). The new value of $lastAvoidedInterval$ is returned in
+	 * length,nHaplotypes) tuple to $avoidedIntervals$ ($nHaplotypes$ is decided by
+	 * $Kmer.isUnique()$). The new value of $lastAvoidedInterval$ is returned in
 	 * output.
      *
 	 * Remark: one-mers collected by this procedure might have a different (and even 
@@ -2060,7 +2061,6 @@ public class RepeatAlphabet {
 	 *
 	 * Remark: the procedure uses global variables $blocks,intBlocks,stack$.
 	 *
-	 * @param haplotypeCoverage coverage of one haplotype;
 	 * @param identityThreshold,distanceThreshold used only when $newKmers$ is null; see 
 	 * $isCharacterAmbiguousInBlock()$;
 	 * @param tmpKmer temporary space;
@@ -2068,11 +2068,11 @@ public class RepeatAlphabet {
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int haplotypeCoverage, int readLength, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int readLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int UNIQUE_MODE = 1;
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
-		int nBlocks, sum, start, end, nHaplotypes, nKmers, out;
+		int nBlocks, sum, start, end, nHaplotypesPrime, nKmers, out;
 		Kmer key, value;
 		Iterator<Kmer> iterator;
 		
@@ -2102,8 +2102,8 @@ public class RepeatAlphabet {
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-				nHaplotypes=getKmers_impl(i,k,null,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
-				if (nHaplotypes==-1) continue;
+				nHaplotypesPrime=getKmers_impl(i,k,null,oldKmers,nReads,avgReadLength,genomeLength,nHaplotypes,tmpKmer,stack,tmpArray2,tmpArray3);
+				if (nHaplotypesPrime==-1) continue;
 				if ( (i!=0 && i!=nBlocks-k) ||
 					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)) || 
 					 (i!=0 && i==nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)) ||
@@ -2112,7 +2112,7 @@ public class RepeatAlphabet {
 					   !isCharacterAmbiguousInBlock(tmpArray2[k-1],intBlocks[nBlocks-1],lastInBlock_int[nBlocks-1],false,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)
 					 )
 				   ) { 
-					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypes; 
+					avoidedIntervals[++out]=i; avoidedIntervals[++out]=k; avoidedIntervals[++out]=nHaplotypesPrime; 
 				}
 			}
 		}
@@ -2126,7 +2126,7 @@ public class RepeatAlphabet {
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
-				getKmers_impl(i,k,tmpMap,oldKmers,haplotypeCoverage,tmpKmer,stack,tmpArray2,tmpArray3);
+				getKmers_impl(i,k,tmpMap,oldKmers,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
 			while (iterator.hasNext()) {
@@ -2329,7 +2329,9 @@ public class RepeatAlphabet {
 	 * canonization, was found in $oldKmers$;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final int getKmers_impl(int first, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int haplotypeCoverage, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+	private static final int getKmers_impl(int first, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+		final int SPANNING_BPS = (IO.quantum*3)>>1;  // Arbitrary
+		final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
 		int i;
 		int top1, top2, row, column, lastChild, length;
 		Kmer value, newKey;
@@ -2353,7 +2355,7 @@ public class RepeatAlphabet {
 				}
 				else {
 					value=oldKmers.get(key);
-					if (value!=null) return (int)Math.round(((double)value.count)/haplotypeCoverage);
+					if (value!=null) return value.isUnique(k,nReads,avgReadLength,SPANNING_BPS,genomeLength,nHaplotypes,SIGNIFICANCE_LEVEL);
 				}
 			}
 			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
@@ -3282,7 +3284,7 @@ public class RepeatAlphabet {
 	
 	public static class Kmer implements Comparable {
 		public int[] sequence;  // Positions in $alphabet$.
-		public long count;
+		public int count;
 		public int sameReadCount;  // Max frequency inside a read
 		
 		/**
@@ -3297,16 +3299,27 @@ public class RepeatAlphabet {
 			set(otherKmer.sequence,0,k,false);
 		}
 		
+		/**
+		 * @param str the comma-separated sequence of character IDs and count, possibly
+		 * followed by a previous and next character.
+		 */
 		public Kmer(String str, int k) {
 			sequence = new int[k];
 			String[] tokens = str.split(",");
 			for (int i=0; i<k; i++) sequence[i]=Integer.parseInt(tokens[i]);
-			count=Long.parseLong(tokens[k]);
+			count=Integer.parseInt(tokens[k]);
 			if (tokens.length>k+1) {
 				previousCharacter=Integer.parseInt(tokens[k+1]);
 				nextCharacter=Integer.parseInt(tokens[k+2]);
 			}
 			else { previousCharacter=-1; nextCharacter=-1; }
+		}
+		
+		public final void set(int[] sequence, int k, int count) {
+			if (this.sequence==null) this.sequence = new int[k];
+			System.arraycopy(sequence,0,this.sequence,0,k);
+			this.count=count;
+			previousCharacter=-1; nextCharacter=-1;
 		}
 		
 		/**
@@ -3341,7 +3354,50 @@ public class RepeatAlphabet {
 			}
 			System.arraycopy(tmpArray,smaller?0:k,sequence,0,k);
 			return smaller;
-		}
+		}		
+		
+	    /**
+	     * @param nReads in the entire dataset;
+	     * @param spanningBps basepairs before and after the k-mer for it to be considered
+	     * observed in a read;
+	     * @param genomeLength of one haplotype;
+	     * @return -1 if the p-value of $count$ fails the two-sided significance test for
+	     * every ploidy of the k-mer (assuming a Poisson distribution for every possible 
+		 * ploidy); this happens if the k-mer is noise or a repeat; otherwise, the 
+		 * smallest ploidy of the k-mer for which the significance test does not fail.
+	     */
+	    public final int isUnique(int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, double significanceLevel) {
+	        int i, length;
+	        double p;
+	        PoissonDistribution distribution;
+        
+	        length=0;
+	        for (i=0; i<k; i++) alphabet[sequence[i]].getLength();
+	        final double base = ((double)(avgReadLength-((spanningBps)<<1)-length))/genomeLength;
+	        final int quantum = nReads/nHaplotypes;
+	        for (i=0; i<nHaplotypes; i++) {
+	            distribution=PoissonDistribution.of(base*quantum*(i+1));
+	            p=distribution.cumulativeProbability(count);
+	            p=2.0*Math.min(p,1.0-p);
+	            if (p>significanceLevel) return i+1;
+	        }
+	        return -1;
+	    }
+		
+	    /**
+	     * Just a one-sided test on the model with one haplotype.
+	     */
+	    public final boolean isFrequent(int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, double significanceLevel) {
+	        int i, length;
+	        PoissonDistribution distribution;
+        
+	        length=0;
+	        for (i=0; i<k; i++) alphabet[sequence[i]].getLength();
+	        final double base = ((double)(avgReadLength-((spanningBps)<<1)-length))/genomeLength;
+	        final int quantum = nReads/nHaplotypes;
+	        distribution=PoissonDistribution.of(base*quantum);
+	        return distribution.cumulativeProbability(count)>significanceLevel;
+	    }		
 		
 		public boolean equals(Object other) {
 			Kmer otherKmer = (Kmer)other;
@@ -4843,15 +4899,10 @@ public class RepeatAlphabet {
 		int from, to, block, firstLength, lastLength, middleLength;
 		
 		
-boolean fabio = readID==957 && Math.abs(intervalStart,4427)<=100 && Math.abs(intervalEnd,24266)<=100;		
-if (fabio) System.err.println("VITTU> 1");
-		
 		if (blueIntervalsID==-1) return false;
-if (fabio) System.err.println("VITTU> 2");		
 		lastBlueInterval=blueIntervals[blueIntervalsID].length-1;
 		lastTandemInterval=lastTandem[readID];
 		if (lastTandemInterval==-1) return false;
-if (fabio) System.err.println("VITTU> 3");		
 		j=0; k=0; containsBlue=false;
 		for (i=0; i<lastBlueInterval; i+=3) {
 			firstBlock=blueIntervals[blueIntervalsID][i];
@@ -4862,12 +4913,10 @@ if (fabio) System.err.println("VITTU> 3");
 			if (lastBlock==nBlocks-1) lastPosition=readLength-1;
 			else lastPosition=boundaries_all[boundariesAllID][lastBlock];
 			if (lastPosition<=intervalStart) continue;
-if (fabio) System.err.println("VITTU> 4  firstBlock="+firstBlock+" lastBlock="+lastBlock);			
 			if ( Intervals.isApproximatelyContained(firstPosition,lastPosition,intervalStart,intervalEnd) &&
 				 !Intervals.areApproximatelyIdentical(firstPosition,lastPosition,intervalStart,intervalEnd) &&
 				 (intervalStart<=firstPosition-differenceThreshold && intervalEnd>=lastPosition+differenceThreshold)
 			   ) {
-if (fabio) System.err.println("VITTU> 5");				   
 				containsBlue=true; found=false;
 				while (j<lastTandemInterval) {
 					if (tandems[readID][j+1]<lastBlock) {
@@ -4883,7 +4932,6 @@ if (fabio) System.err.println("VITTU> 5");
 						block=tandems[readID][j+1];
 						from=block==0?0:boundaries_all[boundariesAllID][block-1];
 						to=block==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][block];
-if (fabio) System.err.println("VITTU> 6  tandem from="+from+" to="+to);						
 						lastLength=to-from+1;
 						if (tandems[readID][j+1]==tandems[readID][j]+1) middleLength=0;
 						else {
@@ -4893,15 +4941,8 @@ if (fabio) System.err.println("VITTU> 6  tandem from="+from+" to="+to);
 							to=block==nBlocks-1?readLength-1:boundaries_all[boundariesAllID][block];
 							middleLength=(to-from+1)/(tandems[readID][j+1]-tandems[readID][j]-1);
 						}
-if (fabio) System.err.println("VITTU> 7  middleLength="+middleLength);
 					}
 					else { lastLength=firstLength; middleLength=0; }
-if (fabio) {
-	System.err.println("VITTU> 8  isBlockPeriodic: "+isBlockPeriodic(boundariesAllID,tandems[readID][j]));
-	System.err.println("VITTU> 8  firstBlock="+firstBlock+" lastBlock="+lastBlock);
-	System.err.println("VITTU> 8  tandems[readID][j]="+tandems[readID][j]+" tandems[readID][j+1]="+tandems[readID][j+1]);
-	System.err.println("VITTU> 8  firstLength="+firstLength+" middleLength="+middleLength+" lastLength="+lastLength+" identityThreshold="+identityThreshold);
-}
 					if ( ( isBlockPeriodic(boundariesAllID,tandems[readID][j]) &&
 						   ( tandems[readID][j]<firstBlock || tandems[readID][j+1]>lastBlock ||
 						     (tandems[readID][j]==firstBlock && tandems[readID][j+1]==lastBlock && (firstPosition<distanceThreshold || lastPosition>readLength-distanceThreshold))
@@ -4924,13 +4965,11 @@ if (fabio) {
 						   )
 						 )		   
 					   ) {
-System.err.println("VITTU> 9");
 						found=true;
 						break;
 					}
 					j+=2;
 				}
-System.err.println("VITTU> 10  found="+found);				
 				if (!found) {
 					k=filterAlignments_tandem_straddlesShortPeriodTandem(firstBlock,lastBlock,readID,boundariesAllID,k,lastTandemInterval);
 					if (k<0) k=-1-k;
@@ -6341,13 +6380,15 @@ System.err.println("VITTU> 10  found="+found);
 	 * histogram of length differences between adjacent spacers.
 	 */
 	public static final boolean getSpacerGraphStatistics(int haplotypeCoverage, int nHaplotypes, boolean printHistograms) {
-		final int MIN_FREQUENCY_UNIQUE = haplotypeCoverage*nHaplotypes-(haplotypeCoverage>>1);
-		final int MAX_FREQUENCY_UNIQUE = haplotypeCoverage*nHaplotypes+(haplotypeCoverage>>1);
-		final double THRESHOLD = 0.5;  // Arbitrary
+		final int POISSON_MEAN = haplotypeCoverage*nHaplotypes;
+		final int POISSON_FROM = POISSON_MEAN-(haplotypeCoverage>>1);
+		final int POISSON_TO = POISSON_MEAN+(haplotypeCoverage>>1);
+		final double THRESHOLD = 0.1;  // Arbitrary
 		boolean out;
 		int i, j;
 		int max, length, last, neighbor, degree, nNonemptySpacers;
-		long mass;
+		double mass;
+		PoissonDistribution poisson;
 		int[] degreeHistogram, lengthDiffHistogram;
 		
 		// Dregree histogram (excluding spacers of length zero).
@@ -6367,9 +6408,11 @@ System.err.println("VITTU> 10  found="+found);
 			}
 			degreeHistogram[degree]++;
 		}
-		mass=0;
-		for (i=MIN_FREQUENCY_UNIQUE; i<=MAX_FREQUENCY_UNIQUE; i++) mass+=degreeHistogram[i];
-		out=mass>=nNonemptySpacers*THRESHOLD;
+		mass=0.0;
+		for (i=POISSON_FROM; i<=POISSON_TO; i++) mass+=degreeHistogram[i];
+		mass/=nNonemptySpacers;	
+		poisson=PoissonDistribution.of(POISSON_MEAN);
+		out=Math.abs(mass-poisson.probability(POISSON_FROM-1,POISSON_TO))<=THRESHOLD;
 		if (!printHistograms) return out;
 		System.err.println("Histogram of spacer degrees:");
 		for (i=0; i<=max; i++) System.err.println(i+","+degreeHistogram[i]);
@@ -9848,14 +9891,15 @@ System.err.println("VITTU> 10  found="+found);
 	 * lastAlphabet$ for the new alphabet.
 	 */
 	public static final Character[] wobble_extendAlphabet(boolean[] flags, int nFlags, boolean wobbleAllPeriodic, int quantum_wobble, int quantum_alphabet, int minAlignmentLength, int[] out) throws IOException {
-		final int MAX_NEWCHARS_PER_CHAR = ((quantum_wobble<<1)/quantum_alphabet)*((quantum_wobble<<1)/quantum_alphabet);
+		final int MULTIPLICITY = (1+quantum_wobble/quantum_alphabet)*3;
+		final int MAX_NEWCHARS_PER_CHAR = MULTIPLICITY*MULTIPLICITY;
 		int i;
 		int lastUnique_new, lastPeriodic_new, lastAlphabet_new;
 		Character tmpCharacter;
 		Character[] alphabet_new;
 		
 		tmpCharacter = new Character();
-		alphabet_new = new Character[lastAlphabet+(nFlags+lastPeriodic-lastUnique)*MAX_NEWCHARS_PER_CHAR];
+		alphabet_new = new Character[lastAlphabet+1+(nFlags+lastPeriodic-lastUnique)*MAX_NEWCHARS_PER_CHAR];
 		lastUnique_new=-1;
 		for (i=0; i<=lastUnique; i++) {
 			alphabet_new[++lastUnique_new]=alphabet[i];

@@ -101,7 +101,7 @@ public class BuildAssemblyGraph {
             
             
             
-if (Alignments.readA==441) {
+if (Alignments.readA==1110) {
     String type2 = "";
     if (Alignments.startA<=100) type2="PREFIX";
     else if (Alignments.endA>=Reads.getReadLength(Alignments.readA-1)-100) type2="SUFFIX";

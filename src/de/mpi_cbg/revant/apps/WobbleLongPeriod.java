@@ -27,6 +27,8 @@ public class WobbleLongPeriod {
 		int[] old2new, tmpArray1, tmpArray2, tmpArray3;
 		RepeatAlphabet.Character[] alphabet_new;
 		
+		final int MULTIPLICITY = (1+WOBBLE_LENGTH/IO.quantum)*3;
+		final int MAX_NEWCHARS_PER_CHAR = MULTIPLICITY*MULTIPLICITY;
 		RepeatAlphabet.loadRepeatLengths(REPEAT_LENGTHS_FILE,N_REPEATS);
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE_NEW,2);
 		alphabet_new=RepeatAlphabet.alphabet; lastUnique_new=RepeatAlphabet.lastUnique; lastPeriodic_new=RepeatAlphabet.lastPeriodic; lastAlphabet_new=RepeatAlphabet.lastAlphabet;
@@ -36,7 +38,7 @@ public class WobbleLongPeriod {
 		for (i=0; i<=RepeatAlphabet.lastAlphabet; i++) old2new[i]=Integer.parseInt(br1.readLine());
 		br1.close();
 		tmpArray1 = new int[100];  // Arbitrary
-		tmpArray2 = new int[RepeatAlphabet.lastAlphabet+1];
+		tmpArray2 = new int[(RepeatAlphabet.lastAlphabet+1)*MAX_NEWCHARS_PER_CHAR];
 		tmpArray3 = new int[] {0,0};
 		br1 = new BufferedReader(new FileReader(TRANSLATED_READS_CHARACTERS_FILE));
         br2 = new BufferedReader(new FileReader(TANDEMS_FILE));

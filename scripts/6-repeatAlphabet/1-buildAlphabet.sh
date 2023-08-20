@@ -46,7 +46,7 @@ SORT_OPTIONS=""
 for i in $(seq 1 9); do  # Should be in sync with the serialization of $Character$.
 	SORT_OPTIONS="${SORT_OPTIONS} -k ${i},${i}n"
 done
-MIN_CHARACTER_FREQUENCY=$(( ${HAPLOTYPE_COVERAGE} / 2 ))
+MIN_CHARACTER_FREQUENCY=$(( ${HAPLOTYPE_COVERAGE} / 2 ))  # Arbitrary
 rm -f ${TMPFILE_PATH}*
 
 

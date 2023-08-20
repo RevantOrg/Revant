@@ -1012,9 +1012,10 @@ public class GenomeSimulator {
 	 * @param outputFileIsPeriodic file marking with a one every short-period repeat.
 	 */
 	private static final void printAuxiliaryRepeatFiles(String outputFileLengths, String outputFileIsPeriodic, int minAlignmentLength) throws IOException {
-		int i;
+		int i, p;
 		int length;
 		BufferedWriter bw;
+        int[] histogram = new int[20];
 		
 		bw = new BufferedWriter(new FileWriter(outputFileLengths));
 		for (i=0; i<=lastRepeat; i++) {
@@ -1022,13 +1023,18 @@ public class GenomeSimulator {
 			length=repeats[i].sequenceLength;
 			while (length<minAlignmentLength) length+=repeats[i].sequenceLength;
 			bw.write(length+"\n");
+            p=length/minAlignmentLength;
+            if (p>=histogram.length) p=histogram.length-1;
+            histogram[p]++;
 		}
-		bw.close();	
+		bw.close();
 		bw = new BufferedWriter(new FileWriter(outputFileIsPeriodic));
 		for (i=0; i<=lastRepeat; i++) {
 			if (repeats[i].type!=-1) bw.write(repeats[i].type==Constants.INTERVAL_PERIODIC?"1\n":"0\n");
 		}
 		bw.close();
+        System.err.println("Histogram of repeat lengths:");
+        for (i=1; i<histogram.length; i++) System.err.println((minAlignmentLength*i)+","+histogram[i]);
 	}
 
 	

@@ -24,12 +24,15 @@ public class GetShortestUniqueIntervals {
 		final String READ_LENGTHS_FILE = args[3];
 		final String ALPHABET_FILE = args[4];
 		final String UNIQUE_KMERS_FILE = args[5];
-		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[6]);
-		final int IDENTITY_THRESHOLD = Integer.parseInt(args[7]);
-		final int DISTANCE_THRESHOLD = Integer.parseInt(args[8]);
-		final double CHARACTER_FRACTION = Double.parseDouble(args[9]);
-		final String OLD_INTERVALS_FILE = args[10];  // NULL to discard it
-		final String NEW_INTERVALS_FILE = args[11];  // Output
+        final int N_READS = Integer.parseInt(args[6]);
+        final int AVG_READ_LENGTH = Integer.parseInt(args[7]);
+        final long GENOME_LENGTH = Long.parseLong(args[8]);  // One haplotype
+        final int N_HAPLOTYPES = Integer.parseInt(args[9]);
+		final int IDENTITY_THRESHOLD = Integer.parseInt(args[10]);
+		final int DISTANCE_THRESHOLD = Integer.parseInt(args[11]);
+		final double CHARACTER_FRACTION = Double.parseDouble(args[12]);
+		final String OLD_INTERVALS_FILE = args[13];  // NULL to discard it
+		final String NEW_INTERVALS_FILE = args[14];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -91,7 +94,7 @@ public class GetShortestUniqueIntervals {
 			else lastUniqueInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,HAPLOTYPE_COVERAGE,readLength,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {
