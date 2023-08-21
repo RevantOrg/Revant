@@ -64,7 +64,7 @@ public class CollectKmers {
 			else lastAvoidedInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			RepeatAlphabet.getKmers(str1,K,kmers,null,avoidedIntervals,lastAvoidedInterval,readLength,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,-1.0/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
+			RepeatAlphabet.getKmers(str1,K,kmers,null,avoidedIntervals,lastAvoidedInterval,readLength,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,-1.0/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
 			str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; 
 			str3=br3.readLine(); str4=br4.readLine(); row++;
 		}
@@ -77,7 +77,7 @@ public class CollectKmers {
 		kmers.keySet().toArray(keys);
 		if (nKmers>1) Arrays.sort(keys,0,nKmers);
 		bw = new BufferedWriter(new FileWriter(KMERS_FILE));
-		for (i=0; i<nKmers; i++) bw.write(keys[i].toString()+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].count+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].sameReadCount+"\n");
+		for (i=0; i<nKmers; i++) bw.write(keys[i].toString()+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].count+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].countPartial+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].sameReadCount+"\n");
 		bw.close();
 	}
 

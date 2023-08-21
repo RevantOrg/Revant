@@ -28,11 +28,12 @@ public class GetShortestUniqueIntervals {
         final int AVG_READ_LENGTH = Integer.parseInt(args[7]);
         final long GENOME_LENGTH = Long.parseLong(args[8]);  // One haplotype
         final int N_HAPLOTYPES = Integer.parseInt(args[9]);
-		final int IDENTITY_THRESHOLD = Integer.parseInt(args[10]);
-		final int DISTANCE_THRESHOLD = Integer.parseInt(args[11]);
-		final double CHARACTER_FRACTION = Double.parseDouble(args[12]);
-		final String OLD_INTERVALS_FILE = args[13];  // NULL to discard it
-		final String NEW_INTERVALS_FILE = args[14];  // Output
+        final int MIN_ALIGNMENT_LENGTH = Integer.parseInt(args[10]);  // Read-repeat   
+		final int IDENTITY_THRESHOLD = Integer.parseInt(args[11]);
+		final int DISTANCE_THRESHOLD = Integer.parseInt(args[12]);
+		final double CHARACTER_FRACTION = Double.parseDouble(args[13]);
+		final String OLD_INTERVALS_FILE = args[14];  // NULL to discard it
+		final String NEW_INTERVALS_FILE = args[15];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -94,7 +95,7 @@ public class GetShortestUniqueIntervals {
 			else lastUniqueInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {

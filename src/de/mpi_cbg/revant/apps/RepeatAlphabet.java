@@ -86,7 +86,7 @@ public class RepeatAlphabet {
 	public static Spacer[] spacers;
 	public static int lastSpacer, nRigidSpacers, nBridgingSpacers, nInactiveSpacers;
 	private static double[][] spacerNeighbors;
-	private static int[] lastSpacerNeighbor;
+	public static int[] lastSpacerNeighbor;
 	
 	/**
 	 * Temporary space used by procedure $recodeRead()$.
@@ -2063,12 +2063,13 @@ public class RepeatAlphabet {
 	 *
 	 * @param identityThreshold,distanceThreshold used only when $newKmers$ is null; see 
 	 * $isCharacterAmbiguousInBlock()$;
+	 * @param minAlignmentLength read-repeat;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int readLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int readLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int UNIQUE_MODE = 1;
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
@@ -2093,16 +2094,16 @@ public class RepeatAlphabet {
 		if (stack==null || stack.length<(1+sum)*3) stack = new int[(1+sum)*3];
 		
 		// Processing every k-mer in the read
-		if (newKmers==null) {
+		if (newKmers==null) {  // Marking k-mers
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,0,readLength)) continue;
+				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,1,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-				nHaplotypesPrime=getKmers_impl(i,k,null,oldKmers,nReads,avgReadLength,genomeLength,nHaplotypes,tmpKmer,stack,tmpArray2,tmpArray3);
+				nHaplotypesPrime=getKmers_impl(i,k,nBlocks,null,oldKmers,nReads,avgReadLength,genomeLength,nHaplotypes,minAlignmentLength,tmpKmer,stack,tmpArray2,tmpArray3);
 				if (nHaplotypesPrime==-1) continue;
 				if ( (i!=0 && i!=nBlocks-k) ||
 					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)) || 
@@ -2116,17 +2117,17 @@ public class RepeatAlphabet {
 				}
 			}
 		}
-		else {
+		else {  // Counting k-mers
 			tmpMap.clear(); lastKmerPool=-1;
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;			
-				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,1,readLength)) continue;
+				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,0,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
-				getKmers_impl(i,k,tmpMap,oldKmers,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
+				getKmers_impl(i,k,nBlocks,tmpMap,oldKmers,-1,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
 			while (iterator.hasNext()) {
@@ -2134,12 +2135,15 @@ public class RepeatAlphabet {
 				value=newKmers.get(key);
 				if (value==null) {
 					value = new Kmer(key,k);
-					value.count=key.count; value.sameReadCount=(int)key.count;
+					value.count=key.count;
+					value.countPartial=key.countPartial;
+					value.sameReadCount=key.count+key.countPartial;
 					newKmers.put(value,value);
 				}
 				else {
-					value.sameReadCount=Math.max(value.sameReadCount,(int)key.count);
 					value.count+=key.count;
+					value.countPartial+=key.countPartial;
+					value.sameReadCount=Math.max(value.sameReadCount,(int)(key.count+key.countPartial));
 				}
 			}
 		}
@@ -2321,6 +2325,7 @@ public class RepeatAlphabet {
 	 * Remark: the objects added to $newKmers$ come from $kmerPool$, which is assumed to
 	 * be already initialized.
 	 *
+	 * @param minAlignmentLength read-repeat;
 	 * @param key temporary space;
 	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
 	 * elements in $intBlocks$ plus one;
@@ -2329,7 +2334,7 @@ public class RepeatAlphabet {
 	 * canonization, was found in $oldKmers$;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final int getKmers_impl(int first, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+	private static final int getKmers_impl(int first, int k, int nBlocks, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
 		final int SPANNING_BPS = (IO.quantum*3)>>1;  // Arbitrary
 		final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
 		int i;
@@ -2343,19 +2348,23 @@ public class RepeatAlphabet {
 			if (row==first+k-1) {
 				key.set(tmpArray2,0,k,true); 
 				key.canonize(k,tmpArray3);				
-				if (newKmers!=null) {
+				if (newKmers!=null) {  // Counting k-mers
 					value=newKmers.get(key);
 					if (value==null) {
 						newKey=kmerPool_allocate(k);
-						newKey.set(key.sequence,0,k,true); 
-						newKey.count=1;
+						newKey.set(key.sequence,0,k,true);
+						if (first==0 || first+k-1==nBlocks-1) { newKey.count=0; newKey.countPartial=1; }
+						else { newKey.count=1; newKey.countPartial=0; }
 						newKmers.put(newKey,newKey);
 					}
-					else value.count++;
+					else {
+						if (first==0 || first+k-1==nBlocks-1) value.countPartial++;
+						else value.count++;
+					}
 				}
-				else {
+				else {  // Marking k-mers
 					value=oldKmers.get(key);
-					if (value!=null) return value.isUnique(k,nReads,avgReadLength,SPANNING_BPS,genomeLength,nHaplotypes,SIGNIFICANCE_LEVEL);
+					if (value!=null) return value.isUnique(k,nReads,avgReadLength,SPANNING_BPS,genomeLength,nHaplotypes,minAlignmentLength,SIGNIFICANCE_LEVEL);
 				}
 			}
 			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
@@ -3284,8 +3293,9 @@ public class RepeatAlphabet {
 	
 	public static class Kmer implements Comparable {
 		public int[] sequence;  // Positions in $alphabet$.
-		public int count;
-		public int sameReadCount;  // Max frequency inside a read
+		public int count;  // Observed number of full occurrences
+		public int countPartial;  // Observed number of partial occurrences
+		public int sameReadCount;  // Max observed frequency inside a read
 		
 		/**
 		 * -1: unknown; -2: more than one character. >=0: canonized index in $alphabet$
@@ -3300,25 +3310,28 @@ public class RepeatAlphabet {
 		}
 		
 		/**
-		 * @param str the comma-separated sequence of character IDs and count, possibly
-		 * followed by a previous and next character.
+		 * @param str the comma-separated sequence:
+		 * $characterIDs,count,countPartial,previousCharacter,nextCharacter$
+		 * where the last two elements are optional.
 		 */
 		public Kmer(String str, int k) {
 			sequence = new int[k];
 			String[] tokens = str.split(",");
 			for (int i=0; i<k; i++) sequence[i]=Integer.parseInt(tokens[i]);
 			count=Integer.parseInt(tokens[k]);
-			if (tokens.length>k+1) {
-				previousCharacter=Integer.parseInt(tokens[k+1]);
-				nextCharacter=Integer.parseInt(tokens[k+2]);
+			countPartial=Integer.parseInt(tokens[k+1]);
+			sameReadCount=Integer.parseInt(tokens[k+2]);
+			if (tokens.length>k+3) {
+				previousCharacter=Integer.parseInt(tokens[k+3]);
+				nextCharacter=Integer.parseInt(tokens[k+4]);
 			}
 			else { previousCharacter=-1; nextCharacter=-1; }
 		}
 		
-		public final void set(int[] sequence, int k, int count) {
+		public final void set(int[] sequence, int k, int count, int countPartial, int sameReadCount) {
 			if (this.sequence==null) this.sequence = new int[k];
 			System.arraycopy(sequence,0,this.sequence,0,k);
-			this.count=count;
+			this.count=count; this.countPartial=countPartial; this.sameReadCount=sameReadCount;
 			previousCharacter=-1; nextCharacter=-1;
 		}
 		
@@ -3359,27 +3372,36 @@ public class RepeatAlphabet {
 	    /**
 	     * @param nReads in the entire dataset;
 	     * @param spanningBps basepairs before and after the k-mer for it to be considered
-	     * observed in a read;
+	     * fully observed in a read;
 	     * @param genomeLength of one haplotype;
-	     * @return -1 if the p-value of $count$ fails the two-sided significance test for
-	     * every ploidy of the k-mer (assuming a Poisson distribution for every possible 
-		 * ploidy); this happens if the k-mer is noise or a repeat; otherwise, the 
+		 * @param minAlignmentLength read-repeat;
+	     * @return -1 if the p-value of $count$ fails the significance test for every
+		 * ploidy of the k-mer (assuming a Poisson distribution for every possible
+		 * ploidy); this happens if the k-mer is noise or a repeat; otherwise, the
 		 * smallest ploidy of the k-mer for which the significance test does not fail.
 	     */
-	    public final int isUnique(int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, double significanceLevel) {
+	    public final int isUnique(int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, double significanceLevel) {
 	        int i, length;
 	        double p;
 	        PoissonDistribution distribution;
-        
+			
 	        length=0;
-	        for (i=0; i<k; i++) alphabet[sequence[i]].getLength();
-	        final double base = ((double)(avgReadLength-((spanningBps)<<1)-length))/genomeLength;
+	        for (i=0; i<k; i++) length+=alphabet[sequence[i]].getLength();
+			final double surface = avgReadLength-length-(spanningBps<<1);
+			if (surface<0) return -1; 
+	        final double baseFull = surface/genomeLength;
+			final double surfaceL = avgReadLength-spanningBps-(length-alphabet[sequence[0]].getLength()+minAlignmentLength);
+			final double surfaceR = avgReadLength-spanningBps-(length-alphabet[sequence[k-1]].getLength()+minAlignmentLength);			
+			final double basePartial = (surfaceL+surfaceR)/genomeLength;
 	        final int quantum = nReads/nHaplotypes;
 	        for (i=0; i<nHaplotypes; i++) {
-	            distribution=PoissonDistribution.of(base*quantum*(i+1));
+	            distribution=PoissonDistribution.of(baseFull*quantum*(i+1));
 	            p=distribution.cumulativeProbability(count);
 	            p=2.0*Math.min(p,1.0-p);
-	            if (p>significanceLevel) return i+1;
+				if (p<=significanceLevel) continue;
+				distribution=PoissonDistribution.of(basePartial*quantum*(i+1));
+				p=distribution.survivalProbability(countPartial);
+	            if (p>significanceLevel) return i+1;  // Excluding only repeats
 	        }
 	        return -1;
 	    }
@@ -3392,10 +3414,12 @@ public class RepeatAlphabet {
 	        PoissonDistribution distribution;
         
 	        length=0;
-	        for (i=0; i<k; i++) alphabet[sequence[i]].getLength();
-	        final double base = ((double)(avgReadLength-((spanningBps)<<1)-length))/genomeLength;
+	        for (i=0; i<k; i++) length+=alphabet[sequence[i]].getLength();
+			final double surface = avgReadLength-length-(spanningBps<<1);
+			if (surface<0) return false;
+	        final double baseFull = surface/genomeLength;
 	        final int quantum = nReads/nHaplotypes;
-	        distribution=PoissonDistribution.of(base*quantum);
+	        distribution=PoissonDistribution.of(baseFull*quantum);
 	        return distribution.cumulativeProbability(count)>significanceLevel;
 	    }		
 		
@@ -8202,7 +8226,7 @@ public class RepeatAlphabet {
 		}
 		System.err.println("Loaded "+(lastSpacer+1)+" tandem spacers ("+(((double)(lastSpacer+1))/(nTranslatedReads+(nonrepetitiveBlocksMode==2?nFullyUnique:0)))+" per eligible read).");
 		System.err.println("Histogram of all observed tandem spacer lengths:");
-		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);		
+		for (i=0; i<lengthHistogram.length; i++) System.err.println((i*IO.quantum)+": "+lengthHistogram[i]);
 	}
 	
 	
@@ -8580,31 +8604,33 @@ public class RepeatAlphabet {
 	 * Remark: in practice propagation adds solutions to just a few spacers that
 	 * previously had no solution. 
 	 *
-	 * @param distanceThreshold used only by calls to $Spacer.solutionsAreConsistent()$;
-	 * @return TRUE iff most spacers have a solution after propagation.
+	 * @param distanceThreshold used only by calls to $Spacer.compactSolutions()$;
+	 * @return TRUE iff a fraction of all spacers have a solution after propagation.
 	 */
 	public static final boolean propagateSolutions(int distanceThreshold) {
 		final int CAPACITY = 10;  // Arbitrary
-		final double THRESHOLD = 0.5;  // Arbitrary
+		final double THRESHOLD = 0.25;  // Arbitrary
 		final int MAX_SOLUTIONS_PER_SPACER = 1000;  // Arbitrary
 		boolean orientation;
 		int i, j;
 		int top, last, currentSpacer, neighbor, nPropagated, nSolved;
 		SpacerSolution[] tmpArray;		
 		
-		// Computing consistent solutions
+		// Compacting existing solutions
 		tmpArray = new SpacerSolution[CAPACITY];
 		for (i=0; i<tmpArray.length; i++) tmpArray[i] = new SpacerSolution();
 		for (i=0; i<=lastSpacer; i++) {
+			spacers[i].breakpoint=-1;  // Used as a flag
+			if (spacers[i].lastSolution==-1) { spacers[i].flag=false; continue; }
+			else if (spacers[i].lastSolution==2) { spacers[i].flag=true; continue; }
 			if (tmpArray.length<spacers[i].lastSolution+1) {
 				SpacerSolution[] newArray = new SpacerSolution[spacers[i].lastSolution+1];
 				System.arraycopy(tmpArray,0,newArray,0,tmpArray.length);
 				for (j=tmpArray.length; j<newArray.length; j++) newArray[j] = new SpacerSolution();
 				tmpArray=newArray;
 			}
-			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
-			spacers[i].flag=spacers[i].lastSolution!=-1;
-			spacers[i].breakpoint=-1;  // Used as a flag
+			spacers[i].compactSolutions(distanceThreshold,tmpArray);
+			spacers[i].flag=true;
 		}
 		
 		// Propagating solutions to spacers without solutions
@@ -8629,21 +8655,19 @@ public class RepeatAlphabet {
 		}
 		System.err.println(nPropagated+" tandem spacers with no solution, acquired a solution after propagation ("+((100.0*nPropagated)/(lastSpacer+1))+"%).");
 		
-		// Making propagated solutions consistent
+		// Compacting propagated solutions
 		nSolved=0;
 		for (i=0; i<=lastSpacer; i++) {
-			if (spacers[i].flag) {
-				nSolved++;
-				continue;
-			}
+			if (spacers[i].lastSolution==-1) continue;
+			nSolved++;
+			if (spacers[i].flag) continue;
 			if (tmpArray.length<spacers[i].lastSolution+1) {
 				SpacerSolution[] newArray = new SpacerSolution[spacers[i].lastSolution+1];
 				System.arraycopy(tmpArray,0,newArray,0,tmpArray.length);
 				for (j=tmpArray.length; j<newArray.length; j++) newArray[j] = new SpacerSolution();
 				tmpArray=newArray;
 			}
-			spacers[i].solutionsAreConsistent(distanceThreshold,tmpArray);
-			if (spacers[i].lastSolution!=-1) nSolved++;
+			spacers[i].compactSolutions(distanceThreshold,tmpArray);
 		}
 		
 		return nSolved>=(lastSpacer+1)*THRESHOLD; 
@@ -11018,97 +11042,6 @@ public class RepeatAlphabet {
 			return out;
 		}
 		
-		/**
-		 * Used only by tandem spacers.
-		 *
-		 * Remark: the procedure discards non-periodic repeats such that different 
-		 * substrings of them (possibly in different orientations) are identical.
-		 *
-		 * @param tmpArray temporary space, assumed to be large enough;
-		 * @return TRUE iff there is at least one repeat such that all its solutions use
-		 * the same substring of it (i.e. start/end positions differ by $<=threshold$) in
-		 * the same orientation. At the end of the procedure all such substrings are
-		 * replaced with a single average, and repeats that do not satisfy the condition
-		 * are removed.
-		 */
-		public boolean solutionsAreConsistent(int threshold, SpacerSolution[] tmpArray) {
-			boolean orientation, isShortPeriod, isConsistent;
-			int i, j, k, n;
-			int repeat, min1, max1, min2, max2, sum1, sum2;
-			final int nSolutions = (lastSolution+1)/3;
-			
-			if (nSolutions<=1) return true;
-			
-			// Sorting solutions
-			for (i=0; i<=lastSolution; i+=3) {
-				j=i/3;
-				if (solutions[i]<0)	{
-					tmpArray[j].repeat=-1-solutions[i];
-					tmpArray[j].orientation=false;
-				}
-				else {
-					tmpArray[j].repeat=solutions[i];
-					tmpArray[j].orientation=true;
-				}
-				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
-				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
-			}
-			Arrays.sort(tmpArray,0,nSolutions);
-			
-			// Merging solutions
-			j=0; n=1; isConsistent=true;
-			repeat=tmpArray[0].repeat; orientation=tmpArray[0].orientation;
-			isShortPeriod=tmpArray[0].isShortPeriod;
-			min1=tmpArray[0].first; max1=min1; sum1=min1;
-			min2=tmpArray[0].last; max2=min2; sum2=min2;
-			for (i=1; i<nSolutions; i++) {
-				if (tmpArray[i].repeat!=repeat) {
-					if (!isShortPeriod) {
-						if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
-						if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
-					}
-					if (isConsistent) {
-						tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
-						tmpArray[j].isShortPeriod=isShortPeriod;
-						j++;
-					}
-					n=1; isConsistent=true;
-					repeat=tmpArray[i].repeat; orientation=tmpArray[i].orientation;
-					isShortPeriod=tmpArray[i].isShortPeriod;
-					min1=tmpArray[i].first; max1=min1; sum1=min1;
-					min2=tmpArray[i].last; max2=min2; sum2=min2;
-					continue;
-				}
-				if (tmpArray[i].orientation!=orientation) isConsistent=false;
-				if (tmpArray[i].first<min1) min1=tmpArray[i].first;
-				if (tmpArray[i].first>max1) max1=tmpArray[i].first;
-				sum1+=tmpArray[i].first;
-				if (tmpArray[i].last<min2) min2=tmpArray[i].last;
-				if (tmpArray[i].last>max2) max2=tmpArray[i].last;
-				sum2+=tmpArray[i].last;
-				n++;
-			}
-			if (!isShortPeriod) {
-				if (max1-min1>threshold || max2-min2>threshold) isConsistent=false;
-				if (isConsistent) { tmpArray[j].first=sum1/n; tmpArray[j].last=sum2/n; }
-			}
-			if (isConsistent) {
-				tmpArray[j].repeat=repeat; tmpArray[j].orientation=orientation;
-				tmpArray[j].isShortPeriod=isShortPeriod;
-			}
-			else j--;
-			
-			// Storing the result of the merge
-			k=-1;
-			for (i=0; i<=j; i++) {
-				solutions[++k]=tmpArray[i].orientation?tmpArray[i].repeat:-1-tmpArray[i].repeat;
-				solutions[++k]=tmpArray[i].first;
-				solutions[++k]=tmpArray[i].last;
-			}
-			lastSolution=k;
-			return true;
-		}
-		
 		
 		/**
 		 * Used only by tandem spacers.
@@ -11186,7 +11119,7 @@ public class RepeatAlphabet {
 			return 0;
 		}
 		
-		public String toString() { return read+"["+first+".."+breakpoint+".."+last+"] ("+blockID+")"; }
+		public String toString() { return read+"["+first+".."+breakpoint+".."+last+"] ("+blockID+") lastSolution="+lastSolution+" breakpoint="+breakpoint+" lastSplit="+lastSplit; }
 		
 		public String printSolutions() {
 			String out = "";
@@ -11273,6 +11206,8 @@ public class RepeatAlphabet {
 			else if (last>otherSolution.last) return 1;			
 			else return 0;
 		}
+		
+		public String toString() { return (orientation?">":"<")+repeat+"["+first+".."+last+"] ("+(isShortPeriod?1:0)+") ("+component+")"; }
 	}
 	
 	

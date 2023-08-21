@@ -217,6 +217,7 @@ if (Alignments.readA==1110) {
 		componentSize = new int[nComponents];
 		Math.set(componentSize,nComponents-1,0);
 		for (i=0; i<N_READS; i++) componentSize[component[i]]++;
+        printHistogram(componentSize,nComponents);
 		j=-1;
 		for (i=0; i<nComponents; i++) {
 			if (componentSize[i]>=MIN_COMPONENT_SIZE) componentSize[++j]=i;
@@ -278,6 +279,7 @@ if (Alignments.readA==1110) {
 		componentSize = new int[nComponents];
 		Math.set(componentSize,nComponents-1,0);
 		for (i=0; i<N_READS; i++) componentSize[component[i]]++;
+        printHistogram(componentSize,nComponents);
 		j=-1;
 		for (i=0; i<nComponents; i++) {
 			if (componentSize[i]>=MIN_COMPONENT_SIZE) componentSize[++j]=i;
@@ -313,7 +315,25 @@ if (Alignments.readA==1110) {
 		for (i=0; i<nComponents; i++) { bws[i].write("}"); bws[i].close(); }
 		br1.close();
 	}
-	
+    
+    
+    private static final void printHistogram(int[] componentSize, int nComponents) {
+        int i;
+        double count;
+        int[] tmpArray;
+        
+        System.err.println("Cumulative distribution of component size:");
+        tmpArray = new int[nComponents];
+        System.arraycopy(componentSize,0,tmpArray,0,nComponents);
+        Arrays.sort(tmpArray);
+        count=1.0;
+        for (i=1; i<nComponents; i++) {
+            if (tmpArray[i]!=tmpArray[i-1]) System.err.println(tmpArray[i-1]+","+(count/nComponents));
+            count++;
+        }
+        System.err.println(tmpArray[nComponents-1]+",1");
+    }
+    
 	
 	/**
 	 * Adds $to$ to $from$.

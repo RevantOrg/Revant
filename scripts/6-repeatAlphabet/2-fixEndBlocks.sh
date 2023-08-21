@@ -26,8 +26,7 @@ N_HAPLOTYPES=$9
 TIGHT_MODE="0"
 SPANNING_BPS="150"  # Bps before and after a k-mer to consider it observed in a read.
 # ------------------------------------ REVANT --------------------------------------------
-REVANT_LIBRARIES="${REVANT_BINARIES}/../lib"
-REVANT_LIBRARIES="${REVANT_LIBRARIES}/commons-numbers-gamma-1.1.jar:${REVANT_LIBRARIES}/commons-rng-sampling-1.5.jar:${REVANT_LIBRARIES}/commons-statistics-distribution-1.0.jar"
+REVANT_LIBRARIES="${REVANT_BINARIES}/../lib/*"
 # ----------------------------------------------------------------------------------------
 
 set -o pipefail; set -e; set -u
@@ -94,7 +93,7 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 	FREQUENT_KMERS_FILE="${INPUT_DIR}/frequent-k${K}.txt"
     OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding frequent ${K}-mers..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} 0 ${ALPHABET_FILE} 1 10000 ${FREQUENT_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} -1 0 ${ALPHABET_FILE} 1 10000 ${FREQUENT_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
 	echo "Computing $((${K}-1))-mers..."
 	K_MINUS_ONE_MERS_FILE="${INPUT_DIR}/kMinusOne-k${K}.txt"
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetKMinusOneMers ${ALPHABET_FILE} ${FREQUENT_KMERS_FILE} ${K} ${K_MINUS_ONE_MERS_FILE}

@@ -22,12 +22,12 @@ DELETE_TMP_FILES=$6
 IDENTITY_THRESHOLD=$7
 DISTANCE_THRESHOLD=$8
 CHARACTER_THRESHOLD=$9
+MIN_ALIGNMENT_LENGTH=${10}  # Read-repeat
 UNIQUE_MODE="1"  # Non-repetitive blocks are allowed in a k-mer, except at the first/last
 # position of the k-mer. Usually a good choice.
 SPANNING_BPS="150"  # Bps before and after a k-mer to consider it observed in a read.
 # ------------------------------------ REVANT --------------------------------------------
-REVANT_LIBRARIES="${REVANT_BINARIES}/../lib"
-REVANT_LIBRARIES="${REVANT_LIBRARIES}/commons-numbers-gamma-1.1.jar:${REVANT_LIBRARIES}/commons-rng-sampling-1.5.jar:${REVANT_LIBRARIES}/commons-statistics-distribution-1.0.jar"
+REVANT_LIBRARIES="${REVANT_BINARIES}/../lib/*"
 # ----------------------------------------------------------------------------------------
 
 
@@ -72,7 +72,7 @@ function intervalsThread() {
 	local LOCAL_UNIQUE_KMERS_FILE=$5
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$6
 	local LOCAL_INTERVALS_FILE=$7
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_UNIQUE_KMERS_FILE} ${N_READS} ${AVG_READ_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${CHARACTER_THRESHOLD} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_UNIQUE_KMERS_FILE} ${N_READS} ${AVG_READ_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${MIN_ALIGNMENT_LENGTH} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${CHARACTER_THRESHOLD} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
 	if [ $? -ne 0 ]; then
 		exit
 	fi
@@ -106,7 +106,7 @@ for K in $(seq 1 ${MAX_K}); do
 	UNIQUE_KMERS_FILE="${INPUT_DIR}/unique-k${K}.txt"
 	OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding unique ${K}-mers..."
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} 1 ${ALPHABET_FILE} 0 ${MAX_HISTOGRAM_COUNT} ${UNIQUE_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} 1 ${ALPHABET_FILE} 0 ${MAX_HISTOGRAM_COUNT} ${UNIQUE_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
 	echo "Updating shortest unique intervals file..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}

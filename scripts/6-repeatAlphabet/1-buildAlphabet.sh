@@ -197,7 +197,7 @@ done
 
 
 echo "Trying to fix tandem spacers if needed..."
-TANDEM_SPACERS_ITERATIONS="1"
+TANDEM_SPACERS_ITERATIONS="3"
 NONREPETITIVE_BLOCKS_MODE="2"
 CONCATENATE_THRESHOLD="200"
 LONG_SPACER_LENGTH=$(( ${MIN_ALIGNMENT_LENGTH} * 20 ))  # Arbitrary
@@ -387,7 +387,7 @@ if [ ${WOBBLE_LENGTH} -ne 0 ]; then
 		TO=$(( ${N_THREADS} - 1 ))
 	fi
 	echo "Computing tandem track..."
-	for THREAD in $(seq 0 ${TO}); do		 
+	for THREAD_ID in $(seq 0 ${TO}); do		 
 		tandemsThread ${TMPFILE_PATH}-wobble-1-${THREAD_ID}.txt ${TMPFILE_PATH}-wobble-2-${THREAD_ID}.txt ${TMPFILE_PATH}-wobble-3-lengths-${THREAD_ID}.txt ${TMPFILE_PATH}-wobble-4-${THREAD_ID}.txt &
 	done
 	wait
