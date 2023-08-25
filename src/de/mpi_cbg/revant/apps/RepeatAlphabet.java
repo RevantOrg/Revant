@@ -10138,8 +10138,9 @@ public class RepeatAlphabet {
 	 * Remark: wobbling is designed to increase the number of edges in a highly
 	 * disconnected overlap graph where the endpoints of repeat occurrences are uncertain.
 	 * However, such increase in frequency may make some k-mers be classified as repeats 
-	 * rather than as unique addresses on the genome, and this might \emph{remove} some
-	 * edges from the overlap graph.
+	 * rather than as unique addresses in the genome, and this might \emph{remove} some
+	 * edges from the overlap graph (of course it might also make rare noisy k-mers become
+	 * frequent enough to be considered unique addresses in the genome).
 	 *
 	 * Remark: this procedure might put multiple unique characters inside a block that
 	 * contains a single unique character. Thus, throughout the code, no test for the

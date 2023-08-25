@@ -217,7 +217,7 @@ if (Alignments.readA==1110) {
 		componentSize = new int[nComponents];
 		Math.set(componentSize,nComponents-1,0);
 		for (i=0; i<N_READS; i++) componentSize[component[i]]++;
-        printHistogram(componentSize,nComponents);
+        printHistogram(componentSize,nComponents,N_READS);
 		j=-1;
 		for (i=0; i<nComponents; i++) {
 			if (componentSize[i]>=MIN_COMPONENT_SIZE) componentSize[++j]=i;
@@ -279,7 +279,7 @@ if (Alignments.readA==1110) {
 		componentSize = new int[nComponents];
 		Math.set(componentSize,nComponents-1,0);
 		for (i=0; i<N_READS; i++) componentSize[component[i]]++;
-        printHistogram(componentSize,nComponents);
+        printHistogram(componentSize,nComponents,N_READS);
 		j=-1;
 		for (i=0; i<nComponents; i++) {
 			if (componentSize[i]>=MIN_COMPONENT_SIZE) componentSize[++j]=i;
@@ -317,21 +317,21 @@ if (Alignments.readA==1110) {
 	}
     
     
-    private static final void printHistogram(int[] componentSize, int nComponents) {
+    private static final void printHistogram(int[] componentSize, int nComponents, int nNodes) {
         int i;
         double count;
         int[] tmpArray;
         
-        System.err.println("Cumulative distribution of component size:");
+        System.err.println("Number of nodes in components of size >=:");
         tmpArray = new int[nComponents];
         System.arraycopy(componentSize,0,tmpArray,0,nComponents);
         Arrays.sort(tmpArray);
-        count=1.0;
-        for (i=1; i<nComponents; i++) {
-            if (tmpArray[i]!=tmpArray[i-1]) System.err.println(tmpArray[i-1]+","+(count/nComponents));
-            count++;
+        count=tmpArray[nComponents-1];
+        for (i=nComponents-2; i>=0; i--) {
+            if (tmpArray[i]!=tmpArray[i+1]) System.err.println(tmpArray[i+1]+","+(count/nNodes));
+            count+=tmpArray[i];
         }
-        System.err.println(tmpArray[nComponents-1]+",1");
+        System.err.println(tmpArray[0]+","+(count/nNodes));
     }
     
 	

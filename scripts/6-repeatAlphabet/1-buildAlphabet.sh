@@ -297,10 +297,15 @@ while [ ${ITER} -le ${TANDEM_SPACERS_ITERATIONS} ]; do
 		mv ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_FILE}-preTspacers
 		mv ${READS_TRANSLATED_BOUNDARIES} ${READS_TRANSLATED_BOUNDARIES}-preTspacers
 		mv ${ALPHABET_FILE} ${ALPHABET_FILE}-preTspacers
+        mv ${FULLY_UNIQUE_FILE} ${FULLY_UNIQUE_FILE}-preTspacers
 		for THREAD in $(seq 0 ${TO}); do
 			cat ${TMPFILE_PATH}-tspacers-12-${THREAD}.txt >> ${READS_TRANSLATED_FILE}
 			cat ${TMPFILE_PATH}-tspacers-13-${THREAD}.txt >> ${READS_TRANSLATED_BOUNDARIES}
 		done
+        touch ${FULLY_UNIQUE_FILE}
+        for i in $(sed -n '/^$/=' ${READS_TRANSLATED_FILE}); do
+            echo $(( $i - 1 )) >> ${FULLY_UNIQUE_FILE}
+        done
 		mv ${ALPHABET_FILE_SPACERS} ${ALPHABET_FILE}
 		TANDEM_SPACERS_FIXED="1"
 		echo "Tandem spacers fixed"

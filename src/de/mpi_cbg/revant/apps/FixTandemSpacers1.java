@@ -54,14 +54,14 @@ public class FixTandemSpacers1 {
         
         
 for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==42) System.err.println("VITTU> 1  "+RepeatAlphabet.spacers[x]);
+	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 1  "+RepeatAlphabet.spacers[x]);
 }	
         
 		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,LONG_SPACER_LENGTH,NONREPETITIVE_BLOCKS_MODE,tmpArray);
         
         
 for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==42) System.err.println("VITTU> 2  "+RepeatAlphabet.spacers[x]);
+	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 2  "+RepeatAlphabet.spacers[x]);
 }	        
         
         
@@ -71,7 +71,7 @@ for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
 
         
 for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==42) System.err.println("VITTU> 3  "+RepeatAlphabet.spacers[x]+"  lastSpacerNeighbor="+RepeatAlphabet.lastSpacerNeighbor[x]);
+	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 3  "+RepeatAlphabet.spacers[x]+"  lastSpacerNeighbor="+RepeatAlphabet.lastSpacerNeighbor[x]);
 }	        
         
         
@@ -79,7 +79,7 @@ for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
 		if (!RepeatAlphabet.propagateSolutions(DISTANCE_THRESHOLD_CONSISTENCY)) { System.out.println("3"); return; }
         
 for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==42) System.err.println("VITTU> 4  "+RepeatAlphabet.spacers[x]);
+	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 4  "+RepeatAlphabet.spacers[x]);
 }	                
         
         
