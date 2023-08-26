@@ -3,6 +3,7 @@ package de.mpi_cbg.revant.apps;
 import java.io.*;
 
 import de.mpi_cbg.revant.util.Math;
+import de.mpi_cbg.revant.util.IO;
 
 /**
  * Given a sorted file that contains the k-mers extracted by several threads, the program
@@ -32,6 +33,7 @@ public class CompactKmers {
 		final String OUTPUT_FILE_HISTOGRAM = args[13].equalsIgnoreCase("null")?null:args[13];
 		
         final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
+        final int MIN_MISSING_LENGTH = IO.quantum;  // Arbitrary
         final String SEPARATOR = ",";
         
 		boolean equal;
@@ -85,7 +87,7 @@ public class CompactKmers {
 			else {
                 kmer.set(previous,K,previousCount,previousCountPartial,previousSameReadCount);
                 if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
-                     (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
+                     (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
                    ) {
 					for (i=0; i<K; i++) bw.write(previous[i]+SEPARATOR);
 					bw.write(previousCount+SEPARATOR+previousCountPartial+SEPARATOR+previousSameReadCount+"\n");
@@ -99,7 +101,7 @@ public class CompactKmers {
 		br.close();
         kmer.set(previous,K,previousCount,previousCountPartial,previousSameReadCount);
 		if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
-             (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
+             (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
            ) {
 			for (i=0; i<K; i++) bw.write(previous[i]+SEPARATOR);
 			bw.write(previousCount+SEPARATOR+previousCountPartial+SEPARATOR+previousSameReadCount+"\n");

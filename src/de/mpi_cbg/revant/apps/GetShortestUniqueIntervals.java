@@ -4,6 +4,8 @@ import java.io.*;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import de.mpi_cbg.revant.util.IO;
+
 /**
  * Let a shortest unique intervals file contain, for every translated read, the list of
  * all intervals such that: (1) every interval is the occurrence of a unique h-mer for all
@@ -36,6 +38,7 @@ public class GetShortestUniqueIntervals {
 		final String NEW_INTERVALS_FILE = args[15];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
+        final int MIN_MISSING_LENGTH = IO.quantum;  // Arbitrary
 		
 		int i, p;
 		int row, nBlocks, nPairs, lastUniqueInterval, readLength;
@@ -95,7 +98,7 @@ public class GetShortestUniqueIntervals {
 			else lastUniqueInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
+			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {

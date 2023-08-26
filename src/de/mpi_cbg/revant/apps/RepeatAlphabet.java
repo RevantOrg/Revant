@@ -2064,12 +2064,14 @@ public class RepeatAlphabet {
 	 * @param identityThreshold,distanceThreshold used only when $newKmers$ is null; see 
 	 * $isCharacterAmbiguousInBlock()$;
 	 * @param minAlignmentLength read-repeat;
+	 * @param minMissingLength min length that must be missing from a character for it to
+	 * be considerd a partial occurrence;
 	 * @param tmpKmer temporary space;
 	 * @param tmpArray2 temporary space, of size at least k;
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int readLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
+	public static final int getKmers(String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int readLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int UNIQUE_MODE = 1;
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
@@ -2103,7 +2105,7 @@ public class RepeatAlphabet {
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-				nHaplotypesPrime=getKmers_impl(i,k,nBlocks,null,oldKmers,nReads,avgReadLength,genomeLength,nHaplotypes,minAlignmentLength,tmpKmer,stack,tmpArray2,tmpArray3);
+				nHaplotypesPrime=getKmers_impl(i,k,nBlocks,readLength,null,oldKmers,nReads,avgReadLength,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,tmpKmer,stack,tmpArray2,tmpArray3);
 				if (nHaplotypesPrime==-1) continue;
 				if ( (i!=0 && i!=nBlocks-k) ||
 					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)) || 
@@ -2127,7 +2129,7 @@ public class RepeatAlphabet {
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
-				getKmers_impl(i,k,nBlocks,tmpMap,oldKmers,-1,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
+				getKmers_impl(i,k,nBlocks,readLength,tmpMap,oldKmers,-1,-1,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
 			while (iterator.hasNext()) {
@@ -2326,6 +2328,8 @@ public class RepeatAlphabet {
 	 * be already initialized.
 	 *
 	 * @param minAlignmentLength read-repeat;
+	 * @param minMissingLength min length that must be missing from a character for it to
+	 * be considerd a partial occurrence;
 	 * @param key temporary space;
 	 * @param tmpArray1 temporary space, of size at least equal to 3 times the number of 
 	 * elements in $intBlocks$ plus one;
@@ -2334,11 +2338,12 @@ public class RepeatAlphabet {
 	 * canonization, was found in $oldKmers$;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final int getKmers_impl(int first, int k, int nBlocks, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+	private static final int getKmers_impl(int first, int k, int nBlocks, int readLength, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
 		final int SPANNING_BPS = (IO.quantum*3)>>1;  // Arbitrary
 		final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
+		final int MIN_MISSING_LENGTH = IO.quantum;  // Arbitrary
 		int i;
-		int top1, top2, row, column, lastChild, length;
+		int top1, top2, row, column, lastChild, length, firstLength, lastLength;
 		Kmer value, newKey;
 		
 		top1=-1; top2=-1;
@@ -2346,25 +2351,26 @@ public class RepeatAlphabet {
 		while (top1>=0) {
 			row=tmpArray1[top1]; column=tmpArray1[top1-1]; lastChild=tmpArray1[top1-2];
 			if (row==first+k-1) {
-				key.set(tmpArray2,0,k,true); 
-				key.canonize(k,tmpArray3);				
+				key.set(tmpArray2,0,k,true);
+				firstLength=alphabet[tmpArray2[0]].getLength(); lastLength=alphabet[tmpArray2[k-1]].getLength();
+				key.canonize(k,tmpArray3);
 				if (newKmers!=null) {  // Counting k-mers
 					value=newKmers.get(key);
 					if (value==null) {
 						newKey=kmerPool_allocate(k);
 						newKey.set(key.sequence,0,k,true);
-						if (first==0 || first+k-1==nBlocks-1) { newKey.count=0; newKey.countPartial=1; }
+						if ((first==0 && boundaries[0]<firstLength-MIN_MISSING_LENGTH) || (first+k-1==nBlocks-1 && readLength-(nBlocks>1?boundaries[nBlocks-2]:0)<lastLength-MIN_MISSING_LENGTH)) { newKey.count=0; newKey.countPartial=1; }
 						else { newKey.count=1; newKey.countPartial=0; }
 						newKmers.put(newKey,newKey);
 					}
 					else {
-						if (first==0 || first+k-1==nBlocks-1) value.countPartial++;
+						if ((first==0 && boundaries[0]<firstLength-MIN_MISSING_LENGTH) || (first+k-1==nBlocks-1 && readLength-(nBlocks>1?boundaries[nBlocks-2]:0)<lastLength-MIN_MISSING_LENGTH)) value.countPartial++;
 						else value.count++;
 					}
 				}
 				else {  // Marking k-mers
 					value=oldKmers.get(key);
-					if (value!=null) return value.isUnique(k,nReads,avgReadLength,SPANNING_BPS,genomeLength,nHaplotypes,minAlignmentLength,SIGNIFICANCE_LEVEL);
+					if (value!=null) return value.isUnique(k,nReads,avgReadLength,SPANNING_BPS,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,SIGNIFICANCE_LEVEL);
 				}
 			}
 			if (row==first+k-1 || lastChild==lastInBlock_int[row+1]) { top1-=3; top2--; }
@@ -3375,12 +3381,14 @@ public class RepeatAlphabet {
 	     * fully observed in a read;
 	     * @param genomeLength of one haplotype;
 		 * @param minAlignmentLength read-repeat;
+		 * @param minMissingLength min length that must be missing from a character for it
+		 * to be considerd a partial occurrence;
 	     * @return -1 if the p-value of $count$ fails the significance test for every
 		 * ploidy of the k-mer (assuming a Poisson distribution for every possible
 		 * ploidy); this happens if the k-mer is noise or a repeat; otherwise, the
 		 * smallest ploidy of the k-mer for which the significance test does not fail.
 	     */
-	    public final int isUnique(int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, double significanceLevel) {
+	    public final int isUnique(int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel) {
 	        int i, length;
 	        double p;
 	        PoissonDistribution distribution;
@@ -3388,19 +3396,22 @@ public class RepeatAlphabet {
 	        length=0;
 	        for (i=0; i<k; i++) length+=alphabet[sequence[i]].getLength();
 			final double surface = avgReadLength-length-(spanningBps<<1);
-			if (surface<0) return -1; 
+			if (surface<=0) return -1; 
 	        final double baseFull = surface/genomeLength;
-			final double surfaceL = avgReadLength-spanningBps-(length-alphabet[sequence[0]].getLength()+minAlignmentLength);
-			final double surfaceR = avgReadLength-spanningBps-(length-alphabet[sequence[k-1]].getLength()+minAlignmentLength);			
-			final double basePartial = (surfaceL+surfaceR)/genomeLength;
+			final double surfaceL = Math.max(alphabet[sequence[0]].getLength()-minAlignmentLength-minMissingLength,0);
+			final double surfaceR = Math.max(alphabet[sequence[k-1]].getLength()-minAlignmentLength-minMissingLength,0);
+			final double basePartial = (surfaceL+surfaceR==0?2:surfaceL+surfaceR)/genomeLength;
 	        final int quantum = nReads/nHaplotypes;
+boolean fabio = k==5 && (sequence[0]>=869 && sequence[0]<=877) && (sequence[1]>=1951 && sequence[1]<=1982) && (sequence[2]>=1951 && sequence[2]<=1982) && (sequence[3]>=1951 && sequence[3]<=1982) && (sequence[4]>=1951 && sequence[4]<=1982) && count==6 && countPartial==6;
 	        for (i=0; i<nHaplotypes; i++) {
 	            distribution=PoissonDistribution.of(baseFull*quantum*(i+1));
 	            p=distribution.cumulativeProbability(count);
 	            p=2.0*Math.min(p,1.0-p);
+if (fabio) System.err.println("isUnique> 1  p="+p+" of="+(baseFull*quantum*(i+1))+" significanceLevel="+significanceLevel+" count="+count+" countPartial="+countPartial+" avgReadLength="+avgReadLength+" length="+length+" surface="+surface+" genomeLength="+genomeLength+" nReads="+nReads+" nHaplotypes="+nHaplotypes);
 				if (p<=significanceLevel) continue;
 				distribution=PoissonDistribution.of(basePartial*quantum*(i+1));
 				p=distribution.survivalProbability(countPartial);
+if (fabio) System.err.println("isUnique> 2  p="+p+" of="+(basePartial*quantum*(i+1))+" significanceLevel="+significanceLevel+" count="+count+" countPartial="+countPartial);				
 	            if (p>significanceLevel) return i+1;  // Excluding only repeats
 	        }
 	        return -1;
