@@ -10,15 +10,19 @@ import java.util.HashMap;
  * sequence of blocks that contains an interval.
  */
 public class CollectKmers {
-	
+	/**
+     * @param args 0: 0 (enumerating) or 1 (counting): see $RepeatAlphabet.getKmers()$.
+     */
 	public static void main(String[] args) throws IOException {
-		final int K = Integer.parseInt(args[0]);
-		final String TRANSLATED_FILE = args[1];
-		final String BOUNDARIES_FILE = args[2];
-		final String READ_LENGTHS_FILE = args[3];
-		final String ALPHABET_FILE = args[4];
-		final String AVOIDED_INTERVALS_FILE = args[5];  // NULL to discard it
-		final String KMERS_FILE = args[6];  // Output file
+        final int MODE = Integer.parseInt(args[0]);
+		final int K = Integer.parseInt(args[1]);
+		final String TRANSLATED_FILE = args[2];
+		final String BOUNDARIES_FILE = args[3];
+		final String READ_LENGTHS_FILE = args[4];
+		final String ALPHABET_FILE = args[5];
+		final String AVOIDED_INTERVALS_FILE = args[6];  // NULL to discard it
+        final String KMERS_FILE_INPUT = args[7];  // NULL to discard it
+		final String KMERS_FILE_OUTPUT = args[8];  // Output file
 		
 		boolean INTERVALS_FILE_EXISTS = !AVOIDED_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -38,8 +42,9 @@ public class CollectKmers {
 		
 		// Collecting k-mers
 		RepeatAlphabet.deserializeAlphabet(ALPHABET_FILE,2);
+        if (!KMERS_FILE_INPUT.equalsIgnoreCase("null")) kmers=deserializeKmers(KMERS_FILE_INPUT,K);
+        else kmers = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
 		RepeatAlphabet.kmerPool_init(K);
-		kmers = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
 		tmpMap = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
 		br1 = new BufferedReader(new FileReader(TRANSLATED_FILE));
 		if (INTERVALS_FILE_EXISTS) {
@@ -64,7 +69,7 @@ public class CollectKmers {
 			else lastAvoidedInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			RepeatAlphabet.getKmers(str1,K,kmers,null,avoidedIntervals,lastAvoidedInterval,readLength,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,-1.0/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
+			RepeatAlphabet.getKmers(MODE,str1,K,kmers,null,avoidedIntervals,lastAvoidedInterval,readLength,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,-1.0/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
 			str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; 
 			str3=br3.readLine(); str4=br4.readLine(); row++;
 		}
@@ -76,9 +81,32 @@ public class CollectKmers {
 		keys = new RepeatAlphabet.Kmer[nKmers];
 		kmers.keySet().toArray(keys);
 		if (nKmers>1) Arrays.sort(keys,0,nKmers);
-		bw = new BufferedWriter(new FileWriter(KMERS_FILE));
-		for (i=0; i<nKmers; i++) bw.write(keys[i].toString()+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].count+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].countPartial+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].sameReadCount+"\n");
+		bw = new BufferedWriter(new FileWriter(KMERS_FILE_OUTPUT));
+		for (i=0; i<nKmers; i++) {
+            bw.write(keys[i].toString());
+            if (MODE==1) bw.write((RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].count+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].countPartial+(RepeatAlphabet.SEPARATOR_MINOR+"")+keys[i].sameReadCount);
+            bw.newLine();
+        }
 		bw.close();
 	}
-
+    
+    
+    private static final HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> deserializeKmers(String path, int k) throws IOException {
+        String str;
+        BufferedReader br;
+        RepeatAlphabet.Kmer kmer;
+        HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer> out;
+        
+        out = new HashMap<RepeatAlphabet.Kmer,RepeatAlphabet.Kmer>();
+        br = new BufferedReader(new FileReader(path));
+        str=br.readLine();
+        while (str!=null) {
+            kmer = new RepeatAlphabet.Kmer(str,k);
+			out.put(kmer,kmer);
+            str=br.readLine();
+        }
+        br.close();
+        return out;
+    }
+    
 }

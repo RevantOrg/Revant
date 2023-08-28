@@ -37,8 +37,9 @@ public class CompactKmers {
         final String SEPARATOR = ",";
         
 		boolean equal;
+        short sameReadCount, previousSameReadCount;
 		int i;
-		int count, countPartial, previousCount, previousCountPartial, sameReadCount, previousSameReadCount;
+		int count, countPartial, previousCount, previousCountPartial;
 		String str;
 		BufferedReader br;
 		BufferedWriter bw;
@@ -66,7 +67,7 @@ public class CompactKmers {
 		for (i=0; i<K; i++) previous[i]=Integer.parseInt(tokens[i]);
 		previousCount=Integer.parseInt(tokens[K]);
         previousCountPartial=Integer.parseInt(tokens[K+1]);
-		previousSameReadCount=Integer.parseInt(tokens[K+2]);
+		previousSameReadCount=Short.parseShort(tokens[K+2]);
 		current = new int[K];
 		str=br.readLine();
 		while (str!=null) {
@@ -78,16 +79,16 @@ public class CompactKmers {
 			}
 			count=Integer.parseInt(tokens[K]);
             countPartial=Integer.parseInt(tokens[K+1]);
-			sameReadCount=Integer.parseInt(tokens[K+2]);
+			sameReadCount=Short.parseShort(tokens[K+2]);
 			if (equal) {
 				previousCount+=count;
                 previousCountPartial+=countPartial;
-				previousSameReadCount=Math.max(previousSameReadCount,sameReadCount);
+				previousSameReadCount=(short)Math.max(previousSameReadCount,sameReadCount);
 			}
 			else {
                 kmer.set(previous,K,previousCount,previousCountPartial,previousSameReadCount);
                 if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
-                     (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
+                     (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
                    ) {
 					for (i=0; i<K; i++) bw.write(previous[i]+SEPARATOR);
 					bw.write(previousCount+SEPARATOR+previousCountPartial+SEPARATOR+previousSameReadCount+"\n");
@@ -101,7 +102,7 @@ public class CompactKmers {
 		br.close();
         kmer.set(previous,K,previousCount,previousCountPartial,previousSameReadCount);
 		if ( (DISCARD_SAME_READ_KMERS?previousSameReadCount==1:true) && 
-             (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
+             (KEEP_ALL_FREQUENT?kmer.isFrequent(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL):(kmer.isUnique(K,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL)!=-1))
            ) {
 			for (i=0; i<K; i++) bw.write(previous[i]+SEPARATOR);
 			bw.write(previousCount+SEPARATOR+previousCountPartial+SEPARATOR+previousSameReadCount+"\n");

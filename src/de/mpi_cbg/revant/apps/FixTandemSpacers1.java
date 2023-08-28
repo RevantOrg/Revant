@@ -51,39 +51,11 @@ public class FixTandemSpacers1 {
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadTandemIntervals(TANDEMS_FILE,N_READS);
 		RepeatAlphabet.loadTandemSpacers(NONREPETITIVE_BLOCKS_MODE);
-        
-        
-for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 1  "+RepeatAlphabet.spacers[x]);
-}	
-        
-		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,LONG_SPACER_LENGTH,NONREPETITIVE_BLOCKS_MODE,tmpArray);
-        
-        
-for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 2  "+RepeatAlphabet.spacers[x]);
-}	        
-        
-        
+		RepeatAlphabet.loadTandemSpacers_blocks(READ_READ_ALIGNMENTS_FILE,DISTANCE_THRESHOLD,LONG_SPACER_LENGTH,NONREPETITIVE_BLOCKS_MODE,tmpArray);    
 		if (RepeatAlphabet.lastSpacer==-1) { System.out.println("1"); return; }
 		RepeatAlphabet.loadFullyContainedTranslation(TRANSLATED_READS_CHARACTERS_FILE,N_FULLY_CONTAINED);
-		if (RepeatAlphabet.loadTandemSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,NONREPETITIVE_BLOCKS_MODE,tmpArray)==0) { System.out.println("2"); return; }
-
-        
-for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 3  "+RepeatAlphabet.spacers[x]+"  lastSpacerNeighbor="+RepeatAlphabet.lastSpacerNeighbor[x]);
-}	        
-        
-        
-        
-		if (!RepeatAlphabet.propagateSolutions(DISTANCE_THRESHOLD_CONSISTENCY)) { System.out.println("3"); return; }
-        
-for (int x=0; x<=RepeatAlphabet.lastSpacer; x++) {
-	if (RepeatAlphabet.spacers[x].read==767) System.err.println("VITTU> 4  "+RepeatAlphabet.spacers[x]);
-}	                
-        
-        
-        
+		if (RepeatAlphabet.loadTandemSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,NONREPETITIVE_BLOCKS_MODE,tmpArray)==0) { System.out.println("2"); return; }        
+		if (!RepeatAlphabet.propagateSolutions(DISTANCE_THRESHOLD_CONSISTENCY)) { System.out.println("3"); return; }        
 		RepeatAlphabet.serializeSpacers(OUTPUT_FILE);
 		System.out.println("0");
 	}

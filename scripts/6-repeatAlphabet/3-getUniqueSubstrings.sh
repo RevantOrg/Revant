@@ -51,14 +51,28 @@ rm -f ${TMPFILE_PATH}*
 rm -f ${INPUT_DIR}/unique-*
 rm -f ${INPUT_DIR}/histogram-*
 
-function kmersThread() {
+function enumerateKmersThread() {
 	local LOCAL_K=$1
 	local LOCAL_TRANSLATED_READS_FILE=$2
 	local LOCAL_BOUNDARIES_FILE=$3
 	local LOCAL_READ_LENGTHS_FILE=$4
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$5
 	local LOCAL_KMERS_FILE=$6
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_KMERS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 0 ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} null ${LOCAL_KMERS_FILE}
+	if [ $? -ne 0 ]; then
+		exit
+	fi
+}
+
+function countKmersThread() {
+	local LOCAL_K=$1
+	local LOCAL_TRANSLATED_READS_FILE=$2
+	local LOCAL_BOUNDARIES_FILE=$3
+	local LOCAL_READ_LENGTHS_FILE=$4
+	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$5
+	local LOCAL_KMERS_FILE_INPUT=$6
+    local LOCAL_KMERS_FILE_OUTPUT=$7
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 1 ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_KMERS_FILE_INPUT} ${LOCAL_KMERS_FILE_OUTPUT}
 	if [ $? -ne 0 ]; then
 		exit
 	fi
@@ -87,7 +101,7 @@ for K in $(seq 1 ${MAX_K}); do
 	for i in $(seq 1 ${K}); do
 		SORT_OPTIONS_KMERS="${SORT_OPTIONS_KMERS} -k ${i},${i}n"
 	done
-	echo "Collecting ${K}-mers..."
+	echo "Enumerating distinct ${K}-mers..."
 	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 		if [ ${K} -le 1 ]; then
@@ -95,14 +109,28 @@ for K in $(seq 1 ${MAX_K}); do
 		else
 			PREVIOUS_INTERVALS="${TMPFILE_PATH}-$((${K}-1))-intervals-${THREAD_ID}"
 		fi
-		kmersThread ${K} ${FILE} ${TMPFILE_PATH}-1-${THREAD_ID} ${TMPFILE_PATH}-2-${THREAD_ID} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID} &
+		enumerateKmersThread ${K} ${FILE} ${TMPFILE_PATH}-1-${THREAD_ID} ${TMPFILE_PATH}-2-${THREAD_ID} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID} &
 	done
 	wait
-	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}.txt
-	if [ ! -s ${TMPFILE_PATH}-${K}.txt ]; then
+	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}-distinct.txt
+	if [ ! -s ${TMPFILE_PATH}-${K}-distinct.txt ]; then
 		MAX_K=$((${K}-1))
 		break
 	fi
+	echo "Counting ${K}-mer occurrences..."
+	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
+		if [ ${K} -le 1 ]; then
+			PREVIOUS_INTERVALS="null"
+		else
+			PREVIOUS_INTERVALS="${TMPFILE_PATH}-$((${K}-1))-intervals-${THREAD_ID}"
+		fi
+        rm -f ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID}
+		countKmersThread ${K} ${FILE} ${TMPFILE_PATH}-1-${THREAD_ID} ${TMPFILE_PATH}-2-${THREAD_ID} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-distinct.txt ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID} &
+	done
+	wait
+    sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}.txt
+    rm -f ${TMPFILE_PATH}-${K}-distinct.txt
 	UNIQUE_KMERS_FILE="${INPUT_DIR}/unique-k${K}.txt"
 	OUTPUT_FILE_HISTOGRAM="${INPUT_DIR}/histogram-k${K}.txt"
 	echo "Finding unique ${K}-mers..."

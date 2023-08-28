@@ -98,7 +98,7 @@ public class GetShortestUniqueIntervals {
 			else lastUniqueInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			lastUniqueInterval=RepeatAlphabet.getKmers(str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
+			lastUniqueInterval=RepeatAlphabet.getKmers(2,str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {
