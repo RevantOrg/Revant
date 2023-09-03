@@ -32,7 +32,7 @@ CONCATENATE_BLOCKS=${12}  # 0=do not try to merge adjacent blocks from the same 
 KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic. Usually good.
 # ----------------------------------------------------------------------------------------
 
-set -o pipefail; set -e; set -u;
+set -euo pipefail
 export LC_ALL=C  # To speed up the $sort$ command.
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"

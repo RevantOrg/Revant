@@ -16,13 +16,15 @@ public class CollectKmers {
 	public static void main(String[] args) throws IOException {
         final int MODE = Integer.parseInt(args[0]);
 		final int K = Integer.parseInt(args[1]);
-		final String TRANSLATED_FILE = args[2];
-		final String BOUNDARIES_FILE = args[3];
-		final String READ_LENGTHS_FILE = args[4];
-		final String ALPHABET_FILE = args[5];
-		final String AVOIDED_INTERVALS_FILE = args[6];  // NULL to discard it
-        final String KMERS_FILE_INPUT = args[7];  // NULL to discard it
-		final String KMERS_FILE_OUTPUT = args[8];  // Output file
+        final int MAX_KMER_LENGTH_BPS = Integer.parseInt(args[2]);  // In bps
+        final int UNIQUE_MODE = Integer.parseInt(args[3]);
+		final String TRANSLATED_FILE = args[4];
+		final String BOUNDARIES_FILE = args[5];
+		final String READ_LENGTHS_FILE = args[6];
+		final String ALPHABET_FILE = args[7];
+		final String AVOIDED_INTERVALS_FILE = args[8];  // NULL to discard it
+        final String KMERS_FILE_INPUT = args[9];  // NULL to discard it
+		final String KMERS_FILE_OUTPUT = args[10];  // Output file
 		
 		boolean INTERVALS_FILE_EXISTS = !AVOIDED_INTERVALS_FILE.equalsIgnoreCase("null");
 		
@@ -69,7 +71,7 @@ public class CollectKmers {
 			else lastAvoidedInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			RepeatAlphabet.getKmers(MODE,str1,K,kmers,null,avoidedIntervals,lastAvoidedInterval,readLength,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,-1.0/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
+			RepeatAlphabet.getKmers(MODE,str1,K,kmers,null,avoidedIntervals,lastAvoidedInterval,UNIQUE_MODE,MAX_KMER_LENGTH_BPS,readLength,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,-1/*argument not used*/,RepeatAlphabet.boundaries,-1/*argument not used*/,-1/*argument not used*/,-1.0/*argument not used*/,tmpKmer,tmpArray2,tmpArray3,tmpMap,tmpChar);
 			str1=br1.readLine(); str2=INTERVALS_FILE_EXISTS?br2.readLine():null; 
 			str3=br3.readLine(); str4=br4.readLine(); row++;
 		}

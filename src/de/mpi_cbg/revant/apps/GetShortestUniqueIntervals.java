@@ -21,24 +21,26 @@ public class GetShortestUniqueIntervals {
 	
 	public static void main(String[] args) throws IOException {
 		final int K = Integer.parseInt(args[0]);
-		final String TRANSLATED_FILE = args[1];
-		final String BOUNDARIES_FILE = args[2];
-		final String READ_LENGTHS_FILE = args[3];
-		final String ALPHABET_FILE = args[4];
-		final String UNIQUE_KMERS_FILE = args[5];
-        final int N_READS = Integer.parseInt(args[6]);
-        final int AVG_READ_LENGTH = Integer.parseInt(args[7]);
-        final long GENOME_LENGTH = Long.parseLong(args[8]);  // One haplotype
-        final int N_HAPLOTYPES = Integer.parseInt(args[9]);
-        final int MIN_ALIGNMENT_LENGTH = Integer.parseInt(args[10]);  // Read-repeat   
-		final int IDENTITY_THRESHOLD = Integer.parseInt(args[11]);
-		final int DISTANCE_THRESHOLD = Integer.parseInt(args[12]);
-		final double CHARACTER_FRACTION = Double.parseDouble(args[13]);
-		final String OLD_INTERVALS_FILE = args[14];  // NULL to discard it
-		final String NEW_INTERVALS_FILE = args[15];  // Output
+        final int MAX_KMER_LENGTH_BPS = Integer.parseInt(args[1]);
+		final String TRANSLATED_FILE = args[2];
+		final String BOUNDARIES_FILE = args[3];
+		final String READ_LENGTHS_FILE = args[4];
+		final String ALPHABET_FILE = args[5];
+		final String UNIQUE_KMERS_FILE = args[6];
+        final int N_READS = Integer.parseInt(args[7]);
+        final int AVG_READ_LENGTH = Integer.parseInt(args[8]);
+        final long GENOME_LENGTH = Long.parseLong(args[9]);  // One haplotype
+        final int N_HAPLOTYPES = Integer.parseInt(args[10]);
+        final int MIN_ALIGNMENT_LENGTH = Integer.parseInt(args[11]);  // Read-repeat   
+		final int IDENTITY_THRESHOLD = Integer.parseInt(args[12]);
+		final int DISTANCE_THRESHOLD = Integer.parseInt(args[13]);
+		final double CHARACTER_FRACTION = Double.parseDouble(args[14]);
+		final String OLD_INTERVALS_FILE = args[15];  // NULL to discard it
+		final String NEW_INTERVALS_FILE = args[16];  // Output
 		
 		boolean OLD_INTERVALS_FILE_EXISTS = !OLD_INTERVALS_FILE.equalsIgnoreCase("null");
         final int MIN_MISSING_LENGTH = IO.quantum;  // Arbitrary
+        final int UNIQUE_MODE = 2;  // Non-repetitive characters not allowed in k-mers
 		
 		int i, p;
 		int row, nBlocks, nPairs, lastUniqueInterval, readLength;
@@ -98,7 +100,7 @@ public class GetShortestUniqueIntervals {
 			else lastUniqueInterval=-1;
 			RepeatAlphabet.loadBoundaries(str3);
 			readLength=Integer.parseInt(str4);
-			lastUniqueInterval=RepeatAlphabet.getKmers(2,str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
+			lastUniqueInterval=RepeatAlphabet.getKmers(2,str1,K,null,kmers,uniqueIntervals,lastUniqueInterval,UNIQUE_MODE,MAX_KMER_LENGTH_BPS,readLength,N_READS,AVG_READ_LENGTH,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,RepeatAlphabet.boundaries,IDENTITY_THRESHOLD,DISTANCE_THRESHOLD,CHARACTER_FRACTION,tmpKmer,tmpArray2,tmpArray3,null,tmpChar);            
 			if (lastUniqueInterval>0) {
 				nPairs=(lastUniqueInterval+1)/3;
 				if (pairs.length<nPairs) {

@@ -33,7 +33,7 @@ MIN_BLUE_INTERVAL_LENGTH="300"  # Blue intervals with fewer bps than this are no
 # considered trustworthy.
 # ----------------------------------------------------------------------------------------
 
-set -o pipefail; set -e; set -u
+set -euo pipefail
 READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 READ_IDS_FILE="${INPUT_DIR}/reads-ids.txt"
 N_READS=$(wc -l < ${READ_IDS_FILE})

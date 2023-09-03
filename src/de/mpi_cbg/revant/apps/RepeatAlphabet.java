@@ -2080,8 +2080,7 @@ public class RepeatAlphabet {
 	 * @param tmpArray3 temporary space, of size at least 2k;
 	 * @param tmpMap temporary hashmap, used only if $newKmers$ is not null.
 	 */
-	public static final int getKmers(int mode, String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int readLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
-		final int UNIQUE_MODE = 1;
+	public static final int getKmers(int mode, String str, int k, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int[] avoidedIntervals, int lastAvoidedInterval, int uniqueMode, int maxKmerLength, int readLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, int[] boundaries, int identityThreshold, int distanceThreshold, double characterFraction, Kmer tmpKmer, int[] tmpArray2, int[] tmpArray3, HashMap<Kmer,Kmer> tmpMap, Character tmpChar) {
 		final int MAX_KMERS_TO_ENUMERATE = 500000;  // Arbitrary, just for speedup.
 		int i, j, p;
 		int nBlocks, sum, start, end, nHaplotypesPrime, nKmers, out;
@@ -2111,11 +2110,11 @@ public class RepeatAlphabet {
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;			
-				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,0,readLength)) continue;
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,0,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
-				getKmers_impl(mode,i,k,nBlocks,readLength,tmpMap,null,-1,-1,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
+				getKmers_impl(mode,i,k,nBlocks,readLength,tmpMap,null,maxKmerLength,-1,-1,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
 			while (iterator.hasNext()) {
@@ -2133,11 +2132,11 @@ public class RepeatAlphabet {
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;			
-				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,0,readLength)) continue;
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,0,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;				
-				getKmers_impl(mode,i,k,nBlocks,readLength,tmpMap,null,-1,-1,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
+				getKmers_impl(mode,i,k,nBlocks,readLength,tmpMap,null,maxKmerLength,-1,-1,-1,-1,-1,-1,tmpKmer,stack,tmpArray2,tmpArray3);
 			}
 			iterator=tmpMap.keySet().iterator();
 			while (iterator.hasNext()) {
@@ -2155,11 +2154,11 @@ public class RepeatAlphabet {
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
 				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
-				if (!isValidWindow(i,k,nBlocks,UNIQUE_MODE,0,readLength)) continue;
+				if (!isValidWindow(i,k,nBlocks,uniqueMode,0,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
 				if (nKmers<0 || nKmers>MAX_KMERS_TO_ENUMERATE) continue;
-				nHaplotypesPrime=getKmers_impl(mode,i,k,nBlocks,readLength,null,oldKmers,nReads,avgReadLength,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,tmpKmer,stack,tmpArray2,tmpArray3);
+				nHaplotypesPrime=getKmers_impl(mode,i,k,nBlocks,readLength,null,oldKmers,maxKmerLength,nReads,avgReadLength,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,tmpKmer,stack,tmpArray2,tmpArray3);
 				if (nHaplotypesPrime==-1) continue;
 				if ( (i!=0 && i!=nBlocks-k) ||
 					 (i==0 && i!=nBlocks-k && !isCharacterAmbiguousInBlock(tmpArray2[0],intBlocks[0],lastInBlock_int[0],true,boundaries,nBlocks,readLength,identityThreshold,distanceThreshold,characterFraction)) || 
@@ -2202,6 +2201,7 @@ public class RepeatAlphabet {
 		int i;
 		int start, end;
 		
+		// Enforcing $uniqueMode,multiMode$.
 		if (uniqueMode==1) {
 			if (isBlockUnique[first] || isBlockUnique[first+k-1]) return false;
 		}
@@ -2363,7 +2363,7 @@ public class RepeatAlphabet {
 	 * canonization, was found in $oldKmers$;
 	 * @param tmpArray3 temporary space, of size at least 2k.
 	 */
-	private static final int getKmers_impl(int mode, int first, int k, int nBlocks, int readLength, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
+	private static final int getKmers_impl(int mode, int first, int k, int nBlocks, int readLength, HashMap<Kmer,Kmer> newKmers, HashMap<Kmer,Kmer> oldKmers, int maxKmerLength, int nReads, int avgReadLength, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, Kmer key, int[] tmpArray1, int[] tmpArray2, int[] tmpArray3) {
 		final int SPANNING_BPS = (IO.quantum*3)>>1;  // Arbitrary
 		final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
 		final int MIN_MISSING_LENGTH = IO.quantum;  // Arbitrary
@@ -2379,12 +2379,14 @@ public class RepeatAlphabet {
 			if (row==first+k-1) {
 				key.set(tmpArray2,0,k,true);
 				firstLength=alphabet[tmpArray2[0]].getLength(); lastLength=alphabet[tmpArray2[k-1]].getLength();
-				key.canonize(k,tmpArray3);
-				if (mode==0) {  // Enumerating
+				length=firstLength+lastLength;
+				for (i=1; i<k-1; i++) length+=alphabet[tmpArray2[i]].getLength();
+				if (mode==0 && length<=maxKmerLength) {  // Enumerating
 					if ( (first!=0 || lastInBlock_int[0]==0 || firstLength>=LARGE_LENGTH) &&
 						 (first+k-1!=nBlocks-1 || lastInBlock_int[nBlocks-1]==0 || lastLength>=LARGE_LENGTH)
 					   ) {
-	   					value=newKmers.get(key);
+	   					key.canonize(k,tmpArray3);
+						value=newKmers.get(key);
 	   					if (value==null) {
 	   						value=kmerPool_allocate(k);
 	   						value.set(key.sequence,0,k,true);
@@ -2392,7 +2394,8 @@ public class RepeatAlphabet {
 	   					}
 					}
 				}
-				else if (mode==1) {  // Counting
+				else if (mode==1 && length<=maxKmerLength) {  // Counting
+					key.canonize(k,tmpArray3);
 					value=newKmers.get(key);
 					if (value==null) {
 						value=kmerPool_allocate(k);
@@ -2403,6 +2406,7 @@ public class RepeatAlphabet {
 					else value.count++;
 				}
 				else if (mode==2) {  // Marking
+					key.canonize(k,tmpArray3);
 					value=oldKmers.get(key);
 					if (value!=null) return value.isUnique(k,nReads,avgReadLength,SPANNING_BPS,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,SIGNIFICANCE_LEVEL);
 				}
@@ -3416,7 +3420,8 @@ public class RepeatAlphabet {
 		 * Remark: if $count=0$ and the k-mer is longer than the avg. read length (e.g. a
 		 * single character might correspond to a repeat that is longer than the avg. read 
 		 * length) only $countPartial$ is tested. If $count=0$ and the k-mer could be
-		 * spanned by a read, the k-mer is considered noise.
+		 * spanned by a read, the k-mer is considered noise. If the k-mer has less than 2
+		 * total occurrences it is considered noise.
 		 *
 		 * Remark: we assume that either $count$ or $countPartial$ is nonzero, i.e. that
 		 * the k-mer occurs at least partially in some read.
@@ -3438,6 +3443,7 @@ public class RepeatAlphabet {
 	        double p;
 	        PoissonDistribution distribution;
 			
+			if (count+countPartial<=1) return -1;
 	        length=0;
 	        for (i=0; i<k; i++) length+=alphabet[sequence[i]].getLength();
 			final double surface = avgReadLength-length-(spanningBps<<1);
@@ -3464,12 +3470,14 @@ public class RepeatAlphabet {
 	    /**
 	     * Just a one-sided test on the model with one haplotype, to remove rare k-mers.
 		 * The procedure uses only $count$ (resp. $countPartial$) if the k-mer can (resp.
-		 * cannot) be spanned by a read.
+		 * cannot) be spanned by a read. If the k-mer has less than 2 total occurrences it
+		 * is considered noise.
 	     */
 	    public final boolean isFrequent(int k, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel) {
 	        int i, length;
 	        PoissonDistribution distribution;
 			
+			if (count+countPartial<=1) return false;
 			final int quantum = nReads/nHaplotypes;
 	        length=0;
 	        for (i=0; i<k; i++) length+=alphabet[sequence[i]].getLength();

@@ -23,13 +23,14 @@ N_THREADS=$6
 DELETE_TMP_FILES=$7
 GENOME_LENGTH=$8
 N_HAPLOTYPES=$9
+MAX_KMER_LENGTH_BPS=${10}
 TIGHT_MODE="0"
 SPANNING_BPS="150"  # Bps before and after a k-mer to consider it observed in a read.
 # ------------------------------------ REVANT --------------------------------------------
 REVANT_LIBRARIES="${REVANT_BINARIES}/../lib/*"
 # ----------------------------------------------------------------------------------------
 
-set -o pipefail; set -e; set -u
+set -euo pipefail
 export LC_ALL=C  # To speed up the $sort$ command.
 TMPFILE_NAME="fixEndBlocks-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
@@ -50,7 +51,7 @@ function enumerateKmersThread() {
 	local LOCAL_BOUNDARIES_FILE=$3
 	local LOCAL_READ_LENGTHS_FILE=$4
 	local LOCAL_KMERS_FILE=$5
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 0 ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null null ${LOCAL_KMERS_FILE}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 0 ${LOCAL_K} ${MAX_KMER_LENGTH_BPS} 1 ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null null ${LOCAL_KMERS_FILE}
 	if [ $? -ne 0 ]; then
 		exit
 	fi
@@ -63,7 +64,7 @@ function countKmersThread() {
 	local LOCAL_READ_LENGTHS_FILE=$4
 	local LOCAL_KMERS_FILE_INPUT=$5
     local LOCAL_KMERS_FILE_OUTPUT=$6
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 1 ${LOCAL_K} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null ${LOCAL_KMERS_FILE_INPUT} ${LOCAL_KMERS_FILE_OUTPUT}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 1 ${LOCAL_K} ${MAX_KMER_LENGTH_BPS} 1 ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null ${LOCAL_KMERS_FILE_INPUT} ${LOCAL_KMERS_FILE_OUTPUT}
 	if [ $? -ne 0 ]; then
 		exit
 	fi

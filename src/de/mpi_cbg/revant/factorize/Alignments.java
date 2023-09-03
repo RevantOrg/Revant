@@ -290,7 +290,7 @@ public class Alignments {
 	 */
 	public static final int readAlignmentFile_getType(int identityThreshold) {	
 		if ( (startA<=identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) ||
-			 (startB<=identityThreshold && endB>=Reads.getReadLength(readA-1)-identityThreshold)
+			 (startB<=identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)
 		   ) return 2;
 		if (orientation) {
 			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA-1)-identityThreshold) &&
@@ -307,6 +307,56 @@ public class Alignments {
 				 ) ||
 			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) &&
 				   (startB>identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)
+			   	 )
+			   ) return 0;
+		}
+		return 1;
+	}
+    
+    
+    /**
+     * A variant that gets read lengths from $str$.
+     */
+	public static final int readAlignmentFile_getType(int identityThreshold, String str) {
+        int i, j, p;
+        int lengthA, lengthB;
+        
+        // Computing $lengthA,lengthB$.
+        lengthA=0; lengthB=0;
+        p=str.indexOf(BPS_LABEL);
+        for (i=p-2; i>=0; i--) {
+            if (str.charAt(i)=='x') {
+                lengthB=intSubstring(str,i+2,p-1);
+                p=i;
+                for (j=i-2; j>=0; j--) {
+                    if (str.charAt(j)=='(') {
+                        lengthA=intSubstring(str,j+1,p-1);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        
+        // Deciding alignment type
+		if ( (startA<=identityThreshold && endA>=lengthA-identityThreshold) ||
+			 (startB<=identityThreshold && endB>=lengthB-identityThreshold)
+		   ) return 2;
+		if (orientation) {
+			if ( ( (startA<=identityThreshold && endA<lengthA-identityThreshold) &&
+				   (startB>identityThreshold && endB>=lengthB-identityThreshold)
+				 ) ||
+			     ( (startA>identityThreshold && endA>=lengthA-identityThreshold) &&
+			   	   (startB<=identityThreshold && endB<lengthB-identityThreshold)
+			   	 )
+			   ) return 0;
+		}
+		else {
+			if ( ( (startA<=identityThreshold && endA<lengthA-identityThreshold) &&
+				   (startB<=identityThreshold && endB<lengthB-identityThreshold)
+				 ) ||
+			     ( (startA>identityThreshold && endA>=lengthA-identityThreshold) &&
+				   (startB>identityThreshold && endB>=lengthB-identityThreshold)
 			   	 )
 			   ) return 0;
 		}
