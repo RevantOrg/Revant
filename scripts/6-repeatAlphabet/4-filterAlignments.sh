@@ -41,6 +41,20 @@ TMPFILE_NAME="filterAlignments-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 rm -f ${TMPFILE_PATH}*
 
+function waitAndCheck() {
+    local ARRAY_NAME=$1[@]
+    
+    local PIDS=(${!ARRAY_NAME})
+    local LAST_THREAD=$((${#PIDS[@]} - 1))
+    N_FAILED="0"
+    for THREAD in $(seq 0 ${LAST_THREAD}); do
+        wait ${PIDS[${THREAD}]} || N_FAILED=$(( ${N_FAILED} + 1 ))
+    done
+    if [ ${N_FAILED} -ne 0 ]; then
+        exit 1
+    fi
+}
+
 echo "Splitting the alignments file..."
 if [ ${PERIODIC_ENDPOINTS_FIXED} -eq 1 ]; then
 	# Reusing the chunks of the read-read alignments file that are already there (we
@@ -79,9 +93,6 @@ ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 function filterThread() {
 	local ALIGNMENTS_FILE_ID=$1
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FilterAlignments ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${N_READS} ${READ_LENGTHS_FILE} ${READ_IDS_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${UNIQUE_INTERVALS_FILE} ${TANDEM_INTERVALS_FILE} ${FILTERING_MODE} ${SUFFIX_PREFIX_MODE} ${BOTH_READS_TANDEM} ${ALPHABET_FILE} ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID} ${MIN_ALIGNMENT_LENGTH_READ_READ} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${MIN_BLUE_INTERVAL_LENGTH} ${MIN_INTERSECTION_NONREPETITIVE}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 	if [ ${BROKEN_READS} -eq 1 ]; then
 		NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
 		OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"
@@ -89,9 +100,6 @@ function filterThread() {
 		READ_LENGTHS_FILE_OLD="${INPUT_DIR}/reads-lengths-unbroken.txt"
 		ALIGNMENTS_FILE_OLD="${INPUT_DIR}/breakReads-tmp-1-${ALIGNMENTS_FILE_ID}.txt"
 		java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads5 ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${NEW2OLD_FILE} ${N_READS} ${OLD2NEW_FILE} ${NREADS_OLD} ${ALIGNMENTS_FILE_OLD} ${READ_LENGTHS_FILE_OLD} ${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID} ${TMPFILE_PATH}-5-${ALIGNMENTS_FILE_ID}
-		if [ $? -ne 0 ]; then
-			exit
-		fi
 	fi
 }
 
@@ -100,10 +108,12 @@ if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
+PIDS=()
 for THREAD in $(seq 0 ${TO}); do
 	filterThread ${THREAD} &
+    PIDS+=($!)
 done
-wait
+waitAndCheck PIDS
 echo "Alignments filtered successfully"
 OUTPUT_BITVECTOR="${ALIGNMENTS_FILE}.mode${FILTERING_MODE}.bitvector"
 OUTPUT_TANDEM_BITVECTOR="${ALIGNMENTS_FILE}.tandem.bitvector"

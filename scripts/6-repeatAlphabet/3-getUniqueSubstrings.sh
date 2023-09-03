@@ -52,6 +52,20 @@ rm -f ${TMPFILE_PATH}*
 rm -f ${INPUT_DIR}/unique-*
 rm -f ${INPUT_DIR}/histogram-*
 
+function waitAndCheck() {
+    local ARRAY_NAME=$1[@]
+    
+    local PIDS=(${!ARRAY_NAME})
+    local LAST_THREAD=$((${#PIDS[@]} - 1))
+    N_FAILED="0"
+    for THREAD in $(seq 0 ${LAST_THREAD}); do
+        wait ${PIDS[${THREAD}]} || N_FAILED=$(( ${N_FAILED} + 1 ))
+    done
+    if [ ${N_FAILED} -ne 0 ]; then
+        exit 1
+    fi
+}
+
 function enumerateKmersThread() {
 	local LOCAL_K=$1
 	local LOCAL_TRANSLATED_READS_FILE=$2
@@ -60,9 +74,6 @@ function enumerateKmersThread() {
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$5
 	local LOCAL_KMERS_FILE=$6
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 0 ${LOCAL_K} ${MAX_KMER_LENGTH_BPS} 2 ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} null ${LOCAL_KMERS_FILE}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 
 function countKmersThread() {
@@ -74,9 +85,6 @@ function countKmersThread() {
 	local LOCAL_KMERS_FILE_INPUT=$6
     local LOCAL_KMERS_FILE_OUTPUT=$7
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 1 ${LOCAL_K} ${MAX_KMER_LENGTH_BPS} 2 ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_KMERS_FILE_INPUT} ${LOCAL_KMERS_FILE_OUTPUT}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 
 function intervalsThread() {
@@ -88,9 +96,6 @@ function intervalsThread() {
 	local LOCAL_K_MINUS_ONE_INTERVALS_FILE=$6
 	local LOCAL_INTERVALS_FILE=$7
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.GetShortestUniqueIntervals ${LOCAL_K} ${MAX_KMER_LENGTH_BPS} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} ${LOCAL_UNIQUE_KMERS_FILE} ${N_READS} ${AVG_READ_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${MIN_ALIGNMENT_LENGTH} ${IDENTITY_THRESHOLD} ${DISTANCE_THRESHOLD} ${CHARACTER_THRESHOLD} ${LOCAL_K_MINUS_ONE_INTERVALS_FILE} ${LOCAL_INTERVALS_FILE}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 
 FINAL_INTERVALS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}.txt"
@@ -103,7 +108,8 @@ for K in $(seq 1 ${MAX_K}); do
 		SORT_OPTIONS_KMERS="${SORT_OPTIONS_KMERS} -k ${i},${i}n"
 	done
 	echo "Enumerating distinct ${K}-mers..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+    PIDS=()
+	for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 		if [ ${K} -le 1 ]; then
 			PREVIOUS_INTERVALS="null"
@@ -111,15 +117,17 @@ for K in $(seq 1 ${MAX_K}); do
 			PREVIOUS_INTERVALS="${TMPFILE_PATH}-$((${K}-1))-intervals-${THREAD_ID}"
 		fi
 		enumerateKmersThread ${K} ${FILE} ${TMPFILE_PATH}-1-${THREAD_ID} ${TMPFILE_PATH}-2-${THREAD_ID} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID} &
+        PIDS+=($!)
 	done
-	wait
-	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}-distinct.txt
+	waitAndCheck PIDS
+	sort --parallel=${N_THREADS} -m -u -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}-distinct.txt
 	if [ ! -s ${TMPFILE_PATH}-${K}-distinct.txt ]; then
 		MAX_K=$((${K}-1))
 		break
 	fi
 	echo "Counting ${K}-mer occurrences..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+    PIDS=()
+	for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 		if [ ${K} -le 1 ]; then
 			PREVIOUS_INTERVALS="null"
@@ -128,8 +136,9 @@ for K in $(seq 1 ${MAX_K}); do
 		fi
         rm -f ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID}
 		countKmersThread ${K} ${FILE} ${TMPFILE_PATH}-1-${THREAD_ID} ${TMPFILE_PATH}-2-${THREAD_ID} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-distinct.txt ${TMPFILE_PATH}-${K}-kmers-${THREAD_ID} &
+        PIDS+=($!)
 	done
-	wait
+	waitAndCheck PIDS
     sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-${K}-kmers-* > ${TMPFILE_PATH}-${K}.txt
     rm -f ${TMPFILE_PATH}-${K}-distinct.txt
 	UNIQUE_KMERS_FILE="${INPUT_DIR}/unique-k${K}.txt"
@@ -137,7 +146,8 @@ for K in $(seq 1 ${MAX_K}); do
 	echo "Finding unique ${K}-mers..."
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CompactKmers ${TMPFILE_PATH}-${K}.txt ${K} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} 1 ${ALPHABET_FILE} 0 ${MAX_HISTOGRAM_COUNT} ${UNIQUE_KMERS_FILE} ${OUTPUT_FILE_HISTOGRAM}
 	echo "Updating shortest unique intervals file..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+    PIDS=()
+	for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-0-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 		if [ ${K} -le 1 ]; then
 			PREVIOUS_INTERVALS="null"
@@ -145,11 +155,12 @@ for K in $(seq 1 ${MAX_K}); do
 			PREVIOUS_INTERVALS="${TMPFILE_PATH}-$((${K}-1))-intervals-${THREAD_ID}"
 		fi
 		intervalsThread ${K} ${FILE} ${TMPFILE_PATH}-1-${THREAD_ID} ${TMPFILE_PATH}-2-${THREAD_ID} ${UNIQUE_KMERS_FILE} ${PREVIOUS_INTERVALS} ${TMPFILE_PATH}-${K}-intervals-${THREAD_ID} &
+        PIDS+=($!)
 	done
-	wait
+	waitAndCheck PIDS
 done
 rm -f ${FINAL_INTERVALS_FILE}
-for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-intervals-*" ); do
+for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-${MAX_K}-intervals-*" ); do
 	cat ${FILE} >> ${FINAL_INTERVALS_FILE}
 done
 INTERVAL_STATS_FILE="${INPUT_DIR}/unique-intervals-k1-${MAX_K}-stats.txt"
@@ -164,18 +175,17 @@ function tandemsThread() {
 	local LOCAL_READ_LENGTHS_FILE=$3
 	local LOCAL_TANDEMS_FILE=$4
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectTandems 1 1 ${NONPERIODIC_MODE} ${ALPHABET_FILE} ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${REPEAT_LENGTHS_FILE} ${N_REPEATS} ${LOCAL_TANDEMS_FILE}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 echo "Collecting tandems..."
-for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+PIDS=()
+for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-0-*"); do
 	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 	tandemsThread ${FILE} ${TMPFILE_PATH}-1-${THREAD_ID} ${TMPFILE_PATH}-2-${THREAD_ID} ${TMPFILE_PATH}-tandems-${THREAD_ID} &
+    PIDS+=($!)
 done
-wait
+waitAndCheck PIDS
 rm -f ${TANDEMS_FILE}
-for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-0-*"); do
+for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-0-*"); do
 	THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-0-}
 	cat ${TMPFILE_PATH}-tandems-${THREAD_ID} >> ${TANDEMS_FILE}
 done

@@ -45,6 +45,20 @@ READS_DISAMBIGUATED_FILE="${INPUT_DIR}/reads-translated-disambiguated.txt"
 ALPHABET_FILE="${INPUT_DIR}/alphabet-cleaned.txt"
 rm -f ${TMPFILE_PATH}*
 
+function waitAndCheck() {
+    local ARRAY_NAME=$1[@]
+    
+    local PIDS=(${!ARRAY_NAME})
+    local LAST_THREAD=$((${#PIDS[@]} - 1))
+    N_FAILED="0"
+    for THREAD in $(seq 0 ${LAST_THREAD}); do
+        wait ${PIDS[${THREAD}]} || N_FAILED=$(( ${N_FAILED} + 1 ))
+    done
+    if [ ${N_FAILED} -ne 0 ]; then
+        exit 1
+    fi
+}
+
 function enumerateKmersThread() {
 	local LOCAL_K=$1
 	local LOCAL_TRANSLATED_READS_FILE=$2
@@ -52,9 +66,6 @@ function enumerateKmersThread() {
 	local LOCAL_READ_LENGTHS_FILE=$4
 	local LOCAL_KMERS_FILE=$5
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 0 ${LOCAL_K} ${MAX_KMER_LENGTH_BPS} 1 ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null null ${LOCAL_KMERS_FILE}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 
 function countKmersThread() {
@@ -65,9 +76,6 @@ function countKmersThread() {
 	local LOCAL_KMERS_FILE_INPUT=$5
     local LOCAL_KMERS_FILE_OUTPUT=$6
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CollectKmers 1 ${LOCAL_K} ${MAX_KMER_LENGTH_BPS} 1 ${LOCAL_TRANSLATED_READS_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${ALPHABET_FILE} null ${LOCAL_KMERS_FILE_INPUT} ${LOCAL_KMERS_FILE_OUTPUT}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 
 function fixThread() {
@@ -79,9 +87,6 @@ function fixThread() {
 	local LOCAL_NEW_TRANSLATED_FILE=$6
 	local LOCAL_STATS_FILE=$7
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixEndBlocks ${ALPHABET_FILE} ${LOCAL_OLD_TRANSLATED_FILE} ${LOCAL_BOUNDARIES_FILE} ${LOCAL_READ_LENGTHS_FILE} ${LOCAL_KMERS_FILE} ${LOCAL_K} ${TIGHT_MODE} ${LOCAL_NEW_TRANSLATED_FILE} ${LOCAL_STATS_FILE}
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 
 rm -f "${TMPFILE_PATH}-1-*"
@@ -94,23 +99,27 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 		SORT_OPTIONS_KMERS="${SORT_OPTIONS_KMERS} -k ${i},${i}n"
 	done
 	echo "Enumerating distinct ${K}-mers..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-1-*"); do
+    PIDS=()
+	for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-1-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-1-}
 		enumerateKmersThread ${K} ${FILE} ${TMPFILE_PATH}-z1-${THREAD_ID} ${TMPFILE_PATH}-z2-${THREAD_ID} ${TMPFILE_PATH}-kmers-${K}-${THREAD_ID} &
+        PIDS+=($!)
 	done
-	wait
-	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-kmers-${K}-* > ${TMPFILE_PATH}-${K}-distinct.txt
+	waitAndCheck PIDS
+	sort --parallel=${N_THREADS} -m -u -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-kmers-${K}-* > ${TMPFILE_PATH}-${K}-distinct.txt
 	if [ ! -s ${TMPFILE_PATH}-${K}-distinct.txt ]; then
 		MAX_K=$((${K}-1))
 		break
 	fi
 	echo "Counting ${K}-mer occurrences..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-1-*"); do
+    PIDS=()
+	for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-1-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-1-}
         rm -f ${TMPFILE_PATH}-kmers-${K}-${THREAD_ID}
 		countKmersThread ${K} ${FILE} ${TMPFILE_PATH}-z1-${THREAD_ID} ${TMPFILE_PATH}-z2-${THREAD_ID} ${TMPFILE_PATH}-${K}-distinct.txt ${TMPFILE_PATH}-kmers-${K}-${THREAD_ID} &
+        PIDS+=($!)
 	done
-	wait
+	waitAndCheck PIDS
 	sort --parallel=${N_THREADS} -m -t , ${SORT_OPTIONS_KMERS} ${TMPFILE_PATH}-kmers-${K}-* > ${TMPFILE_PATH}-${K}.txt
     rm -f ${TMPFILE_PATH}-${K}-distinct.txt
 	FREQUENT_KMERS_FILE="${INPUT_DIR}/frequent-k${K}.txt"
@@ -121,13 +130,15 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 	K_MINUS_ONE_MERS_FILE="${INPUT_DIR}/kMinusOne-k${K}.txt"
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetKMinusOneMers ${ALPHABET_FILE} ${FREQUENT_KMERS_FILE} ${K} ${K_MINUS_ONE_MERS_FILE}
 	echo "Disambiguating read ends using contexts of length $((${K}-1))..."
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-$((${K}-1))-*"); do
+    PIDS=()
+	for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-$((${K}-1))-*"); do
 		THREAD_ID=${FILE#${INPUT_DIR}/${TMPFILE_NAME}-$((${K}-1))-}
 		fixThread ${FILE} ${TMPFILE_PATH}-z1-${THREAD_ID} ${TMPFILE_PATH}-z2-${THREAD_ID} ${K_MINUS_ONE_MERS_FILE} $((${K}-1)) ${TMPFILE_PATH}-${K}-${THREAD_ID} ${TMPFILE_PATH}-counts-${K}-${THREAD_ID} &
+        PIDS+=($!)
 	done
-	wait
+	waitAndCheck PIDS
 	N_FIXED="0"; N_FIXABLE="0"; N_ENDS="0";
-	for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-counts-${K}-*"); do
+	for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-counts-${K}-*"); do
 		N_FIXED=$(( ${N_FIXED} + $(cut -d , -f 1 ${FILE}) ))
 		N_FIXABLE=$(( ${N_FIXABLE} + $(cut -d , -f 2 ${FILE}) ))
 		N_ENDS=$(( ${N_ENDS} + $(cut -d , -f 3 ${FILE}) ))
@@ -136,7 +147,7 @@ for K in $(seq ${MIN_K} ${MAX_K}); do
 	echo "Disambiguated ${N_FIXED} read ends out of ${N_FIXABLE} fixable (${N_ENDS} total)"
 done
 rm -f ${READS_DISAMBIGUATED_FILE}
-for FILE in $(find -s ${INPUT_DIR} -name "${TMPFILE_NAME}-${MAX_K}-*" ); do
+for FILE in $(find -s ${INPUT_DIR} -maxdepth 1 -name "${TMPFILE_NAME}-${MAX_K}-*" ); do
 	cat ${FILE} >> ${READS_DISAMBIGUATED_FILE}
 done
 if [ ${BROKEN_READS} -eq 1 ]; then

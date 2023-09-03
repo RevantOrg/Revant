@@ -97,21 +97,6 @@ public class BuildAssemblyGraph {
                 prefixOrSuffixB=Alignments.startB<=IDENTITY_THRESHOLD?0:1;
             }
             else { prefixOrSuffixA=2; prefixOrSuffixB=2; }
-            
-            
-            
-            
-if (Alignments.readA==1110) {
-    String type2 = "";
-    if (Alignments.startA<=100) type2="PREFIX";
-    else if (Alignments.endA>=Reads.getReadLength(Alignments.readA-1)-100) type2="SUFFIX";
-    String keep1 = str2.equalsIgnoreCase("1")?"KEEP-N":"-";
-    String keep2 = str3.equalsIgnoreCase("1")?"KEEP-T":"-";
-    System.err.println((keep?"KEEP ":"DELETE ")+" "+keep1+" "+keep2+" "+type2+" "+str1);
-}
-            
-            
-            
 			addEdge(Alignments.readA-1,Alignments.readB-1,keep,prefixOrSuffixA);
 			addEdge(Alignments.readB-1,Alignments.readA-1,keep,prefixOrSuffixB);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();

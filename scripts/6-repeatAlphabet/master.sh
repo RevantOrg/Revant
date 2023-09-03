@@ -34,7 +34,7 @@ CONCATENATE_BLOCKS="1"
 IDENTITY_THRESHOLD="100"  # For ambiguous characters in first/last block. >=WOBBLE_LENGTH.
 DISTANCE_THRESHOLD=$(( ${IDENTITY_THRESHOLD} * 4 ))  # >=IDENTITY_THRESHOLD
 CHARACTER_THRESHOLD="0.9"  # For ambiguous characters in first/last block. Arbitrary.
-MAX_K_UNIQUE="8"  # Use k-mers up to this length as unique addresses
+MAX_K_UNIQUE="6"  # Use k-mers up to this length as unique addresses
 MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than this n. of
 # bps are not considered trustworthy addresses on the genome.
 # Good settings for a mostly periodic genome: MIN_INTERSECTION_NONREPETITIVE="100000"
@@ -42,7 +42,7 @@ MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than t
 # ------------------------ Properties of alignment filters -------------------------------
 ALIGNMENT_FILTERING_MODE="0"  # 0=loose, 1=tight, 2=tight with matching characters.
 # ----------------------------------- Resources ------------------------------------------
-N_THREADS="1"
+N_THREADS="2"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 DELETE_TMP_FILES="0"
 # ----------------------------------------------------------------------------------------
@@ -58,7 +58,7 @@ if [ ${IS_CLR} -eq 1 ]; then
 else
 	BROKEN_READS="0"
 fi
-./1-buildAlphabet.sh ${INPUT_DIR} ${BROKEN_READS} ${MAX_ALIGNMENT_ERROR} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${N_HAPLOTYPES} ${HAPLOTYPE_COVERAGE} ${N_THREADS} ${DELETE_TMP_FILES} ${MAX_SPACER_LENGTH} ${WOBBLE_LENGTH} ${FIX_TANDEM_SPACERS} ${CONCATENATE_BLOCKS}
+./1-buildAlphabet.sh ${INPUT_DIR} ${BROKEN_READS} ${MAX_ALIGNMENT_ERROR} ${MIN_ALIGNMENT_LENGTH_READ_REPEAT} ${N_HAPLOTYPES} ${HAPLOTYPE_COVERAGE} ${N_THREADS} ${DELETE_TMP_FILES} ${MAX_SPACER_LENGTH} ${WOBBLE_LENGTH} ${FIX_TANDEM_SPACERS} ${CONCATENATE_BLOCKS} ${AVG_READ_LENGTH}
 PERIODIC_ENDPOINTS_FIXED=$(cat ${INPUT_DIR}/buildAlphabet-tmp-return.txt)
 MIN_K_FOR_DISAMBIGUATION="2"; MAX_K_FOR_DISAMBIGUATION="4"
 ./2-fixEndBlocks.sh ${INPUT_DIR} ${BROKEN_READS} ${LOW_QUALITY_TYPE} ${MIN_K_FOR_DISAMBIGUATION} ${MAX_K_FOR_DISAMBIGUATION} ${N_THREADS} ${DELETE_TMP_FILES} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${MAX_KMER_LENGTH_BPS}

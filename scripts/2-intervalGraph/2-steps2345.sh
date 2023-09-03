@@ -133,10 +133,10 @@ cp ${TAGS_DIR}/tags-root.txt ${STEP4_DIR}/
 # Merging all tag files
 TMP_FILE="${TAGS_DIR}/tmp.txt"
 rm -f ${TMP_FILE}
-find "${TAGS_DIR}" -type f -name "tags-*.txt" -exec cat {} + >> ${TMP_FILE}
+find "${TAGS_DIR}" -type f -maxdepth 1 -name "tags-*.txt" -exec cat {} + >> ${TMP_FILE}
 sort -m -t , -k 1,1n -k 2,2n -k 3,3n ${TMP_FILE} > ${TAGS_DIR}/allTags.txt
 rm -f ${TMP_FILE}
-find "${STEP4_DIR}" -type f -name "tags-*.txt" -exec cat {} + >> ${TMP_FILE}
+find "${STEP4_DIR}" -type f -maxdepth 1 -name "tags-*.txt" -exec cat {} + >> ${TMP_FILE}
 sort -m -t , -k 1,1n -k 2,2n -k 3,3n ${TMP_FILE} > ${STEP4_DIR}/allTags.txt
 rm -f ${TMP_FILE}
 

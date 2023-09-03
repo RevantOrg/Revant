@@ -13,6 +13,9 @@ import de.mpi_cbg.revant.util.IO;
  * Remark: one could return instead the min L such that, say, 90% of all alignments have
  * length <=L. However, using such a threshold to avoid considering unique k-mers does
  * make the assembly graph less connected in practice.
+ *
+ * Remark: k-mer enumeration should stop at max read-read alignment length, instead of at
+ * a specific value of k. We currently cap it at a max k just for speed.
  */
 public class GetAlignmentLengthThreshold {
 	/**

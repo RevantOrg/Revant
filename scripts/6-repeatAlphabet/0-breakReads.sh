@@ -26,6 +26,21 @@ TMPFILE_NAME="breakReads-tmp"
 TMPFILE_PATH="${INPUT_DIR}/${TMPFILE_NAME}"
 rm -f ${TMPFILE_PATH}*
 
+function waitAndCheck() {
+    local ARRAY_NAME=$1[@]
+    
+    local PIDS=(${!ARRAY_NAME})
+    local LAST_THREAD=$((${#PIDS[@]} - 1))
+    N_FAILED="0"
+    for THREAD in $(seq 0 ${LAST_THREAD}); do
+        wait ${PIDS[${THREAD}]} || N_FAILED=$(( ${N_FAILED} + 1 ))
+    done
+    if [ ${N_FAILED} -ne 0 ]; then
+        exit 1
+    fi
+}
+
+
 echo "Breaking reads..."
 OLD2NEW_FILE="${INPUT_DIR}/unbroken2broken.txt"
 NEW2OLD_FILE="${INPUT_DIR}/broken2unbroken.txt"
@@ -39,9 +54,6 @@ function alignmentsThread1() {
 	local ALIGNMENTS_FILE_ID=$1
 	local WRITE_HEADER=$2
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 1 ${WRITE_HEADER} ${TMPFILE_PATH}-1-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-2-${ALIGNMENTS_FILE_ID}.txt
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-reads.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
@@ -53,11 +65,14 @@ if [ -e ${TMPFILE_PATH}-1-${N_THREADS}.txt ]; then
 else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
+PIDS=()
 alignmentsThread1 0 1 &
+PIDS+=($!)
 for THREAD in $(seq 1 ${TO}); do
 	alignmentsThread1 ${THREAD} 1 &  # We always write the header for future scripts.
+    PIDS+=($!)
 done
-wait
+waitAndCheck PIDS
 echo "Read-read alignments translated successfully"
 # We do not need to concatenate the chunks in a single file, since they will be used
 # directly as chunks by the following scripts.
@@ -74,9 +89,6 @@ function alignmentsThread2() {
 	local ALIGNMENTS_FILE_ID=$1
 	local WRITE_HEADER=$2
 	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BreakReads2 ${N_READS} ${READ_LENGTHS_FILE} ${OLD2NEW_FILE} 0 ${WRITE_HEADER} ${TMPFILE_PATH}-3-${ALIGNMENTS_FILE_ID}.txt ${TMPFILE_PATH}-4-${ALIGNMENTS_FILE_ID}.txt
-	if [ $? -ne 0 ]; then
-		exit
-	fi
 }
 ALIGNMENTS_FILE="${INPUT_DIR}/LAshow-reads-repeats.txt"
 N_ALIGNMENTS=$(( $(wc -l < ${ALIGNMENTS_FILE}) - 2 ))
@@ -88,11 +100,14 @@ if [ -e ${TMPFILE_PATH}-3-${N_THREADS}.txt ]; then
 else
 	TO=$(( ${N_THREADS} - 1 ))
 fi
+PIDS=()
 alignmentsThread2 0 1 &
+PIDS+=($!)
 for THREAD in $(seq 1 ${TO}); do
 	alignmentsThread2 ${THREAD} 1 &  # We always write the header for future scripts.
+    PIDS+=($!)
 done
-wait
+waitAndCheck PIDS
 echo "Read-repeat alignments translated successfully"
 # We do not need to concatenate the chunks in a single file, since they will be used
 # directly as chunks by the following scripts.

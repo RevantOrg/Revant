@@ -54,7 +54,7 @@ public class CompactKmers {
 		if (str==null) {
 			br.close();
 			System.err.println("ERROR: empty file "+INPUT_FILE);
-			System.exit(1);
+			throw new RuntimeException();
 		}
 		if (OUTPUT_FILE_HISTOGRAM!=null) {
 			histogram = new long[MAX_HISTOGRAM_COUNT+1];
