@@ -110,7 +110,7 @@ public class GetShortestUniqueIntervals {
 					pairs=newArray;
 				}
 				for (i=0; i<nPairs; i++) pairs[i].set(uniqueIntervals[3*i],uniqueIntervals[3*i+1],uniqueIntervals[3*i+2]);
-				if (nPairs>1) Arrays.sort(pairs,0,nPairs);
+				if (nPairs>1) Arrays.parallelSort(pairs,0,nPairs);
 				bw.write(pairs[0].position+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[0].length+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[0].nHaplotypes);
 				for (i=1; i<nPairs; i++) bw.write((RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[i].position+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[i].length+(RepeatAlphabet.SEPARATOR_MINOR+"")+pairs[i].nHaplotypes);
 			}

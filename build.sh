@@ -9,7 +9,7 @@ BUILD_DIR="./bin"
 DEBUGGING_INFO="1"  # 0/1
 
 
-COMPILER_FLAGS="-deprecation"    # "-deprecation -Xlint"
+COMPILER_FLAGS="-deprecation"  #" -Xlint:unchecked"
 if [ ${DEBUGGING_INFO} -eq 0 ]; then
 	COMPILER_FLAGS="${COMPILER_FLAGS} -g:none"
 fi

@@ -121,7 +121,7 @@ public class BuildAssemblyGraph {
                 edges[k].neighbor=neighbors[i][j];
                 edges[k].prefixOrSuffix=neighbors[i][j+1];
             }
-			Arrays.sort(edges,0,nNeighbors);
+			Arrays.parallelSort(edges,0,nNeighbors);
 			k=0;
 			for (j=1; j<nNeighbors; j++) {
 				if (edges[j].neighbor!=edges[k].neighbor || edges[j].prefixOrSuffix!=edges[k].prefixOrSuffix) {
@@ -310,7 +310,7 @@ public class BuildAssemblyGraph {
         System.err.println("Number of nodes in components of size >=:");
         tmpArray = new int[nComponents];
         System.arraycopy(componentSize,0,tmpArray,0,nComponents);
-        Arrays.sort(tmpArray);
+        Arrays.parallelSort(tmpArray);
         count=tmpArray[nComponents-1];
         for (i=nComponents-2; i>=0; i--) {
             if (tmpArray[i]!=tmpArray[i+1]) System.err.println(tmpArray[i+1]+","+(count/nNodes));

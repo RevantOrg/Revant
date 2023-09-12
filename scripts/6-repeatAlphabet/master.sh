@@ -34,7 +34,7 @@ CONCATENATE_BLOCKS="1"
 IDENTITY_THRESHOLD="100"  # For ambiguous characters in first/last block. >=WOBBLE_LENGTH.
 DISTANCE_THRESHOLD=$(( ${IDENTITY_THRESHOLD} * 4 ))  # >=IDENTITY_THRESHOLD
 CHARACTER_THRESHOLD="0.9"  # For ambiguous characters in first/last block. Arbitrary.
-MAX_K_UNIQUE="6"  # Use k-mers up to this length as unique addresses
+MAX_K_UNIQUE="8"  # Use k-mers up to this length as unique addresses
 MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than this n. of
 # bps are not considered trustworthy addresses on the genome.
 # Good settings for a mostly periodic genome: MIN_INTERSECTION_NONREPETITIVE="100000"
@@ -42,7 +42,7 @@ MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than t
 # ------------------------ Properties of alignment filters -------------------------------
 ALIGNMENT_FILTERING_MODE="0"  # 0=loose, 1=tight, 2=tight with matching characters.
 # ----------------------------------- Resources ------------------------------------------
-N_THREADS="2"
+N_THREADS="1"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 DELETE_TMP_FILES="0"
 # ----------------------------------------------------------------------------------------

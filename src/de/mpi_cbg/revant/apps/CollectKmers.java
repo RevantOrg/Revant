@@ -82,7 +82,7 @@ public class CollectKmers {
 		// Serializing sorted k-mers
 		keys = new RepeatAlphabet.Kmer[nKmers];
 		kmers.keySet().toArray(keys);
-		if (nKmers>1) Arrays.sort(keys,0,nKmers);
+		if (nKmers>1) Arrays.parallelSort(keys,0,nKmers);
 		bw = new BufferedWriter(new FileWriter(KMERS_FILE_OUTPUT));
 		for (i=0; i<nKmers; i++) {
             bw.write(keys[i].toString());

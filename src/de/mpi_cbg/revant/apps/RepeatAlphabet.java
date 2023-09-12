@@ -318,7 +318,7 @@ public class RepeatAlphabet {
 		if (periodicIntervals.length<(lastAlignment+1)<<1) periodicIntervals = new int[(lastAlignment+1)<<1];
 		if (points.length<(lastAlignment+1)<<1) points = new int[(lastAlignment+1)<<1];
 		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
-		if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+		if (lastAlignment>0) Arrays.parallelSort(alignments,0,lastAlignment+1);
 		if (stack.length<lastAlignment+1) stack = new int[lastAlignment+1];
 		
 		// Building maximal periodic intervals
@@ -336,7 +336,7 @@ public class RepeatAlphabet {
 				continue;
 			}
 			if (lastStack>0) {
-				Arrays.sort(stack,0,lastStack+1);
+				Arrays.parallelSort(stack,0,lastStack+1);
 				j=0;
 				for (k=1; k<=lastStack; k++) {
 					if (stack[k]!=stack[j]) stack[++j]=stack[k];
@@ -362,7 +362,7 @@ public class RepeatAlphabet {
 			points[++lastPoint]=alignments[i].startA;
 			points[++lastPoint]=alignments[i].endA;
 		}
-		if (lastPoint>0) Arrays.sort(points,0,lastPoint+1);
+		if (lastPoint>0) Arrays.parallelSort(points,0,lastPoint+1);
 		initializeGraph(lastPoint+1);		
 		
 		// Marking points: (0) outside periodic intervals; (1) inside a periodic interval
@@ -570,9 +570,9 @@ public class RepeatAlphabet {
 		
 		System.err.println("Quantizing characters... ");
 		for (i=0; i<=lastAlphabet; i++) alphabet[i].quantize(QUANTUM);
-		if (lastUnique>0) Arrays.sort(alphabet,0,lastUnique+1);
-		if (lastPeriodic>lastUnique+1) Arrays.sort(alphabet,lastUnique+1,lastPeriodic+1);
-		if (lastAlphabet>lastPeriodic+1) Arrays.sort(alphabet,lastPeriodic+1,lastAlphabet+1);
+		if (lastUnique>0) Arrays.parallelSort(alphabet,0,lastUnique+1);
+		if (lastPeriodic>lastUnique+1) Arrays.parallelSort(alphabet,lastUnique+1,lastPeriodic+1);
+		if (lastAlphabet>lastPeriodic+1) Arrays.parallelSort(alphabet,lastPeriodic+1,lastAlphabet+1);
 		j=0;
 		for (i=1; i<=lastAlphabet; i++) {
 			if ( alphabet[i].repeat!=alphabet[j].repeat || alphabet[i].orientation!=alphabet[j].orientation || 
@@ -633,9 +633,9 @@ public class RepeatAlphabet {
 		int first;
 		Character tmpChar;
 		
-		if (lastUnique>0) Arrays.sort(alphabet,0,lastUnique+1);
-		if (lastPeriodic>lastUnique+1) Arrays.sort(alphabet,lastUnique+1,lastPeriodic+1);
-		if (lastAlphabet>lastPeriodic+1) Arrays.sort(alphabet,lastPeriodic+1,lastAlphabet+1);
+		if (lastUnique>0) Arrays.parallelSort(alphabet,0,lastUnique+1);
+		if (lastPeriodic>lastUnique+1) Arrays.parallelSort(alphabet,lastUnique+1,lastPeriodic+1);
+		if (lastAlphabet>lastPeriodic+1) Arrays.parallelSort(alphabet,lastPeriodic+1,lastAlphabet+1);
 		j=0;
 		for (i=1; i<=lastAlphabet; i++) {
 			if ( alphabet[i].repeat!=alphabet[j].repeat || alphabet[i].orientation!=alphabet[j].orientation || 
@@ -688,7 +688,7 @@ public class RepeatAlphabet {
 			repeat=alphabet[i].repeat;
 			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;		
 			if (repeat!=alphabet[from].repeat) {
-				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+				if (k>newFrom) Arrays.parallelSort(newAlphabet,newFrom,k+1);
 				from=i; newFrom=k+1;
 			}
 			k++;
@@ -751,7 +751,7 @@ public class RepeatAlphabet {
 				}
 			}
 		}
-		if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+		if (k>newFrom) Arrays.parallelSort(newAlphabet,newFrom,k+1);
 		lastPeriodicNew=k;
 		
 		// Nonperiodic
@@ -761,7 +761,7 @@ public class RepeatAlphabet {
 			repeat=alphabet[i].repeat;
 			openStart=alphabet[i].openStart; openEnd=alphabet[i].openEnd;			
 			if (repeat!=alphabet[from].repeat) {
-				if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+				if (k>newFrom) Arrays.parallelSort(newAlphabet,newFrom,k+1);
 				from=i; newFrom=k+1;
 			}			
 			k++;
@@ -824,7 +824,7 @@ public class RepeatAlphabet {
 				}
 			}
 		}
-		if (k>newFrom) Arrays.sort(newAlphabet,newFrom,k+1);
+		if (k>newFrom) Arrays.parallelSort(newAlphabet,newFrom,k+1);
 		lastAlphabet=k; lastPeriodic=lastPeriodicNew;
 		alphabet=newAlphabet;
 		System.err.println("DONE "+nAdded+" reverse-complement characters added ("+(lastAlphabet+1)+" total characters)");
@@ -1229,7 +1229,7 @@ public class RepeatAlphabet {
 		}
 		
 		// Removing duplicates
-		if (last>0) Arrays.sort(stack,0,last+1);
+		if (last>0) Arrays.parallelSort(stack,0,last+1);
 		j=stack[0]; bw.write(stack[0]+"");
 		for (i=1; i<=last; i++) {
 			if (stack[i]==j) continue;
@@ -1313,7 +1313,7 @@ public class RepeatAlphabet {
 		}
 		
 		// Removing duplicates
-		if (last>0) Arrays.sort(stack,0,last+1);
+		if (last>0) Arrays.parallelSort(stack,0,last+1);
 		j=stack[0]; bw.write(stack[0]+"");
 		for (i=1; i<=last; i++) {
 			if (stack[i]==j) continue;
@@ -1873,7 +1873,7 @@ public class RepeatAlphabet {
 				}
 				br.close();
 				lastUnique+=nNewCharacters; lastPeriodic+=nNewCharacters; lastAlphabet+=nNewCharacters;
-				Arrays.sort(alphabet,0,lastUnique+1);
+				Arrays.parallelSort(alphabet,0,lastUnique+1);
 			}
 			else {
 				newAlphabet = new Character[lastAlphabet+1+nNewCharacters];
@@ -1885,7 +1885,7 @@ public class RepeatAlphabet {
 				}
 				br.close();
 				i=lastUnique+1+nNewCharacters;
-				Arrays.sort(newAlphabet,0,i);
+				Arrays.parallelSort(newAlphabet,0,i);
 				System.arraycopy(alphabet,lastUnique+1,newAlphabet,i,lastPeriodic-lastUnique);
 				i=lastPeriodic+nNewCharacters;
 				System.arraycopy(alphabet,lastPeriodic+1,newAlphabet,i,lastAlphabet-lastPeriodic);
@@ -2037,28 +2037,41 @@ public class RepeatAlphabet {
 	 * multiple characters, every character can be used to build a k-mer. K-mers are 
 	 * canonized before being added to $newKmers$ (see $Kmer.canonize()$). Array 
 	 * $avoidedIntervals$ contains tuples (position,length,nHaplotypes) sorted by 
-	 * position: if a window contains one such interval, it is not used to build k-mers.
+	 * position: if a window contains one such interval, it is not used for enumeration.
 	 *
 	 * In counting mode, the procedure just increments the counts of the k-mers that are
 	 * already in $newKmers$. Counting is distinct from enumeration, since the former uses
 	 * all characters in the first/last block of a read to count partial occurrences,
-	 * whereas the latter uses only a subset of such characters. Separating counting from
-	 * enumeration decreases peak RAM but requires two passes over the translated reads.
+	 * whereas the latter uses only a subset of such characters. Counting uses every 
+	 * window, including those that contain avoided intervals: this is because a k-mer 
+	 * from a window that contains avoided intervals in the current read, might have been 
+	 * enumerated in a different read, since in that read its window did not contain any 
+	 * avoided interval. This improves the assembly graph topology in practice. Excluding
+	 * from counting the windows that contain avoided intervals risks to undercount k-mer
+	 * occurrences, but it is faster. Note that separating counting from enumeration
+	 * decreases peak RAM but requires two passes over the translated reads, making the
+	 * process slower overall.
 	 *
-	 * In marking mode, the procedure checks instead if any window (including the 
-	 * first/last) contains a k-mer in $oldKmers$, and if so it appends a (position,
-	 * length,nHaplotypes) tuple to $avoidedIntervals$ ($nHaplotypes$ is decided by
-	 * $Kmer.isUnique()$). The new value of $lastAvoidedInterval$ is returned in
-	 * output.
+	 * In marking mode, the procedure checks instead if any window (including the
+	 * first/last, but excluding windows that contain avoided intervals) contains a k-mer
+	 * in $oldKmers$, and if so it appends a (position,length,nHaplotypes) tuple to
+	 * $avoidedIntervals$ ($nHaplotypes$ is decided by $Kmer.isUnique()$). The new value
+	 * of $lastAvoidedInterval$ is returned in output.
      *
+	 * Remark: skipping windows that contain avoided intervals during enumeration can
+	 * produce fewer unique k-mers. One should instead enumerate every k-mer in every 
+	 * window, and just remove k-mers that contain a unique h-mer for any h < k. We do not
+	 * do that to reduce peak RAM and computations.
+	 *
 	 * Remark: one-mers collected by this procedure might have a different (and even 
 	 * smaller) count than the one produced by the $getCharacterHistogram()$ pipeline, 
 	 * because of the constraints and of canonization. E.g. a one-mer might be rare in 
 	 * this procedure but frequent in $getCharacterHistogram()$, if the latter counted all
 	 * the occurrences of the character but the former counts just closed occurrences.
 	 *
-	 * Remark: often several characters map to the same block in practice, and most of 
-	 * the k-mers (k>=2) that result from this are rare.
+	 * Remark: often several characters map to the same block in practice (this is the
+	 * norm with wobbling). Without wobbling, most of the k-mers (k>=2) that result from
+	 * this are rare.
 	 *
 	 * Remark: the procedure enumerates k-mers everywhere, including strictly inside 
 	 * tandems. Substrings that would generate too many k-mers are skipped to avoid large
@@ -2109,7 +2122,7 @@ public class RepeatAlphabet {
 			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
 				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
-				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;			
+				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,0,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
@@ -2128,10 +2141,7 @@ public class RepeatAlphabet {
 		}
 		else if (mode==1) {  // Counting
 			tmpMap.clear(); lastKmerPool=-1;
-			j=0;
 			for (i=0; i<=nBlocks-k; i++) {
-				while (j<lastAvoidedInterval && avoidedIntervals[j]<i) j+=3;
-				if (j<lastAvoidedInterval && avoidedIntervals[j]+avoidedIntervals[j+1]-1<=i+k-1) continue;			
 				if (!isValidWindow(i,k,nBlocks,uniqueMode,0,readLength)) continue;
 				nKmers=lastInBlock_int[i]+1;
 				for (p=i+1; p<=i+k-1; p++) nKmers*=lastInBlock_int[p]+1;
@@ -3150,7 +3160,7 @@ public class RepeatAlphabet {
 		
 		// Merging overlapping intervals
 		if (lastInterval<=0) return lastInterval;
-		Arrays.sort(tandemIntervals,0,lastInterval+1);
+		Arrays.parallelSort(tandemIntervals,0,lastInterval+1);
 		j=0;
 		for (i=0; i<=lastInterval; i++) {
 			if (tandemIntervals[i].from<=tandemIntervals[j].to) tandemIntervals[j].to=tandemIntervals[i].to;
@@ -4086,7 +4096,7 @@ public class RepeatAlphabet {
 			throw new RuntimeException();
 		}
 		if (last1>0) {
-			Arrays.sort(shortPeriodTmp1,0,last1+1);
+			Arrays.parallelSort(shortPeriodTmp1,0,last1+1);
 			j=0;
 			for (i=1; i<=last1; i++) {
 				if (shortPeriodTmp1[i]!=shortPeriodTmp1[j]) shortPeriodTmp1[++j]=shortPeriodTmp1[i];
@@ -4149,7 +4159,7 @@ public class RepeatAlphabet {
 		}		
 		if (last2==-1) return 1;
 		if (last2>0) {
-			Arrays.sort(shortPeriodTmp2,0,last2+1);
+			Arrays.parallelSort(shortPeriodTmp2,0,last2+1);
 			j=0;
 			for (i=1; i<=last1; i++) {
 				if (shortPeriodTmp2[i]!=shortPeriodTmp2[j]) shortPeriodTmp2[++j]=shortPeriodTmp2[i];
@@ -4675,8 +4685,8 @@ public class RepeatAlphabet {
 		if (stack==null || stack.length<lengthA+lengthB) stack = new int[lengthA+lengthB];
 		for (i=0; i<lengthA; i++) stack[i]=canonizeCharacter(translation_all[readA][blockA][i],true);
 		for (i=0; i<lengthB; i++) stack[lengthA+i]=canonizeCharacter(translation_all[readB][blockB][i],mode);
-		if (lengthA>1) Arrays.sort(stack,0,lengthA);
-		if (lengthB>1) Arrays.sort(stack,lengthA,lengthA+lengthB);
+		if (lengthA>1) Arrays.parallelSort(stack,0,lengthA);
+		if (lengthB>1) Arrays.parallelSort(stack,lengthA,lengthA+lengthB);
 		return Math.nonemptyIntersection(stack,0,lengthA-1,stack,lengthA,lengthA+lengthB-1);
 	}
 	
@@ -5230,7 +5240,7 @@ public class RepeatAlphabet {
 			readA=Alignments.readA-1;
 			if (readA!=currentReadA) {
 				if (currentReadA!=-1) {
-					if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+					if (lastAlignment>0) Arrays.parallelSort(alignments,0,lastAlignment+1);
 					for (i=0; i<=lastAlignment; i++) bw.write((alignments[i].readA+1)+"  "+(alignments[i].readB+1)+"  "+(alignments[i].orientation?'n':'c')+"  ["+alignments[i].startA+".. "+alignments[i].endA+"] x ["+(alignments[i].orientation?alignments[i].startB+".. "+alignments[i].endB:alignments[i].endB+".. "+alignments[i].startB)+"] ( "+alignments[i].diffs+" diffs)\n");
 				}
 				currentReadA=readA; lastAlignment=-1;
@@ -5284,7 +5294,7 @@ public class RepeatAlphabet {
 		}
 		br.close();
 		if (currentReadA!=-1) {
-			if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+			if (lastAlignment>0) Arrays.parallelSort(alignments,0,lastAlignment+1);
 			for (i=0; i<=lastAlignment; i++) bw.write((alignments[i].readA+1)+"  "+(alignments[i].readB+1)+"  "+(alignments[i].orientation?'n':'c')+"  ["+alignments[i].startA+".. "+alignments[i].endA+"] x ["+(alignments[i].orientation?alignments[i].startB+".. "+alignments[i].endB:alignments[i].endB+".. "+alignments[i].startB)+"] ( "+alignments[i].diffs+" diffs)\n");
 		}
 		bw.close();
@@ -5381,7 +5391,7 @@ public class RepeatAlphabet {
 			oldReadA=Reads.breakReads_new2old[Alignments.readA-1][0]; 
 			if (oldReadA!=currentReadA) {
 				if (currentReadA!=-1) {
-					if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+					if (lastAlignment>0) Arrays.parallelSort(alignments,0,lastAlignment+1);
 					// This procedure calls $Alignments.readAlignmentFile()$, so we should
 					// call it again afterwards.
 					str3=breakReads_translateBitvector_impl(currentReadA,br3,str3,bw1,bw2,tmpAlignment);
@@ -5414,7 +5424,7 @@ public class RepeatAlphabet {
 			str1=br1.readLine(); str2=br2.readLine(); str4=br4.readLine();
 		}
 		if (currentReadA!=-1) {
-			if (lastAlignment>0) Arrays.sort(alignments,0,lastAlignment+1);
+			if (lastAlignment>0) Arrays.parallelSort(alignments,0,lastAlignment+1);
 			breakReads_translateBitvector_impl(currentReadA,br3,str3,bw1,bw2,tmpAlignment);
 		}
 		br1.close(); br2.close(); br3.close(); br4.close(); bw1.close(); bw2.close();
@@ -6009,7 +6019,7 @@ public class RepeatAlphabet {
 		}
 		if (last1==-1) return -1;
 		if (last1>0) {
-			Arrays.sort(tmpArray1,0,last1+1);
+			Arrays.parallelSort(tmpArray1,0,last1+1);
 			j=0;
 			for (i=1; i<=last1; i++) {
 				if (tmpArray1[i]==tmpArray1[j]) continue;
@@ -6028,7 +6038,7 @@ public class RepeatAlphabet {
 		}
 		if (last2==-1) return -1;
 		if (last2>0) {
-			Arrays.sort(tmpArray2,0,last2+1);
+			Arrays.parallelSort(tmpArray2,0,last2+1);
 			j=0;
 			for (i=1; i<=last2; i++) {
 				if (tmpArray2[i]==tmpArray2[j]) continue;
@@ -6059,7 +6069,7 @@ public class RepeatAlphabet {
 			}
 		}
 		if (last1==-1) return false;
-		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
+		if (last1>0) Arrays.parallelSort(tmpArray1,0,last1+1);
 		last2=-1;
 		for (i=0; i<length2; i++) {
 			c=Integer.parseInt(array2[i]);
@@ -6070,7 +6080,7 @@ public class RepeatAlphabet {
 			}
 		}
 		if (last2==-1) return false;
-		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
+		if (last2>0) Arrays.parallelSort(tmpArray2,0,last2+1);
 		return Math.nonemptyIntersection(tmpArray1,0,last1,tmpArray2,0,last2);
 	}
 	
@@ -6269,7 +6279,7 @@ public class RepeatAlphabet {
 			for (j=0; j<last; j+=3) edges[j/3].set(spacerNeighbors[i][j],spacerNeighbors[i][j+1],spacerNeighbors[i][j+2]);
 			if (nEdges>1) {
 				Edge.order=Edge.ORDER_NEIGHBOR;
-				Arrays.sort(edges,0,nEdges);
+				Arrays.parallelSort(edges,0,nEdges);
 				k=0;
 				for (j=1; j<nEdges; j++) {
 					if (edges[j].neighbor!=edges[k].neighbor) {
@@ -6282,7 +6292,7 @@ public class RepeatAlphabet {
 			}
 			if (nEdges>1) {
 				Edge.order=Edge.ORDER_DIFFS;
-				Arrays.sort(edges,0,nEdges);
+				Arrays.parallelSort(edges,0,nEdges);
 			}
 			k=-1;
 			for (j=0; j<nEdges; j++) {
@@ -7324,7 +7334,7 @@ public class RepeatAlphabet {
 			tmpArray1[++j]=character.orientation?character.repeat:-1-character.repeat;
 		}
 		last1=j;
-		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
+		if (last1>0) Arrays.parallelSort(tmpArray1,0,last1+1);
 		j=0;
 		for (i=1; i<=last1; i++) {
 			if (tmpArray1[i]==tmpArray1[j]) continue;
@@ -7339,7 +7349,7 @@ public class RepeatAlphabet {
 			tmpArray2[++j]=character.orientation?character.repeat:-1-character.repeat;
 		}
 		last2=j;
-		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
+		if (last2>0) Arrays.parallelSort(tmpArray2,0,last2+1);
 		j=0;
 		for (i=1; i<=last2; i++) {
 			if (tmpArray2[i]==tmpArray2[j]) continue;
@@ -7639,7 +7649,7 @@ public class RepeatAlphabet {
 			tmpArray1[++j]=character.orientation?character.repeat:-1-character.repeat;
 		}
 		last1=j;
-		if (last1>0) Arrays.sort(tmpArray1,0,last1+1);
+		if (last1>0) Arrays.parallelSort(tmpArray1,0,last1+1);
 		j=0;
 		for (i=1; i<=last1; i++) {
 			if (tmpArray1[i]==tmpArray1[j]) continue;
@@ -7655,7 +7665,7 @@ public class RepeatAlphabet {
 			tmpArray2[++j]=character.orientation?character.repeat:-1-character.repeat;
 		}
 		last2=j;
-		if (last2>0) Arrays.sort(tmpArray2,0,last2+1);
+		if (last2>0) Arrays.parallelSort(tmpArray2,0,last2+1);
 		j=0;
 		for (i=1; i<=last2; i++) {
 			if (tmpArray2[i]==tmpArray2[j]) continue;
@@ -8051,7 +8061,7 @@ public class RepeatAlphabet {
 			if (leftCharacters[i].repeat!=UNIQUE && leftCharacters[i].start==-1) leftCharacters[i].quantize(quantum);
 			p=fixPeriodicEndpoints_updateTranslation_impl(leftCharacters[i],newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,tmpArray,p);
 		}
-		if (p>0) Arrays.sort(tmpArray,0,p+1);
+		if (p>0) Arrays.parallelSort(tmpArray,0,p+1);
 		read2characters_new.write(tmpArray[0]+"");
 		for (i=1; i<=p; i++) {
 			if (tmpArray[i]!=tmpArray[i-1]) read2characters_new.write((SEPARATOR_MINOR+"")+tmpArray[i]);
@@ -8086,7 +8096,7 @@ public class RepeatAlphabet {
 				p=fixPeriodicEndpoints_updateTranslation_impl(tmpCharacter,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,quantum,tmpArray,p);
 			}
 		}
-		if (p>0) Arrays.sort(tmpArray,0,p+1);
+		if (p>0) Arrays.parallelSort(tmpArray,0,p+1);
 		read2characters_new.write(tmpArray[0]+"");
 		for (i=1; i<=p; i++) {
 			if (tmpArray[i]!=tmpArray[i-1]) read2characters_new.write((SEPARATOR_MINOR+"")+tmpArray[i]);
@@ -8297,7 +8307,7 @@ public class RepeatAlphabet {
 				if (spacers[lastSpacer]==null) spacers[lastSpacer] = new Spacer(fullyUnique[i],0,length-1,false,false,0);
 				else spacers[lastSpacer].set(fullyUnique[i],0,length-1,false,false,0);
 			}
-			if (lastSpacer>lastSpacerPrime) Arrays.sort(spacers,0,lastSpacer+1);
+			if (lastSpacer>lastSpacerPrime) Arrays.parallelSort(spacers,0,lastSpacer+1);
 		}
 		System.err.println("Loaded "+(lastSpacer+1)+" tandem spacers ("+(((double)(lastSpacer+1))/(nTranslatedReads+(nonrepetitiveBlocksMode==2?nFullyUnique:0)))+" per eligible read).");
 		System.err.println("Histogram of all observed tandem spacer lengths:");
@@ -8498,7 +8508,7 @@ public class RepeatAlphabet {
 			if (nEdges<=1) continue;
 			for (j=0; j<last; j+=4) edges[j>>2].set(spacerNeighbors[i][j],spacerNeighbors[i][j+1],spacerNeighbors[i][j+2],spacerNeighbors[i][j+3]);
 			Edge.order=Edge.ORDER_NEIGHBOR;
-			Arrays.sort(edges,0,nEdges);
+			Arrays.parallelSort(edges,0,nEdges);
 			k=0; n=1;
 			for (j=1; j<nEdges; j++) {
 				if (edges[j].neighbor!=edges[k].neighbor) {
@@ -8515,7 +8525,7 @@ public class RepeatAlphabet {
 			nEdges=k+1; nEdgesTotal+=nEdges;
 			if (nEdges>1) {
 				Edge.order=Edge.ORDER_DIFFS;
-				Arrays.sort(edges,0,nEdges);
+				Arrays.parallelSort(edges,0,nEdges);
 			}
 			k=-1;
 			for (j=0; j<nEdges; j++) {
@@ -8867,7 +8877,7 @@ public class RepeatAlphabet {
 		for (i=0; i<=lastSpacerPrime; i++) {
 			// Clustering splits
 			if (spacers[i].lastSplit==-1) continue;
-			if (spacers[i].lastSplit>0) Arrays.sort(spacers[i].splits,0,spacers[i].lastSplit+1);
+			if (spacers[i].lastSplit>0) Arrays.parallelSort(spacers[i].splits,0,spacers[i].lastSplit+1);
 			initializeGraph(spacers[i].lastSplit+1);
 			for (j=0; j<spacers[i].lastSplit; j++) {
 				for (k=j+1; k<=spacers[i].lastSplit; k++) {
@@ -8920,7 +8930,7 @@ public class RepeatAlphabet {
 		if (nSpacerChildren>0) {
 			// $Spacer.compareTo()$ guarantees that every parent spacer occurs before all
 			// of its children.
-			Arrays.sort(spacers,0,lastSpacer+1);
+			Arrays.parallelSort(spacers,0,lastSpacer+1);
 		}
 		System.err.println("Created "+nSpacerChildren+" tandem spacer children ("+((100.0*nSpacerChildren)/(lastSpacer+1))+"% of all spacers)");
 	}
@@ -9224,7 +9234,7 @@ public class RepeatAlphabet {
 						p=q;
 					}
 				}
-				if (p>0) Arrays.sort(stack,0,p+1);
+				if (p>0) Arrays.parallelSort(stack,0,p+1);
 				read2characters_new.write(stack[0]+"");
 				for (j=1; j<=p; j++) {
 					if (stack[j]!=stack[j-1]) read2characters_new.write(SEPARATOR_MINOR+""+stack[j]);
@@ -9287,7 +9297,7 @@ public class RepeatAlphabet {
 					}
 				}
 				if (p>=0) {
-					if (p>0) Arrays.sort(stack,0,p+1);
+					if (p>0) Arrays.parallelSort(stack,0,p+1);
 					read2characters_new.write(stack[0]+"");
 					for (j=1; j<=p; j++) {
 						if (stack[j]!=stack[j-1]) read2characters_new.write(SEPARATOR_MINOR+""+stack[j]);
@@ -9483,7 +9493,7 @@ public class RepeatAlphabet {
 				}
 			}
 			if (last>outLast+1) {
-				Arrays.sort(stack,outLast+1,last+1);
+				Arrays.parallelSort(stack,outLast+1,last+1);
 				p=outLast+1;
 				for (i=outLast+2; i<=last; i++) {
 					if (stack[i]!=stack[p]) stack[++p]=stack[i];
@@ -9765,7 +9775,7 @@ public class RepeatAlphabet {
 							p=tandemSpacers_updateTranslation_impl(tmpCharacter,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,QUANTUM,p,false/*Might not be implied by any char in the alphabet, e.g. because of slight differences in length.*/);
 						}
 						if (p>0) {
-							Arrays.sort(stack,0,p+1);
+							Arrays.parallelSort(stack,0,p+1);
 							j=0;
 							for (k=1; k<=p; k++) {
 								if (stack[k]!=stack[j]) stack[++j]=stack[k];
@@ -9858,7 +9868,7 @@ public class RepeatAlphabet {
 				p=q;
 			}
 		}
-		if (p>0) Arrays.sort(stack,0,p+1);
+		if (p>0) Arrays.parallelSort(stack,0,p+1);
 		i=0;
 		for (j=1; j<=p; j++) {
 			if (stack[j]!=stack[i]) stack[++i]=stack[j];
@@ -10281,7 +10291,7 @@ public class RepeatAlphabet {
 			else {
 				last=-1;
 				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),quantum_wobble,quantum_alphabet,old2new,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpArray2,last);
-				if (last>0) Arrays.sort(tmpArray2,0,last+1);
+				if (last>0) Arrays.parallelSort(tmpArray2,0,last+1);
 				j=0; bw.write(tmpArray2[0]+"");
 				for (j=1; j<=last; j++) {
 					if (tmpArray2[j]!=tmpArray2[j-1]) bw.write(SEPARATOR_MINOR+""+tmpArray2[j]);
@@ -10457,7 +10467,7 @@ public class RepeatAlphabet {
 			else {
 				last=-1;
 				for (j=0; j<=lastInBlock[i]; j++) last=wobble_impl(Integer.parseInt(blocks[i][j]),quantum_wobble,quantum_alphabet,old2new,alphabet_new,lastUnique_new,lastPeriodic_new,lastAlphabet_new,tmpArray2,last);
-				if (last>0) Arrays.sort(tmpArray2,0,last+1);
+				if (last>0) Arrays.parallelSort(tmpArray2,0,last+1);
 				j=0; bw.write(tmpArray2[0]+"");
 				for (j=1; j<=last; j++) {
 					if (tmpArray2[j]!=tmpArray2[j-1]) bw.write(SEPARATOR_MINOR+""+tmpArray2[j]);
@@ -10718,7 +10728,7 @@ public class RepeatAlphabet {
 				}
 				lastCharacter=j;
 			}
-			if (lastCharacter>0) Arrays.sort(characters,0,lastCharacter+1);
+			if (lastCharacter>0) Arrays.parallelSort(characters,0,lastCharacter+1);
 			
 			// Constraint 3 (using temporary field $Character.flag$).
 			if (!firstOrLast) {
@@ -11147,7 +11157,7 @@ public class RepeatAlphabet {
 				tmpArray[j].first=solutions[i+1]; tmpArray[j].last=solutions[i+2];
 				tmpArray[j].isShortPeriod=solutions[i+1]==-1;
 			}
-			Arrays.sort(tmpArray,0,nSolutions);
+			Arrays.parallelSort(tmpArray,0,nSolutions);
 			
 			// Clustering solutions
 			for (i=0; i<nSolutions; i++) tmpArray[i].component=-1;
@@ -11313,7 +11323,7 @@ public class RepeatAlphabet {
 		
 		// Removing exact duplicates
 		AlignmentRow.order=AlignmentRow.ORDER_READB_ORIENTATION_STARTA_ENDA_STARTB_ENDB;
-		Arrays.sort(alignments,0,lastAlignment+1);
+		Arrays.parallelSort(alignments,0,lastAlignment+1);
 		j=0;
 		for (i=1; i<=lastAlignment; i++) {
 			if (!alignments[i].equals(alignments[j])) {
@@ -11330,7 +11340,7 @@ public class RepeatAlphabet {
 		// If an alignment is strictly contained in another one in readA, we discard it
 		// because it is less specific (regardless of what happens in readB).
 		AlignmentRow.order=AlignmentRow.ORDER_STARTA;
-		Arrays.sort(alignments,0,lastAlignment+1);
+		Arrays.parallelSort(alignments,0,lastAlignment+1);
 		for (i=0; i<=lastAlignment; i++) alignments[i].flag=true;
 		for (i=0; i<=lastAlignment; i++) {
 			if (!alignments[i].flag) continue;
