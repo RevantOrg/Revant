@@ -92,6 +92,7 @@ public class FilterAlignments {
 		
 		// The constant below is arbitrary, should be defined in a more principled way.
 		final int MIN_INTERSECTION_REPETITIVE = Math.max(MIN_ALIGNMENT_LENGTH_READ_READ>>2,IO.quantum*3);
+        int from, fromPrime, to;
 		long[][] stats, tandemStats;
 		
 		Reads.nReads=N_READS;
@@ -101,7 +102,7 @@ public class FilterAlignments {
 		RepeatAlphabet.loadReadsFully(FULLY_UNIQUE_FILE,N_FULLY_UNIQUE,FULLY_CONTAINED_FILE,N_FULLY_CONTAINED);
 		RepeatAlphabet.loadBlueIntervals(UNIQUE_INTERVALS_FILE);
 		RepeatAlphabet.loadTandemIntervals(TANDEM_INTERVALS_FILE,N_READS);
-		stats = new long[3][3]; tandemStats = new long[2][3];
+		stats = new long[3][8]; tandemStats = new long[2][8];
 		Math.set(stats,0);
 		if (MODE==0) {
 			RepeatAlphabet.loadAllBoundaries(TRANSLATED_READS_FILE,true,true,TRANSLATED_BOUNDARIES_FILE);
@@ -114,14 +115,24 @@ public class FilterAlignments {
 			RepeatAlphabet.filterAlignments_tandem(ALIGNMENTS_FILE,BOTH_READS_TANDEM,MIN_INTERSECTION_NONREPETITIVE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,BITVECTOR_TANDEM,tandemStats);
 		}
 		System.err.println("All alignments:  (input, output)");
-		System.err.println("Suffix/prefix overlaps: \t"+stats[0][0]+" ("+stats[2][0]+") -> "+stats[1][0]+" ("+(100*((double)(stats[1][0]-stats[0][0]))/stats[0][0])+"%)");
-		System.err.println("Local substring: \t\t"+stats[0][1]+" ("+stats[2][1]+") -> "+stats[1][1]+" ("+(100*((double)(stats[1][1]-stats[0][1]))/stats[0][1])+"%)");
-		System.err.println("Full containment/identity: \t"+stats[0][2]+" ("+stats[2][2]+") -> "+stats[1][2]+" ("+(100*((double)(stats[1][2]-stats[0][2]))/stats[0][2])+"%)");
+        from=stats[0][0]+stats[0][1]+stats[0][2]+stats[0][3];
+        fromPrime=stats[2][0]+stats[2][1]+stats[2][2]+stats[2][3];
+        to=stats[1][0]+stats[1][1]+stats[1][2]+stats[1][3];
+		System.err.println("Suffix/prefix overlaps: \t"+from+" ("+fromPrime+") -> "+to+" ("+(100*((double)(to-from))/from)+"%)");    
+		System.err.println("Local substring: \t\t"+stats[0][4]+" ("+stats[2][4]+") -> "+stats[1][4]+" ("+(100*((double)(stats[1][4]-stats[0][4]))/stats[0][4])+"%)");
+        from=stats[0][5]+stats[0][6]+stats[0][7];
+        fromPrime=stats[2][5]+stats[2][6]+stats[2][7];
+        to=stats[1][5]+stats[1][6]+stats[1][7];
+		System.err.println("Full containment/identity: \t"+from+" ("+fromPrime+") -> "+to+" ("+(100*((double)(to-from))/from)+"%)");
 		System.err.println();
+        from=tandemStats[0][0]+tandemStats[0][1]+tandemStats[0][2]+tandemStats[0][3];
+        to=tandemStats[1][0]+tandemStats[1][1]+tandemStats[1][2]+tandemStats[1][3];
 		System.err.println("All alignments, tandem bitvector:  (input, output)");
-		System.err.println("Suffix/prefix overlaps: \t"+tandemStats[0][0]+" -> "+tandemStats[1][0]+" ("+(100*((double)(tandemStats[1][0]-tandemStats[0][0]))/tandemStats[0][0])+"%)");
-		System.err.println("Local substring: \t\t"+tandemStats[0][1]+" -> "+tandemStats[1][1]+" ("+(100*((double)(tandemStats[1][1]-tandemStats[0][1]))/tandemStats[0][1])+"%)");
-		System.err.println("Full containment/identity: \t"+tandemStats[0][2]+" -> "+tandemStats[1][2]+" ("+(100*((double)(tandemStats[1][2]-tandemStats[0][2]))/tandemStats[0][2])+"%)");
+		System.err.println("Suffix/prefix overlaps: \t"+from+" -> "+to+" ("+(100*((double)(to-from))/from)+"%)");
+		System.err.println("Local substring: \t\t"+tandemStats[0][4]+" -> "+tandemStats[1][4]+" ("+(100*((double)(tandemStats[1][4]-tandemStats[0][4]))/tandemStats[0][4])+"%)");
+        from=tandemStats[0][5]+tandemStats[0][6]+tandemStats[0][7];
+        to=tandemStats[1][5]+tandemStats[1][6]+tandemStats[1][7];
+		System.err.println("Full containment/identity: \t"+from+" -> "+to+" ("+(100*((double)(to-from))/from)+"%)");
 	}
 
 }

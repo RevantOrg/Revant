@@ -35,7 +35,7 @@ public class GetAlignmentLengthThreshold {
         final int IDENTITY_THRESHOLD = QUANTUM;
         
 		int i;
-        int length, lengthA, lengthB, max;
+        int length, lengthA, lengthB, max, type;
         long nAlignments;
 		String str;
         BufferedReader br;
@@ -49,7 +49,11 @@ public class GetAlignmentLengthThreshold {
         max=0;
 		while (str!=null)  {
 			Alignments.readAlignmentFile(str);
-            if (Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD,str)==TYPE) {
+            type=Alignments.readAlignmentFile_getType(IDENTITY_THRESHOLD,str);
+            if ( (TYPE==0 && type>=0 && type<=3) ||
+                 (TYPE==1 && type==4) ||
+                 (TYPE==2 && type>=5 && type<=7)
+               ) {
                 lengthA=Alignments.endA-Alignments.startA+1;
                 lengthB=Alignments.endB-Alignments.startB+1;
                 length=Math.max(lengthA,lengthB);

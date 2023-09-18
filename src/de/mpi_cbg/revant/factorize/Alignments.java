@@ -285,33 +285,39 @@ public class Alignments {
 	 * ID.
 	 *
 	 * @return the type of the alignment currently in the global variables written by
-	 * $readAlignmentsFile()$: 0=suffix-prefix overlap; 1=local substring; 2=full
-	 * containment or full identity.
+	 * $readAlignmentsFile()$: 
+     * 0: prefix A, prefix B;
+     * 1: prefix A, suffix B;
+     * 2: suffix A, prefix B;
+     * 3: suffix A, suffix B;
+     * 4: A and B share a substring;
+     * 5: A contained in B;
+     * 6: B contained in A;
+     * 7: A = B.
 	 */
 	public static final int readAlignmentFile_getType(int identityThreshold) {	
-		if ( (startA<=identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) ||
-			 (startB<=identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)
-		   ) return 2;
+		if (startA<=identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) {
+            if (startB<=identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold) return 7;
+            else return 5;
+		}
+        else if (startB<=identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold) return 6;
 		if (orientation) {
-			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA-1)-identityThreshold) &&
-				   (startB>identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)
-				 ) ||
-			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) &&
-			   	   (startB<=identityThreshold && endB<Reads.getReadLength(readB-1)-identityThreshold)
-			   	 )
-			   ) return 0;
+			if ((startA<=identityThreshold && endA<Reads.getReadLength(readA-1)-identityThreshold) && (startB>identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)) return 1;
+            else if ((startA>identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) && (startB<=identityThreshold && endB<Reads.getReadLength(readB-1)-identityThreshold)) return 2;
 		}
 		else {
-			if ( ( (startA<=identityThreshold && endA<Reads.getReadLength(readA-1)-identityThreshold) &&
-				   (startB<=identityThreshold && endB<Reads.getReadLength(readB-1)-identityThreshold)
-				 ) ||
-			     ( (startA>identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) &&
-				   (startB>identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)
-			   	 )
-			   ) return 0;
+			if ((startA<=identityThreshold && endA<Reads.getReadLength(readA-1)-identityThreshold) && (startB<=identityThreshold && endB<Reads.getReadLength(readB-1)-identityThreshold)) return 0;
+            else if ((startA>identityThreshold && endA>=Reads.getReadLength(readA-1)-identityThreshold) && (startB>identityThreshold && endB>=Reads.getReadLength(readB-1)-identityThreshold)) return 3;
 		}
-		return 1;
+		return 4;
 	}
+    
+    
+    /**
+     * Expresses the output of $readAlignmentFile_getType()$ when the roles of A and B
+     * are reversed.
+     */
+    public static final int[] transposeType = new int[] {0,2,1,3,4,6,5,7};
     
     
     /**
@@ -339,28 +345,20 @@ public class Alignments {
         }
         
         // Deciding alignment type
-		if ( (startA<=identityThreshold && endA>=lengthA-identityThreshold) ||
-			 (startB<=identityThreshold && endB>=lengthB-identityThreshold)
-		   ) return 2;
+		if (startA<=identityThreshold && endA>=lengthA-identityThreshold) {
+            if (startB<=identityThreshold && endB>=lengthB-identityThreshold) return 7;
+            else return 5;
+		}
+        else if (startB<=identityThreshold && endB>=lengthB-identityThreshold) return 6;
 		if (orientation) {
-			if ( ( (startA<=identityThreshold && endA<lengthA-identityThreshold) &&
-				   (startB>identityThreshold && endB>=lengthB-identityThreshold)
-				 ) ||
-			     ( (startA>identityThreshold && endA>=lengthA-identityThreshold) &&
-			   	   (startB<=identityThreshold && endB<lengthB-identityThreshold)
-			   	 )
-			   ) return 0;
+			if ((startA<=identityThreshold && endA<lengthA-identityThreshold) && (startB>identityThreshold && endB>=lengthB-identityThreshold)) return 1;
+            else if ((startA>identityThreshold && endA>=lengthA-identityThreshold) && (startB<=identityThreshold && endB<lengthB-identityThreshold)) return 2;
 		}
 		else {
-			if ( ( (startA<=identityThreshold && endA<lengthA-identityThreshold) &&
-				   (startB<=identityThreshold && endB<lengthB-identityThreshold)
-				 ) ||
-			     ( (startA>identityThreshold && endA>=lengthA-identityThreshold) &&
-				   (startB>identityThreshold && endB>=lengthB-identityThreshold)
-			   	 )
-			   ) return 0;
+			if ((startA<=identityThreshold && endA<lengthA-identityThreshold) && (startB<=identityThreshold && endB<lengthB-identityThreshold)) return 0;
+            else if ((startA>identityThreshold && endA>=lengthA-identityThreshold) && (startB>identityThreshold && endB>=lengthB-identityThreshold)) return 3;
 		}
-		return 1;
+		return 4;
 	}
 	
 	
