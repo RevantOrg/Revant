@@ -92,7 +92,7 @@ public class FilterAlignments {
 		
 		// The constant below is arbitrary, should be defined in a more principled way.
 		final int MIN_INTERSECTION_REPETITIVE = Math.max(MIN_ALIGNMENT_LENGTH_READ_READ>>2,IO.quantum*3);
-        int from, fromPrime, to;
+        long from, fromPrime, to;
 		long[][] stats, tandemStats;
 		
 		Reads.nReads=N_READS;
