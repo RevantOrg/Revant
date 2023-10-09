@@ -49,7 +49,7 @@ public class BuildAssemblyGraph {
 			
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int MIN_COMPONENT_SIZE = 10;  // Arbitrary
-        final int MAX_DISTANCE = 5;  // Arbitrary, in edges.
+        final int MAX_DISTANCE = 10;  // Arbitrary, in edges.
 		
 		boolean keep, hasPrefix, hasSuffix, hasPrefixPrime, hasSuffixPrime, hasLoop;
 		int i, j, k;
@@ -379,11 +379,9 @@ public class BuildAssemblyGraph {
     
     /**
      * Reused temporary space, of size equal to the total number of nodes in the graph, to
-     * store the distance along bidirected walks that use the prefix (0) or the suffix (1)
-     * of a node.
+     * store the shortest path length.
      */
-    private static int[][] distance;
-    private static byte[] visited;
+    private static int[] distance;
     
     /**
      * Reused temporary space, at least as big as the max number of neighbors of a node.
@@ -408,36 +406,37 @@ public class BuildAssemblyGraph {
      */
     private static final void getCutVertices(int nReads) {
         int i, p;
-        int top, nodeID, lastChild, reachableTime, parentPointer, neighbor, pushedChildren;
+        int top, nodeID, lastChild, reachableTime, parentPointer, neighbor, pushedChildren, isCutvertex;
         int[] stack, times;
         
         times = new int[nReads];
         Math.set(times,nReads-1,0);
         cutVertices = new int[100];  // Arbitrary
         lastCutVertex=-1;
-        stack = new int[400];  // Arbitrary, multiple of 4.
+        stack = new int[500];  // Arbitrary, multiple of 5.
         for (i=0; i<nReads; i++) {
             if (times[i]!=0 || lastNeighbor[i]<=1) continue;
             times[i]=1; pushedChildren=0;
-            top=3; stack[0]=i; stack[1]=-2; stack[2]=times[i]; stack[3]=-1;
+            top=4; stack[0]=i; stack[1]=-2; stack[2]=times[i]; stack[3]=0; stack[4]=-1;
             while (top>=0) {
                 p=top;
-                nodeID=stack[top-3];
-                lastChild=stack[top-2];
-                reachableTime=stack[top-1];
-                parentPointer=stack[top]; 
+                nodeID=stack[top-4];
+                lastChild=stack[top-3];
+                reachableTime=stack[top-2];
+                isCutvertex=stack[top-1];
+                parentPointer=stack[top];
                 lastChild+=2;
                 if (lastChild<=lastNeighbor[nodeID]) {
                     neighbor=neighbors[nodeID][lastChild];
-                    if (neighbor<0 || (parentPointer!=-1 && neighbor==stack[parentPointer-3])) {
-                        stack[p-2]=lastChild;
+                    if (neighbor<0 || (parentPointer!=-1 && neighbor==stack[parentPointer-4])) {
+                        stack[p-3]=lastChild;
                         continue;
                     }
                     if (times[neighbor]!=0) reachableTime=Math.min(reachableTime,times[neighbor]);
                     else {
                         times[neighbor]=times[nodeID]+1;
                         if (nodeID==i) pushedChildren++;
-                        if (top+4>=stack.length) {
+                        if (top+5>=stack.length) {
                             int[] newArray = new int[stack.length<<1];
                             System.arraycopy(stack,0,newArray,0,stack.length);
                             stack=newArray;
@@ -445,12 +444,13 @@ public class BuildAssemblyGraph {
                         stack[++top]=neighbor;
                         stack[++top]=-2;
                         stack[++top]=times[neighbor];
+                        stack[++top]=0;
                         stack[++top]=p;
                     }
-                    stack[p-2]=lastChild; stack[p-1]=reachableTime;
+                    stack[p-3]=lastChild; stack[p-2]=reachableTime;
                 }
                 else {
-                    if (reachableTime>=times[nodeID]) {
+                    if (isCutvertex==1) {
                         lastCutVertex++;
                         if (lastCutVertex==cutVertices.length) {
                             int[] newArray = new int[cutVertices.length<<1];
@@ -459,8 +459,11 @@ public class BuildAssemblyGraph {
                         }
                         cutVertices[lastCutVertex]=nodeID;
                     }
-                    if (parentPointer!=-1) stack[parentPointer-1]=Math.min(stack[parentPointer-1],reachableTime);
-                    top-=4;
+                    if (parentPointer!=-1 && parentPointer!=4) {
+                        if (reachableTime>=times[stack[parentPointer-4]]) stack[parentPointer-1]=1;
+                        stack[parentPointer-2]=Math.min(stack[parentPointer-2],reachableTime);
+                    }
+                    top-=5;
                 }
             }
             if (pushedChildren>1) {
@@ -494,13 +497,12 @@ public class BuildAssemblyGraph {
     private static final void simplify(int maxDistance, int maxNeighbors, int nReads) {
         int i, j;
         int nAnomalousNodes, nPairs, first;
+        int[] anomalousNodes;
         Pair[] pairs;
         
         // Allocating reused space
-        distance = new int[nReads][2];
-        Math.set(distance,Math.POSITIVE_INFINITY);
-        visited = new byte[nReads];
-        Math.set(visited,nReads-1,(byte)0);
+        distance = new int[nReads];
+        Math.set(distance,nReads-1,Math.POSITIVE_INFINITY);
         nodePool = new Node[maxNeighbors];  // Arbitrary
         for (i=0; i<nodePool.length; i++) nodePool[i] = new Node();
         lastNodeInPool=-1;
@@ -512,22 +514,32 @@ public class BuildAssemblyGraph {
         tmpArray = new int[maxNeighbors];
         neighborsPrime = new int[maxNeighbors][2];  // Arbitrary
         lastNeighborPrime = new int[maxNeighbors];
+        anomalousNodes = new int[100];  // Arbitrary
         
         // Collecting edges to remove
         nAnomalousNodes=0; edgesToRemove_last=-1;
         j=0;
         for (i=0; i<nReads; i++) {
             if (j>lastCutVertex || i<cutVertices[j]) {
-System.err.println("isNodeAnomalous "+i);
-                if (isNodeAnomalous(i,maxDistance)) nAnomalousNodes++;
+System.err.println("isNodeAnomalous? "+i);
+                if (isNodeAnomalous(i,maxDistance)) {
+                    nAnomalousNodes++;
+                    if (nAnomalousNodes>anomalousNodes.length) {
+                        int[] newArray = new int[nAnomalousNodes<<1];
+                        System.arraycopy(anomalousNodes,0,newArray,0,anomalousNodes.length);
+                        anomalousNodes=newArray;
+                    }
+                    anomalousNodes[nAnomalousNodes-1]=i;
+                }
             }
             else if (i==cutVertices[j]) j++;
         }
-        System.err.println("Found "+nAnomalousNodes+" nodes with spurious edges");
+        System.err.print("Found "+nAnomalousNodes+" nodes with spurious edges: ");
+        for (i=0; i<nAnomalousNodes; i++) System.err.print(anomalousNodes[i]+" ");
+        System.err.println();
         
         // Deallocating reused space
-        for (i=0; i<distance.length; i++) distance[i]=null;
-        distance=null; visited=null; 
+        distance=null;
         for (i=0; i<nodePool.length; i++) nodePool[i]=null;
         nodePool=null;
         tmpQueue.clear(); tmpQueue=null;
@@ -588,13 +600,13 @@ System.err.println("isNodeAnomalous "+i);
     /**
      * In a perfect assembly graph, removing a node would keep its neighbors connected.
      * The procedure returns true iff, after removing $nodeID$ from the graph, its 
-     * neighbors are not all mutually reachable via bidirected walks through edges that 
+     * neighbors are not all mutually reachable via undirected paths through edges that 
      * are kept after filtering. In this case the procedure adds to $edgesToRemove$ every 
      * edge (of any overlap type) from $nodeID$ to a neighbor that does not belong to the
      * largest cluster of reachable neighbors.
      *
      * @param maxDistance two neighbors are considered unreachable if the shortest
-     * bidirected walk between them is longer than this.
+     * undirected path between them is longer than this.
      */
     private static final boolean isNodeAnomalous(int nodeID, int maxDistance) {
         int i, j;
@@ -621,15 +633,21 @@ System.err.println("isNodeAnomalous "+i);
         }
         last=j;
         
+boolean fabio = nodeID==171 || nodeID==142 || nodeID==621;
+if (fabio) {
+    System.err.print("isNodeAnomalous> 0  neighbors of node "+nodeID+": ");
+    for (int x=0; x<=last; x++) System.err.print(tmpArray[x]+" ");
+    System.err.println();
+}        
+        
         // Removing $nodeID$ from the graph and clustering distinct neighbors by mutual
         // reachability via bidirected walks.
         Math.set(lastNeighborPrime,last,-1);
         for (i=0; i<last; i++) {
             for (j=i+1; j<=last; j++) {
-//System.err.println("VITTU> 2  shortestPath "+tmpArray[i]+" -- "+tmpArray[j]);                
-                if ( shortestPath(tmpArray[i],true,tmpArray[j],nodeID,maxDistance) || 
-                     shortestPath(tmpArray[i],false,tmpArray[j],nodeID,maxDistance)
-                   ) {
+if (fabio) System.err.println("isNodeAnomalous> 1  finding shortest path between "+tmpArray[i]+" and "+tmpArray[j]);                
+                if (shortestPath(tmpArray[i],tmpArray[j],nodeID,maxDistance)) {
+if (fabio) System.err.println("isNodeAnomalous> 1  shortest path found between "+tmpArray[i]+" and "+tmpArray[j]);
                     lastNeighborPrime[i]++;
                     if (lastNeighborPrime[i]==neighborsPrime[i].length) {
                         int[] newArray = new int[neighborsPrime[i].length<<1];
@@ -647,7 +665,6 @@ System.err.println("isNodeAnomalous "+i);
                 }
             }
         }
-System.err.println("VITTU> 3");        
         Math.set(component,last,-1); Math.set(componentSize,last,0);
         j=-1; lastComponent=-1;
         for (i=0; i<=last; i++) {
@@ -685,82 +702,61 @@ System.err.println("VITTU> 3");
     
     
     /**
-     * Remark: the procedure stores in global variable $visited$ the following values:
-     * 0=not visited; 1=visited from the prefix; 2=visited from the suffix; 3=visited from
-     * both. $visited$ is assumed to be initialized to all zeros, and it it reset to this
-     * state at the end.
-     * 
      * Remark: the procedure assumes that global variable $distance$ is initialized to 
      * infinity, and it resets it to this state at the end. The procedure assumes that 
      * global variable $tmpQueue$ is empty, and it resets it to this state at the end.
      *
-     * @param fromSide assume that the prefix (TRUE) or the suffix (FALSE) of $from$ have
-     * already been used;
+     * Remark: considering the graph as undirected rather than as bidirected makes the 
+     * computation of pairwise reachability much faster in practice, when $maxDistance$ is
+     * a number of edges rather than bps.
+     *
      * @param excludeNode paths that use this node are not considered;
      * @param maxDistance stop the search when only distances greater than this are left;
-     * @return TRUE iff there is a bidirected walk from $from$ on side $fromSide$, to
-     * $to$ on any side, that has length at most $maxDistance$ and that uses only edges 
-     * that are kept after filtering.
+     * @return TRUE iff there is an undirected path $from--to$ with length $<=maxDistance$
+     * and that uses only edges that are kept after filtering.
      */
-    private static final boolean shortestPath(int from, boolean fromSide, int to, int excludeNode, int maxDistance) {
-        boolean usedSide, out, found;
+    private static final boolean shortestPath(int from, int to, int excludeNode, int maxDistance) {
+        boolean out, found;
         int i;
         int nodeID, nodeDistance, last, neighbor, edgeType;
         Node currentNode, neighborNode;
         
-        distance[from][fromSide?0:1]=0;
+boolean fabio = from==621 && to==1119;        
+        
+        distance[from]=0;
         currentNode=getNodeFromPool();
-        currentNode.set(fromSide?from:-1-from); tmpQueue.add(currentNode);
-        visited[from]=(byte)(fromSide?1:2);
+        currentNode.set(from); tmpQueue.add(currentNode);
         while (!tmpQueue.isEmpty()) {
             currentNode=tmpQueue.poll();
-            if (currentNode.id>=0) { 
-                usedSide=true; nodeID=currentNode.id; 
-                nodeDistance=distance[nodeID][0];
-            }
-            else { 
-                usedSide=false; nodeID=-1-currentNode.id;
-                nodeDistance=distance[nodeID][1];
-            }
+            nodeID=currentNode.id; 
+            nodeDistance=distance[nodeID];
             if (nodeDistance>maxDistance) break;
             last=lastNeighbor[nodeID];
             
             
-//System.err.println("Considering node "+nodeID+" with distance "+nodeDistance+" and "+(last+1)+" neighbors");
+if (fabio) System.err.println("Considering node "+nodeID+" with distance "+nodeDistance+" and "+(last+1)+" neighbors");
             
             found=false;
             for (i=0; i<=last; i+=2) {
-                neighbor=neighbors[nodeID][i]; edgeType=neighbors[nodeID][i+1];
-                if ( neighbor<0 || neighbor==excludeNode || 
-                     (usedSide && (edgeType==0||edgeType==1)) ||
-                     (!usedSide && (edgeType==2||edgeType==3))
-                   ) continue;
-                neighborNode=getNodeFromPool();
-                if (edgeType==0 || edgeType==2) {
-                    distance[neighbor][0]=Math.min(distance[neighbor][0],nodeDistance+1);
-                    if (neighbor==to && distance[neighbor][0]<=maxDistance) { found=true; break; }
-                    if (visited[neighbor]==0) visited[neighbor]=1;
-                    else if (visited[neighbor]==2) visited[neighbor]=3;
+                neighbor=neighbors[nodeID][i];
+                if (neighbor<0 || neighbor==excludeNode) continue;
+                if (nodeDistance+1<distance[neighbor]) {
+                    neighborNode=getNodeFromPool();
                     neighborNode.set(neighbor);
+                    distance[neighbor]=nodeDistance+1;
+                    if (neighbor==to && distance[neighbor]<=maxDistance) { 
+if (fabio) System.err.println(to+" is a neighbor!");                        
+                        found=true; break; 
+                    }
+                    tmpQueue.remove(neighborNode); tmpQueue.add(neighborNode);
+if (fabio) System.err.println("Added node "+neighbor+" with distance "+distance[neighbor]);
                 }
-                else {
-                    distance[neighbor][1]=Math.min(distance[neighbor][1],nodeDistance+1);
-                    if (neighbor==to && distance[neighbor][1]<=maxDistance) { found=true; break; }
-                    if (visited[neighbor]==0) visited[neighbor]=2;
-                    else if (visited[neighbor]==1) visited[neighbor]=3;
-                    neighborNode.set(-1-neighbor);
-                }
-                tmpQueue.remove(neighborNode); tmpQueue.add(neighborNode);
-//System.err.println("Added node "+neighborNode.id+". tmpQueue.size="+tmpQueue.size());                
             }
             if (found) break;
         }
-        out=distance[to][0]<=maxDistance||distance[to][1]<=maxDistance;
-        for (i=0; i<=lastNodeInPool; i++) {
-            nodeID=nodePool[i].id<0?-1-nodePool[i].id:nodePool[i].id;
-            distance[nodeID][0]=Math.POSITIVE_INFINITY; distance[nodeID][1]=Math.POSITIVE_INFINITY;
-            visited[nodeID]=0;
-        }
+if (from==621 && to==1119) System.err.println("shortestPath> distance between "+from+" and "+to+" is "+distance[to]);        
+        out=distance[to]<=maxDistance;
+        for (i=0; i<=lastNodeInPool; i++) distance[nodePool[i].id]=Math.POSITIVE_INFINITY;
         tmpQueue.clear(); lastNodeInPool=-1;
         return out;
     }
@@ -792,20 +788,16 @@ System.err.println("VITTU> 3");
     
     
     private static class Node implements Comparable {
-        /**
-         * X = the prefix of node X was already used;
-         * -1-X = the suffix of node X was already used.
-         */
         public int id;
         
-        public Node() { this.id=-1; }
+        public Node() { this.id=Math.POSITIVE_INFINITY; }
         
         public void set(int i) { this.id=i; }
         
         public int compareTo(Object other) {
             Node otherNode = (Node)other;
-            final int d1 = id>=0?distance[id][0]:distance[-1-id][1];
-            final int d2 = otherNode.id>=0?distance[otherNode.id][0]:distance[-1-otherNode.id][1];
+            final int d1 = distance[id];
+            final int d2 = distance[otherNode.id];
             if (d1<d2) return -1;
             else if (d1>d2) return 1;
             return 0;
