@@ -35,7 +35,8 @@ public class BuildAssemblyGraph {
 		final String FILTERING_MODE = args[2];
 		final int ALIGNMENT_TYPE = Integer.parseInt(args[3]);
 		final double MAX_ERROR_RATE = Double.parseDouble(args[4]);
-		final String OUTPUT_DIR = args[5];
+        final int AVG_READ_LENGTH = Integer.parseInt(args[5]);
+		final String OUTPUT_DIR = args[6];
 		
 		final String ALIGNMENTS_FILE = INPUT_DIR+"/LAshow-reads-reads.txt";
 		final String BITVECTOR_FILE = INPUT_DIR+"/LAshow-reads-reads.txt.mode"+FILTERING_MODE+".bitvector";
@@ -49,12 +50,12 @@ public class BuildAssemblyGraph {
 			
 		final int IDENTITY_THRESHOLD = IO.quantum;
 		final int MIN_COMPONENT_SIZE = 10;  // Arbitrary
-        final int MAX_DISTANCE = 10;  // Arbitrary, in edges.
+        final int MAX_DISTANCE = (AVG_READ_LENGTH)<<1;  // In bps
 		
 		boolean keep, hasPrefix, hasSuffix, hasPrefixPrime, hasSuffixPrime, hasLoop;
 		int i, j, k;
 		int type, nAlignments, idGenerator, top, node, neighbor, nNeighbors, nComponents, size, nextFullyUnique;
-        int prefixOrSuffixA, prefixOrSuffixB, maxNeighbors, nSingletons, nTips, nLoops;
+        int prefixOrSuffixA, prefixOrSuffixB, maxNeighbors, nSingletons, nTips, nLoops, addedLengthA, addedLengthB;
 		double errorRate;
 		String str1, str2, str3;
 		RepeatAlphabet.Character tmpChar;
@@ -94,8 +95,10 @@ public class BuildAssemblyGraph {
 				continue;
 			}
 			keep=str2.equalsIgnoreCase("1")&&str3.equalsIgnoreCase("1");
-			addEdge(Alignments.readA-1,Alignments.readB-1,keep,type);
-			addEdge(Alignments.readB-1,Alignments.readA-1,keep,Alignments.transposeType[type]);
+            addedLengthA=type<=3?Alignments.readAlignmentFile_addedLength(false,type):0;
+            addedLengthB=type<=3?Alignments.readAlignmentFile_addedLength(true,type):0;
+			addEdge(Alignments.readA-1,Alignments.readB-1,keep,type,addedLengthB);
+			addEdge(Alignments.readB-1,Alignments.readA-1,keep,Alignments.transposeType[type],addedLengthA);
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 			if (nAlignments%10000==0) System.err.println("Processed "+nAlignments+" alignments");
 		}
@@ -107,16 +110,17 @@ public class BuildAssemblyGraph {
         for (i=0; i<N_READS; i++) {  
             if (lastNeighbor[i]>maxNeighbors) maxNeighbors=lastNeighbor[i];
         }
-        maxNeighbors=(maxNeighbors+1)>>1;
+        maxNeighbors=(maxNeighbors+1)/3;
         edges = new Edge[maxNeighbors];
         for (i=0; i<maxNeighbors; i++) edges[i] = new Edge();
 		for (i=0; i<N_READS; i++) {
 			if (lastNeighbor[i]<=1) continue;
-            nNeighbors=(lastNeighbor[i]+1)>>1;
-            for (j=0; j<=lastNeighbor[i]; j+=2) {
-                k=j>>1;
+            nNeighbors=(lastNeighbor[i]+1)/3;
+            for (j=0; j<=lastNeighbor[i]; j+=3) {
+                k=j/3;
                 edges[k].neighbor=neighbors[i][j];
                 edges[k].type=neighbors[i][j+1];
+                edges[k].addedLength=neighbors[i][j+2];
             }
 			Arrays.parallelSort(edges,0,nNeighbors);
 			k=0;
@@ -129,6 +133,7 @@ public class BuildAssemblyGraph {
             for (j=0; j<=k; j++) {
                 neighbors[i][++lastNeighbor[i]]=edges[j].neighbor;
                 neighbors[i][++lastNeighbor[i]]=edges[j].type;
+                neighbors[i][++lastNeighbor[i]]=edges[j].addedLength;
             }
 		}
         
@@ -142,8 +147,8 @@ public class BuildAssemblyGraph {
             if (lastNeighbor[i]==-1) { nSingletons++; continue; }
             hasPrefix=false; hasSuffix=false; hasLoop=false;
             hasPrefixPrime=false; hasSuffixPrime=false;
-            for (j=0; j<=lastNeighbor[i]; j+=2) {
-                if (j>0 && neighbors[i][j]!=neighbors[i][j-2]) {
+            for (j=0; j<=lastNeighbor[i]; j+=3) {
+                if (j>0 && neighbors[i][j]!=neighbors[i][j-3]) {
                     if (hasPrefixPrime && hasSuffixPrime) hasLoop=true;
                     hasPrefixPrime=false; hasSuffixPrime=false;
                 }
@@ -185,7 +190,7 @@ public class BuildAssemblyGraph {
 			top=0; stack[0]=i; size=1;
 			while (top>=0) {
 				node=stack[top--];
-				for (j=0; j<=lastNeighbor[node]; j+=2) {
+				for (j=0; j<=lastNeighbor[node]; j+=3) {
 					neighbor=neighbors[node][j];
 					if (neighbor<0) neighbor=-1-neighbor;
 					if (component[neighbor]!=-1) continue;
@@ -228,7 +233,7 @@ public class BuildAssemblyGraph {
 					nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
 				}
 				else bws[k].write(i+" [uniqueStatus=\""+(containsUnique[i]?1:0)+"\"];\n");
-				for (j=0; j<=lastNeighbor[i]; j+=2) {
+				for (j=0; j<=lastNeighbor[i]; j+=3) {
 					neighbor=neighbors[i][j]>=0?neighbors[i][j]:-1-neighbors[i][j];
 					if (i<neighbor) bws[k].write(i+" -- "+neighbor+";\n");
 				}
@@ -247,7 +252,7 @@ public class BuildAssemblyGraph {
 			top=0; stack[0]=i; size=1;
 			while (top>=0) {
 				node=stack[top--];
-				for (j=0; j<=lastNeighbor[node]; j+=2) {
+				for (j=0; j<=lastNeighbor[node]; j+=3) {
 					neighbor=neighbors[node][j];
 					if (neighbor<0 || component[neighbor]!=-1) continue;
 					component[neighbor]=idGenerator;
@@ -289,7 +294,7 @@ public class BuildAssemblyGraph {
 					nextFullyUnique=str1!=null?Integer.parseInt(str1):Math.POSITIVE_INFINITY;
 				}
 				else bws[k].write(i+" [uniqueStatus=\""+(containsUnique[i]?1:0)+"\"];\n");
-				for (j=0; j<=lastNeighbor[i]; j+=2) {
+				for (j=0; j<=lastNeighbor[i]; j+=3) {
 					if (neighbors[i][j]>=0 && i<neighbors[i][j]) bws[k].write(i+" -- "+neighbors[i][j]+";\n");
 				}
 			}
@@ -323,27 +328,28 @@ public class BuildAssemblyGraph {
      * @param alignmentType as in $Alignments.readAlignmentFile_getType()$, expressed as 
      * if $from$ were readA and $to$ were readB.
 	 */
-	private static final void addEdge(int from, int to, boolean keep, int alignmentType) {
-		final int CAPACITY = 4;  // Arbitrary
+	private static final void addEdge(int from, int to, boolean keep, int alignmentType, int addedLength) {
+		final int CAPACITY = 6;  // Arbitrary, multiple of 3.
 		
 		if (neighbors[from]==null || neighbors[from].length==0) neighbors[from] = new int[CAPACITY];
-		else if (lastNeighbor[from]+2>=neighbors[from].length) {
+		else if (lastNeighbor[from]+3>=neighbors[from].length) {
 			int[] newArray = new int[neighbors[from].length<<1];
 			System.arraycopy(neighbors[from],0,newArray,0,lastNeighbor[from]+1);
 			neighbors[from]=newArray;
 		}
 		neighbors[from][++lastNeighbor[from]]=keep?to:-1-to;
         neighbors[from][++lastNeighbor[from]]=alignmentType;
+        neighbors[from][++lastNeighbor[from]]=addedLength;
 	}
 	
     
     private static class Edge implements Comparable {
-        public int neighbor, type;
+        public int neighbor, type, addedLength;
         
         public Edge() { }
         
-        public void set(int n, int t) {
-            this.neighbor=n; this.type=t;
+        public void set(int n, int t, int l) {
+            this.neighbor=n; this.type=t; this.addedLength=l;
         }
         
         public int compareTo(Object other) {
@@ -352,12 +358,14 @@ public class BuildAssemblyGraph {
             else if (neighbor>otherEdge.neighbor) return 1;
             if (type<otherEdge.type) return -1;
             else if (type>otherEdge.type) return 1;
+            if (addedLength<otherEdge.addedLength) return -1;
+            else if (addedLength>otherEdge.addedLength) return 1;
             return 0;
         }
         
         public boolean equals(Object other) {
             Edge otherEdge = (Edge)other;
-            return neighbor==otherEdge.neighbor && type==otherEdge.type;
+            return neighbor==otherEdge.neighbor && type==otherEdge.type && addedLength==otherEdge.addedLength;
         }
     }
     
@@ -417,7 +425,7 @@ public class BuildAssemblyGraph {
         for (i=0; i<nReads; i++) {
             if (times[i]!=0 || lastNeighbor[i]<=1) continue;
             times[i]=1; pushedChildren=0;
-            top=4; stack[0]=i; stack[1]=-2; stack[2]=times[i]; stack[3]=0; stack[4]=-1;
+            top=4; stack[0]=i; stack[1]=-3; stack[2]=times[i]; stack[3]=0; stack[4]=-1;
             while (top>=0) {
                 p=top;
                 nodeID=stack[top-4];
@@ -425,7 +433,7 @@ public class BuildAssemblyGraph {
                 reachableTime=stack[top-2];
                 isCutvertex=stack[top-1];
                 parentPointer=stack[top];
-                lastChild+=2;
+                lastChild+=3;
                 if (lastChild<=lastNeighbor[nodeID]) {
                     neighbor=neighbors[nodeID][lastChild];
                     if (neighbor<0 || (parentPointer!=-1 && neighbor==stack[parentPointer-4])) {
@@ -442,7 +450,7 @@ public class BuildAssemblyGraph {
                             stack=newArray;
                         }
                         stack[++top]=neighbor;
-                        stack[++top]=-2;
+                        stack[++top]=-3;
                         stack[++top]=times[neighbor];
                         stack[++top]=0;
                         stack[++top]=p;
@@ -584,10 +592,11 @@ System.err.println("isNodeAnomalous? "+i);
         p=start; q=0;
         while (p<=end && q<last) {
             if (neighbors[row][q]>pairs[p].to) { p++; continue; }
-            else if (neighbors[row][q]<pairs[p].to) { q+=2; continue; }
+            else if (neighbors[row][q]<pairs[p].to) { q+=3; continue; }
             neighbors[row][q]=Math.POSITIVE_INFINITY;
             neighbors[row][q+1]=Math.POSITIVE_INFINITY;
-            p++; q+=2;
+            neighbors[row][q+2]=Math.POSITIVE_INFINITY;
+            p++; q+=3;
         }
         i=-1;
         for (q=0; q<=last; q++) {
@@ -606,7 +615,7 @@ System.err.println("isNodeAnomalous? "+i);
      * largest cluster of reachable neighbors.
      *
      * @param maxDistance two neighbors are considered unreachable if the shortest
-     * undirected path between them is longer than this.
+     * undirected path between them adds more than than this number of bps.
      */
     private static final boolean isNodeAnomalous(int nodeID, int maxDistance) {
         int i, j;
@@ -615,11 +624,11 @@ System.err.println("isNodeAnomalous? "+i);
         // Collecting the distinct neighbors of $nodeID$ that are different from $nodeID$.
         j=-1;
         last=lastNeighbor[nodeID];
-        for (i=0; i<=last; i+=2) {
+        for (i=0; i<=last; i+=3) {
             if (neighbors[nodeID][i]>=0) tmpArray[++j]=neighbors[nodeID][i];
         }
         if (j>0) Arrays.parallelSort(tmpArray,0,j+1);
-        last=j;        
+        last=j;
         j=0;
         while (j<=last && tmpArray[j]==nodeID) j++;
         if (j>last) return false;
@@ -706,19 +715,20 @@ if (fabio) System.err.println("isNodeAnomalous> 1  shortest path found between "
      * infinity, and it resets it to this state at the end. The procedure assumes that 
      * global variable $tmpQueue$ is empty, and it resets it to this state at the end.
      *
-     * Remark: considering the graph as undirected rather than as bidirected makes the 
-     * computation of pairwise reachability much faster in practice, when $maxDistance$ is
-     * a number of edges rather than bps.
+     * Remark: when $maxDistance$ is a number of edges rather than bps, considering the 
+     * graph as undirected rather than as bidirected makes the computation of pairwise
+     * reachability much faster in practice.
      *
      * @param excludeNode paths that use this node are not considered;
-     * @param maxDistance stop the search when only distances greater than this are left;
+     * @param maxDistance stop the search when only distances (in bps) greater than this
+     * are left;
      * @return TRUE iff there is an undirected path $from--to$ with length $<=maxDistance$
      * and that uses only edges that are kept after filtering.
      */
     private static final boolean shortestPath(int from, int to, int excludeNode, int maxDistance) {
         boolean out, found;
         int i;
-        int nodeID, nodeDistance, last, neighbor, edgeType;
+        int nodeID, nodeDistance, last, neighbor, edgeType, addedLength;
         Node currentNode, neighborNode;
         
 boolean fabio = from==621 && to==1119;        
@@ -737,13 +747,14 @@ boolean fabio = from==621 && to==1119;
 if (fabio) System.err.println("Considering node "+nodeID+" with distance "+nodeDistance+" and "+(last+1)+" neighbors");
             
             found=false;
-            for (i=0; i<=last; i+=2) {
+            for (i=0; i<=last; i+=3) {
                 neighbor=neighbors[nodeID][i];
                 if (neighbor<0 || neighbor==excludeNode) continue;
-                if (nodeDistance+1<distance[neighbor]) {
+                addedLength=neighbors[nodeID][i+2];
+                if (nodeDistance+addedLength<distance[neighbor]) {
                     neighborNode=getNodeFromPool();
                     neighborNode.set(neighbor);
-                    distance[neighbor]=nodeDistance+1;
+                    distance[neighbor]=nodeDistance+addedLength;
                     if (neighbor==to && distance[neighbor]<=maxDistance) { 
 if (fabio) System.err.println(to+" is a neighbor!");                        
                         found=true; break; 

@@ -360,6 +360,24 @@ public class Alignments {
 		}
 		return 4;
 	}
+    
+    
+    /**
+     * @return number of bps added by the suffix-prefix alignment that is currently loaded
+     * (returns zero if the alignment is of another type);
+     * @param onReadB the added bps are on readB (TRUE) or readA (FALSE).
+     */
+    public static final int readAlignmentFile_addedLength(boolean onReadB, int alignmentType) {
+        if (onReadB) {
+            if (alignmentType==0 || alignmentType==2) return Reads.getReadLength(readB-1)-endB;
+            else if (alignmentType==1 || alignmentType==3) return startB;
+        }
+        else {
+            if (alignmentType==0 || alignmentType==1) return Reads.getReadLength(readA-1)-endA;
+            else if (alignmentType==2 || alignmentType==3) return startA;
+        }
+        return 0;
+    }
 	
 	
 	public static final int nextParenthesis(boolean open, int p, String str) {
