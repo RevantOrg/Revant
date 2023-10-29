@@ -36,7 +36,8 @@ public class BuildAssemblyGraph {
 		final int ALIGNMENT_TYPE = Integer.parseInt(args[3]);
 		final double MAX_ERROR_RATE = Double.parseDouble(args[4]);
         final int AVG_READ_LENGTH = Integer.parseInt(args[5]);
-		final String OUTPUT_DIR = args[6];
+        final boolean SIMPLIFY = Integer.parseInt(args[6])==1;
+		final String OUTPUT_DIR = args[7];
 		
 		final String ALIGNMENTS_FILE = INPUT_DIR+"/LAshow-reads-reads.txt";
 		final String BITVECTOR_FILE = INPUT_DIR+"/LAshow-reads-reads.txt.mode"+FILTERING_MODE+".bitvector";
@@ -138,8 +139,10 @@ public class BuildAssemblyGraph {
 		}
         
         // Removing spurious edges
-        getCutVertices(N_READS);
-        simplify(MAX_DISTANCE,maxNeighbors,N_READS);
+        if (SIMPLIFY) {
+            getCutVertices(N_READS);
+            simplify(MAX_DISTANCE,maxNeighbors,N_READS);
+        }
         
         // Computing number of nodes with only-prefix or only-suffix alignments
         nSingletons=0; nTips=0; nLoops=0;
@@ -529,7 +532,6 @@ public class BuildAssemblyGraph {
         j=0;
         for (i=0; i<nReads; i++) {
             if (j>lastCutVertex || i<cutVertices[j]) {
-System.err.println("isNodeAnomalous? "+i);
                 if (isNodeAnomalous(i,maxDistance)) {
                     nAnomalousNodes++;
                     if (nAnomalousNodes>anomalousNodes.length) {
@@ -612,7 +614,10 @@ System.err.println("isNodeAnomalous? "+i);
      * neighbors are not all mutually reachable via undirected paths through edges that 
      * are kept after filtering. In this case the procedure adds to $edgesToRemove$ every 
      * edge (of any overlap type) from $nodeID$ to a neighbor that does not belong to the
-     * largest cluster of reachable neighbors.
+     * largest cluster of mutually reachable neighbors.
+     *
+     * Remark: we use undirected paths just for simplicity. It would be easy to support
+     * bidirected paths throughout the code instead.
      *
      * @param maxDistance two neighbors are considered unreachable if the shortest
      * undirected path between them adds more than than this number of bps.
@@ -642,21 +647,12 @@ System.err.println("isNodeAnomalous? "+i);
         }
         last=j;
         
-boolean fabio = nodeID==171 || nodeID==142 || nodeID==621;
-if (fabio) {
-    System.err.print("isNodeAnomalous> 0  neighbors of node "+nodeID+": ");
-    for (int x=0; x<=last; x++) System.err.print(tmpArray[x]+" ");
-    System.err.println();
-}        
-        
         // Removing $nodeID$ from the graph and clustering distinct neighbors by mutual
         // reachability via bidirected walks.
         Math.set(lastNeighborPrime,last,-1);
         for (i=0; i<last; i++) {
             for (j=i+1; j<=last; j++) {
-if (fabio) System.err.println("isNodeAnomalous> 1  finding shortest path between "+tmpArray[i]+" and "+tmpArray[j]);                
                 if (shortestPath(tmpArray[i],tmpArray[j],nodeID,maxDistance)) {
-if (fabio) System.err.println("isNodeAnomalous> 1  shortest path found between "+tmpArray[i]+" and "+tmpArray[j]);
                     lastNeighborPrime[i]++;
                     if (lastNeighborPrime[i]==neighborsPrime[i].length) {
                         int[] newArray = new int[neighborsPrime[i].length<<1];
@@ -731,8 +727,6 @@ if (fabio) System.err.println("isNodeAnomalous> 1  shortest path found between "
         int nodeID, nodeDistance, last, neighbor, edgeType, addedLength;
         Node currentNode, neighborNode;
         
-boolean fabio = from==621 && to==1119;        
-        
         distance[from]=0;
         currentNode=getNodeFromPool();
         currentNode.set(from); tmpQueue.add(currentNode);
@@ -742,10 +736,6 @@ boolean fabio = from==621 && to==1119;
             nodeDistance=distance[nodeID];
             if (nodeDistance>maxDistance) break;
             last=lastNeighbor[nodeID];
-            
-            
-if (fabio) System.err.println("Considering node "+nodeID+" with distance "+nodeDistance+" and "+(last+1)+" neighbors");
-            
             found=false;
             for (i=0; i<=last; i+=3) {
                 neighbor=neighbors[nodeID][i];
@@ -756,16 +746,13 @@ if (fabio) System.err.println("Considering node "+nodeID+" with distance "+nodeD
                     neighborNode.set(neighbor);
                     distance[neighbor]=nodeDistance+addedLength;
                     if (neighbor==to && distance[neighbor]<=maxDistance) { 
-if (fabio) System.err.println(to+" is a neighbor!");                        
                         found=true; break; 
                     }
                     tmpQueue.remove(neighborNode); tmpQueue.add(neighborNode);
-if (fabio) System.err.println("Added node "+neighbor+" with distance "+distance[neighbor]);
                 }
             }
             if (found) break;
         }
-if (from==621 && to==1119) System.err.println("shortestPath> distance between "+from+" and "+to+" is "+distance[to]);        
         out=distance[to]<=maxDistance;
         for (i=0; i<=lastNodeInPool; i++) distance[nodePool[i].id]=Math.POSITIVE_INFINITY;
         tmpQueue.clear(); lastNodeInPool=-1;

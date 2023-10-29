@@ -41,6 +41,8 @@ MIN_INTERSECTION_NONREPETITIVE="100000"  # Non-repetitive regions shorter than t
 # Good settings for a mostly nonperiodic genome: MIN_INTERSECTION_NONREPETITIVE="500"
 # ------------------------ Properties of alignment filters -------------------------------
 ALIGNMENT_FILTERING_MODE="0"  # 0=loose, 1=tight, 2=tight with matching characters.
+# ------------------------ Properties of the assembly graph ------------------------------
+SIMPLIFY_ASSEMBLY_GRAPH="0"
 # ----------------------------------- Resources ------------------------------------------
 N_THREADS="1"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
@@ -68,4 +70,4 @@ READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 N_READS=$(wc -l < ${READ_LENGTHS_FILE})
 GRAPH_DIR="${INPUT_DIR}/components-mode-${ALIGNMENT_FILTERING_MODE}"
 rm -rf ${GRAPH_DIR}; mkdir ${GRAPH_DIR}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BuildAssemblyGraph ${INPUT_DIR} ${N_READS} ${ALIGNMENT_FILTERING_MODE} 2 ${MAX_ALIGNMENT_ERROR} ${GRAPH_DIR}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BuildAssemblyGraph ${INPUT_DIR} ${N_READS} ${ALIGNMENT_FILTERING_MODE} 2 ${MAX_ALIGNMENT_ERROR} ${SIMPLIFY_ASSEMBLY_GRAPH} ${GRAPH_DIR}

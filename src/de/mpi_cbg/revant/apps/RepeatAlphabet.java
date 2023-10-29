@@ -3433,6 +3433,10 @@ public class RepeatAlphabet {
 		 * spanned by a read, the k-mer is considered noise. If the k-mer has less than 2
 		 * total occurrences it is considered noise.
 		 *
+         * Remark: a repeat might be mistaken for a unique k-mer if the factorization of
+         * its instances is inconsistent enough across the reads that the counts do not
+         * cumulate to a high value for a single k-mer, even after wobbling.
+         *
 		 * Remark: we assume that either $count$ or $countPartial$ is nonzero, i.e. that
 		 * the k-mer occurs at least partially in some read.
 		 *
