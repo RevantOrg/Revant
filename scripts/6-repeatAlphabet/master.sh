@@ -44,7 +44,7 @@ ALIGNMENT_FILTERING_MODE="0"  # 0=loose, 1=tight, 2=tight with matching characte
 # ------------------------ Properties of the assembly graph ------------------------------
 SIMPLIFY_ASSEMBLY_GRAPH="0"
 # ----------------------------------- Resources ------------------------------------------
-N_THREADS="1"
+N_THREADS="2"
 JAVA_RUNTIME_FLAGS="-Xms2G -Xmx10G"
 DELETE_TMP_FILES="0"
 # ----------------------------------------------------------------------------------------
@@ -70,4 +70,4 @@ READ_LENGTHS_FILE="${INPUT_DIR}/reads-lengths.txt"
 N_READS=$(wc -l < ${READ_LENGTHS_FILE})
 GRAPH_DIR="${INPUT_DIR}/components-mode-${ALIGNMENT_FILTERING_MODE}"
 rm -rf ${GRAPH_DIR}; mkdir ${GRAPH_DIR}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BuildAssemblyGraph ${INPUT_DIR} ${N_READS} ${ALIGNMENT_FILTERING_MODE} 2 ${MAX_ALIGNMENT_ERROR} ${SIMPLIFY_ASSEMBLY_GRAPH} ${GRAPH_DIR}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.BuildAssemblyGraph ${INPUT_DIR} ${N_READS} ${ALIGNMENT_FILTERING_MODE} 2 ${MAX_ALIGNMENT_ERROR} ${AVG_READ_LENGTH} ${SIMPLIFY_ASSEMBLY_GRAPH} ${GRAPH_DIR}
