@@ -2154,7 +2154,7 @@ public class RepeatAlphabet {
 				value=newKmers.get(key);
 				if (value!=null) {
 					value.count+=key.count;
-					value.countPartial+=key.countPartial;
+					value.countPartial+=key.countPartial;                    
 					value.sameReadCount=(short)Math.max(value.sameReadCount,(int)(key.count+key.countPartial));
 				}
 			}
@@ -3464,8 +3464,9 @@ public class RepeatAlphabet {
 			if (surface>0 && count==0) return -1;
 			final double surfaceL = Math.max(alphabet[sequence[0]].getLength()-minAlignmentLength-minMissingLength,0);
 			final double surfaceR = Math.max(alphabet[sequence[k-1]].getLength()-minAlignmentLength-minMissingLength,0);
+            if (surface+surfaceL+surfaceR==0) return -1;
 			final double probFull = surface/genomeLength;
-			final double probPartial = (surfaceL+surfaceR==0?2:surfaceL+surfaceR)/genomeLength;
+			final double probPartial = (surfaceL+surfaceR)/genomeLength;
 	        final int quantum = nReads/nHaplotypes;
 	        for (i=0; i<nHaplotypes; i++) {
 				if (surface>0) {
@@ -3473,10 +3474,18 @@ public class RepeatAlphabet {
 		            p=distribution.cumulativeProbability(count);
 		            p=2.0*Math.min(p,1.0-p);
 					if (p<=significanceLevel) continue;
+                    if (surfaceL+surfaceR>0) {
+        				distribution=PoissonDistribution.of(probPartial*quantum*(i+1));
+        				p=distribution.survivalProbability(countPartial);
+        	            if (p>significanceLevel) return i+1;  // Excluding only repeats
+                    }
+                    else return i+1;
 				}
-				distribution=PoissonDistribution.of(probPartial*quantum*(i+1));
-				p=distribution.survivalProbability(countPartial);
-	            if (p>significanceLevel) return i+1;  // Excluding only repeats
+                else if (surfaceL+surfaceR>0) {
+    				distribution=PoissonDistribution.of(probPartial*quantum*(i+1));
+    				p=distribution.survivalProbability(countPartial);
+    	            if (p>significanceLevel) return i+1;  // Excluding only repeats
+                }
 	        }
 	        return -1;
 	    }
@@ -3504,7 +3513,8 @@ public class RepeatAlphabet {
 			else {
 				final double surfaceL = Math.max(alphabet[sequence[0]].getLength()-minAlignmentLength-minMissingLength,0);
 				final double surfaceR = Math.max(alphabet[sequence[k-1]].getLength()-minAlignmentLength-minMissingLength,0);
-				final double probPartial = (surfaceL+surfaceR==0?2:surfaceL+surfaceR)/genomeLength;
+                if (surfaceL+surfaceR==0) return false;
+				final double probPartial = (surfaceL+surfaceR)/genomeLength;
 				distribution=PoissonDistribution.of(probPartial*quantum);
 				return distribution.cumulativeProbability(countPartial)>significanceLevel;
 			}
@@ -8697,16 +8707,15 @@ public class RepeatAlphabet {
 	 * @return TRUE iff a fraction of all spacers have a solution after propagation.
 	 */
 	public static final boolean propagateSolutions(int distanceThreshold) {
-		final int CAPACITY = 10;  // Arbitrary
 		final double THRESHOLD = 0.25;  // Arbitrary
-		final int MAX_SOLUTIONS_PER_SPACER = 1000;  // Arbitrary
+		final int MAX_SOLUTIONS_PER_SPACER = 10000;  // Arbitrary
 		boolean orientation;
 		int i, j;
 		int top, last, currentSpacer, neighbor, nPropagated, nSolved;
 		SpacerSolution[] tmpArray;		
 		
 		// Compacting existing solutions
-		tmpArray = new SpacerSolution[CAPACITY];
+		tmpArray = new SpacerSolution[MAX_SOLUTIONS_PER_SPACER];
 		for (i=0; i<tmpArray.length; i++) tmpArray[i] = new SpacerSolution();
 		for (i=0; i<=lastSpacer; i++) {
 			spacers[i].breakpoint=-1;  // Used as a flag
