@@ -35,7 +35,7 @@ public class RepeatAlphabet {
 	public static Character[] alphabet;
 	public static int lastUnique, lastPeriodic, lastAlphabet;
 	public static int maxOpenLength_unique;
-	public static long[] alphabetCount;
+	public static long[][] alphabetCount;
 	
 	/**
 	 * All alignments of a given readA
@@ -1327,15 +1327,20 @@ public class RepeatAlphabet {
 	 * Adds to $characterCount$ every character instance in a row $str$ of the translated 
 	 * reads file.
 	 * 
-	 * @param characterCount one cell per character of the alphabet, plus one.
+     * @param str1 read translation;
+     * @param str2 translation boundaries;
+	 * @param characterCount one row per character of the alphabet, plus one; columns:
+     * 0=full occurrences; 1=partial occurrences.
 	 */
-	public static final void incrementCharacterCounts(String str, long[] characterCount) {
+	public static final void incrementCharacterCounts(String str1, String str2, int readLength, long[][] characterCount) {
+        final int MIN_MISSING_LENGTH = IO.quantum;  // Arbitrary
 		boolean orientation;
 		int i, j, k;
-		int c, to, nBlocks, last, repeat;
+		int c, to, nBlocks, last, repeat, cell, length;
 		
-		if (str.length()==0) return;
-		nBlocks=loadBlocks(str);
+		if (str1.length()==0) return;
+		nBlocks=loadBlocks(str1);
+        loadBoundaries(str2);
 		for (i=0; i<nBlocks; i++) {
 			last=lastInBlock[i];
 			for (j=0; j<=last; j++) {
@@ -1343,17 +1348,29 @@ public class RepeatAlphabet {
 				if (c<0) {
 					c=-1-c;
 					if (c<=lastUnique) {
-						for (k=c; k<=lastUnique; k++) characterCount[k]++;
+						for (k=c; k<=lastUnique; k++) {
+                            length=alphabet[k].getLength();
+                            cell=((i==0 && boundaries[0]<length-MIN_MISSING_LENGTH)||(i==nBlocks-1 && readLength-(nBlocks>1?boundaries[nBlocks-2]:0)<length-MIN_MISSING_LENGTH))?1:0;
+                            characterCount[k][cell]++;
+                        }
 					}
 					else {
 						repeat=alphabet[c].repeat; orientation=alphabet[c].orientation;
 						for (k=c; k<=lastPeriodic; k++) {
 							if (alphabet[k].repeat!=repeat || alphabet[k].orientation!=orientation) break;
-							if (alphabet[k].implies(alphabet[c])) characterCount[k]++;
+							if (alphabet[k].implies(alphabet[c])) {
+                                length=alphabet[k].getLength();
+                                cell=((i==0 && boundaries[0]<length-MIN_MISSING_LENGTH)||(i==nBlocks-1 && readLength-(nBlocks>1?boundaries[nBlocks-2]:0)<length-MIN_MISSING_LENGTH))?1:0;
+                                characterCount[k][cell]++;
+                            }
 						}
 					}
 				}
-				else characterCount[c]++;
+				else {
+                    length=alphabet[c].getLength();
+                    cell=((i==0 && boundaries[0]<length-MIN_MISSING_LENGTH)||(i==nBlocks-1 && readLength-(nBlocks>1?boundaries[nBlocks-2]:0)<length-MIN_MISSING_LENGTH))?1:0;
+                    characterCount[c][cell]++;
+                }
 			}
 		}
 	}
@@ -1371,33 +1388,34 @@ public class RepeatAlphabet {
 	 *
 	 * @param marked temporary space, of size at least $lastAlphabet+1$.
 	 */
-	public static final void symmetrizeCharacterCounts(long[] characterCount, boolean[] marked) {
+	public static final void symmetrizeCharacterCounts(long[][] characterCount, boolean[] marked) {
 		int i, j;
 		int repeat, start, end, length;
-		long sum;
+		long sum1, sum2;
 		
 		Math.set(marked,lastAlphabet,false);
 		
 		// Periodic
 		for (i=lastUnique+1; i<lastPeriodic; i++) {
 			if (marked[i]) continue;
-			repeat=alphabet[i].repeat; length=alphabet[i].length; sum=characterCount[i];
+			repeat=alphabet[i].repeat; length=alphabet[i].length; 
+            sum1=characterCount[i][0]; sum2=characterCount[i][1];
 			for (j=i+1; j<=lastPeriodic; j++) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].length==length) sum+=characterCount[j];
+				if (alphabet[j].length==length) { sum1+=characterCount[j][0]; sum2+=characterCount[j][1]; }
 			}
 			for (j=i-1; j>lastUnique; j--) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].length==length) sum+=characterCount[j];
+				if (alphabet[j].length==length) { sum1+=characterCount[j][0]; sum2+=characterCount[j][1]; }
 			}
-			characterCount[i]=sum;
+			characterCount[i][0]=sum1; characterCount[i][1]=sum2;
 			for (j=i+1; j<=lastPeriodic; j++) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
 				if (alphabet[j].length==length) {
-					characterCount[j]=sum;
+					characterCount[j][0]=sum1; characterCount[j][1]=sum2;
 					marked[j]=true;
 				}
 			}
@@ -1405,7 +1423,7 @@ public class RepeatAlphabet {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
 				if (alphabet[j].length==length) {
-					characterCount[j]=sum;
+					characterCount[j][0]=sum1; characterCount[j][1]=sum2;
 					marked[j]=true;
 				}
 			}
@@ -1415,23 +1433,23 @@ public class RepeatAlphabet {
 		for (i=lastPeriodic+1; i<lastAlphabet; i++) {
 			if (marked[i]) continue;
 			repeat=alphabet[i].repeat; start=alphabet[i].start; end=alphabet[i].end;
-			sum=characterCount[i];
+			sum1=characterCount[i][0]; sum2=characterCount[i][1];
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].start==start && alphabet[j].end==end) sum+=characterCount[j];
+				if (alphabet[j].start==start && alphabet[j].end==end) { sum1+=characterCount[j][0]; sum2+=characterCount[j][1]; }
 			}
 			for (j=i-1; j>lastPeriodic; j--) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
-				if (alphabet[j].start==start && alphabet[j].end==end) sum+=characterCount[j];
+				if (alphabet[j].start==start && alphabet[j].end==end) { sum1+=characterCount[j][0]; sum2+=characterCount[j][1]; }
 			}
-			characterCount[i]=sum;
+			characterCount[i][0]=sum1; characterCount[i][1]=sum2;
 			for (j=i+1; j<=lastAlphabet; j++) {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
 				if (alphabet[j].start==start && alphabet[j].end==end) {
-					characterCount[j]=sum;
+					characterCount[j][0]=sum1; characterCount[j][1]=sum2;
 					marked[j]=true;
 				}
 			}
@@ -1439,7 +1457,7 @@ public class RepeatAlphabet {
 				if (alphabet[j].repeat!=repeat) break;
 				if (marked[j]) continue;
 				if (alphabet[j].start==start && alphabet[j].end==end) {
-					characterCount[j]=sum;
+					characterCount[j][0]=sum1; characterCount[j][1]=sum2;
 					marked[j]=true;
 				}
 			}
@@ -1454,10 +1472,11 @@ public class RepeatAlphabet {
 	 * 2: periodic;
 	 * 3: nonperiodic.
 	 *
+     * @param type 0=full counts; 1=partial counts; 2=all counts;
 	 * @param marked the same array used by $symmetrizeCharacterCounts()$, after that
 	 * procedure completes.
 	 */
-	public static final long[][] getCharacterHistogram(long[] characterCount, boolean[] marked, int maxFrequency) throws IOException {
+	public static final long[][] getCharacterHistogram(long[][] characterCount, int type, boolean[] marked, int maxFrequency) throws IOException {
 		int i;
 		long count;
 		long[][] characterHistogram;
@@ -1466,24 +1485,44 @@ public class RepeatAlphabet {
 		characterHistogram = new long[maxFrequency+1][4];
 		Math.set(characterHistogram,0);
 		for (i=0; i<=lastUnique; i++) {
-			count=characterCount[i];
+            switch (type) {
+                case 0: count=characterCount[i][0]; break;
+                case 1: count=characterCount[i][1]; break;
+                case 2: count=characterCount[i][0]+characterCount[i][1]; break;
+                default: count=0;
+            }
 			if (count>maxFrequency) count=maxFrequency;
 			characterHistogram[(int)count][1/*All closed*/]++;
 		}
-		count=characterCount[lastAlphabet+1];
+        switch (type) {
+            case 0: count=characterCount[lastAlphabet+1][0]; break;
+            case 1: count=characterCount[lastAlphabet+1][1]; break;
+            case 2: count=characterCount[lastAlphabet+1][0]+characterCount[lastAlphabet+1][1]; break;
+            default: count=0;
+        }
 		if (count>maxFrequency) count=maxFrequency;
 		characterHistogram[(int)count][0/*Open*/]++;
 		// Periodic
 		for (i=lastUnique+1; i<=lastPeriodic; i++) {
 			if (marked[i]) continue;
-			count=characterCount[i];
+            switch (type) {
+                case 0: count=characterCount[i][0]; break;
+                case 1: count=characterCount[i][1]; break;
+                case 2: count=characterCount[i][0]+characterCount[i][1]; break;
+                default: count=0;
+            }
 			if (count>maxFrequency) count=maxFrequency;
 			characterHistogram[(int)count][2]++;
 		}		
 		// Nonperiodic
 		for (i=lastPeriodic+1; i<=lastAlphabet; i++) {
 			if (marked[i]) continue;
-			count=characterCount[i];
+            switch (type) {
+                case 0: count=characterCount[i][0]; break;
+                case 1: count=characterCount[i][1]; break;
+                case 2: count=characterCount[i][0]+characterCount[i][1]; break;
+                default: count=0;
+            }
 			if (count>maxFrequency) count=maxFrequency;
 			characterHistogram[(int)count][3]++;
 		}
@@ -1689,17 +1728,22 @@ public class RepeatAlphabet {
 	public static final void loadAlphabetCount(String file, int alphabetSize) throws IOException {
 		int i;
 		BufferedReader br;
+        String[] tokens;
 
-		alphabetCount = new long[alphabetSize+1];
+		alphabetCount = new long[alphabetSize+1][2];
 		br = new BufferedReader(new FileReader(file));
-		for (i=0; i<alphabetSize+1; i++) alphabetCount[i]=Long.parseLong(br.readLine());
+		for (i=0; i<alphabetSize+1; i++) {
+            tokens=br.readLine().split(",");
+            alphabetCount[i][0]=Long.parseLong(tokens[0]);
+            alphabetCount[i][1]=Long.parseLong(tokens[1]);
+        }
 		br.close();
 	}
 	
 	
 	/**
 	 * Appends to $bw$ the new unique closed characters that result from removing every 
-	 * character with count smaller than $minCount$ from $read2characters$, and updates 
+	 * character ---------->with count smaller than $minCount$ from $read2characters$, and updates 
 	 * $maxOpenLength_unique$ as well.
 	 *
 	 * Remark: the procedure assumes that global variables $alphabet,alphabetCount$ have
@@ -1712,7 +1756,7 @@ public class RepeatAlphabet {
 	 * @param read2boundaries boundaries of the characters in $read2characters$;
 	 * @param tmpChar temporary space.
 	 */
-	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, int minCount, boolean keepPeriodic, int quantum, BufferedWriter bw, Character tmpChar) throws IOException {
+	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, boolean keepPeriodic, int quantum, BufferedWriter bw, Character tmpChar) throws IOException {
 		boolean isUnique;
 		int i, j, k;
 		int c, length, first, nBlocks, nBoundaries;
@@ -1721,7 +1765,9 @@ public class RepeatAlphabet {
 		if (read2characters.length()==0) return;
 		nBoundaries=loadBoundaries(read2boundaries)+1;
 		nBlocks=loadBlocks(read2characters);
-		removeRareCharacters(nBlocks,minCount,lastUnique,lastPeriodic,lastAlphabet,keepPeriodic);
+		--->removeRareCharacters(nBlocks,lastUnique,lastPeriodic,lastAlphabet,keepPeriodic);
+            removeRareCharacters(int nBlocks, int lastUnique, int lastPeriodic, int lastAlphabet, boolean keepPeriodic, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel)
+        
 		first=-1;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]==-1) isUnique=true;
@@ -1769,14 +1815,20 @@ public class RepeatAlphabet {
 
 	
 	/**
-	 * Removes from $blocks$ all non-unique characters with count smaller than $minCount$.
+	 * Removes from $blocks$ all non-unique characters whose count fails a statistical
+     * test.
 	 *
 	 * Remark: the procedure assumes that global variable $alphabetCount$ has already been
 	 * initialized.
 	 *
-	 * @param keepPeriodic TRUE=does not remove rare periodic characters.
+	 * @param keepPeriodic TRUE=does not remove rare periodic characters;
+     * @param nReads total in the dataset;
+     * @param spanningBps basepairs before and after the character for it to be considered
+	 * fully observed in a read;
+     * @param minMissingLength min length that must be missing from a character for it to
+	 * be considerd a partial occurrence.
 	 */
-	private static final void removeRareCharacters(int nBlocks, int minCount, int lastUnique, int lastPeriodic, int lastAlphabet, boolean keepPeriodic) {
+	private static final void removeRareCharacters(int nBlocks, int lastUnique, int lastPeriodic, int lastAlphabet, boolean keepPeriodic, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel) {
 		boolean found, deleted, orientation;
 		int i, j, k, h;
 		int c, last, repeat;
@@ -1790,12 +1842,12 @@ public class RepeatAlphabet {
 				if (c<0) {
 					c=-1-c;
 					if (c>lastUnique) {
-						if ((keepPeriodic?c>lastPeriodic:true) && alphabetCount[c]<minCount) {
+						if ((keepPeriodic?c>lastPeriodic:true) && alphabet[c].isRare(alphabetCount[c][0],alphabetCount[c][1],nReads,avgReadLength,spanningBps,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,significanceLevel)) {
 							repeat=alphabet[c].repeat; orientation=alphabet[c].orientation;
 							h=c+1; found=false;
 							while (h<=lastPeriodic) {
 								if (alphabet[h].repeat!=repeat || alphabet[h].orientation!=orientation) break;
-								if (alphabetCount[h]>=minCount && alphabet[h].implies(alphabet[c])) {
+								if (alphabet[h].implies(alphabet[c]) && !alphabet[h].isRare(alphabetCount[h][0],alphabetCount[h][1],nReads,avgReadLength,spanningBps,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,significanceLevel)) {
 									found=true;
 									break;
 								}
@@ -1810,7 +1862,7 @@ public class RepeatAlphabet {
 						// repeats cannot be negative.
 					}
 				}
-				else if (c>lastUnique && (keepPeriodic?c>lastPeriodic:true) && alphabetCount[c]<minCount) deleted=true;
+				else if (c>lastUnique && (keepPeriodic?c>lastPeriodic:true) && alphabet[c].isRare(alphabetCount[c][0],alphabetCount[c][1],nReads,avgReadLength,spanningBps,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,significanceLevel)) deleted=true;
 				if (!deleted) blocks[i][++k]=blocks[i][j];
 			}
 			lastInBlock[i]=k;
@@ -3518,7 +3570,7 @@ public class RepeatAlphabet {
 				distribution=PoissonDistribution.of(probPartial*quantum);
 				return distribution.cumulativeProbability(countPartial)>significanceLevel;
 			}
-	    }		
+	    }
 		
 		public boolean equals(Object other) {
 			Kmer otherKmer = (Kmer)other;
@@ -11031,6 +11083,32 @@ public class RepeatAlphabet {
 			if (repeat==UNIQUE) return;
 			orientation=!orientation;
 		}
+        
+        
+	    /**
+	     * Like $Kmer.isFrequent()$.
+	     */
+	    public final boolean isRare(int count, int countPartial, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel) {
+            final int length = getLength();
+	        PoissonDistribution distribution;
+			
+			if (count+countPartial<=1) return true;
+			final int quantum = nReads/nHaplotypes;
+			final double surface = avgReadLength-length-(spanningBps<<1);
+			if (surface>0) {
+				final double probFull = surface/genomeLength;
+	            distribution=PoissonDistribution.of(probFull*quantum);
+	            return distribution.cumulativeProbability(count)<=significanceLevel;
+			}
+			else {
+				final double surfacePrime = Math.max(length-minAlignmentLength-minMissingLength,0);
+                if (surfacePrime==0) return true;
+				final double probPartial = (surfacePrime*2)/genomeLength;
+				distribution=PoissonDistribution.of(probPartial*quantum);
+				return distribution.cumulativeProbability(countPartial)<=significanceLevel;
+			}
+	    }
+        
 	}
 	
 	

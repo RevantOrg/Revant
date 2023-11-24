@@ -100,6 +100,9 @@ public class BuildAssemblyGraph {
             addedLengthB=type<=3?Alignments.readAlignmentFile_addedLength(true,type):0;
 			addEdge(Alignments.readA-1,Alignments.readB-1,keep,type,addedLengthB);
 			addEdge(Alignments.readB-1,Alignments.readA-1,keep,Alignments.transposeType[type],addedLengthA);
+            
+if (Alignments.readA==368 && !keep && (type==0 || type==1)) System.err.println("ALIGNMENT NOT KEPT: "+str1);
+            
 			str1=br1.readLine(); str2=br2.readLine(); str3=br3.readLine();
 			if (nAlignments%10000==0) System.err.println("Processed "+nAlignments+" alignments");
 		}
