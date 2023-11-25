@@ -1742,8 +1742,8 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Appends to $bw$ the new unique closed characters that result from removing every 
-	 * character ---------->with count smaller than $minCount$ from $read2characters$, and updates 
+	 * Appends to $bw$ the new unique closed characters that result from removing from 
+     * $read2characters$ every character whose count fails a statistical test, and updates 
 	 * $maxOpenLength_unique$ as well.
 	 *
 	 * Remark: the procedure assumes that global variables $alphabet,alphabetCount$ have
@@ -1756,7 +1756,7 @@ public class RepeatAlphabet {
 	 * @param read2boundaries boundaries of the characters in $read2characters$;
 	 * @param tmpChar temporary space.
 	 */
-	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, boolean keepPeriodic, int quantum, BufferedWriter bw, Character tmpChar) throws IOException {
+	public static final void cleanTranslatedRead_collectCharacterInstances(String read2characters, String read2boundaries, int readLength, boolean keepPeriodic, int quantum, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel, BufferedWriter bw, Character tmpChar) throws IOException {
 		boolean isUnique;
 		int i, j, k;
 		int c, length, first, nBlocks, nBoundaries;
@@ -1765,9 +1765,7 @@ public class RepeatAlphabet {
 		if (read2characters.length()==0) return;
 		nBoundaries=loadBoundaries(read2boundaries)+1;
 		nBlocks=loadBlocks(read2characters);
-		--->removeRareCharacters(nBlocks,lastUnique,lastPeriodic,lastAlphabet,keepPeriodic);
-            removeRareCharacters(int nBlocks, int lastUnique, int lastPeriodic, int lastAlphabet, boolean keepPeriodic, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel)
-        
+		removeRareCharacters(nBlocks,lastUnique,lastPeriodic,lastAlphabet,keepPeriodic,nReads,avgReadLength,spanningBps,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,significanceLevel);        
 		first=-1;
 		for (i=0; i<nBlocks; i++) {
 			if (lastInBlock[i]==-1) isUnique=true;
@@ -1871,8 +1869,9 @@ public class RepeatAlphabet {
 	
 	
 	/**
-	 * Removes from $alphabet$ all characters with $alphabetCount < minCount$, and adds to
-	 * $alphabet$ all the new unique characters in $newCharactersFile$.
+	 * Removes from $alphabet$ all characters whose count are too low and fail a 
+     * statistical test, and adds to $alphabet$ all the new unique characters in
+     * $newCharactersFile$.
 	 *
 	 * Remark: $alphabetCount$ is not valid after the procedure completes.
 	 *
@@ -1882,7 +1881,7 @@ public class RepeatAlphabet {
 	 * the new alphabet). Positions are relative to the corresponding values of 
 	 * $lastUnique+1$.
 	 */
-	public static final int[] cleanTranslatedRead_updateAlphabet(int nNewCharacters, String newCharactersFile, int minCount, boolean keepPeriodic) throws IOException {
+	public static final int[] cleanTranslatedRead_updateAlphabet(int nNewCharacters, String newCharactersFile, boolean keepPeriodic, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel) throws IOException {
 		int i, j;
 		int lastPeriodicPrime;
 		String str;
@@ -1900,7 +1899,7 @@ public class RepeatAlphabet {
 		}
 		else { j=lastUnique; lastPeriodicPrime=-1; }
 		for (i=keepPeriodic?lastPeriodic+1:lastUnique+1; i<=lastAlphabet; i++) {
-			if (alphabetCount[i]<minCount) continue;
+			if (alphabet[i].isRare(alphabetCount[i][0],alphabetCount[i][1],nReads,avgReadLength,spanningBps,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,significanceLevel)) continue;
 			j++;
 			tmpChar=alphabet[j];
 			alphabet[j]=alphabet[i];

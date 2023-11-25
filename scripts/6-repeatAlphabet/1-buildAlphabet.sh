@@ -30,7 +30,9 @@ WOBBLE_LENGTH=${10}  # 0=do not wobble
 FIX_TANDEM_SPACERS=${11}  # 0=assume that non-repetitive blocks near tandems are real.
 CONCATENATE_BLOCKS=${12}  # 0=do not try to merge adjacent blocks from the same repeat.
 AVG_READ_LENGTH=${13}
+GENOME_LENGTH=${14}  # Of one haplotype
 KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic. Usually good.
+SPANNING_BPS="150"  # Bps before and after a character to consider it observed in a read.
 # ---------------------------------- TANDEM SPACERS --------------------------------------
 TANDEM_SPACERS_ITERATIONS="1"  # >=1
 NONREPETITIVE_BLOCKS_MODE="2"  # Should be probably set to 1 in production, 2 is the most aggressive.
@@ -614,14 +616,14 @@ fi
 echo "Discarding rare characters..."
 COUNTS_FILE="${INPUT_DIR}/alphabet-counts.txt"
 HISTOGRAM_FILE="${INPUT_DIR}/alphabet-histogram.txt"
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterCounts ${READS_TRANSLATED_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${HISTOGRAM_FILE}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.GetCharacterCounts ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${HISTOGRAM_FILE}
 function cleaningThread1() {
 	local TRANSLATED_CHARACTERS=$1
 	local TRANSLATED_BOUNDARIES=$2
 	local PREFIX_1=$3
 	local PREFIX_2=$4
 	local ID=$5
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${MIN_CHARACTER_FREQUENCY} ${KEEP_PERIODIC} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${KEEP_PERIODIC} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
 	sort --parallel=1 -t , -u ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt > ${PREFIX_2}${ID}.txt
 }
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-12-"
@@ -639,7 +641,7 @@ ALPHABET_FILE_CLEANED="${INPUT_DIR}/alphabet-cleaned.txt"
 rm -f ${ALPHABET_FILE_CLEANED}
 OLD2NEW_FILE="${INPUT_DIR}/alphabet-old2new.txt"
 rm -f ${OLD2NEW_FILE}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} $(wc -l < ${TMPFILE_PATH}-15.txt) ${TMPFILE_PATH}-15.txt ${MIN_CHARACTER_FREQUENCY} ${KEEP_PERIODIC} ${TMPFILE_PATH}-14-unique.txt ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} $(wc -l < ${TMPFILE_PATH}-15.txt) ${TMPFILE_PATH}-15.txt ${KEEP_PERIODIC} ${TMPFILE_PATH}-14-unique.txt ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE}
 function cleaningThread3() {
 	local TRANSLATED_CHARACTERS_OLD=$1
 	local TRANSLATED_BOUNDARIES_OLD=$2
