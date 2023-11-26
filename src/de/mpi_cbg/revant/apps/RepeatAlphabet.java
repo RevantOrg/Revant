@@ -6,7 +6,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Iterator;
-import org.apache.commons.statistics.distribution.PoissonDistribution;
+import org.apache.commons.math3.distribution.PoissonDistribution;
+import org.apache.commons.math3.stat.inference.ChiSquareTest;
 
 import de.mpi_cbg.revant.util.Math;
 import de.mpi_cbg.revant.util.IO;
@@ -35,7 +36,7 @@ public class RepeatAlphabet {
 	public static Character[] alphabet;
 	public static int lastUnique, lastPeriodic, lastAlphabet;
 	public static int maxOpenLength_unique;
-	public static long[][] alphabetCount;
+	public static int[][] alphabetCount;
 	
 	/**
 	 * All alignments of a given readA
@@ -1730,12 +1731,12 @@ public class RepeatAlphabet {
 		BufferedReader br;
         String[] tokens;
 
-		alphabetCount = new long[alphabetSize+1][2];
+		alphabetCount = new int[alphabetSize+1][2];
 		br = new BufferedReader(new FileReader(file));
 		for (i=0; i<alphabetSize+1; i++) {
             tokens=br.readLine().split(",");
-            alphabetCount[i][0]=Long.parseLong(tokens[0]);
-            alphabetCount[i][1]=Long.parseLong(tokens[1]);
+            alphabetCount[i][0]=Integer.parseInt(tokens[0]);
+            alphabetCount[i][1]=Integer.parseInt(tokens[1]);
         }
 		br.close();
 	}
@@ -1953,15 +1954,13 @@ public class RepeatAlphabet {
 	 * Updates the translation of a read into characters, assuming that $alphabetCount$ 
 	 * refers to the OLD alphabet before $cleanTranslatedRead_updateAlphabet()$.
 	 * 
-	 * Remark: real repeats might be inadvertedly discarded by this process, since the
-	 * frequency threshold is not perfect. Discarded repeat characters are transformed 
-	 * into non-repetitive: this completely discards the information that the substring 
-	 * of the read is similar to a repeat (this information might have been particularly 
-	 * useful if the discarded repeat was periodic), and it might affect alignment 
-	 * filtering downstream (any alignment that contains this new nonrepetitive character
-	 * might be kept, precisely because of this character). We keep things as they are for
-	 * simplicity.
-	 *	
+	 * Remark: real repeats might be inadvertedly discarded by this process. Discarded
+     * repeat characters are transformed into non-repetitive: this completely discards the
+     * information that the substring of the read is similar to a repeat (this information
+     * might have been particularly useful if the discarded repeat was periodic), and it
+     * might affect alignment filtering downstream (any alignment that contains this new
+     * nonrepetitive character might be kept, precisely because of this character).
+	 *
 	 * @param read2characters_old old translation;
 	 * @param read2boundaries_old old block boundaries of the translation;
 	 * @param newAlphabet obtained from the old alphabet by running $cleanTranslatedRead_
@@ -1970,7 +1969,7 @@ public class RepeatAlphabet {
 	 * @param read2characters_new,read2boundaries_new output files;
 	 * @return the number of blocks in the new translation.
 	 */
-	public static final int cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, int minCount, boolean keepPeriodic, int quantum, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
+	public static final int cleanTranslatedRead_updateTranslation(String read2characters_old, String read2boundaries_old, Character[] oldAlphabet, int lastUnique_old, int lastPeriodic_old, int lastAlphabet_old, Character[] newAlphabet, int lastUnique_new, int lastPeriodic_new, int lastAlphabet_new, int[] old2new, int readLength, boolean keepPeriodic, int quantum, int nReads, int avgReadLength, int spanningBps, long genomeLength, int nHaplotypes, int minAlignmentLength, int minMissingLength, double significanceLevel, BufferedWriter read2characters_new, BufferedWriter read2boundaries_new, Character tmpChar) throws IOException {
 		boolean isUnique;
 		int i, j;
 		int c, length, first, last, nBlocks, nBoundaries, nAppendedBlocks;
@@ -1979,8 +1978,8 @@ public class RepeatAlphabet {
 		if (read2characters_old.length()==0) return 0;
 		nBoundaries=loadBoundaries(read2boundaries_old)+1;
 		nBlocks=loadBlocks(read2characters_old);
-		alphabet=oldAlphabet; lastUnique=lastUnique_old; lastPeriodic=lastPeriodic_old; lastAlphabet=lastAlphabet_old;
-		removeRareCharacters(nBlocks,minCount,lastUnique_old,lastPeriodic_old,lastAlphabet_old,keepPeriodic);
+		alphabet=oldAlphabet; lastUnique=lastUnique_old; lastPeriodic=lastPeriodic_old; lastAlphabet=lastAlphabet_old;    
+        removeRareCharacters(nBlocks,lastUnique_old,lastPeriodic_old,lastAlphabet_old,keepPeriodic,nReads,avgReadLength,spanningBps,genomeLength,nHaplotypes,minAlignmentLength,minMissingLength,significanceLevel);
 		alphabet=newAlphabet; lastUnique=lastUnique_new; lastPeriodic=lastPeriodic_new; lastAlphabet=lastAlphabet_new;
 		first=-1; nAppendedBlocks=0;
 		for (i=0; i<nBlocks; i++) {
@@ -3521,20 +3520,20 @@ public class RepeatAlphabet {
 	        final int quantum = nReads/nHaplotypes;
 	        for (i=0; i<nHaplotypes; i++) {
 				if (surface>0) {
-		            distribution=PoissonDistribution.of(probFull*quantum*(i+1));
+		            distribution = new PoissonDistribution(probFull*quantum*(i+1));
 		            p=distribution.cumulativeProbability(count);
 		            p=2.0*Math.min(p,1.0-p);
 					if (p<=significanceLevel) continue;
                     if (surfaceL+surfaceR>0) {
-        				distribution=PoissonDistribution.of(probPartial*quantum*(i+1));
-        				p=distribution.survivalProbability(countPartial);
+        				distribution = new PoissonDistribution(probPartial*quantum*(i+1));
+        				p=1.0-distribution.cumulativeProbability(countPartial);
         	            if (p>significanceLevel) return i+1;  // Excluding only repeats
                     }
                     else return i+1;
 				}
                 else if (surfaceL+surfaceR>0) {
-    				distribution=PoissonDistribution.of(probPartial*quantum*(i+1));
-    				p=distribution.survivalProbability(countPartial);
+    				distribution = new PoissonDistribution(probPartial*quantum*(i+1));
+    				p=1.0-distribution.cumulativeProbability(countPartial);
     	            if (p>significanceLevel) return i+1;  // Excluding only repeats
                 }
 	        }
@@ -3558,7 +3557,7 @@ public class RepeatAlphabet {
 			final double surface = avgReadLength-length-(spanningBps<<1);
 			if (surface>0) {
 				final double probFull = surface/genomeLength;
-	            distribution=PoissonDistribution.of(probFull*quantum);
+	            distribution = new PoissonDistribution(probFull*quantum);
 	            return distribution.cumulativeProbability(count)>significanceLevel;
 			}
 			else {
@@ -3566,7 +3565,7 @@ public class RepeatAlphabet {
 				final double surfaceR = Math.max(alphabet[sequence[k-1]].getLength()-minAlignmentLength-minMissingLength,0);
                 if (surfaceL+surfaceR==0) return false;
 				final double probPartial = (surfaceL+surfaceR)/genomeLength;
-				distribution=PoissonDistribution.of(probPartial*quantum);
+				distribution = new PoissonDistribution(probPartial*quantum);
 				return distribution.cumulativeProbability(countPartial)>significanceLevel;
 			}
 	    }
@@ -6537,9 +6536,10 @@ public class RepeatAlphabet {
 	
 	/**
 	 * If most spacers with positive length correspond to real non-repetitive regions of 
-	 * the genome, most of their degrees in the spacers graph should be similar to the 
-	 * coverage (we assume that most non-repetitive sequence in a polyploid genome is 
-	 * common to all the haplotypes). The procedure returns TRUE iff this is the case.
+	 * the genome, the distribution of their degrees in the spacers graph should be 
+     * similar to the distribution of coverage (we assume that most non-repetitive 
+     * sequence in a polyploid genome is common to all the haplotypes). The procedure
+     * returns TRUE iff this is the case.
 	 *
 	 * Remark: if spacers are real non-repetitive regions, the difference in length 
 	 * between adjacent spacers in the spacers graph should also be small. In practice the
@@ -6549,26 +6549,25 @@ public class RepeatAlphabet {
 	 * Remark: wrong spacers are a global feature induced by the aligner, so correcting
 	 * just spacers with anomalous degree or length difference does not make much sense.
 	 *
-	 * @param haplotypeCoverage of one haplotype;
 	 * @param printHistograms TRUE=prints the degree histogram to STDERR, as well as the
 	 * histogram of length differences between adjacent spacers.
 	 */
-	public static final boolean getSpacerGraphStatistics(int haplotypeCoverage, int nHaplotypes, boolean printHistograms) {
-		final int POISSON_MEAN = haplotypeCoverage*nHaplotypes;
-		final int POISSON_FROM = POISSON_MEAN-(haplotypeCoverage>>1);
-		final int POISSON_TO = POISSON_MEAN+(haplotypeCoverage>>1);
-		final double THRESHOLD = 0.1;  // Arbitrary
+	public static final boolean getSpacerGraphStatistics(int nReads, int avgReadLength, long genomeLength, double significanceLevel, boolean printHistograms) {
+        final double POISSON_MEAN = ((double)(nReads*avgReadLength))/genomeLength;
 		boolean out;
 		int i, j;
 		int max, length, last, neighbor, degree, nNonemptySpacers;
 		double mass;
-		PoissonDistribution poisson;
-		int[] degreeHistogram, lengthDiffHistogram;
+		final PoissonDistribution poisson = new PoissonDistribution(POISSON_MEAN);
+        final ChiSquareTest test = new ChiSquareTest();
+		int[] lengthDiffHistogram;
+        long[] degreeHistogram;
+        double[] poissonHistogram;
 		
 		// Dregree histogram (excluding spacers of length zero).
-		max=0;
+		max=(int)Math.ceil(POISSON_MEAN*2.0);
 		for (i=0; i<=lastSpacer; i++) max=Math.max(max,lastSpacerNeighbor[i]+1);
-		degreeHistogram = new int[max+1];
+		degreeHistogram = new long[max+1];
 		Math.set(degreeHistogram,max,0);
 		nNonemptySpacers=0;
 		for (i=0; i<=lastSpacer; i++) {
@@ -6582,11 +6581,9 @@ public class RepeatAlphabet {
 			}
 			degreeHistogram[degree]++;
 		}
-		mass=0.0;
-		for (i=POISSON_FROM; i<=POISSON_TO; i++) mass+=degreeHistogram[i];
-		mass/=nNonemptySpacers;	
-		poisson=PoissonDistribution.of(POISSON_MEAN);
-		out=Math.abs(mass-poisson.probability(POISSON_FROM-1,POISSON_TO))<=THRESHOLD;
+        poissonHistogram = new double[max+1];
+        for (i=0; i<=max; i++) poissonHistogram[i]=poisson.probability(i);
+        out=test.chiSquareTest(poissonHistogram,degreeHistogram)>significanceLevel;
 		if (!printHistograms) return out;
 		System.err.println("Histogram of spacer degrees:");
 		for (i=0; i<=max; i++) System.err.println(i+","+degreeHistogram[i]);
@@ -11096,14 +11093,14 @@ public class RepeatAlphabet {
 			final double surface = avgReadLength-length-(spanningBps<<1);
 			if (surface>0) {
 				final double probFull = surface/genomeLength;
-	            distribution=PoissonDistribution.of(probFull*quantum);
+	            distribution = new PoissonDistribution(probFull*quantum);
 	            return distribution.cumulativeProbability(count)<=significanceLevel;
 			}
 			else {
 				final double surfacePrime = Math.max(length-minAlignmentLength-minMissingLength,0);
                 if (surfacePrime==0) return true;
 				final double probPartial = (surfacePrime*2)/genomeLength;
-				distribution=PoissonDistribution.of(probPartial*quantum);
+				distribution = new PoissonDistribution(probPartial*quantum);
 				return distribution.cumulativeProbability(countPartial)<=significanceLevel;
 			}
 	    }

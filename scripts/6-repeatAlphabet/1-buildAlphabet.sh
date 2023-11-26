@@ -16,21 +16,20 @@ BROKEN_READS=$2  # 1=TRUE
 MAX_ALIGNMENT_ERROR=$3  # Repeat-read alignments with error > this are discarded
 MIN_ALIGNMENT_LENGTH=$4  # Repeat-read alignments with length < this are discarded
 N_HAPLOTYPES=$5
-HAPLOTYPE_COVERAGE=$6  # Of one haplotype
-N_THREADS=$7
-DELETE_TMP_FILES=$8
-MAX_SPACER_LENGTH=$9  # 0=assume that the endpoints of periodic repeats are accurate
-WOBBLE_LENGTH=${10}  # 0=do not wobble
+N_THREADS=$6
+DELETE_TMP_FILES=$7
+MAX_SPACER_LENGTH=$8  # 0=assume that the endpoints of periodic repeats are accurate
+WOBBLE_LENGTH=$9  # 0=do not wobble
 # Good settings for mostly periodic genome: MAX_SPACER_LENGTH="10000"; WOBBLE_LENGTH="100"
 # If spacers are real in the read translations (i.e. if they do not come from
 # idiosyncrasies of the aligner) the translations are automatically untouched.
 # WOBBLE_LENGTH values have to be chosen experimentally. Smaller values might strike a
 # better balance between increasing frequency and not making truly unique k-mers too
 # frequent as to be classified as repeats.
-FIX_TANDEM_SPACERS=${11}  # 0=assume that non-repetitive blocks near tandems are real.
-CONCATENATE_BLOCKS=${12}  # 0=do not try to merge adjacent blocks from the same repeat.
-AVG_READ_LENGTH=${13}
-GENOME_LENGTH=${14}  # Of one haplotype
+FIX_TANDEM_SPACERS=${10}  # 0=assume that non-repetitive blocks near tandems are real.
+CONCATENATE_BLOCKS=${11}  # 0=do not try to merge adjacent blocks from the same repeat.
+AVG_READ_LENGTH=${12}
+GENOME_LENGTH=${13}  # Of one haplotype
 KEEP_PERIODIC="1"  # 1=do not remove rare characters if they are periodic. Usually good.
 SPANNING_BPS="150"  # Bps before and after a character to consider it observed in a read.
 # ---------------------------------- TANDEM SPACERS --------------------------------------
@@ -38,8 +37,9 @@ TANDEM_SPACERS_ITERATIONS="1"  # >=1
 NONREPETITIVE_BLOCKS_MODE="2"  # Should be probably set to 1 in production, 2 is the most aggressive.
 CONCATENATE_THRESHOLD="200"
 LONG_SPACER_LENGTH=$(( ${AVG_READ_LENGTH} / 3 ))  # Arbitrary
+# ------------------------------------ REVANT --------------------------------------------
+REVANT_LIBRARIES="${REVANT_BINARIES}/../lib/*"
 # ----------------------------------------------------------------------------------------
-
 
 set -euo pipefail
 export LC_ALL=C  # To speed up the $sort$ command.
@@ -55,7 +55,6 @@ SORT_OPTIONS=""
 for i in $(seq 1 9); do  # Should be in sync with the serialization of $Character$.
 	SORT_OPTIONS="${SORT_OPTIONS} -k ${i},${i}n"
 done
-MIN_CHARACTER_FREQUENCY=$(( ${HAPLOTYPE_COVERAGE} / 2 ))  # Arbitrary
 rm -f ${TMPFILE_PATH}*
 
 function waitAndCheck() {
@@ -472,7 +471,7 @@ if [ ${MAX_SPACER_LENGTH} -ne 0 ]; then
 	echo "Collecting spacers and assigning breakpoints to them..."
 	N_FULLY_UNIQUE=$(wc -l < ${FULLY_UNIQUE_FILE})
 	N_FULLY_CONTAINED=$(wc -l < ${FULLY_CONTAINED_FILE})
-	SPACERS_ARE_CORRECT=$(java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${HAPLOTYPE_COVERAGE} ${N_HAPLOTYPES} ${TMPFILE_PATH}-spacers.txt)
+	SPACERS_ARE_CORRECT=$(java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.FixPeriodicEndpoints1 ${MAX_SPACER_LENGTH} ${MIN_ALIGNMENT_LENGTH} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${READS_TRANSLATED_FILE} ${READS_TRANSLATED_BOUNDARIES} ${FULLY_UNIQUE_FILE} ${N_FULLY_UNIQUE} ${FULLY_CONTAINED_FILE} ${N_FULLY_CONTAINED} ${READ_READ_ALIGNMENTS_FILE} ${AVG_READ_LENGTH} ${GENOME_LENGTH} ${TMPFILE_PATH}-spacers.txt)
 	if [ ${SPACERS_ARE_CORRECT} -eq 1 ]; then
 		PERIODIC_ENDPOINTS_FIXED="0"
 	else
@@ -623,7 +622,7 @@ function cleaningThread1() {
 	local PREFIX_1=$3
 	local PREFIX_2=$4
 	local ID=$5
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${KEEP_PERIODIC} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads1 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${TRANSLATED_CHARACTERS} ${TRANSLATED_BOUNDARIES} ${KEEP_PERIODIC} ${PREFIX_1}${ID}.txt > ${PREFIX_1}unique-${ID}.txt
 	sort --parallel=1 -t , -u ${SORT_OPTIONS} ${PREFIX_1}${ID}.txt > ${PREFIX_2}${ID}.txt
 }
 split -l $(( ${N_READS} / ${N_THREADS} )) ${READS_TRANSLATED_FILE} "${TMPFILE_PATH}-12-"
@@ -641,7 +640,7 @@ ALPHABET_FILE_CLEANED="${INPUT_DIR}/alphabet-cleaned.txt"
 rm -f ${ALPHABET_FILE_CLEANED}
 OLD2NEW_FILE="${INPUT_DIR}/alphabet-old2new.txt"
 rm -f ${OLD2NEW_FILE}
-java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} $(wc -l < ${TMPFILE_PATH}-15.txt) ${TMPFILE_PATH}-15.txt ${KEEP_PERIODIC} ${TMPFILE_PATH}-14-unique.txt ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE}
+java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads2 ${ALPHABET_FILE} ${COUNTS_FILE} ${N_READS} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} $(wc -l < ${TMPFILE_PATH}-15.txt) ${TMPFILE_PATH}-15.txt ${KEEP_PERIODIC} ${TMPFILE_PATH}-14-unique.txt ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE}
 function cleaningThread3() {
 	local TRANSLATED_CHARACTERS_OLD=$1
 	local TRANSLATED_BOUNDARIES_OLD=$2
@@ -650,7 +649,7 @@ function cleaningThread3() {
 	local HISTOGRAM_FILE=$5
 	local FULLY_UNIQUE_FILE_NEW=$6
 	local LAST_TRANSLATED_READ=$7
-	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads3 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${TRANSLATED_CHARACTERS_OLD} ${TRANSLATED_BOUNDARIES_OLD} ${MIN_CHARACTER_FREQUENCY} ${KEEP_PERIODIC} ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE} ${TRANSLATED_CHARACTERS_NEW} ${TRANSLATED_BOUNDARIES_NEW} ${HISTOGRAM_FILE} ${FULLY_UNIQUE_FILE_NEW} ${LAST_TRANSLATED_READ}
+	java ${JAVA_RUNTIME_FLAGS} -classpath "${REVANT_BINARIES}:${REVANT_LIBRARIES}" de.mpi_cbg.revant.apps.CleanTranslatedReads3 ${N_READS} ${READ_IDS_FILE} ${READ_LENGTHS_FILE} ${ALPHABET_FILE} ${COUNTS_FILE} ${TRANSLATED_CHARACTERS_OLD} ${TRANSLATED_BOUNDARIES_OLD} ${AVG_READ_LENGTH} ${SPANNING_BPS} ${MIN_ALIGNMENT_LENGTH} ${GENOME_LENGTH} ${N_HAPLOTYPES} ${KEEP_PERIODIC} ${ALPHABET_FILE_CLEANED} ${OLD2NEW_FILE} ${TRANSLATED_CHARACTERS_NEW} ${TRANSLATED_BOUNDARIES_NEW} ${HISTOGRAM_FILE} ${FULLY_UNIQUE_FILE_NEW} ${LAST_TRANSLATED_READ}
 }
 LAST_TRANSLATED_READ="-1"
 PIDS=()

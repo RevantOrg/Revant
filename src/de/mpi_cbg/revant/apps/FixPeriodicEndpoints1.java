@@ -29,10 +29,12 @@ public class FixPeriodicEndpoints1 {
 		final String FULLY_CONTAINED_FILE = args[10];
 		final int N_FULLY_CONTAINED = Integer.parseInt(args[11]);
 		final String READ_READ_ALIGNMENTS_FILE = args[12];
-		final int HAPLOTYPE_COVERAGE = Integer.parseInt(args[13]);
-		final int N_HAPLOTYPES = Integer.parseInt(args[14]);
+		final int AVG_READ_LENGTH = Integer.parseInt(args[13]);
+		final long GENOME_LENGTH = Long.parseLong(args[14]);
 		final String OUTPUT_FILE = args[15];
 		
+        final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
+        
 		int maxBlockLength;
 		int[] tmpArray1, tmpArray2, tmpArray3;
 		
@@ -48,7 +50,7 @@ public class FixPeriodicEndpoints1 {
 		RepeatAlphabet.loadSpacers(MAX_SPACER_LENGTH);
 		if (RepeatAlphabet.lastSpacer==-1) { System.out.println("1"); return; }
 		RepeatAlphabet.loadSpacerNeighbors(READ_READ_ALIGNMENTS_FILE,MIN_ALIGNMENT_LENGTH_READ_REPEAT,tmpArray1,tmpArray2,tmpArray3);
-		if (RepeatAlphabet.getSpacerGraphStatistics(HAPLOTYPE_COVERAGE,N_HAPLOTYPES,false)) { System.out.println("1"); return; }
+		if (RepeatAlphabet.getSpacerGraphStatistics(N_READS,AVG_READ_LENGTH,GENOME_LENGTH,SIGNIFICANCE_LEVEL,false)) { System.out.println("1"); return; }        
 		RepeatAlphabet.assignBreakpoints();
 		RepeatAlphabet.serializeSpacers(OUTPUT_FILE);
 		System.out.println("0");

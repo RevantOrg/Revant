@@ -20,17 +20,23 @@ public class CleanTranslatedReads3 {
 		final String ALPHABET_COUNTS_FILE_OLD = args[4];
 		final String TRANSLATED_FILE_CHARACTERS_OLD = args[5];
 		final String TRANSLATED_FILE_BOUNDARIES_OLD = args[6];
-		final int MIN_FREQUENCY = Integer.parseInt(args[7]);
-		final boolean KEEP_PERIODIC = Integer.parseInt(args[8])==1;
-		final String ALPHABET_FILE_NEW = args[9];
-		final String OLD2NEW_FILE = args[10];
-		final String TRANSLATED_FILE_CHARACTERS_NEW = args[11];
-		final String TRANSLATED_FILE_BOUNDARIES_NEW = args[12];
-		final String HISTOGRAM_FILE = args[13];
-		final String FULLY_UNIQUE_FILE_NEW = args[14];
-		final int LAST_TRANSLATED_READ = Integer.parseInt(args[15]);  // Same as in $TranslateReads.java$. -1 if no read has been updated yet.
+        final int AVG_READ_LENGTH = Integer.parseInt(args[7]);
+        final int SPANNING_BPS = Integer.parseInt(args[8]);
+        final int MIN_ALIGNMENT_LENGTH = Integer.parseInt(args[9]);  // Read-repeat
+        final long GENOME_LENGTH = Long.parseLong(args[10]);  // Of one haplotype
+        final int N_HAPLOTYPES = Integer.parseInt(args[11]);
+		final boolean KEEP_PERIODIC = Integer.parseInt(args[12])==1;
+		final String ALPHABET_FILE_NEW = args[13];
+		final String OLD2NEW_FILE = args[14];
+		final String TRANSLATED_FILE_CHARACTERS_NEW = args[15];
+		final String TRANSLATED_FILE_BOUNDARIES_NEW = args[16];
+		final String HISTOGRAM_FILE = args[17];
+		final String FULLY_UNIQUE_FILE_NEW = args[18];
+		final int LAST_TRANSLATED_READ = Integer.parseInt(args[19]);  // Same as in $TranslateReads.java$. -1 if no read has been updated yet.
 		
-		final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
+        final double SIGNIFICANCE_LEVEL = 0.05;  // Conventional
+        final int MIN_MISSING_LENGTH = IO.quantum;  // Arbitrary
+        final int MAX_HISTOGRAM_LENGTH = 1000;  // Arbitrary
 		
 		int i;
 		int lastUnique_old, lastPeriodic_old, lastAlphabet_old;
@@ -73,8 +79,8 @@ public class CleanTranslatedReads3 {
 		bw2 = new BufferedWriter(new FileWriter(TRANSLATED_FILE_BOUNDARIES_NEW));
 		bw3 = new BufferedWriter(new FileWriter(FULLY_UNIQUE_FILE_NEW));
 		i=LAST_TRANSLATED_READ+1; str1=br1.readLine(); str2=br2.readLine();
-		while (str1!=null && i<N_READS) {
-			nBlocks=RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,old2new,Reads.getReadLength(i),MIN_FREQUENCY,KEEP_PERIODIC,IO.quantum,bw1,bw2,tmpChar);
+		while (str1!=null && i<N_READS) {            
+            nBlocks=RepeatAlphabet.cleanTranslatedRead_updateTranslation(str1,str2,oldAlphabet,lastUnique_old,lastPeriodic_old,lastAlphabet_old,newAlphabet,lastUnique_new,lastPeriodic_new,lastAlphabet_new,old2new,Reads.getReadLength(i),KEEP_PERIODIC,IO.quantum,N_READS,AVG_READ_LENGTH,SPANNING_BPS,GENOME_LENGTH,N_HAPLOTYPES,MIN_ALIGNMENT_LENGTH,MIN_MISSING_LENGTH,SIGNIFICANCE_LEVEL,bw1,bw2,tmpChar);
 			blocksHistogram[nBlocks]++;
 			bw1.newLine(); bw2.newLine();
 			if (nBlocks==0) bw3.write(Reads.readIDs[i]+"\n");

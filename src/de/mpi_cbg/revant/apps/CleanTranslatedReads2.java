@@ -2,6 +2,8 @@ package de.mpi_cbg.revant.apps;
 
 import java.io.*;
 
+import de.mpi_cbg.revant.util.IO;
+
 /**
  * Removes from the alphabet all rare characters, and adds to the alphabet all the new
  * unique characters induced by the removal.

@@ -4,7 +4,8 @@
 #
 SOURCE_DIR="./src"
 SOURCE_DIR_NESTED="${SOURCE_DIR}/de/mpi_cbg/revant"
-LIBRARIES="./lib/commons-statistics-distribution-1.0.jar"
+#LIBRARIES="./lib/commons-statistics-distribution-1.0.jar"
+LIBRARIES="./lib/commons-math3-3.6.1.jar"
 BUILD_DIR="./bin"
 DEBUGGING_INFO="1"  # 0/1
 
